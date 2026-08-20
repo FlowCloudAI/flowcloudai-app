@@ -87,11 +87,10 @@ test('整页编辑态在键盘收起后仍由离开闸门保护', () => {
     }), true)
 })
 
-test('visualViewport 只作旧壳层兜底，不把键盘高度二次回写到应用根节点', () => {
+test('只观察 visualViewport，不把键盘高度二次回写到应用根节点', () => {
     assert.doesNotMatch(inputModeHookSource, /style\.setProperty\(['"]--mobile-visual-viewport-height/)
     assert.doesNotMatch(mobileAppCss, /--mobile-visual-viewport-height/)
-    assert.match(inputModeHookSource, /getMobileKeyboardMetricsSnapshot\(\)\.source !== 'native'/)
-    assert.match(mobileAppCss, /height:\s*100%/)
+    assert.match(mobileAppCss, /height:\s*100dvh/)
 })
 
 test('沉浸正文编辑使用全屏 Portal 隔离下层页面且不二次裁短视口', () => {
@@ -107,10 +106,7 @@ test('沉浸正文编辑使用全屏 Portal 隔离下层页面且不二次裁短
     assert.match(entryDetailCss, /\.mobile-entry-detail__immersive-layer\s*\{[^}]*background:\s*var\(--fc-color-bg\);/s)
 })
 
-test('仅在原生桥不可用时补采 visualViewport，原生指标到达后停止轮询', () => {
-    assert.match(inputModeHookSource, /usesVisualViewportFallback\(\) && !viewportPollTimer/)
+test('聚焦期间补采样键盘可见性，系统收起未派发 resize 时仍能退出输入态', () => {
     assert.match(inputModeHookSource, /setInterval\(scheduleUpdate, 250\)/)
-    assert.match(inputModeHookSource, /subscribeMobileKeyboardMetrics/)
-    assert.match(inputModeHookSource, /!usesVisualViewportFallback\(\) && viewportPollTimer/)
     assert.match(inputModeHookSource, /const scheduleUpdate = \(\) => \{\s*if \(frame\) cancelAnimationFrame\(frame\)\s*frame = requestAnimationFrame\(update\)\s*}/)
 })

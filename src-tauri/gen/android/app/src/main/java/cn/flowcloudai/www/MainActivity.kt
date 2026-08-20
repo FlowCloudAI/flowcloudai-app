@@ -25,7 +25,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.File
 import java.util.Locale
@@ -34,9 +33,6 @@ import java.util.UUID
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
   private var mobileSafeInsets: Insets = Insets.NONE
-  private var mobileImeInsets: Insets = Insets.NONE
-  private var mobileImeVisible = false
-  private var mobileImeAnimationDurationMs = 0L
 
   companion object {
     init {
@@ -75,7 +71,6 @@ class MainActivity : TauriActivity() {
     this.webView = webView
     webView.addJavascriptInterface(MobileUiJavascriptBridge(), "flowcloudaiMobileUi")
     pushMobileUiEnvironment()
-    pushMobileKeyboardMetrics()
     ViewCompat.requestApplyInsets(window.decorView)
     if (AndroidRuntimeWorkarounds.isX86_64_16KbPageEnvironment) {
       // Android 16KB x86_64 模拟器上的 WebView/GPU 组合可能只渲染黑屏，改用软件层绘制。
@@ -87,7 +82,6 @@ class MainActivity : TauriActivity() {
   override fun onResume() {
     super.onResume()
     pushMobileUiEnvironment()
-    pushMobileKeyboardMetrics()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
@@ -101,78 +95,10 @@ class MainActivity : TauriActivity() {
       mobileSafeInsets = windowInsets.getInsets(
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
-      updateMobileImeInsets(windowInsets)
       pushMobileUiEnvironment()
-      pushMobileKeyboardMetrics()
       windowInsets
     }
-    ViewCompat.setWindowInsetsAnimationCallback(
-      window.decorView,
-      object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
-        override fun onPrepare(animation: WindowInsetsAnimationCompat) {
-          super.onPrepare(animation)
-          if (animation.typeMask and WindowInsetsCompat.Type.ime() == 0) return
-          mobileImeAnimationDurationMs = animation.durationMillis.coerceAtLeast(0L)
-        }
-
-        override fun onProgress(
-          insets: WindowInsetsCompat,
-          @Suppress("UNUSED_PARAMETER")
-          runningAnimations: MutableList<WindowInsetsAnimationCompat>
-        ): WindowInsetsCompat {
-          /*
-           * 系统负责 IME 的逐帧动画。这里若同步改 WebView 高度并执行 JavaScript，
-           * 会把最终 WindowInsets 与动画中间帧交替写入页面，造成升降过程反复重排。
-           */
-          return insets
-        }
-
-        override fun onEnd(animation: WindowInsetsAnimationCompat) {
-          super.onEnd(animation)
-          if (animation.typeMask and WindowInsetsCompat.Type.ime() == 0) return
-          mobileImeAnimationDurationMs = 0L
-          ViewCompat.getRootWindowInsets(window.decorView)?.let(::updateMobileImeInsets)
-          pushMobileKeyboardMetrics()
-        }
-      }
-    )
     ViewCompat.requestApplyInsets(window.decorView)
-  }
-
-  private fun updateMobileImeInsets(windowInsets: WindowInsetsCompat) {
-    mobileImeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
-    mobileImeVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
-      && mobileImeInsets.bottom > 0
-  }
-
-  private fun pushMobileKeyboardMetrics() {
-    val target = webView ?: return
-    val density = resources.displayMetrics.density.coerceAtLeast(1f)
-    val bottom = if (mobileImeVisible) mobileImeInsets.bottom / density else 0f
-    val viewportWidth = target.width.coerceAtLeast(0) / density
-    val viewportHeight = target.height.coerceAtLeast(0) / density
-    val frameTop = (viewportHeight - bottom).coerceAtLeast(0f)
-    val duration = mobileImeAnimationDurationMs.coerceAtLeast(0L)
-    val visible = mobileImeVisible && bottom > 0f
-    val script = """
-      (() => {
-        const metrics = {
-          visible: $visible,
-          docked: $visible,
-          viewportAdjusted: false,
-          occludedBottom: ${String.format(Locale.US, "%.2f", bottom)},
-          frame: ${if (visible) "{ x: 0, y: ${String.format(Locale.US, "%.2f", frameTop)}, width: ${String.format(Locale.US, "%.2f", viewportWidth)}, height: ${String.format(Locale.US, "%.2f", bottom)} }" else "null"},
-          animationDurationMs: $duration,
-          animationCurve: 'ease-in-out',
-        };
-        window.__flowcloudaiPendingMobileKeyboardMetrics = metrics;
-        window.__flowcloudaiReceiveMobileKeyboardMetrics?.(metrics);
-      })();
-    """.trimIndent()
-
-    target.post {
-      target.evaluateJavascript(script, null)
-    }
   }
 
   private fun dispatchAndroidBackEvent(name: String, progress: Float? = null) {

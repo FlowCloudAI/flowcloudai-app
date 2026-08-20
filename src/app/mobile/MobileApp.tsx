@@ -60,11 +60,6 @@ import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 import {useMobileInputMode} from './useMobileInputMode'
 import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
-import {
-    getMobileReservedKeyboardInset,
-    useMobileKeyboardMetrics,
-} from './useMobileKeyboardMetrics'
-import {useIosWebViewFocusRevealGuard} from './useIosWebViewFocusRevealGuard'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -92,7 +87,6 @@ interface MobileEdgeBackOrigin {
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
-    useIosWebViewFocusRevealGuard(platformInfo.os === 'ios')
     const closingRef = useRef(false)
     const mobileAppRef = useRef<HTMLDivElement>(null)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
@@ -130,13 +124,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         active: mobileInputModeActive,
         dismissFocusedInput,
     } = useMobileInputMode(mobileAppRef)
-    const mobileKeyboardMetrics = useMobileKeyboardMetrics()
-    const nativeKeyboardDocked = mobileKeyboardMetrics.source === 'native'
-        && mobileKeyboardMetrics.docked
-    const reservedKeyboardInset = getMobileReservedKeyboardInset(mobileKeyboardMetrics)
-    const mobileKeyboardStyle = useMemo(() => ({
-        '--mobile-keyboard-inset': `${reservedKeyboardInset}px`,
-    }) as CSSProperties, [reservedKeyboardInset])
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -613,12 +600,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }
 
     return (
-        <div
-            ref={mobileAppRef}
-            className="mobile-app"
-            data-native-keyboard={nativeKeyboardDocked ? 'docked' : mobileKeyboardMetrics.visible ? 'floating' : 'hidden'}
-            style={mobileKeyboardStyle}
-        >
+        <div ref={mobileAppRef} className="mobile-app">
             <div
                 className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
@@ -711,7 +693,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     ideaDrawerOpen={sideDrawerOpen && ideaDrawerEnabled}
                                     onOpenIdeaDrawer={openIdeaDrawer}
                                     onCloseIdeaDrawer={closeCategoryDrawer}
-                                    preventWebViewFocusReveal={platformInfo.os === 'ios'}
                                 />
                             </div>
                         )}
@@ -732,7 +713,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                     <MobileNav
                         activeTab={activeTab}
-                        keyboardSuppressed={nativeKeyboardDocked}
                         onTabChange={handleTabChange}
                     />
                 </div>

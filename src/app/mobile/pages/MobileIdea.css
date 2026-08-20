@@ -1,10 +1,10 @@
 .mobile-idea {
     position: relative;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: flex;
     min-height: 0;
     height: 100%;
     flex: 1;
+    flex-direction: column;
     overflow: hidden;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
@@ -53,12 +53,12 @@
 }
 
 .mobile-idea__editor {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: flex;
     min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
     gap: var(--mobile-gap-item);
-    overflow: hidden;
-    padding: var(--mobile-gap-inline) var(--mobile-page-x) var(--mobile-gap-item);
+    padding: var(--mobile-gap-inline) var(--mobile-page-x) calc(var(--mobile-gap-item) + var(--mobile-safe-bottom));
 }
 
 .mobile-idea__meta {
@@ -159,13 +159,10 @@
 }
 
 .mobile-idea__content {
-    display: block;
     width: 100%;
-    height: 100%;
     min-height: 0;
+    flex: 1 1 auto;
     box-sizing: border-box;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding: var(--mobile-gap-group);
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
@@ -176,7 +173,6 @@
     font-size: var(--mobile-text-body);
     line-height: var(--mobile-leading-normal);
     resize: none;
-    touch-action: pan-y;
 }
 
 .mobile-idea__content:focus,

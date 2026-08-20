@@ -4,27 +4,6 @@
     background: transparent;
 }
 
-/*
- * Portal 脱离 .mobile-app 后不能继承页面根的键盘变量。可输入 Sheet 显式接管这段
- * 遮挡空间；:has 保持到 Overlay 退场卸载，避免关闭途中背景页先发生跳变。
- */
-.mobile-bottom-sheet-layer.is-keyboard-aware {
-    padding-bottom: var(--mobile-bottom-sheet-keyboard-inset, 0px);
-}
-
-body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-app {
-    padding-bottom: 0;
-}
-
-/* 可输入 Sheet 出场期间背景布局保持原高度，避免 Tab 改为覆盖层后背景内容突然下沉。 */
-body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-app[data-native-keyboard='docked'] {
-    --mobile-nav-reserved-height: var(--mobile-nav-height);
-}
-
-body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-nav.is-keyboard-suppressed {
-    display: flex;
-}
-
 .mobile-bottom-sheet-host {
     overflow: visible;
 }
@@ -46,17 +25,6 @@ body:has(.mobile-bottom-sheet-layer.is-keyboard-aware) .mobile-nav.is-keyboard-s
     transition: transform var(--mobile-duration-fast) var(--mobile-ease-standard);
     overscroll-behavior: contain;
     scrollbar-width: none;
-}
-
-.mobile-bottom-sheet-layer.is-keyboard-aware .mobile-bottom-sheet {
-    max-height: min(
-        82vh,
-        calc(100vh - var(--mobile-bottom-sheet-keyboard-inset, 0px) - var(--mobile-safe-top) - var(--mobile-gap-group))
-    );
-}
-
-.mobile-bottom-sheet-layer.has-keyboard-inset .mobile-bottom-sheet {
-    padding-bottom: var(--mobile-gap-group);
 }
 
 .mobile-bottom-sheet.is-dragging {

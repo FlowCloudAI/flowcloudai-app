@@ -7,14 +7,11 @@ const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url)
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileNavSource = readFileSync(new URL('./MobileNav.tsx', import.meta.url), 'utf8')
 const mobileNavCss = readFileSync(new URL('./MobileNav.css', import.meta.url), 'utf8')
-const mobileBottomSheetSource = readFileSync(new URL('./components/MobileBottomSheet.tsx', import.meta.url), 'utf8')
-const mobileBottomSheetCss = readFileSync(new URL('./components/MobileBottomSheet.css', import.meta.url), 'utf8')
 const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.tsx', import.meta.url), 'utf8')
 const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', import.meta.url), 'utf8')
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
 const mobileAiChatSource = readFileSync(new URL('./pages/MobileAiChat.tsx', import.meta.url), 'utf8')
-const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
 const mobileIdeaSource = readFileSync(new URL('./pages/MobileIdea.tsx', import.meta.url), 'utf8')
 const mobileTimelineSource = readFileSync(new URL('./pages/MobileTimeline.tsx', import.meta.url), 'utf8')
 const mobileRelationGraphSource = readFileSync(new URL('./pages/MobileRelationGraph.tsx', import.meta.url), 'utf8')
@@ -33,7 +30,6 @@ const androidManifest = readFileSync(new URL('../../../src-tauri/gen/android/app
 const iosBridge = readFileSync(new URL('../../../src-tauri/ios/Sources/MobileUiBridge.m', import.meta.url), 'utf8')
 const mobileUiApi = readFileSync(new URL('../../api/mobileUi.ts', import.meta.url), 'utf8')
 const androidPredictiveBackHook = readFileSync(new URL('./useAndroidPredictiveBack.ts', import.meta.url), 'utf8')
-const iosFocusRevealGuard = readFileSync(new URL('./useIosWebViewFocusRevealGuard.ts', import.meta.url), 'utf8')
 const appBootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url), 'utf8')
 const appShellSource = readFileSync(new URL('../index/AppShell.tsx', import.meta.url), 'utf8')
 const themeProviderSource = readFileSync(new URL('../../../node_modules/flowcloudai-ui/src/ThemeProvider.tsx', import.meta.url), 'utf8')
@@ -57,7 +53,6 @@ test('底部导航覆盖到机器底部，滚动页穿过其背后且固定页�
     assert.match(tokensCss, /--mobile-nav-glass-filter:\s*blur\(24px\)/)
     assert.match(tokensCss, /--mobile-nav-surface:\s*color-mix\([^;]+50%[^;]+transparent\)/)
     assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*?--mobile-nav-reserved-height:\s*var\(--mobile-nav-height\)/)
-    assert.match(mobileAppCss, /\.mobile-app\[data-native-keyboard='docked'\]\s*\{\s*--mobile-nav-reserved-height:\s*0px;/)
     const tabViewRule = mobileAppCss.match(/\.mobile-app__tab-view\s*\{([^}]*)\}/)?.[1] ?? ''
     assert.doesNotMatch(tabViewRule, /padding-bottom/)
     assert.match(mobileAppCss, /\.mobile-page\s*\{[\s\S]*?--mobile-scroll-nav-spacer:\s*max\(/)
@@ -78,69 +73,11 @@ test('Android 通过 WindowInsets 补齐系统栏安全区并允许横屏', () =
     assert.doesNotMatch(androidManifest, /android:screenOrientation="portrait"/)
 })
 
-test('Android 原生桥只在稳定边界发布 IME 指标，不逐帧改写页面', () => {
-    const progressBody = androidBridge.match(
-        /override fun onProgress\([\s\S]*?\): WindowInsetsCompat \{([\s\S]*?)\n\s*return insets/,
-    )?.[1] ?? ''
-    assert.match(androidBridge, /WindowInsetsCompat\.Type\.ime\(\)/)
-    assert.match(androidBridge, /WindowInsetsAnimationCompat\.Callback/)
-    assert.match(androidBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
-    assert.match(androidBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
-    assert.doesNotMatch(progressBody, /updateMobileImeInsets|updateMobileWebViewKeyboardViewport|pushMobileKeyboardMetrics/)
-    assert.match(androidManifest, /android:windowSoftInputMode="adjustNothing"/)
-    assert.match(androidBridge, /viewportAdjusted: false/)
-    assert.doesNotMatch(androidBridge, /updateMobileWebViewKeyboardViewport|layoutParams\.height/)
-})
-
-test('iOS 原生桥按 WKWebView 坐标发布键盘指标并由 Web 消费遮挡', () => {
-    assert.match(iosBridge, /UIKeyboardWillChangeFrameNotification/)
-    assert.match(iosBridge, /UIKeyboardDidChangeFrameNotification/)
-    assert.match(iosBridge, /UIKeyboardWillHideNotification/)
-    assert.match(iosBridge, /UIKeyboardDidHideNotification/)
-    assert.match(iosBridge, /UIApplicationDidEnterBackgroundNotification/)
-    assert.match(iosBridge, /FCAResetKeyboardState[\s\S]*FCALastKeyboardScreenFrame = CGRectNull/)
-    assert.match(iosBridge, /FCAResetOuterDocumentOffsetAtStableBoundary/)
-    assert.match(iosBridge, /setContentOffset:origin animated:NO/)
-    assert.match(iosBridge, /window\.scrollTo\(0, 0\)/)
-    assert.match(iosBridge, /convertRect:FCALastKeyboardScreenFrame[\s\S]*fromCoordinateSpace:/)
-    assert.match(iosBridge, /intersection\.size\.width >= fullFrame\.size\.width \* 0\.8/)
-    assert.match(iosBridge, /intersection\.size\.height >= FCAMinimumKeyboardOcclusion/)
-    assert.match(iosBridge, /@"viewportAdjusted": @NO/)
-    assert.doesNotMatch(iosBridge, /webView\.frame\s*=/)
-    assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
-    assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
-})
-
-test('iOS 在默认聚焦前阻止 WebKit reveal，且不接管指针默认选区行为', () => {
-    assert.match(mobileAppSource, /useIosWebViewFocusRevealGuard\(platformInfo\.os === 'ios'\)/)
-    assert.match(iosFocusRevealGuard, /document\.addEventListener\('mousedown', handleMouseDown, \{capture: true, passive: true\}\)/)
-    assert.doesNotMatch(iosFocusRevealGuard, /addEventListener\('pointerdown'/)
-    assert.match(iosFocusRevealGuard, /editor\.focus\(\{preventScroll: true\}\)/)
-    assert.doesNotMatch(iosFocusRevealGuard, /preventDefault/)
-    assert.match(mobileIdeaSource, /data-mobile-prevent-webview-focus-reveal="true"/)
-    assert.match(mobileIdeaSource, /focusMobileTextEditor\(element, preventWebViewFocusReveal\)/)
-    assert.doesNotMatch(mobileIdeaSource, /\sautoFocus(?:\s|=)/)
-    assert.match(mobileAiComposerSource, /mobile-ai-chat__composer" data-mobile-prevent-webview-focus-reveal="true"/)
-    assert.match(mobileAiComposerSource, /keyboardAware preventWebViewFocusReveal/)
-    assert.match(mobileBottomSheetSource, /data-mobile-prevent-webview-focus-reveal=\{preventWebViewFocusReveal \|\| undefined\}/)
-})
-
-test('底部导航只服从原生停靠键盘指标，不再服从焦点或 visualViewport 推断', () => {
-    assert.match(mobileAppSource, /mobileKeyboardMetrics\.source === 'native'[\s\S]*mobileKeyboardMetrics\.docked/)
-    assert.match(mobileAppSource, /keyboardSuppressed=\{nativeKeyboardDocked\}/)
-    assert.doesNotMatch(mobileAppSource, /keyboardSuppressed=\{mobileInputModeActive\}/)
-    assert.match(mobileNavSource, /aria-hidden=\{keyboardSuppressed \|\| undefined\}/)
-    assert.match(mobileNavSource, /inert=\{keyboardSuppressed\}/)
-    assert.match(mobileNavCss, /\.mobile-nav\.is-keyboard-suppressed\s*\{[^}]*display:\s*none/s)
-    assert.doesNotMatch(mobileNavCss, /max-height var\(--mobile-keyboard|padding-bottom var\(--mobile-keyboard/)
-})
-
-test('移动文档锁定为原生 WebView 的真实高度，页面根不再独立滚动', () => {
-    assert.match(mobileAppCss, /:root\[data-fc-density="touch"\][\s\S]*#root[\s\S]*height:\s*100%[\s\S]*overflow:\s*hidden/)
-    assert.match(mobileAppCss, /:root\[data-fc-density="touch"\] body[\s\S]*position:\s*fixed/)
-    assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*height:\s*100%/)
-    assert.match(mobileAppCss, /\.mobile-app\s*\{[\s\S]*padding-bottom:\s*var\(--mobile-keyboard-inset/)
-    assert.doesNotMatch(mobileAppCss, /height:\s*100d?vh/)
+test('键盘输入模式不再隐藏或禁用底部导航', () => {
+    assert.doesNotMatch(mobileAppSource, /suppressed=\{mobileInputModeActive\}/)
+    assert.doesNotMatch(mobileNavSource, /suppressed|aria-hidden=|inert=/)
+    assert.doesNotMatch(mobileNavCss, /\.mobile-nav\.is-suppressed/)
+    assert.match(mobileAppSource, /if \(mobileInputModeActive\) dismissFocusedInput\(\)/)
 })
 
 test('可读三级文字和统一 48px 命中区只覆盖 touch density', () => {
@@ -230,19 +167,6 @@ test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
     assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
 })
 
-test('含输入控件的底部菜单独占键盘遮挡空间并冻结背景布局', () => {
-    assert.match(mobileAiComposerSource, /<MobileBottomSheet[^>]*keyboardAware/)
-    assert.match(mobileBottomSheetSource, /getMobileReservedKeyboardInset\(keyboardMetrics\)/)
-    assert.match(mobileBottomSheetSource, /layerClassName=\{`mobile-bottom-sheet-layer\$\{keyboardAware \? ' is-keyboard-aware'/)
-    assert.match(mobileBottomSheetSource, /layerStyle=\{layerStyle\}/)
-    assert.match(overlaySource, /layerStyle\?: CSSProperties/)
-    assert.match(overlaySource, /const overlayStyle: OverlayStyle = \{\s*\.\.\.layerStyle,/)
-    assert.match(mobileBottomSheetCss, /\.mobile-bottom-sheet-layer\.is-keyboard-aware\s*\{[^}]*padding-bottom:\s*var\(--mobile-bottom-sheet-keyboard-inset/s)
-    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-app\s*\{\s*padding-bottom:\s*0;/)
-    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-app\[data-native-keyboard='docked'\]\s*\{\s*--mobile-nav-reserved-height:\s*var\(--mobile-nav-height\)/)
-    assert.match(mobileBottomSheetCss, /body:has\(\.mobile-bottom-sheet-layer\.is-keyboard-aware\) \.mobile-nav\.is-keyboard-suppressed\s*\{\s*display:\s*flex;/)
-})
-
 test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {
     assert.match(mobileAiChatUiSource, /M7\.6 8h8\.8v4\.2a4\.4 4\.4 0 0 1-8\.8 0Z/)
     assert.match(mobileAiChatUiSource, /M13\.3 3\.5 6\.9 12\.6h4\.9l-1\.1 7\.9 6\.4-9\.4h-4\.8Z/)
@@ -256,22 +180,6 @@ test('AI 空消息态不会被末尾滚动锚点制造伪滚动距离', () => {
     assert.match(mobileAiMessageListSource, /const showEmptyState = messages\.length === 0 && !isStreaming/)
     assert.match(mobileAiMessageListSource, /mobile-ai-chat__messages--empty/)
     assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{\s*gap:\s*0;/)
-})
-
-test('AI 页面使用固定外壳与单一消息滚动区响应原生键盘缩放', () => {
-    const composerRule = mobileAiChatCss.match(/\.mobile-ai-chat__composer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    assert.match(mobileAiChatCss, /\.mobile-ai-chat\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[\s\S]*?overflow:\s*hidden;/)
-    assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/)
-    assert.match(composerRule, /position:\s*relative;/)
-    assert.doesNotMatch(mobileAiChatCss, /--mobile-ai-(?:topbar|composer)-space/)
-    assert.doesNotMatch(composerRule, /position:\s*absolute;/)
-})
-
-test('灵感页固定外壳并只允许正文输入区内部滚动', () => {
-    assert.match(mobileIdeaCss, /\.mobile-idea\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\);[\s\S]*?overflow:\s*hidden;/)
-    assert.match(mobileIdeaCss, /\.mobile-idea__editor\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\);[\s\S]*?overflow:\s*hidden;/)
-    assert.match(mobileIdeaCss, /\.mobile-idea__content\s*\{[\s\S]*?height:\s*100%;[\s\S]*?overflow-y:\s*auto;[\s\S]*?overscroll-behavior:\s*contain;/)
-    assert.doesNotMatch(mobileIdeaCss, /\.mobile-idea__editor\s*\{[\s\S]*?var\(--mobile-safe-bottom\)/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {

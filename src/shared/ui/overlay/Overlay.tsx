@@ -19,8 +19,6 @@ interface OverlayProps {
     variant?: OverlayVariant
     /** 浮层外壳附加类名，用于变体组件调整背板或安全区。 */
     layerClassName?: string
-    /** 浮层外壳样式，仅供变体组件传递布局变量，不应承载业务外观。 */
-    layerStyle?: CSSProperties
     /** 浮层面板附加类名，用于承载自定义卡片样式。 */
     className?: string
     ariaLabel?: string
@@ -39,7 +37,6 @@ export default function Overlay({
     dismissible = true,
     variant = 'floating',
     layerClassName,
-    layerStyle,
     className,
     ariaLabel,
     labelledBy,
@@ -160,7 +157,6 @@ export default function Overlay({
     if (!mounted) return null
 
     const overlayStyle: OverlayStyle = {
-        ...layerStyle,
         '--fc-overlay-transition-duration': `${transitionDurationMs}ms`,
         ...(variant === 'floating' ? {top: overlayTop} : {}),
     }

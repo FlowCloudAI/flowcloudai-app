@@ -1,8 +1,8 @@
 /*
  * 移动端输入模式的纯判断逻辑。
  *
- * 原生键盘桥缺失时的 viewport 兜底依赖这里，纯函数单独保留是为了用 Node 测试覆盖
- * 旧壳层与浏览器预览差异，避免把启发式判断散落到页面组件。
+ * React 壳层和真机 viewport 监听都依赖这里，纯函数单独保留是为了用 Node 测试覆盖
+ * iOS/Android 键盘高度差异，避免把平台判断散落到页面组件。
  */
 
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -38,8 +38,8 @@ export interface MobileInputModeSignals {
 /**
  * 计算一次输入会话使用的完整视口基准。
  *
- * 旧壳层可能先缩短 WebView、再派发 `focusin`。因此兜底路径不能只在 focus 事件里
- * 读取当前高度，必须保留最近一次无键盘时的完整高度。
+ * Android `adjustResize` 可能先缩短 WebView、再派发 `focusin`。因此不能只在
+ * focus 事件里读取当前高度，必须保留最近一次无键盘时的完整高度。
  */
 export function getMobileFocusReferenceHeight(
     stableViewportHeight: number,

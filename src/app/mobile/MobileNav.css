@@ -19,10 +19,6 @@
     z-index: var(--mobile-z-nav);
 }
 
-.mobile-nav.is-keyboard-suppressed {
-    display: none;
-}
-
 .mobile-nav__item {
     display: flex;
     flex-direction: column;

@@ -1,12 +1,13 @@
 /*
  * 移动端输入/编辑模式协调器。
  *
- * 统一监听文本焦点、原生键盘指标与页面声明的整页编辑态；壳层据此安排返回键和
- * 预测式返回手势。visualViewport 只在原生桥尚不可用时兜底，且绝不回写页面布局。
+ * 统一监听文本焦点、visualViewport 与页面声明的整页编辑态；壳层据此安排返回键和
+ * 预测式返回手势。底部 Tab 不再随键盘隐藏。这里只观察键盘状态，不把
+ * visualViewport 高度回写布局：WKWebView/Android WebView 会自行处理软键盘，
+ * 再手动缩短根节点会触发二次收缩和错误的焦点滚动。
  */
 
 import {type RefObject, useCallback, useEffect, useState} from 'react'
-import {getMobileKeyboardMetricsSnapshot, subscribeMobileKeyboardMetrics} from '../../api'
 import {
     getMobileFocusReferenceHeight,
     getMobileViewportState,
@@ -61,9 +62,6 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
             0,
             window.visualViewport?.height ?? window.innerHeight,
         )
-        const usesVisualViewportFallback = () => (
-            getMobileKeyboardMetricsSnapshot().source !== 'native'
-        )
         const beginFocusSession = (element: Element | null) => {
             if (!isMobileTextEditingElement(element) || element === focusedInput) return
 
@@ -89,19 +87,16 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
             const textInputFocused = isMobileTextEditingElement(activeElement)
             if (textInputFocused) beginFocusSession(activeElement)
 
-            const nativeKeyboard = getMobileKeyboardMetricsSnapshot()
-            const keyboardVisible = nativeKeyboard.source === 'native'
-                ? nativeKeyboard.visible
-                : getMobileViewportState(
-                    window.innerHeight,
-                    window.visualViewport,
-                    focusViewportHeight || stableViewportHeight || window.innerHeight,
-                ).keyboardVisible
-            if (textInputFocused && keyboardVisible) keyboardSeenForFocus = true
+            const viewport = getMobileViewportState(
+                window.innerHeight,
+                window.visualViewport,
+                focusViewportHeight || stableViewportHeight || window.innerHeight,
+            )
+            if (textInputFocused && viewport.keyboardVisible) keyboardSeenForFocus = true
 
             const nextActive = isMobileInputModeActive({
                 textInputFocused,
-                keyboardVisible,
+                keyboardVisible: viewport.keyboardVisible,
                 keyboardSeenForFocus,
                 editingRegionActive: hasActiveEditingRegion(root),
             })
@@ -120,7 +115,7 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
                 }, 180)
             }
 
-            if (!textInputFocused && !keyboardVisible) {
+            if (!textInputFocused && !viewport.keyboardVisible) {
                 focusedInput = null
                 focusViewportHeight = 0
                 keyboardSeenForFocus = false
@@ -140,10 +135,8 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
         }
         const handleFocusIn = (event: FocusEvent) => {
             beginFocusSession(event.target as Element | null)
-            // 仅浏览器预览或旧壳层缺少原生桥时，才低频补采 visualViewport。
-            if (usesVisualViewportFallback() && !viewportPollTimer) {
-                viewportPollTimer = window.setInterval(scheduleUpdate, 250)
-            }
+            // 某些 WebView 收起系统键盘时不可靠地派发 resize；聚焦期间低频补采样兜底。
+            if (!viewportPollTimer) viewportPollTimer = window.setInterval(scheduleUpdate, 250)
             scheduleUpdate()
         }
         const handleFocusOut = () => {
@@ -165,19 +158,9 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
 
         document.addEventListener('focusin', handleFocusIn, true)
         document.addEventListener('focusout', handleFocusOut, true)
-        const handleViewportChange = () => {
-            if (usesVisualViewportFallback()) scheduleUpdate()
-        }
-        window.addEventListener('resize', handleViewportChange)
-        window.visualViewport?.addEventListener('resize', handleViewportChange)
-        window.visualViewport?.addEventListener('scroll', handleViewportChange)
-        const unsubscribeKeyboardMetrics = subscribeMobileKeyboardMetrics(() => {
-            if (!usesVisualViewportFallback() && viewportPollTimer) {
-                window.clearInterval(viewportPollTimer)
-                viewportPollTimer = 0
-            }
-            scheduleUpdate()
-        })
+        window.addEventListener('resize', scheduleUpdate)
+        window.visualViewport?.addEventListener('resize', scheduleUpdate)
+        window.visualViewport?.addEventListener('scroll', scheduleUpdate)
         update()
 
         return () => {
@@ -185,12 +168,11 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
             if (restoreTimer) window.clearTimeout(restoreTimer)
             if (viewportPollTimer) window.clearInterval(viewportPollTimer)
             observer.disconnect()
-            unsubscribeKeyboardMetrics()
             document.removeEventListener('focusin', handleFocusIn, true)
             document.removeEventListener('focusout', handleFocusOut, true)
-            window.removeEventListener('resize', handleViewportChange)
-            window.visualViewport?.removeEventListener('resize', handleViewportChange)
-            window.visualViewport?.removeEventListener('scroll', handleViewportChange)
+            window.removeEventListener('resize', scheduleUpdate)
+            window.visualViewport?.removeEventListener('resize', scheduleUpdate)
+            window.visualViewport?.removeEventListener('scroll', scheduleUpdate)
         }
     }, [rootRef])
 

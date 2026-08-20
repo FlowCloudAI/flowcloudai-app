@@ -17,8 +17,7 @@
       android:launchMode="singleTask"
       android:label="@string/main_activity_title"
       android:name=".MainActivity"
-      android:exported="true"
-      android:windowSoftInputMode="adjustNothing">
+      android:exported="true">
       <property
         android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
         android:value="true"/>

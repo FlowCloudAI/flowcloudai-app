@@ -8,10 +8,6 @@ import {
 } from 'react'
 import {useDrag} from '@use-gesture/react'
 import Overlay from '../../../shared/ui/overlay/Overlay'
-import {
-    getMobileReservedKeyboardInset,
-    useMobileKeyboardMetrics,
-} from '../useMobileKeyboardMetrics'
 import './MobileBottomSheet.css'
 
 interface BottomSheetDragRuntime {
@@ -20,7 +16,6 @@ interface BottomSheetDragRuntime {
 }
 
 type MobileBottomSheetStyle = CSSProperties & {'--mobile-bottom-sheet-drag-offset'?: string}
-type MobileBottomSheetLayerStyle = CSSProperties & {'--mobile-bottom-sheet-keyboard-inset'?: string}
 
 function shouldSkipBottomSheetDrag(target: EventTarget | null, sheet: HTMLElement): boolean {
     if (!(target instanceof HTMLElement)) return false
@@ -43,10 +38,6 @@ export interface MobileBottomSheetProps {
     onClose: () => void
     ariaLabel?: string
     dismissible?: boolean
-    /** 含输入控件时启用：键盘空间由当前浮层消费，背景页面保持原布局。 */
-    keyboardAware?: boolean
-    /** iOS 上阻止 WebKit 在键盘布局接管前自动 reveal 面板内输入控件。 */
-    preventWebViewFocusReveal?: boolean
     className?: string
     children?: ReactNode
 }
@@ -56,8 +47,6 @@ export default function MobileBottomSheet({
     onClose,
     ariaLabel = '底部操作面板',
     dismissible = true,
-    keyboardAware = false,
-    preventWebViewFocusReveal = false,
     className,
     children,
 }: MobileBottomSheetProps) {
@@ -65,10 +54,6 @@ export default function MobileBottomSheet({
     const [dragOffset, setDragOffset] = useState(0)
     const sheetRef = useRef<HTMLElement | null>(null)
     const dragRef = useRef<BottomSheetDragRuntime | null>(null)
-    const keyboardMetrics = useMobileKeyboardMetrics()
-    const keyboardInset = keyboardAware
-        ? getMobileReservedKeyboardInset(keyboardMetrics)
-        : 0
 
     const resetDrag = useCallback(() => {
         dragRef.current = null
@@ -147,9 +132,6 @@ export default function MobileBottomSheet({
     const sheetStyle: CSSProperties | undefined = dragOffset > 0
         ? ({'--mobile-bottom-sheet-drag-offset': `${dragOffset}px`} as MobileBottomSheetStyle)
         : undefined
-    const layerStyle: MobileBottomSheetLayerStyle | undefined = keyboardAware
-        ? {'--mobile-bottom-sheet-keyboard-inset': `${keyboardInset}px`}
-        : undefined
 
     return (
         <Overlay
@@ -157,14 +139,12 @@ export default function MobileBottomSheet({
             onClose={onClose}
             dismissible={dismissible}
             variant="sheet"
-            layerClassName={`mobile-bottom-sheet-layer${keyboardAware ? ' is-keyboard-aware' : ''}${keyboardInset > 0 ? ' has-keyboard-inset' : ''}`}
-            layerStyle={layerStyle}
+            layerClassName="mobile-bottom-sheet-layer"
             className="mobile-bottom-sheet-host"
             ariaLabel={ariaLabel}
         >
             <section
                 ref={sheetRef}
-                data-mobile-prevent-webview-focus-reveal={preventWebViewFocusReveal || undefined}
                 className={`mobile-bottom-sheet${dragging ? ' is-dragging' : ''}${className ? ` ${className}` : ''}`}
                 style={sheetStyle}
                 {...bindSheetDrag()}

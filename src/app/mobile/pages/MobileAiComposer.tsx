@@ -34,7 +34,7 @@ interface Props {
 
 export default function MobileAiComposer(p: Props) {
     return <>
-        <footer className="mobile-ai-chat__composer" data-mobile-prevent-webview-focus-reveal="true"><div className="mobile-ai-composer-card">
+        <footer className="mobile-ai-chat__composer"><div className="mobile-ai-composer-card">
             {p.isCompacting ? <div className="mobile-ai-composer-card__status" role="status">正在压缩对话历史…</div> : null}
             <textarea aria-label="AI 消息" value={p.inputValue} onChange={event => p.onInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); p.onSend() } }} placeholder={p.inputPlaceholder} rows={1} disabled={p.inputDisabled && !p.isStreaming}/>
             <div className="mobile-ai-composer-card__bar"><div className="mobile-ai-composer-card__chips">
@@ -61,7 +61,7 @@ export default function MobileAiComposer(p: Props) {
         </MobileAnchoredMenu>
 
         <MobileAnchoredActionMenu open={p.topMenuOpen} onClose={p.onCloseTopMenu} anchorRef={p.topActionsRef} containerRef={p.pageRef} ariaLabel="对话操作" className="mobile-ai-conversation-menu" items={p.activeConversationMenuItems}/>
-        <MobileBottomSheet open={p.morePanelOpen} onClose={p.onCloseMore} ariaLabel="更多对话设置" keyboardAware preventWebViewFocusReveal className="mobile-ai-more-sheet"><div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
+        <MobileBottomSheet open={p.morePanelOpen} onClose={p.onCloseMore} ariaLabel="更多对话设置" className="mobile-ai-more-sheet"><div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
             <button type="button" disabled aria-label="相机，即将支持"><MobileAiIcon type="camera"/><span>相机</span><small>即将支持</small></button><button type="button" disabled aria-label="图库，即将支持"><MobileAiIcon type="image"/><span>图库</span><small>即将支持</small></button><button type="button" onClick={p.onAttachDocuments}><MobileAiIcon type="file"/><span>文件</span></button><button type="button" className={p.webSearchEnabled ? 'active' : ''} aria-pressed={p.webSearchEnabled} onClick={p.onToggleWebSearch}><MobileAiIcon type="web"/><span>联网搜索</span></button>
         </div>{p.conversationControls}</MobileBottomSheet>
         <ActionMenu open={!!p.conversationActionTarget} onClose={p.onCloseConversationAction} title={p.conversationActionTarget?.title} ariaLabel="对话操作菜单" items={p.conversationActionMenuItems}/>
