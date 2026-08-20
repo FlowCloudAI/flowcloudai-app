@@ -57,3 +57,29 @@ test('原生已调整视口时 Web 不重复预留键盘高度', () => {
         occludedBottom: 312.5,
     }).occludedBottom, 0)
 })
+
+test('第三方键盘残余条和外接键盘快捷栏不接管底部布局', () => {
+    for (const occludedBottom of [20, 44, 79.9]) {
+        const metrics = normalizeMobileKeyboardMetrics({
+            visible: true,
+            docked: true,
+            viewportAdjusted: false,
+            occludedBottom,
+            frame: {x: 0, y: 800 - occludedBottom, width: 390, height: occludedBottom},
+        })
+        assert.equal(metrics.visible, true)
+        assert.equal(metrics.docked, false)
+        assert.equal(metrics.occludedBottom, 0)
+    }
+})
+
+test('达到有效遮挡阈值的停靠键盘仍接管底部布局', () => {
+    const metrics = normalizeMobileKeyboardMetrics({
+        visible: true,
+        docked: true,
+        viewportAdjusted: false,
+        occludedBottom: 80,
+    })
+    assert.equal(metrics.docked, true)
+    assert.equal(metrics.occludedBottom, 80)
+})

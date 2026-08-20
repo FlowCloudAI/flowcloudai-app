@@ -7,8 +7,10 @@
 #import <WebKit/WebKit.h>
 
 static NSString *const FCAMobileUiMessageHandlerName = @"flowcloudaiMobileUi";
-static CGRect FCALastKeyboardScreenFrame;
+static const CGFloat FCAMinimumKeyboardOcclusion = 80.0;
+static CGRect FCALastKeyboardScreenFrame = {{0, 0}, {0, 0}};
 static __weak UIScreen *FCALastKeyboardScreen;
+static BOOL FCAKeyboardForceHidden = YES;
 static NSTimeInterval FCALastKeyboardAnimationDuration = 0;
 static UIViewAnimationCurve FCALastKeyboardAnimationCurve = UIViewAnimationCurveEaseInOut;
 
@@ -118,6 +120,14 @@ static NSString *FCAKeyboardAnimationCurveName(UIViewAnimationCurve curve) {
     }
 }
 
+static void FCAResetKeyboardState(void) {
+    FCAKeyboardForceHidden = YES;
+    FCALastKeyboardScreenFrame = CGRectNull;
+    FCALastKeyboardScreen = nil;
+    FCALastKeyboardAnimationDuration = 0;
+    FCALastKeyboardAnimationCurve = UIViewAnimationCurveEaseInOut;
+}
+
 static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     UIWindow *window = webView.window;
     UIView *parentView = webView.superview;
@@ -128,7 +138,8 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     /* WebView 保持父视图尺寸；共享 Web 壳只消费一次最终遮挡，不与 UIKit 重复驱动动画。 */
     const CGRect fullFrame = parentView.bounds;
     CGRect intersection = CGRectNull;
-    if (FCALastKeyboardScreen != nil
+    if (!FCAKeyboardForceHidden
+        && FCALastKeyboardScreen != nil
         && window.screen == FCALastKeyboardScreen) {
         CGRect frameInWindow = [window convertRect:FCALastKeyboardScreenFrame
                                fromCoordinateSpace:window.screen.coordinateSpace];
@@ -139,13 +150,14 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     const BOOL visible = !CGRectIsNull(intersection)
         && !CGRectIsEmpty(intersection)
         && intersection.size.width > 0
-        && intersection.size.height > 0;
+        && intersection.size.height >= FCAMinimumKeyboardOcclusion;
     const CGFloat bottomDelta = visible
         ? fabs(CGRectGetMaxY(intersection) - CGRectGetMaxY(fullFrame))
         : CGFLOAT_MAX;
     const BOOL docked = visible
         && bottomDelta <= 1.0
-        && intersection.size.width >= fullFrame.size.width * 0.8;
+        && intersection.size.width >= fullFrame.size.width * 0.8
+        && intersection.size.height >= FCAMinimumKeyboardOcclusion;
 
     id frame = [NSNull null];
     if (visible) {
@@ -191,12 +203,25 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
     NSValue *frameValue = userInfo[UIKeyboardFrameEndUserInfoKey];
     NSNumber *durationValue = userInfo[UIKeyboardAnimationDurationUserInfoKey];
     NSNumber *curveValue = userInfo[UIKeyboardAnimationCurveUserInfoKey];
-    if (frameValue != nil) {
-        FCALastKeyboardScreenFrame = frameValue.CGRectValue;
-    }
-    FCALastKeyboardScreen = [notification.object isKindOfClass:[UIScreen class]]
+    const BOOL hiding = [notification.name isEqualToString:UIKeyboardWillHideNotification]
+        || [notification.name isEqualToString:UIKeyboardDidHideNotification];
+    UIScreen *screen = [notification.object isKindOfClass:[UIScreen class]]
         ? (UIScreen *)notification.object
         : UIScreen.mainScreen;
+
+    if (hiding) {
+        /* 第三方键盘可能不给出可靠的最终 frame；Hide 是终态，必须清除全部缓存。 */
+        FCAResetKeyboardState();
+        FCAPushKeyboardMetricsToAllWebViews();
+        return;
+    }
+
+    if (frameValue != nil && screen != nil) {
+        /* 是否仍在屏内必须先换算到各 WebView 坐标，不能用可能旋转过的 UIScreen.bounds 预判。 */
+        FCAKeyboardForceHidden = NO;
+        FCALastKeyboardScreenFrame = frameValue.CGRectValue;
+        FCALastKeyboardScreen = screen;
+    }
     FCALastKeyboardAnimationDuration = durationValue != nil ? durationValue.doubleValue : 0;
     FCALastKeyboardAnimationCurve = curveValue != nil
         ? (UIViewAnimationCurve)curveValue.integerValue
@@ -277,6 +302,31 @@ static void FCAInstallMobileUiBridge(void) {
                              queue:NSOperationQueue.mainQueue
                         usingBlock:^(NSNotification *notification) {
             FCAHandleKeyboardNotification(notification);
+        }];
+        [center addObserverForName:UIKeyboardDidChangeFrameNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(NSNotification *notification) {
+            FCAHandleKeyboardNotification(notification);
+        }];
+        [center addObserverForName:UIKeyboardWillHideNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(NSNotification *notification) {
+            FCAHandleKeyboardNotification(notification);
+        }];
+        [center addObserverForName:UIKeyboardDidHideNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(NSNotification *notification) {
+            FCAHandleKeyboardNotification(notification);
+        }];
+        [center addObserverForName:UIApplicationDidEnterBackgroundNotification
+                            object:nil
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(__unused NSNotification *notification) {
+            /* 后台不会保留可交互软键盘；只清状态，前台刷新再发布统一隐藏指标。 */
+            FCAResetKeyboardState();
         }];
         FCAScheduleMobileUiEnvironmentRefresh();
     });

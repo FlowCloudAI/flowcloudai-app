@@ -10,6 +10,9 @@ export type AndroidNavigationMode = 'buttons' | 'gesture' | 'unknown'
 export type MobileKeyboardAnimationCurve = 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear'
 export type MobileKeyboardMetricsSource = 'unavailable' | 'native'
 
+/** 小于该高度的贴底区域视为键盘附件/残余条，不接管页面和 Tab 的底部布局。 */
+export const MOBILE_KEYBOARD_DOCKED_MIN_OCCLUSION = 80
+
 export interface MobileKeyboardFrame {
     x: number
     y: number
@@ -88,7 +91,10 @@ function normalizeKeyboardFrame(value: unknown): MobileKeyboardFrame | null {
 /** 把不可信的原生桥 payload 收敛成稳定、可比较的移动端键盘状态。 */
 export function normalizeMobileKeyboardMetrics(payload: NativeMobileKeyboardMetrics): MobileKeyboardMetrics {
     const visible = payload.visible === true
-    const docked = visible && payload.docked === true
+    const rawOccludedBottom = finiteNonNegative(payload.occludedBottom)
+    const docked = visible
+        && payload.docked === true
+        && rawOccludedBottom >= MOBILE_KEYBOARD_DOCKED_MIN_OCCLUSION
     const viewportAdjusted = payload.viewportAdjusted === true
     const supportedCurves: MobileKeyboardAnimationCurve[] = ['ease', 'ease-in', 'ease-out', 'ease-in-out', 'linear']
     const animationCurve = supportedCurves.includes(payload.animationCurve as MobileKeyboardAnimationCurve)
@@ -100,7 +106,7 @@ export function normalizeMobileKeyboardMetrics(payload: NativeMobileKeyboardMetr
         visible,
         docked,
         viewportAdjusted,
-        occludedBottom: docked && !viewportAdjusted ? finiteNonNegative(payload.occludedBottom) : 0,
+        occludedBottom: docked && !viewportAdjusted ? rawOccludedBottom : 0,
         frame: visible ? normalizeKeyboardFrame(payload.frame) : null,
         animationDurationMs: finiteNonNegative(payload.animationDurationMs),
         animationCurve,
