@@ -14,6 +14,10 @@ static BOOL FCAKeyboardForceHidden = YES;
 static NSTimeInterval FCALastKeyboardAnimationDuration = 0;
 static UIViewAnimationCurve FCALastKeyboardAnimationCurve = UIViewAnimationCurveEaseInOut;
 
+#if DEBUG
+static void FCALogKeyboardDiagnosticsToAllWebViews(NSString *phase);
+#endif
+
 static NSArray<WKWebView *> *FCACollectWebViews(UIView *rootView) {
     NSMutableArray<WKWebView *> *webViews = [NSMutableArray array];
     if ([rootView isKindOfClass:[WKWebView class]]) {
@@ -92,6 +96,10 @@ static void FCAPerformHaptic(NSString *kind) {
         FCAApplyTheme(value);
     } else if ([type isEqualToString:@"haptic"]) {
         FCAPerformHaptic(value);
+#if DEBUG
+    } else if ([type isEqualToString:@"keyboard-diagnostic"]) {
+        FCALogKeyboardDiagnosticsToAllWebViews(value);
+#endif
     }
 }
 
@@ -119,6 +127,209 @@ static NSString *FCAKeyboardAnimationCurveName(UIViewAnimationCurve curve) {
             return @"ease-in-out";
     }
 }
+
+#if DEBUG
+static NSURL *FCAKeyboardDiagnosticLogURL(void) {
+    static NSURL *logURL;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSURL *cachesURL = [NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory
+                                                                inDomains:NSUserDomainMask].firstObject;
+        logURL = [cachesURL URLByAppendingPathComponent:@"flowcloudai-keyboard-diag.jsonl"];
+        [NSFileManager.defaultManager removeItemAtURL:logURL error:nil];
+    });
+    return logURL;
+}
+
+static void FCAAppendKeyboardDiagnosticRecord(NSDictionary *record) {
+    NSError *jsonError = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:record options:0 error:&jsonError];
+    if (jsonData == nil) {
+        NSLog(@"[FCAKeyboardDiag] file serialization error=%@", jsonError.localizedDescription);
+        return;
+    }
+    NSMutableData *lineData = [jsonData mutableCopy];
+    [lineData appendData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];
+
+    NSURL *logURL = FCAKeyboardDiagnosticLogURL();
+    @synchronized (NSFileManager.defaultManager) {
+        if (![NSFileManager.defaultManager fileExistsAtPath:logURL.path]) {
+            [NSData.data writeToURL:logURL atomically:YES];
+        }
+        NSError *handleError = nil;
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingToURL:logURL error:&handleError];
+        if (handle == nil) {
+            NSLog(@"[FCAKeyboardDiag] file open error=%@", handleError.localizedDescription);
+            return;
+        }
+        [handle seekToEndOfFile];
+        [handle writeData:lineData];
+        [handle closeFile];
+    }
+}
+
+static NSDictionary *FCAKeyboardDiagnosticPoint(CGPoint point) {
+    return @{@"x": @(point.x), @"y": @(point.y)};
+}
+
+static NSDictionary *FCAKeyboardDiagnosticSize(CGSize size) {
+    return @{@"width": @(size.width), @"height": @(size.height)};
+}
+
+static NSDictionary *FCAKeyboardDiagnosticRect(CGRect rect) {
+    if (CGRectIsNull(rect)) {
+        return @{@"null": @YES};
+    }
+    return @{
+        @"x": @(rect.origin.x),
+        @"y": @(rect.origin.y),
+        @"width": @(rect.size.width),
+        @"height": @(rect.size.height),
+    };
+}
+
+static NSDictionary *FCAKeyboardDiagnosticInsets(UIEdgeInsets insets) {
+    return @{
+        @"top": @(insets.top),
+        @"left": @(insets.left),
+        @"bottom": @(insets.bottom),
+        @"right": @(insets.right),
+    };
+}
+
+static NSString *FCAKeyboardDiagnosticWebSnapshotScript(void) {
+    return @"(() => {"
+        "const readRect = (selector) => {"
+        "const element = document.querySelector(selector);"
+        "if (!element) return null;"
+        "const rect = element.getBoundingClientRect();"
+        "return {top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height};"
+        "};"
+        "const active = document.activeElement;"
+        "const rootStyle = document.querySelector('.mobile-app') ? getComputedStyle(document.querySelector('.mobile-app')) : null;"
+        "const sheetLayer = document.querySelector('.mobile-bottom-sheet-layer');"
+        "const sheetStyle = sheetLayer ? getComputedStyle(sheetLayer) : null;"
+        "const viewport = window.visualViewport;"
+        "return {"
+        "timestamp: performance.now(),"
+        "innerHeight: window.innerHeight,"
+        "innerWidth: window.innerWidth,"
+        "clientHeight: document.documentElement.clientHeight,"
+        "clientWidth: document.documentElement.clientWidth,"
+        "scrollX: window.scrollX,"
+        "scrollY: window.scrollY,"
+        "visualViewport: viewport ? {height: viewport.height, width: viewport.width, offsetTop: viewport.offsetTop, offsetLeft: viewport.offsetLeft, pageTop: viewport.pageTop, pageLeft: viewport.pageLeft, scale: viewport.scale} : null,"
+        "activeElement: active ? {tag: active.tagName, className: typeof active.className === 'string' ? active.className : '', ariaLabel: active.getAttribute('aria-label') || ''} : null,"
+        "pendingMetrics: window.__flowcloudaiPendingMobileKeyboardMetrics || null,"
+        "cssInsets: {"
+        "mobileKeyboardInset: rootStyle ? rootStyle.getPropertyValue('--mobile-keyboard-inset').trim() : '',"
+        "mobileNavReservedHeight: rootStyle ? rootStyle.getPropertyValue('--mobile-nav-reserved-height').trim() : '',"
+        "bottomSheetKeyboardInset: sheetStyle ? sheetStyle.getPropertyValue('--mobile-bottom-sheet-keyboard-inset').trim() : ''"
+        "},"
+        "rects: {"
+        "html: readRect('html'),"
+        "body: readRect('body'),"
+        "mobileApp: readRect('.mobile-app'),"
+        "mobileContent: readRect('.mobile-app__content'),"
+        "activeTabView: readRect('.mobile-app__tab-view.is-active'),"
+        "idea: readRect('.mobile-idea'),"
+        "ideaContent: readRect('.mobile-idea__content'),"
+        "aiChat: readRect('.mobile-ai-chat:not([hidden])'),"
+        "aiComposer: readRect('.mobile-ai-chat:not([hidden]) .mobile-ai-chat__composer'),"
+        "bottomSheetLayer: readRect('.mobile-bottom-sheet-layer'),"
+        "bottomSheet: readRect('.mobile-bottom-sheet')"
+        "}"
+        "};"
+        "})()";
+}
+
+static void FCALogKeyboardDiagnosticForWebView(WKWebView *webView, NSString *phase) {
+    UIScrollView *scrollView = webView.scrollView;
+    NSLog(
+        @"[FCAKeyboardDiag] native phase=%@ webView=%p frame=%@ bounds=%@ offset=%@ contentSize=%@ contentInset=%@ adjustedInset=%@ safeArea=%@ lastKeyboardFrame=%@ forceHidden=%@",
+        phase,
+        webView,
+        NSStringFromCGRect(webView.frame),
+        NSStringFromCGRect(webView.bounds),
+        NSStringFromCGPoint(scrollView.contentOffset),
+        NSStringFromCGSize(scrollView.contentSize),
+        NSStringFromUIEdgeInsets(scrollView.contentInset),
+        NSStringFromUIEdgeInsets(scrollView.adjustedContentInset),
+        NSStringFromUIEdgeInsets(webView.safeAreaInsets),
+        NSStringFromCGRect(FCALastKeyboardScreenFrame),
+        FCAKeyboardForceHidden ? @"YES" : @"NO"
+    );
+    FCAAppendKeyboardDiagnosticRecord(@{
+        @"kind": @"native",
+        @"phase": phase,
+        @"unixTimeMs": @([NSDate.date timeIntervalSince1970] * 1000),
+        @"webViewFrame": FCAKeyboardDiagnosticRect(webView.frame),
+        @"webViewBounds": FCAKeyboardDiagnosticRect(webView.bounds),
+        @"contentOffset": FCAKeyboardDiagnosticPoint(scrollView.contentOffset),
+        @"contentSize": FCAKeyboardDiagnosticSize(scrollView.contentSize),
+        @"contentInset": FCAKeyboardDiagnosticInsets(scrollView.contentInset),
+        @"adjustedContentInset": FCAKeyboardDiagnosticInsets(scrollView.adjustedContentInset),
+        @"safeAreaInsets": FCAKeyboardDiagnosticInsets(webView.safeAreaInsets),
+        @"lastKeyboardFrame": FCAKeyboardDiagnosticRect(FCALastKeyboardScreenFrame),
+        @"forceHidden": @(FCAKeyboardForceHidden),
+    });
+    [webView evaluateJavaScript:FCAKeyboardDiagnosticWebSnapshotScript()
+              completionHandler:^(id result, NSError *error) {
+        if (error != nil) {
+            NSLog(@"[FCAKeyboardDiag] web phase=%@ error=%@", phase, error.localizedDescription);
+            FCAAppendKeyboardDiagnosticRecord(@{
+                @"kind": @"web-error",
+                @"phase": phase,
+                @"unixTimeMs": @([NSDate.date timeIntervalSince1970] * 1000),
+                @"error": error.localizedDescription ?: @"unknown",
+            });
+            return;
+        }
+        NSError *jsonError = nil;
+        NSData *jsonData = result == nil
+            ? nil
+            : [NSJSONSerialization dataWithJSONObject:result options:0 error:&jsonError];
+        NSString *json = jsonData == nil
+            ? nil
+            : [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        NSLog(
+            @"[FCAKeyboardDiag] web phase=%@ snapshot=%@",
+            phase,
+            json ?: [NSString stringWithFormat:@"<serialization-error:%@>", jsonError.localizedDescription ?: @"unknown"]
+        );
+        if ([result isKindOfClass:[NSDictionary class]]) {
+            FCAAppendKeyboardDiagnosticRecord(@{
+                @"kind": @"web",
+                @"phase": phase,
+                @"unixTimeMs": @([NSDate.date timeIntervalSince1970] * 1000),
+                @"snapshot": result,
+            });
+        }
+    }];
+}
+
+static void FCALogKeyboardDiagnosticsToAllWebViews(NSString *phase) {
+    for (WKWebView *webView in FCAAllWebViews()) {
+        FCALogKeyboardDiagnosticForWebView(webView, phase);
+    }
+}
+
+static void FCAScheduleKeyboardDiagnostics(NSString *basePhase) {
+    const NSTimeInterval delays[] = {0.1, 0.3, 0.8};
+    for (NSUInteger index = 0; index < sizeof(delays) / sizeof(delays[0]); index++) {
+        const NSTimeInterval delay = delays[index];
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)),
+            dispatch_get_main_queue(),
+            ^{
+                FCALogKeyboardDiagnosticsToAllWebViews(
+                    [NSString stringWithFormat:@"%@:+%.0fms", basePhase, delay * 1000]
+                );
+            }
+        );
+    }
+}
+#endif
 
 static void FCAResetKeyboardState(void) {
     FCAKeyboardForceHidden = YES;
@@ -236,8 +447,17 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
         /* 第三方键盘可能不给出可靠的最终 frame；Hide 是终态，必须清除全部缓存。 */
         FCAResetKeyboardState();
         FCAPushKeyboardMetricsToAllWebViews();
+#if DEBUG
+        FCALogKeyboardDiagnosticsToAllWebViews(
+            [NSString stringWithFormat:@"notification:%@:before-offset-reset", notification.name]
+        );
+#endif
         if ([notification.name isEqualToString:UIKeyboardDidHideNotification]) {
             FCAResetOuterDocumentOffsetAtStableBoundary();
+#if DEBUG
+            FCALogKeyboardDiagnosticsToAllWebViews(@"notification:did-hide:after-offset-reset");
+            FCAScheduleKeyboardDiagnostics(@"notification:did-hide:after-offset-reset");
+#endif
         }
         return;
     }
@@ -253,8 +473,17 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
         ? (UIViewAnimationCurve)curveValue.integerValue
         : UIViewAnimationCurveEaseInOut;
     FCAPushKeyboardMetricsToAllWebViews();
+#if DEBUG
+    FCALogKeyboardDiagnosticsToAllWebViews(
+        [NSString stringWithFormat:@"notification:%@:before-offset-reset", notification.name]
+    );
+#endif
     if ([notification.name isEqualToString:UIKeyboardDidChangeFrameNotification]) {
         FCAResetOuterDocumentOffsetAtStableBoundary();
+#if DEBUG
+        FCALogKeyboardDiagnosticsToAllWebViews(@"notification:did-change:after-offset-reset");
+        FCAScheduleKeyboardDiagnostics(@"notification:did-change:after-offset-reset");
+#endif
     }
 }
 
@@ -281,6 +510,18 @@ static void FCAApplyMobileUiEnvironment(void) {
          "attributes: true, attributeFilter: ['data-theme', 'data-theme-preference']"
          "});"
          "}"
+#if DEBUG
+         "if (!window.__flowcloudaiKeyboardDiagnosticFocusListener) {"
+         "window.__flowcloudaiKeyboardDiagnosticFocusListener = true;"
+         "const reportKeyboardFocus = (event) => {"
+         "window.webkit?.messageHandlers?.flowcloudaiMobileUi?.postMessage({"
+         "type: 'keyboard-diagnostic', value: 'dom:' + event.type"
+         "});"
+         "};"
+         "document.addEventListener('focusin', reportKeyboardFocus, true);"
+         "document.addEventListener('focusout', reportKeyboardFocus, true);"
+         "}"
+#endif
          "syncNativeTheme();"
          "})();",
         fontScale,

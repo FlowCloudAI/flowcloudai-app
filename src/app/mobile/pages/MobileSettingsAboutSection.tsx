@@ -146,7 +146,7 @@ export default function MobileSettingsAboutSection({
                     <div className="mobile-settings-about-action__copy">
                         <span className="mobile-settings-about-action__title">应用日志</span>
                         <span className="mobile-settings-about-action__desc">
-                            查看最近 app.log 内容，用于排查插件安装等运行问题。
+                            查看最近运行日志；Debug 构建同时包含移动端键盘诊断。
                         </span>
                     </div>
                     <Button

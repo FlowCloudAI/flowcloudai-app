@@ -5,9 +5,12 @@ use std::fs::OpenOptions;
 #[cfg(all(debug_assertions, target_os = "ios"))]
 use std::io::Write;
 use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
 use tauri::Manager;
 
 const MAX_APP_LOG_BYTES: u64 = 256 * 1024;
+#[cfg(all(debug_assertions, target_os = "ios"))]
+const IOS_KEYBOARD_DIAGNOSTIC_LOG_NAME: &str = "flowcloudai-keyboard-diag.jsonl";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,18 +78,53 @@ pub fn read_app_log(app: AppHandle) -> Result<AppLogSnapshot, String> {
         .join("app.log");
     let path = log_path.display().to_string();
 
-    if !log_path.exists() {
-        return Ok(AppLogSnapshot {
-            path,
-            content: String::new(),
-            truncated: false,
-        });
+    let (mut content, mut truncated) = read_recent_log_content(&log_path)?;
+
+    #[cfg(all(debug_assertions, target_os = "ios"))]
+    {
+        /*
+         * UIKit 键盘通知来自 ObjC 层，单独写入 Caches，避免和 Rust 日志并发追加同一文件。
+         * “关于”页读取时再合并，既沿用现有刷新/复制入口，也不会把诊断采集带进 Release。
+         */
+        let diagnostic_path = app
+            .path()
+            .cache_dir()
+            .map_err(|e| e.to_string())?
+            .join(IOS_KEYBOARD_DIAGNOSTIC_LOG_NAME);
+        let (diagnostic_content, diagnostic_truncated) = read_recent_log_content(&diagnostic_path)?;
+        if !diagnostic_content.is_empty() {
+            if !content.is_empty() && !content.ends_with('\n') {
+                content.push('\n');
+            }
+            content.push_str("\n===== iOS 键盘诊断（Debug）=====\n");
+            content.push_str(&format!("来源：{}\n", diagnostic_path.display()));
+            content.push_str(&diagnostic_content);
+            truncated |= diagnostic_truncated;
+        }
     }
 
-    let mut file = File::open(&log_path).map_err(|e| e.to_string())?;
+    let content_bytes = content.as_bytes();
+    if content_bytes.len() > MAX_APP_LOG_BYTES as usize {
+        let start = content_bytes.len() - MAX_APP_LOG_BYTES as usize;
+        content = String::from_utf8_lossy(&content_bytes[start..]).to_string();
+        truncated = true;
+    }
+
+    Ok(AppLogSnapshot {
+        path,
+        content,
+        truncated,
+    })
+}
+
+fn read_recent_log_content(path: &Path) -> Result<(String, bool), String> {
+    if !path.exists() {
+        return Ok((String::new(), false));
+    }
+
+    let mut file = File::open(path).map_err(|e| e.to_string())?;
     let len = file.metadata().map_err(|e| e.to_string())?.len();
     let truncated = len > MAX_APP_LOG_BYTES;
-
     if truncated {
         file.seek(SeekFrom::Start(len.saturating_sub(MAX_APP_LOG_BYTES)))
             .map_err(|e| e.to_string())?;
@@ -94,12 +132,7 @@ pub fn read_app_log(app: AppHandle) -> Result<AppLogSnapshot, String> {
 
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-
-    Ok(AppLogSnapshot {
-        path,
-        content: String::from_utf8_lossy(&bytes).to_string(),
-        truncated,
-    })
+    Ok((String::from_utf8_lossy(&bytes).to_string(), truncated))
 }
 
 /// 在系统文件管理器中打开指定路径。
