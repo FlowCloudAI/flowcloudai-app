@@ -334,7 +334,7 @@ L1 token 一律挂在 `:root[data-fc-density="touch"]` 上，**不挂在 `.mobil
 | 字号缩放 | Dynamic Type | `Configuration.fontScale` | 共用根变量 `--mobile-font-scale`，两端各自原生桥接 |
 | 按压反馈 | 变暗 / 轻微缩放 | Material state layer | 统一 `:active` token；Android 额外允许 ripple |
 | 触觉反馈 | Haptic Engine | `VibrationEffect` | 统一语义层（成功 / 警告 / 选择），各自映射 |
-| 软键盘 | `UIKeyboardWillChangeFrame` 发布最终遮挡 | `WindowInsets.Type.ime()` 发布最终遮挡 | 原生视口保持不变，Web 根只预留一份 `occludedBottom`；`visualViewport` 仅在原生桥缺失时兜底 |
+| 软键盘 | 当前交由 WKWebView 默认行为 | 当前交由 Android WebView 默认行为 | 原生指标方案已于 2026-08-20 回退；现行仅用 `visualViewport` 判断输入态且不隐藏 Tab，下一版必须重新设计并完成双端真机验收 |
 | 材质降级 | Reduce Transparency | 高对比度设置 | 触发时强制实色高对比 surface |
 
 **规则：新增任何平台相关行为，必须先在本表加一行，两列都填写后再实现。**

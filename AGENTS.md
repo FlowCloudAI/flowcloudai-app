@@ -209,6 +209,6 @@ app_main/
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
 - macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
-- **iOS 键盘指标必须保留明确的终态与视口所有权**：`UIKeyboardWillHide` / `UIKeyboardDidHide` 必须清空缓存 frame 并发布隐藏状态，应用进入后台也要清缓存；iOS 的 WKWebView 会把停靠键盘反映到 Web 布局视口，因此原生指标必须发布 `viewportAdjusted: true`，共享 Web 根不得再消费同一份 `occludedBottom`。大 textarea 聚焦时只允许在 `DidChangeFrame` / `DidHide` 稳定边界复位 WKWebView 外层与 document scroll，禁止逐帧复位或改 textarea 自身 `scrollTop`。Android 继续使用 `adjustNothing` + WindowInsets，并发布 `viewportAdjusted: false`。不得把两端重新合并为同一个布尔值，也不得恢复逐帧改写 `WKWebView.frame`；修改后必须回归系统/第三方键盘收起但输入仍保持焦点的场景。
+- **移动端原生键盘指标架构当前已回退**：2026-08-20 的 `a781f94` 撤销了 iOS/Android 原生键盘 frame/insets、共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 键盘专用布局。现行代码回到 `visualViewport` 只判断输入态、底部 Tab 不因输入而隐藏的旧基线；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。归档设计和 devlog 只能用于复盘，不能当作现行实现约束。重新引入前必须先形成双端方案，并分别完成系统/第三方键盘、AI composer、灵感正文和含输入 Bottom Sheet 的真机动画验收。
 
 文档同步时间：2026-08-20 15:20:00 +08:00

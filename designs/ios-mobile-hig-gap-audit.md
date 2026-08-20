@@ -4,6 +4,7 @@
 > 审计对象：`app_main/src/app/mobile`、共享 UI 组件、iOS 最低版本配置
 > 规范基线：`designs/apple-ios-ui-ux-design-guidelines.md`、Apple HIG、项目 `AGENTS.md`
 > 证据类型：iPhone 17 / iOS 26.5 模拟器运行截图 + 源码静态核查 + 4 个 Kimi CLI 与 3 个 Claude CLI 审计线程的候选项交叉复核
+> 状态补充：IOS-005 的原生键盘指标方案已于 2026-08-20 由 `a781f94` 回退；标签 `mobile-keyboard-native-v1-2026-08-20` 保留回退前代码和证据。本文其余审计结论不受影响。
 
 ## 1. 结论
 
@@ -47,7 +48,7 @@
 |---|---|---|
 | IOS-001 | 最低支持版本提升到 iOS 16.2+ | 不再为 iOS 14/15 维护 `color-mix()` 双套 fallback |
 | IOS-002 | 使用小型 iOS 原生桥接支持 Dynamic Type | 原生层只暴露系统字号等级；业务 UI 继续通过共享字体 token 消费 |
-| IOS-005 | 停靠软键盘展开时隐藏底部 Tab | 以两端原生键盘区域为唯一布局依据；浮动键盘和外接键盘不隐藏 Tab，页面只压缩明确的内部滚动区 |
+| IOS-005 | 停靠软键盘展开时隐藏底部 Tab | 该产品目标保留，但原生指标实现已回退；重新设计前，现行版本不隐藏 Tab，也不声明页面/Portal 的自定义键盘空间所有权 |
 | IOS-017 | 正式实现 iPad 自适应布局 | 复用现有 store、API 和领域组件，只新增 regular-width 壳层 |
 | IOS-018 | 保留 React 手势并补跟手进度 | 不改造为原生页面栈；iOS/Android 共用进度、取消区间和专项测试 |
 | IOS-019 | 使用 iOS 原生桥接读取降低透明度/提高对比度 | 与 Dynamic Type 共用轻量辅助功能桥接层，Windows/Android 不依赖该实现 |
@@ -63,7 +64,7 @@
 | IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
 | IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
 | IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
-| IOS-005 | iOS 终态与视口所有权已修复，待真机验收 | Android 以 `WindowInsets.Type.ime()`、iOS 以系统键盘 frame 为依据；有效停靠遮挡至少为 80pt。iOS 发布 `viewportAdjusted:true`，Web 根不重复预留；Hide/DidHide 与后台切换会清空旧 frame。AI 仅压缩消息区，灵感页仅压缩正文 textarea |
+| IOS-005 | 原生指标方案已回退，待重新设计 | 当前恢复到回退前基线：`visualViewport` 只参与输入态判断，不改应用根高度；底部 Tab 不因输入而隐藏，AI、灵感和 Bottom Sheet 不再消费自定义键盘 inset。回退前实现见归档标签，不作为现行能力 |
 | IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
 | IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
 | IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |
@@ -74,11 +75,11 @@
 
 2026-08-18 本批次的 34 项移动壳层专项测试、完整 lint、TypeScript/Vite 生产构建与 iOS 16.2 simulator debug 原生构建均通过。输入视口又在 iPhone 17 Pro（iOS 26.5）模拟器上进入输入流程并截图；修复后的输入区没有二次收缩，系统收起软键盘且输入焦点仍保留时，底部 Tab 已在模拟器画面中恢复。应用深色主题下的 iOS 原生状态栏图标同步也已截图确认。Android 代码已实现 WindowInsets、系统字号/高对比度、系统栏主题、触觉与预测式返回，但当前 Mac 未安装或未配置 Android SDK/NDK，debug APK 命令在进入编译前被环境检查阻断，因此 Android 原生包与真机表现仍标为未验证。
 
-2026-08-19 键盘架构第二次更新：物理缩短 WebView 与 WebView 自身键盘补偿会在动画期间竞争，因此两端改为固定原生 WebView，由原生只发布稳定的最终键盘遮挡，Web 根只消费一次 `occludedBottom`。Android 使用 `adjustNothing`，不在 insets animation 的 `onProgress` 中改尺寸或执行 JavaScript；iOS 不再动画或改写 `WKWebView.frame`，只监听 `UIKeyboardWillChangeFrame`。底栏改为一次性显隐，不再动画 `max-height` / `padding`；`visualViewport` 只在原生桥不可用时兜底。AI 与灵感页的内部单滚动区结构保持不变。本次重构需重新完成双端真机验收，旧物理缩放方案的通过结论不沿用。
+2026-08-19 历史实现（已回退）：物理缩短 WebView 与 WebView 自身键盘补偿会在动画期间竞争，因此两端曾改为固定原生 WebView，由原生只发布稳定的最终键盘遮挡，Web 根只消费一次 `occludedBottom`。Android 使用 `adjustNothing`，不在 insets animation 的 `onProgress` 中改尺寸或执行 JavaScript；iOS 不再动画或改写 `WKWebView.frame`，只监听 `UIKeyboardWillChangeFrame`。底栏改为一次性显隐，不再动画 `max-height` / `padding`；`visualViewport` 只在原生桥不可用时兜底。该实现后来整体回退，本段只用于说明失败方案演进。
 
-2026-08-20 iPhone 与模拟器暴露了上段 iOS 假设仍不完整：WKWebView 虽未改写原生 `frame`，但 iOS 已把键盘变化反映到 Web 布局视口；原生仍发布 `viewportAdjusted:false` 会让共享根再次预留 `occludedBottom`，灵感正文因此二次压缩。去掉重复预留后，XCUITest 又证明 WebKit 会为了大 textarea 平移外层 document，使顶栏与元数据离屏。现只在 DidChangeFrame/DidHide 稳定边界复位 WKWebView 外层 offset 与 `window.scrollTo(0, 0)`，不碰 textarea 内部滚动。另一方面，只依赖 ChangeFrame 的隐藏 frame 会被延迟刷新重放，第三方键盘收起后 Tab 可能锁死。iOS 已收紧为 `viewportAdjusted:true`，同时监听 Will/Did ChangeFrame 与 Will/Did Hide；Hide 和进入后台均清空缓存，低于 80pt 的残余遮挡不得判为 `docked`。Android 的 `adjustNothing + viewportAdjusted:false` 不变。专项测试、lint、前端构建和 iOS 模拟器原生构建已通过；XCUITest 截图确认顶栏/元数据固定、正文填充剩余空间，以及键盘收起但焦点保留时 Tab 恢复。最终版已覆盖安装并启动到 iPhone，系统/第三方键盘验收待项目负责人确认。
+2026-08-20 历史实现（已回退）：iPhone 与模拟器暴露了上段 iOS 假设仍不完整。后续曾加入 `viewportAdjusted:true`、Will/Did Hide 终态、80pt 有效遮挡阈值及稳定边界外层 offset 复位；虽然静态测试和模拟器终态截图通过，真机点击聚焦仍出现键盘开始升起后自行落下，核心输入流程不可用，因此这些改动连同原生指标架构由 `a781f94` 整体撤销。截图与诊断仍是后续重新设计的反例证据，不代表现行能力。
 
-同日后续补齐了 Portal 浮层的键盘所有权：含输入控件的 AI 更多菜单显式消费键盘遮挡，背景页面在浮层存续期间保持原布局。Android 真机已验证菜单升起、系统返回收起键盘及菜单回落；iOS 仍需真机复验。当天完整的问题链、失败方案、最终约束与验证边界见工作区 `docs/devlog/2026-08-19-移动端原生交互-复盘.md`（该文件在根仓库，不在本仓）。
+同日历史实现（已回退）还曾补齐 Portal 浮层的键盘所有权：含输入控件的 AI 更多菜单显式消费键盘遮挡，背景页面在浮层存续期间保持原布局。Android 真机曾验证菜单升起、系统返回收起键盘及菜单回落；该证据只说明当时终态，不足以覆盖后来出现的 iOS 键盘呼出中断。当天完整的问题链与失败方案见工作区 `docs/devlog/2026-08-19-移动端原生交互-复盘.md`（该文件在根仓库，不在本仓）。
 
 同日较早的 Android 真机数据仍用于说明问题来源：MIUI edge-to-edge 曾把 `adjustResize` 退化为 visual viewport 平移，首轮为 `innerHeight=834`、`visualViewport.height=521.54`、`offsetTop=312.92`。随后“直接约束 WebView 物理高度”的方案虽一度让 composer 与键盘边界对齐，却在键盘动画中引入最终 insets、中间帧和 WebView 自身补偿的竞争，现已撤销；当时的复验数据不能作为当前固定 WebView 方案的验收结果。
 
@@ -117,8 +118,8 @@
 
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
-- **最新决策方案**：停靠软键盘出现时隐藏并禁用底部 Tab；浮动键盘与外接键盘不隐藏。键盘区域由 iOS/Android 原生 API 提供，原生 WebView 保持固定，Web 根只预留一次最终遮挡；业务页声明自己的唯一滚动所有者，不允许浏览器把整个页面平移到键盘上方。返回键/Esc 仍优先结束输入，预测式返回在输入期间继续暂停。
-- **实现状态**：共享移动壳层已接入带 `viewportAdjusted` 语义的原生键盘指标 store。Android 使用 `adjustNothing`，从 `WindowInsets.Type.ime()` 在稳定边界发布遮挡并保持 `viewportAdjusted:false`；iOS 不动画或改写 WKWebView frame，但发布 `viewportAdjusted:true`，因为 WebKit 已把键盘反映到布局视口。iOS 同时监听 Will/Did ChangeFrame 与 Will/Did Hide，隐藏和进入后台时清空旧 frame；只在 DidChangeFrame/DidHide 终态复位外层文档 offset，避免焦点滚动把固定顶栏推离屏幕。原生层与共享归一化层都要求至少 80pt 有效遮挡才允许 `docked`。Tab 只在归一化后的 `docked` 时隐藏、`aria-hidden` 并 `inert`；AI 页只滚动 Messages，灵感页只滚动正文 textarea。模拟器 XCUITest 和截图已覆盖键盘展开/收起；最终版已覆盖安装 iPhone，系统/第三方键盘、横屏、浮动/外接键盘及 Portal 仍待人工验收。
+- **目标方案**：停靠软键盘出现时隐藏并禁用底部 Tab；浮动键盘与外接键盘不隐藏。页面外壳不整体移动，AI 只压缩 Messages，灵感正文内部滚动，前景 Bottom Sheet 优先于背景页。该目标需要重新设计，不能直接恢复归档实现。
+- **实现状态**：原生 frame/insets、共享 `occludedBottom` store、Tab 原生显隐、页面/Portal 键盘专用布局及 iOS focus reveal guard 已由 `a781f94` 回退。现行版本沿用旧 `visualViewport` 输入态检测且不隐藏 Tab；IOS-005 重新标记为未解决。回退前代码可从标签 `mobile-keyboard-native-v1-2026-08-20` 检出比较。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
@@ -253,7 +254,7 @@
 ### 第一批：阻断 iOS 验收
 
 1. 将最低支持版本统一提升到 iOS 16.2，并同步配置与文档。
-2. 修复 16px 输入、Dynamic Type、左右安全区；由原生键盘区域驱动停靠键盘时的 Tab 折叠和页面内部空间压缩。
+2. 修复 16px 输入、Dynamic Type、左右安全区；重新设计停靠键盘下的 Tab、页面和前景浮层空间所有权，禁止直接恢复已回退的原生指标实现。
 3. 提升三级文字对比度，统一 44pt 点击区。
 
 ### 第二批：完成 VoiceOver/键盘基线
