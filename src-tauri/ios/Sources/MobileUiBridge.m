@@ -347,8 +347,9 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     }
 
     /*
-     * WKWebView 保持父视图尺寸，但 iOS 会把键盘变化反映到 Web 布局视口。
-     * 原生指标只控制 Tab/输入态，不能再让 Web 根重复预留同一份遮挡。
+     * 真机测量表明 WKWebView 的布局视口仍保持父视图尺寸；iOS 只缩短 visualViewport，
+     * 并通过外层 UIScrollView 的 adjustedContentInset/contentOffset 做焦点避让。
+     * Web 根或前景 Portal 必须消费一次遮挡高度，原生终态复位只清理残余外层平移。
      */
     const CGRect fullFrame = parentView.bounds;
     CGRect intersection = CGRectNull;
@@ -385,7 +386,7 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     NSDictionary *payload = @{
         @"visible": @(visible),
         @"docked": @(docked),
-        @"viewportAdjusted": @YES,
+        @"viewportAdjusted": @NO,
         @"occludedBottom": @(docked ? intersection.size.height : 0),
         @"frame": frame,
         @"animationDurationMs": @(MAX(0, FCALastKeyboardAnimationDuration * 1000)),

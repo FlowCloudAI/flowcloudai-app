@@ -91,7 +91,7 @@ test('Android 原生桥只在稳定边界发布 IME 指标，不逐帧改写页�
     assert.doesNotMatch(androidBridge, /updateMobileWebViewKeyboardViewport|layoutParams\.height/)
 })
 
-test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () => {
+test('iOS 原生桥按 WKWebView 坐标发布键盘指标并由 Web 消费遮挡', () => {
     assert.match(iosBridge, /UIKeyboardWillChangeFrameNotification/)
     assert.match(iosBridge, /UIKeyboardDidChangeFrameNotification/)
     assert.match(iosBridge, /UIKeyboardWillHideNotification/)
@@ -104,7 +104,7 @@ test('iOS 原生桥按 WKWebView 坐标发布停靠与浮动键盘指标', () =>
     assert.match(iosBridge, /convertRect:FCALastKeyboardScreenFrame[\s\S]*fromCoordinateSpace:/)
     assert.match(iosBridge, /intersection\.size\.width >= fullFrame\.size\.width \* 0\.8/)
     assert.match(iosBridge, /intersection\.size\.height >= FCAMinimumKeyboardOcclusion/)
-    assert.match(iosBridge, /@"viewportAdjusted": @YES/)
+    assert.match(iosBridge, /@"viewportAdjusted": @NO/)
     assert.doesNotMatch(iosBridge, /webView\.frame\s*=/)
     assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
