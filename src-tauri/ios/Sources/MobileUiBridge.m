@@ -135,7 +135,10 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
         return;
     }
 
-    /* WebView 保持父视图尺寸；共享 Web 壳只消费一次最终遮挡，不与 UIKit 重复驱动动画。 */
+    /*
+     * WKWebView 保持父视图尺寸，但 iOS 会把键盘变化反映到 Web 布局视口。
+     * 原生指标只控制 Tab/输入态，不能再让 Web 根重复预留同一份遮挡。
+     */
     const CGRect fullFrame = parentView.bounds;
     CGRect intersection = CGRectNull;
     if (!FCAKeyboardForceHidden
@@ -171,7 +174,7 @@ static void FCAPushKeyboardMetricsToWebView(WKWebView *webView) {
     NSDictionary *payload = @{
         @"visible": @(visible),
         @"docked": @(docked),
-        @"viewportAdjusted": @NO,
+        @"viewportAdjusted": @YES,
         @"occludedBottom": @(docked ? intersection.size.height : 0),
         @"frame": frame,
         @"animationDurationMs": @(MAX(0, FCALastKeyboardAnimationDuration * 1000)),
@@ -198,6 +201,26 @@ static void FCAPushKeyboardMetricsToAllWebViews(void) {
     }
 }
 
+static void FCAResetOuterDocumentOffsetAtStableBoundary(void) {
+    for (WKWebView *webView in FCAAllWebViews()) {
+        /*
+         * iOS 会为露出大 textarea 平移 WKWebView 的外层 scroll view；页面本身并不可滚动，
+         * 这份偏移只会把固定顶栏和元数据推出屏幕。只在键盘终态复位外层，不能逐帧执行，
+         * 也不能改 textarea 的 scrollTop。
+         */
+        UIScrollView *scrollView = webView.scrollView;
+        UIEdgeInsets inset = scrollView.adjustedContentInset;
+        CGPoint origin = CGPointMake(-inset.left, -inset.top);
+        if (fabs(scrollView.contentOffset.x - origin.x) > 0.5
+            || fabs(scrollView.contentOffset.y - origin.y) > 0.5) {
+            [scrollView setContentOffset:origin animated:NO];
+        }
+        [webView evaluateJavaScript:
+            @"if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);"
+                   completionHandler:nil];
+    }
+}
+
 static void FCAHandleKeyboardNotification(NSNotification *notification) {
     NSDictionary *userInfo = notification.userInfo;
     NSValue *frameValue = userInfo[UIKeyboardFrameEndUserInfoKey];
@@ -213,6 +236,9 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
         /* 第三方键盘可能不给出可靠的最终 frame；Hide 是终态，必须清除全部缓存。 */
         FCAResetKeyboardState();
         FCAPushKeyboardMetricsToAllWebViews();
+        if ([notification.name isEqualToString:UIKeyboardDidHideNotification]) {
+            FCAResetOuterDocumentOffsetAtStableBoundary();
+        }
         return;
     }
 
@@ -227,6 +253,9 @@ static void FCAHandleKeyboardNotification(NSNotification *notification) {
         ? (UIViewAnimationCurve)curveValue.integerValue
         : UIViewAnimationCurveEaseInOut;
     FCAPushKeyboardMetricsToAllWebViews();
+    if ([notification.name isEqualToString:UIKeyboardDidChangeFrameNotification]) {
+        FCAResetOuterDocumentOffsetAtStableBoundary();
+    }
 }
 
 static void FCAApplyMobileUiEnvironment(void) {
