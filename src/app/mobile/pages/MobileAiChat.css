@@ -523,7 +523,11 @@
 .mobile-ai-chat__composer {
     position: absolute;
     right: 0;
-    bottom: 0;
+    /*
+     * 页面通过 padding 缩短普通流内容，但绝对定位不会停在 padding 上方；
+     * 因此输入区必须显式消费与常驻 Tab 相同的保留高度。
+     */
+    bottom: var(--mobile-nav-reserved-height);
     left: 0;
     z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;

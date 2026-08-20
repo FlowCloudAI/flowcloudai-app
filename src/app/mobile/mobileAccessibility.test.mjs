@@ -59,6 +59,7 @@ test('底部导航覆盖到机器底部，滚动页穿过其背后且固定页�
     assert.match(mobileAppCss, /\.mobile-page:not\(\.mobile-nav-safe-fixed\)\s*\{[\s\S]*?padding-bottom:\s*calc\([\s\S]*?var\(--mobile-scroll-nav-spacer\)/)
     assert.match(mobileAppCss, /\.mobile-nav-safe-fixed\s*\{[\s\S]*?padding-bottom:\s*var\(--mobile-nav-reserved-height\)/)
     assert.match(mobileAiChatSource, /className="mobile-ai-chat mobile-nav-safe-fixed"/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__composer\s*\{[\s\S]*?bottom:\s*var\(--mobile-nav-reserved-height\)/)
     assert.match(mobileIdeaSource, /className="mobile-idea mobile-nav-safe-fixed"/)
     assert.match(mobileTimelineSource, /className="mobile-page mobile-nav-safe-fixed mobile-timeline-page"/)
     assert.match(mobileRelationGraphSource, /className="mobile-page mobile-nav-safe-fixed mobile-relation-graph-page"/)
