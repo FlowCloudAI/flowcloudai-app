@@ -113,7 +113,8 @@ test('iOS 原生桥按 WKWebView 坐标发布键盘指标并由 Web 消费遮挡
 
 test('iOS 在默认聚焦前阻止 WebKit reveal，且不接管指针默认选区行为', () => {
     assert.match(mobileAppSource, /useIosWebViewFocusRevealGuard\(platformInfo\.os === 'ios'\)/)
-    assert.match(iosFocusRevealGuard, /document\.addEventListener\('pointerdown', handlePointerDown, \{capture: true, passive: true\}\)/)
+    assert.match(iosFocusRevealGuard, /document\.addEventListener\('mousedown', handleMouseDown, \{capture: true, passive: true\}\)/)
+    assert.doesNotMatch(iosFocusRevealGuard, /addEventListener\('pointerdown'/)
     assert.match(iosFocusRevealGuard, /editor\.focus\(\{preventScroll: true\}\)/)
     assert.doesNotMatch(iosFocusRevealGuard, /preventDefault/)
     assert.match(mobileIdeaSource, /data-mobile-prevent-webview-focus-reveal="true"/)

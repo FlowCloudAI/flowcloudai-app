@@ -3,7 +3,7 @@
  *
  * WebKit 会在软键盘出现前主动 reveal 新聚焦的编辑控件，而应用键盘布局只能在随后
  * 收到原生指标后收缩内容区。这里仅对业务显式标记的区域提前使用 preventScroll 聚焦，
- * 阻止两套布局所有者先后移动页面；不阻止指针默认行为，以保留光标定位与文本选择。
+ * 阻止两套布局所有者先后移动页面；不阻止鼠标兼容事件的默认行为，以保留光标定位与文本选择。
  */
 
 import {useEffect} from 'react'
@@ -30,20 +30,22 @@ export function focusMobileTextEditor(element: HTMLElement | null, preventWebVie
 }
 
 /**
- * 在指针默认聚焦前抢先聚焦受保护控件。已聚焦控件不接管，让用户仍能点击移动光标。
+ * iOS 会在 touchend 后合成 `mousedown -> focus -> mouseup -> click`。必须在捕获阶段
+ * mousedown 聚焦：它仍早于 WebKit 默认 focus，又不会像 pointerdown 那样在手指刚落下时
+ * 提前启动键盘事务。已聚焦控件不接管，让用户仍能点击移动光标。
  * Portal 浮层不属于 `.mobile-app` 的 DOM 子树，因此监听 document，而不是应用根节点。
  */
 export function useIosWebViewFocusRevealGuard(enabled: boolean): void {
     useEffect(() => {
         if (!enabled) return
 
-        const handlePointerDown = (event: PointerEvent) => {
+        const handleMouseDown = (event: MouseEvent) => {
             const editor = resolveGuardedTextEditor(event.target)
             if (!editor || document.activeElement === editor) return
             editor.focus({preventScroll: true})
         }
 
-        document.addEventListener('pointerdown', handlePointerDown, {capture: true, passive: true})
-        return () => document.removeEventListener('pointerdown', handlePointerDown, true)
+        document.addEventListener('mousedown', handleMouseDown, {capture: true, passive: true})
+        return () => document.removeEventListener('mousedown', handleMouseDown, true)
     }, [enabled])
 }
