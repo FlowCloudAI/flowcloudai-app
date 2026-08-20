@@ -64,6 +64,7 @@ import {
     getMobileReservedKeyboardInset,
     useMobileKeyboardMetrics,
 } from './useMobileKeyboardMetrics'
+import {useIosWebViewFocusRevealGuard} from './useIosWebViewFocusRevealGuard'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -91,6 +92,7 @@ interface MobileEdgeBackOrigin {
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
+    useIosWebViewFocusRevealGuard(platformInfo.os === 'ios')
     const closingRef = useRef(false)
     const mobileAppRef = useRef<HTMLDivElement>(null)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
@@ -709,6 +711,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     ideaDrawerOpen={sideDrawerOpen && ideaDrawerEnabled}
                                     onOpenIdeaDrawer={openIdeaDrawer}
                                     onCloseIdeaDrawer={closeCategoryDrawer}
+                                    preventWebViewFocusReveal={platformInfo.os === 'ios'}
                                 />
                             </div>
                         )}

@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Select} from 'flowcloudai-ui'
 import {
@@ -18,6 +18,7 @@ import {
     MobileTopActionPill,
 } from '../components/MobileTopControls'
 import {type MobilePage} from '../usePageStack'
+import {focusMobileTextEditor} from '../useIosWebViewFocusRevealGuard'
 import './MobileIdea.css'
 
 interface Props {
@@ -26,6 +27,7 @@ interface Props {
     ideaDrawerOpen?: boolean
     onOpenIdeaDrawer?: () => void
     onCloseIdeaDrawer?: () => void
+    preventWebViewFocusReveal?: boolean
 }
 
 function MobileIdeaIcon({type}: {type: 'pin' | 'archive' | 'delete' | 'status' | 'refresh'}) {
@@ -150,17 +152,29 @@ export default function MobileIdea({
     ideaDrawerOpen = false,
     onOpenIdeaDrawer,
     onCloseIdeaDrawer,
+    preventWebViewFocusReveal = false,
 }: Props) {
     const controller = useMobileIdeaController()
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
     const contentRef = useRef<HTMLTextAreaElement>(null)
+    const initialContentFocusRequestedRef = useRef(false)
     const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
     const [menuOpen, setMenuOpen] = useState(false)
 
     useEffect(() => {
         setDrawerRoot(document.getElementById('mobile-idea-drawer-root'))
     }, [ideaDrawerOpen])
+
+    const focusContent = useCallback(() => {
+        focusMobileTextEditor(contentRef.current, preventWebViewFocusReveal)
+    }, [preventWebViewFocusReveal])
+    const bindContentRef = useCallback((element: HTMLTextAreaElement | null) => {
+        contentRef.current = element
+        if (!element || initialContentFocusRequestedRef.current) return
+        initialContentFocusRequestedRef.current = true
+        focusMobileTextEditor(element, preventWebViewFocusReveal)
+    }, [preventWebViewFocusReveal])
 
     const menuItems = buildIdeaMenuItems(controller)
     const projectOptions = [
@@ -205,7 +219,7 @@ export default function MobileIdea({
                             onClick: () => {
                                 setMenuOpen(false)
                                 controller.startNewIdea()
-                                requestAnimationFrame(() => contentRef.current?.focus())
+                                requestAnimationFrame(focusContent)
                             },
                         },
                         {
@@ -221,7 +235,10 @@ export default function MobileIdea({
                 />}
             />
 
-            <main className="mobile-idea__editor">
+            <main
+                className="mobile-idea__editor"
+                data-mobile-prevent-webview-focus-reveal="true"
+            >
                 <section className="mobile-idea__meta">
                     <input
                         className="mobile-idea__title-input"
@@ -262,13 +279,12 @@ export default function MobileIdea({
                 </section>
 
                 <textarea
-                    ref={contentRef}
+                    ref={bindContentRef}
                     className="mobile-idea__content"
                     value={controller.draftContent}
                     aria-label="灵感正文"
                     onChange={event => controller.setDraftContent(event.target.value)}
                     placeholder="写下一个灵感、片段、设定疑问或待整理素材…"
-                    autoFocus
                 />
             </main>
 

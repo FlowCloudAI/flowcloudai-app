@@ -45,6 +45,8 @@ export interface MobileBottomSheetProps {
     dismissible?: boolean
     /** 含输入控件时启用：键盘空间由当前浮层消费，背景页面保持原布局。 */
     keyboardAware?: boolean
+    /** iOS 上阻止 WebKit 在键盘布局接管前自动 reveal 面板内输入控件。 */
+    preventWebViewFocusReveal?: boolean
     className?: string
     children?: ReactNode
 }
@@ -55,6 +57,7 @@ export default function MobileBottomSheet({
     ariaLabel = '底部操作面板',
     dismissible = true,
     keyboardAware = false,
+    preventWebViewFocusReveal = false,
     className,
     children,
 }: MobileBottomSheetProps) {
@@ -161,6 +164,7 @@ export default function MobileBottomSheet({
         >
             <section
                 ref={sheetRef}
+                data-mobile-prevent-webview-focus-reveal={preventWebViewFocusReveal || undefined}
                 className={`mobile-bottom-sheet${dragging ? ' is-dragging' : ''}${className ? ` ${className}` : ''}`}
                 style={sheetStyle}
                 {...bindSheetDrag()}

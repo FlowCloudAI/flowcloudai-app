@@ -33,6 +33,7 @@ const androidManifest = readFileSync(new URL('../../../src-tauri/gen/android/app
 const iosBridge = readFileSync(new URL('../../../src-tauri/ios/Sources/MobileUiBridge.m', import.meta.url), 'utf8')
 const mobileUiApi = readFileSync(new URL('../../api/mobileUi.ts', import.meta.url), 'utf8')
 const androidPredictiveBackHook = readFileSync(new URL('./useAndroidPredictiveBack.ts', import.meta.url), 'utf8')
+const iosFocusRevealGuard = readFileSync(new URL('./useIosWebViewFocusRevealGuard.ts', import.meta.url), 'utf8')
 const appBootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url), 'utf8')
 const appShellSource = readFileSync(new URL('../index/AppShell.tsx', import.meta.url), 'utf8')
 const themeProviderSource = readFileSync(new URL('../../../node_modules/flowcloudai-ui/src/ThemeProvider.tsx', import.meta.url), 'utf8')
@@ -108,6 +109,19 @@ test('iOS 原生桥按 WKWebView 坐标发布键盘指标并由 Web 消费遮挡
     assert.doesNotMatch(iosBridge, /webView\.frame\s*=/)
     assert.match(iosBridge, /__flowcloudaiPendingMobileKeyboardMetrics/)
     assert.match(iosBridge, /__flowcloudaiReceiveMobileKeyboardMetrics/)
+})
+
+test('iOS 在默认聚焦前阻止 WebKit reveal，且不接管指针默认选区行为', () => {
+    assert.match(mobileAppSource, /useIosWebViewFocusRevealGuard\(platformInfo\.os === 'ios'\)/)
+    assert.match(iosFocusRevealGuard, /document\.addEventListener\('pointerdown', handlePointerDown, \{capture: true, passive: true\}\)/)
+    assert.match(iosFocusRevealGuard, /editor\.focus\(\{preventScroll: true\}\)/)
+    assert.doesNotMatch(iosFocusRevealGuard, /preventDefault/)
+    assert.match(mobileIdeaSource, /data-mobile-prevent-webview-focus-reveal="true"/)
+    assert.match(mobileIdeaSource, /focusMobileTextEditor\(element, preventWebViewFocusReveal\)/)
+    assert.doesNotMatch(mobileIdeaSource, /\sautoFocus(?:\s|=)/)
+    assert.match(mobileAiComposerSource, /mobile-ai-chat__composer" data-mobile-prevent-webview-focus-reveal="true"/)
+    assert.match(mobileAiComposerSource, /keyboardAware preventWebViewFocusReveal/)
+    assert.match(mobileBottomSheetSource, /data-mobile-prevent-webview-focus-reveal=\{preventWebViewFocusReveal \|\| undefined\}/)
 })
 
 test('底部导航只服从原生停靠键盘指标，不再服从焦点或 visualViewport 推断', () => {
