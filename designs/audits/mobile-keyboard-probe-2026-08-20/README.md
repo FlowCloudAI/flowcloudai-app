@@ -7,7 +7,9 @@
 
 ## 文件
 
-- `keyboard-probe.html` — 探针页（已在本次整理后精简为空壳，完整版见本目录首次提交）
+- `mobile-keyboard-shell.html` — 移动端外壳的最小复现，只有布局、没有任何键盘逻辑，
+  用作从零复现该需求的基线。它由完整探针页精简而来；带测量与补偿档位的完整探针
+  保留在提交 `1c70b21` 的 `keyboard-probe.html` 中。
 - `01-simulator-before-double-shrink.png` 等截图属于 `ios-inspiration-keyboard-2026-08-20`，不在本目录
 
 ## 实测结论（iOS 26.6）
