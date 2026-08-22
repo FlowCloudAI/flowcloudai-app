@@ -211,4 +211,14 @@ app_main/
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
 - **移动端原生键盘指标架构当前已回退**：2026-08-20 的 `a781f94` 撤销了 iOS/Android 原生键盘 frame/insets、共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 键盘专用布局。现行代码回到 `visualViewport` 只判断输入态、底部 Tab 不因输入而隐藏的旧基线；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。归档设计和 devlog 只能用于复盘，不能当作现行实现约束。重新引入前必须先形成双端方案，并分别完成系统/第三方键盘、AI composer、灵感正文和含输入 Bottom Sheet 的真机动画验收。
 
-文档同步时间：2026-08-20 15:20:00 +08:00
+- **Android 键盘只有 `visualViewport` 一个可用来源**（2026-08-23 真机实测，Xiaomi / Android 16 / WebView 143）：
+  `navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——`overlaysContent = true` 写入被接受且
+  回读为 true，但 `env(keyboard-inset-height)` 与 `boundingRect` 恒为 0、`geometrychange` 一次都不触发，不要依赖它。
+  `interactive-widget` 的三个取值在 iOS（WebKit 根本没实现）和 Android（实测逐项相同）都不产生任何差异，
+  **不要再为键盘问题去改这个 viewport meta**。另外 targetSdk 35+ 强制 edge-to-edge 后 IME **不 resize 窗口**，
+  布局视口恒为全屏高——所以「外壳固定 + Tab 绝对定位在屏幕底部被键盘盖住」这套结构在 Android 上天然成立，
+  不需要原生代码；但 Chromium 只在 IME 落位后上报一次高度，**逐帧跟随做不到**，要逐帧必须接原生
+  `WindowInsetsAnimationCallback`。完整数据与 6 条被排除的误判见
+  `docs/devlog/2026-08-23-android-软键盘布局接管.md`（工作区根仓）。
+
+文档同步时间：2026-08-23 02:25:00 +08:00
