@@ -1,5 +1,14 @@
 .mobile-idea {
+    /*
+     * 软键盘接管：同 MobileAiChat，只重定义保留高度。
+     * 本页带 mobile-nav-safe-fixed，其 padding-bottom 读的就是这个变量；
+     * 正文 textarea 是 flex: 1 1 auto，父级 padding 变大它自然缩短，无需额外声明。
+     * 方案见 docs/mobile_keyboard_layout.md。
+     */
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
     position: relative;
+    transition: padding-bottom var(--fc-kb-transition, 0s);
     display: flex;
     min-height: 0;
     height: 100%;
@@ -183,5 +192,13 @@
 @media (max-width: 380px) {
     .mobile-idea__select-row {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* 键盘跟随的过渡降级为直接到位。对本方案没有损失：
+       收起方向本来就是吸附，升起方向少一段动画只是变成瞬移，布局终态完全一致。 */
+    .mobile-idea {
+        transition: none;
     }
 }

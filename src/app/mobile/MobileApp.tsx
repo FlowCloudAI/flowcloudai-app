@@ -123,7 +123,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const {
         active: mobileInputModeActive,
         dismissFocusedInput,
-    } = useMobileInputMode(mobileAppRef)
+    } = useMobileInputMode(mobileAppRef, {writeKeyboardInset: platformInfo.os === 'android'})
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage

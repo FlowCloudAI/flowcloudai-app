@@ -2,9 +2,14 @@
  * 移动端输入/编辑模式协调器。
  *
  * 统一监听文本焦点、visualViewport 与页面声明的整页编辑态；壳层据此安排返回键和
- * 预测式返回手势。底部 Tab 不再随键盘隐藏。这里只观察键盘状态，不把
- * visualViewport 高度回写布局：WKWebView/Android WebView 会自行处理软键盘，
- * 再手动缩短根节点会触发二次收缩和错误的焦点滚动。
+ * 预测式返回手势。底部 Tab 不再随键盘隐藏。
+ *
+ * 关于「回写布局」：这里曾经**完全不**把键盘高度写回布局，因为 WKWebView 会自行避让键盘，
+ * 再手动缩短根节点就是二次收缩（见 `docs/devlog/2026-08-18-ios-输入视口-二次缩短.md`）。
+ * 该禁令对 iOS 仍然成立。但 2026-08-23 真机实测确认 Android/Chromium **不做**这套自动避让——
+ * IME 弹出时 `contentOffset`、`scrollTop` 全程为 0，窗口也不被 resize——所以那里不存在可二次补偿的对象。
+ * 因此本 hook 支持按平台把 `keyboardInset` 写进 `--fc-kb`，由 `writeKeyboardInset` 显式打开，
+ * 默认关闭。方案见 `docs/mobile_keyboard_layout.md`。
  */
 
 import {type RefObject, useCallback, useEffect, useState} from 'react'
@@ -14,6 +19,12 @@ import {
     isMobileTextEditingElement,
     isMobileInputModeActive,
 } from './mobileInputMode'
+import {
+    applyMobileKeyboardInset,
+    predictMobileKeyboardInset,
+    resetMobileKeyboardInset,
+    setMobileKeyboardInsetEnabled,
+} from './mobileKeyboardInset'
 
 function isActiveEditingRegion(element: Element): boolean {
     if (element.closest('[hidden]')) return false
@@ -35,7 +46,15 @@ export interface MobileInputModeController {
     dismissFocusedInput: () => boolean
 }
 
-export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): MobileInputModeController {
+export interface MobileInputModeOptions {
+    /** 是否把键盘遮挡高度写进 `--fc-kb`。仅 Android 打开，原因见文件头注释 */
+    writeKeyboardInset?: boolean
+}
+
+export function useMobileInputMode(
+    rootRef: RefObject<HTMLDivElement | null>,
+    {writeKeyboardInset = false}: MobileInputModeOptions = {},
+): MobileInputModeController {
     const [active, setActive] = useState(false)
 
     const dismissFocusedInput = useCallback(() => {
@@ -44,6 +63,11 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
         focused.blur()
         return true
     }, [])
+
+    useEffect(() => {
+        setMobileKeyboardInsetEnabled(writeKeyboardInset)
+        return () => setMobileKeyboardInsetEnabled(false)
+    }, [writeKeyboardInset])
 
     useEffect(() => {
         let frame = 0
@@ -94,6 +118,14 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
             )
             if (textInputFocused && viewport.keyboardVisible) keyboardSeenForFocus = true
 
+            /*
+             * 只在 keyboardVisible（既有的 80px 阈值）为真时才认这个高度。
+             * 直接写 keyboardInset 会让系统栏的微小伸缩也推动布局——那 80px 阈值
+             * 本来就是为排除这类抖动而存在的，这里复用它而不是另立一个。
+             * 键盘未可见时是否要归零，交给 applyMobileKeyboardInset 按乐观让位的宽限期决定。
+             */
+            applyMobileKeyboardInset(viewport.keyboardInset, viewport.keyboardVisible)
+
             const nextActive = isMobileInputModeActive({
                 textInputFocused,
                 keyboardVisible: viewport.keyboardVisible,
@@ -135,6 +167,12 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
         }
         const handleFocusIn = (event: FocusEvent) => {
             beginFocusSession(event.target as Element | null)
+            /*
+             * 在键盘真正弹出之前先按学到的高度让位，让输入区落进「键盘弹出后的可视区」。
+             * 否则 Chromium 会平移视觉视口去露出它，把固定顶栏推出屏幕——那次平移收不回来。
+             * 这里只改 CSS 变量，不碰 focus/preventDefault，不影响唤起链路。
+             */
+            if (isMobileTextEditingElement(event.target as Element | null)) predictMobileKeyboardInset()
             // 某些 WebView 收起系统键盘时不可靠地派发 resize；聚焦期间低频补采样兜底。
             if (!viewportPollTimer) viewportPollTimer = window.setInterval(scheduleUpdate, 250)
             scheduleUpdate()
@@ -164,6 +202,7 @@ export function useMobileInputMode(rootRef: RefObject<HTMLDivElement | null>): M
         update()
 
         return () => {
+            resetMobileKeyboardInset()
             if (frame) cancelAnimationFrame(frame)
             if (restoreTimer) window.clearTimeout(restoreTimer)
             if (viewportPollTimer) window.clearInterval(viewportPollTimer)

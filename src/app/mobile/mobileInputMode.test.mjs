@@ -6,6 +6,10 @@ import {
     getMobileViewportState,
     isMobileInputModeActive,
 } from './mobileInputMode.ts'
+import {
+    MOBILE_KEYBOARD_RISE_TRANSITION,
+    resolveMobileKeyboardTransition,
+} from './mobileKeyboardInset.ts'
 import {readFileSync} from 'node:fs'
 import {URL} from 'node:url'
 
@@ -109,4 +113,62 @@ test('沉浸正文编辑使用全屏 Portal 隔离下层页面且不二次裁短
 test('聚焦期间补采样键盘可见性，系统收起未派发 resize 时仍能退出输入态', () => {
     assert.match(inputModeHookSource, /setInterval\(scheduleUpdate, 250\)/)
     assert.match(inputModeHookSource, /const scheduleUpdate = \(\) => \{\s*if \(frame\) cancelAnimationFrame\(frame\)\s*frame = requestAnimationFrame\(update\)\s*}/)
+})
+
+test('键盘升起走过渡、收起吸附', () => {
+    // 升起：拿到终值时 IME 还在动（真机实测 focusin → vv.resize 仅 60~75ms，
+    // 而 IME 滑入约 200~300ms），这段过渡有对齐余地。
+    assert.equal(resolveMobileKeyboardTransition(0, 312.5), MOBILE_KEYBOARD_RISE_TRANSITION)
+
+    // 收起：拿到 0 时键盘早已消失，任何过渡都只是滞后。
+    assert.equal(resolveMobileKeyboardTransition(312.5, 0), '0s')
+
+    // 变矮但没到 0（候选栏收掉、换小键盘）同样吸附：
+    // 滞后会让布局比真实键盘高，读起来像输入区莫名变厚。
+    assert.equal(resolveMobileKeyboardTransition(312.5, 289), '0s')
+
+    // 高度不变时按吸附处理，不重复起一段动画。
+    assert.equal(resolveMobileKeyboardTransition(312.5, 312.5), '0s')
+})
+
+test('键盘接管默认关闭，且只重定义保留高度而不散写偏移', () => {
+    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+    // 默认关闭是 iOS 的零回归保证：同一份布局在 iOS 上会复现顶栏离屏。
+    assert.match(insetSource, /let enabled = false/)
+    assert.match(insetSource, /export function setMobileKeyboardInsetEnabled/)
+
+    // 调用方必须按平台显式打开。
+    assert.match(inputModeHookSource, /writeKeyboardInset/)
+    assert.match(
+        readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8'),
+        /writeKeyboardInset:\s*platformInfo\.os === 'android'/,
+    )
+
+    // 接入方式是重定义保留高度，不是给元素散写键盘偏移。
+    for (const name of ['pages/MobileAiChat.css', 'pages/MobileIdea.css']) {
+        const css = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')
+        assert.match(css, /--mobile-nav-reserved-height:\s*calc\(var\(--mobile-nav-height\) \+ var\(--mobile-keyboard-extra\)\)/)
+        assert.match(css, /--mobile-keyboard-extra:\s*max\(var\(--fc-kb, 0px\) - var\(--mobile-nav-height\), 0px\)/)
+    }
+})
+
+test('聚焦时先按学到的键盘高度让位，避免视觉视口被平移', () => {
+    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+
+    // 真机实测：聚焦位于「键盘弹出后可视区」之下的输入框时，Chromium 会平移视觉视口
+    // （visualViewport.offsetTop 0 → 312.9）去露出它，把固定顶栏推出屏幕上方。
+    // 该平移一旦发生就收不回来（scrollTo / scrollTop / overflow:hidden 均实测无效），
+    // 唯一可行的是让它压根不发生——聚焦时就把位置让开。
+    assert.match(insetSource, /export function predictMobileKeyboardInset/)
+    assert.match(inputModeHookSource, /predictMobileKeyboardInset\(\)/)
+
+    // 必须在 focusin 里做，而不是等 visualViewport.resize——那时平移已经发生了。
+    const focusIn = inputModeHookSource.slice(inputModeHookSource.indexOf('const handleFocusIn'))
+    assert.match(focusIn.slice(0, 600), /predictMobileKeyboardInset/)
+
+    // 没学到高度就不让位：宁可这一次被平移，也不猜一个值。
+    assert.match(insetSource, /if \(learned <= 0\) return false/)
+
+    // 乐观让位必须有宽限期回退，否则「只聚焦不弹键盘」（硬件键盘等）会让布局空让一块。
+    assert.match(insetSource, /PREDICTION_GRACE_MS/)
 })

@@ -1,6 +1,14 @@
 .mobile-ai-chat {
     --mobile-ai-topbar-space: 4.25rem;
     --mobile-ai-composer-space: 8.25rem;
+    /*
+     * 软键盘接管：只重定义保留高度，不给具体元素散写键盘偏移。
+     * 这样 __composer 的 `bottom: var(--mobile-nav-reserved-height)` 等既有声明一行都不用改。
+     * --fc-kb 由 mobileKeyboardInset.ts 写入，iOS 上不写 → 回落 0px → 与接入前逐字等价。
+     * 方案见 docs/mobile_keyboard_layout.md。
+     */
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
     position: relative;
     isolation: isolate;
     display: flex;
@@ -472,11 +480,16 @@
     gap: var(--mobile-gap-item);
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--mobile-ai-topbar-space) var(--mobile-page-x) var(--mobile-ai-composer-space);
+    /*
+     * 消息列表既是绝对定位输入区的下方内容、又用固定 rem 预留空间，两者都不会自动跟着
+     * 父级 padding 变——所以这里必须显式补上键盘多出来的那一段，否则末条消息会被输入区盖住。
+     */
+    padding: var(--mobile-ai-topbar-space) var(--mobile-page-x)
+        calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
     background: var(--fc-color-bg);
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);
-    scroll-padding-bottom: var(--mobile-ai-composer-space);
+    scroll-padding-bottom: calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
@@ -529,6 +542,8 @@
      */
     bottom: var(--mobile-nav-reserved-height);
     left: 0;
+    /* 升起走过渡、收起吸附，方向由 --fc-kb-transition 决定，见 mobileKeyboardInset.ts */
+    transition: bottom var(--fc-kb-transition, 0s);
     z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;
     padding: var(--mobile-gap-text) var(--mobile-page-x) var(--mobile-gap-text);
@@ -918,5 +933,10 @@
         animation: none;
         transition: none;
         transform: none;
+    }
+
+    /* 键盘跟随的过渡降级为直接到位，布局终态与开启动效时完全一致 */
+    .mobile-ai-chat__composer {
+        transition: none;
     }
 }
