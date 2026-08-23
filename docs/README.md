@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-19
+> 更新日期：2026-08-23
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -54,6 +54,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [Mobile_world.md](Mobile_world.md) | 现行 | 2026-08-02 | 移动端世界观/词条能力缺口与方案。§7 持续记录实现进展，含 10 处未完成项。总计划见 `../plans/ANDROID-01.md` |
+| [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-23 | **移动端软键盘布局接管方案**：`--fc-kb` + 重定义 `--mobile-nav-reserved-height` 的接入方式、升起平滑/收起吸附的不对称处理、iOS 接缝位置。当前只在 Android 的 AI 聊天页与灵感页启用。含 3 条「不要再动」的平台结论与 4 项未覆盖项 |
 
 > 移动端的问题排查记录（返回手势、键盘布局、WebView 光栅化、TLS、图标安全区等 7 篇）已迁至 `docs/devlog/`，见 §8。
 
