@@ -37,6 +37,8 @@ targets:
       - path: ../../ios/Sources
       - path: Assets.xcassets
       - path: Externals
+        # Rust 静态库只通过 dependencies 参与链接；禁止 XcodeGen 再把它复制进 .app。
+        buildPhase: none
       - path: {{app.name}}_iOS
       - path: {{app.asset-dir}}
         buildPhase: resources
