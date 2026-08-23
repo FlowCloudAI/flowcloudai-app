@@ -1,4 +1,5 @@
 import './MobileNav.css'
+import {mobile_haptic} from '../../api'
 
 export type MobileTab = 'home' | 'ai' | 'ideas' | 'settings'
 
@@ -53,12 +54,20 @@ function TabIcon({tab}: { tab: MobileTab }) {
 
 export default function MobileNav({activeTab, onTabChange}: MobileNavProps) {
     return (
-        <nav className="mobile-nav">
+        <nav
+            className="mobile-nav"
+            aria-label="主导航"
+        >
             {TAB_CONFIG.map(({key, label}) => (
                 <button
+                    type="button"
                     key={key}
                     className={`mobile-nav__item${activeTab === key ? ' active' : ''}`}
-                    onClick={() => onTabChange(key)}
+                    aria-current={activeTab === key ? 'page' : undefined}
+                    onClick={() => {
+                        mobile_haptic('selection')
+                        onTabChange(key)
+                    }}
                 >
                     <span className="mobile-nav__icon"><TabIcon tab={key}/></span>
                     <span className="mobile-nav__label">{label}</span>

@@ -5,7 +5,11 @@
     <!--
         maximum/minimum-scale + user-scalable=no：应用壳禁止浏览器级页面缩放
         viewport-fit=cover：让内容延伸到 safe-area（刘海/圆角屏）
-        interactive-widget=resizes-content：软键盘弹出时内容区收缩而非整体上移
+
+        interactive-widget：**不要为键盘问题改这个值。** 2026-08 两端真机实测三个取值都不产生差异——
+        iOS 26.6 上 WebKit 根本没实现该特性（逐项相同的数据），Android 16 / WebView 143 上实现了但
+        在本应用的 edge-to-edge 配置下同样逐项相同。两端的键盘问题各有别的根因，
+        见 docs/devlog/2026-08-23-android-软键盘布局接管.md（工作区根仓）。
     -->
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
           name="viewport"/>

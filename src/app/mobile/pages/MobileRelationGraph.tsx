@@ -21,7 +21,7 @@ export default function MobileRelationGraph({params, pop}: Props) {
     const [relationsHost, setRelationsHost] = useState<HTMLDivElement | null>(null)
 
     return (
-        <div className="mobile-page mobile-relation-graph-page">
+        <div className="mobile-page mobile-nav-safe-fixed mobile-relation-graph-page">
             <MobilePageTopBar
                 className="mobile-relation-graph-page__topbar"
                 sticky

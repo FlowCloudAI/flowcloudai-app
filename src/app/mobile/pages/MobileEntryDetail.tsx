@@ -281,23 +281,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }, [isDirty, showAlert])
 
     useEffect(() => {
-        if (mode !== 'edit') {
-            setBeforeLeave(null)
-            return
-        }
-        setBeforeLeave(async (intent) => {
-            // 返回键可以先“吃掉”一次，只收起沉浸编辑；切 Tab 会直接卸载本页，
-            // 收起沉浸编辑没有意义，必须直奔未保存确认。
-            if (intent === 'back' && immersiveEditorOpen) {
-                setImmersiveEditorOpen(false)
-                return false
-            }
-            return confirmDiscard()
-        })
-        return () => setBeforeLeave(null)
-    }, [confirmDiscard, immersiveEditorOpen, mode, setBeforeLeave])
-
-    useEffect(() => {
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
             if (event.payload.entry_id !== entryId) return
             if (event.payload.source_id === saveSourceIdRef.current) return
@@ -335,9 +318,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         return () => { updatedListener.then((fn) => fn()); deletedListener.then((fn) => fn()) }
     }, [entryId, isDirty, mode, params, pop, projectId, reloadEntryState, replace, setLoadError, showAlert])
 
-    // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
-    const handleCancel = useCallback(async () => {
-        if (!await confirmDiscard()) return
+    // 输入/编辑期间第一次返回只退出编辑模式；不会顺带离开词条或切换 Tab。
+    const exitEditMode = useCallback(async (): Promise<boolean> => {
+        if (!await confirmDiscard()) return false
         if (entry) {
             syncForm(entry)
             setRelationDrafts(initialRelationDrafts)
@@ -346,7 +329,34 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         } else {
             pop()
         }
+        return true
     }, [confirmDiscard, entry, initialRelationDrafts, pop, syncForm])
+
+    // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
+    const handleCancel = useCallback(async () => {
+        await exitEditMode()
+    }, [exitEditMode])
+
+    useEffect(() => {
+        if (mode !== 'edit') {
+            setBeforeLeave(null)
+            return
+        }
+        setBeforeLeave(async (intent) => {
+            // 返回键可以先“吃掉”一次，只收起沉浸编辑；切 Tab 会直接卸载本页，
+            // 收起沉浸编辑没有意义，必须直奔未保存确认。
+            if (intent === 'back' && immersiveEditorOpen) {
+                setImmersiveEditorOpen(false)
+                return false
+            }
+            if (intent === 'back') {
+                await exitEditMode()
+                return false
+            }
+            return confirmDiscard()
+        })
+        return () => setBeforeLeave(null)
+    }, [confirmDiscard, exitEditMode, immersiveEditorOpen, mode, setBeforeLeave])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})

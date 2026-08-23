@@ -14,7 +14,7 @@
 
 本计划的唯一主题基线来自 UI 库语义令牌文件：
 
-- `E:/Projects/FlowCloudAI/lib_ui/ui/src/style/index.css`
+- `lib_ui/ui/src/style/index.css`
 
 应用层不得再自行定义第二套主题系统；如需补充视觉能力，应优先扩展 UI 库语义令牌，而不是在应用内局部发明新变量。
 

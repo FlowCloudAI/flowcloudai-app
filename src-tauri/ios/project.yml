@@ -34,6 +34,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios/Sources
       - path: Assets.xcassets
       - path: Externals
       - path: {{app.name}}_iOS
@@ -49,6 +50,9 @@ targets:
       path: {{app.name}}_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        # ProMotion 机型上，没有这个键时系统把 CADisplayLink 与动画上限钉在 60Hz，
+        # 只在代码里设 preferredFrameRateRange 无效。键盘跟随需要满 120Hz 采样。
+        CADisableMinimumFrameDurationOnPhone: true
         NSLocalNetworkUsageDescription: 开发模式需要连接同一局域网内的 FlowCloudAI 开发服务器。
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]

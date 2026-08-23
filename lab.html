@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <!--
+        maximum/minimum-scale + user-scalable=no：应用壳禁止浏览器级页面缩放
+        viewport-fit=cover：让内容延伸到 safe-area（刘海/圆角屏）
+
+        interactive-widget：**不要为键盘问题改这个值。** 2026-08 两端真机实测三个取值都不产生差异——
+        iOS 26.6 上 WebKit 根本没实现该特性（逐项相同的数据），Android 16 / WebView 143 上实现了但
+        在本应用的 edge-to-edge 配置下同样逐项相同。两端的键盘问题各有别的根因，
+        见 docs/devlog/2026-08-23-android-软键盘布局接管.md（工作区根仓）。
+    -->
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
+          name="viewport"/>
+    <link rel="icon" type="image/svg+xml" href="/icon.svg"/>
+    <title>FlowCloudAI 键盘实验（dev）</title>
+    <style>
+        /*
+         * 关键渲染路径 CSS —— 内联在此，WebView 解析 HTML 后立即生效，
+         * 无需等待 JS bundle 加载完成。
+         */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        /* 页面底色与 React 渲染后的主题匹配，避免闪白 */
+        body {
+            background: var(--fc-color-bg-elevated, #ffffff);
+            color: var(--fc-color-text, #111111);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: var(--fc-color-bg, #111111);
+                color: var(--fc-color-text, #f0f0f0);
+            }
+        }
+
+        /* 亚克力毛玻璃模式：启动期也保持 body 透明，避免不透明底色盖住磨砂层 */
+        html[data-backdrop="acrylic"] body {
+            background: transparent;
+        }
+
+        /*
+         * 当 #root 为空（React 尚未挂载）时显示 loading 指示器。
+         * React render() 后 #root 不再为空，:empty 自动失效，
+         * spinner 消失，无需任何 JS。
+         */
+        #root:empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        #root:empty::before {
+            content: 'FlowCloudAI';
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            opacity: 0.45;
+        }
+
+        #root:empty::after {
+            content: '';
+            width: 24px;
+            height: 24px;
+            border: 2px solid color-mix(in srgb, var(--fc-color-text-tertiary, #808080) 20%, transparent);
+            border-top-color: color-mix(in srgb, var(--fc-color-text-tertiary, #808080) 65%, transparent);
+            border-radius: 50%;
+            animation: fc-spin 0.75s linear infinite;
+        }
+
+        @keyframes fc-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+<!--
+    键盘实验页的独立入口（**仅 dev**）。
+    没有登记进 vite build 的 input，所以不会进生产产物；
+    npm run ios:dev 起来后在 WebView 里访问 /lab.html 即可。
+    实验结束后连同 src/lab 一起删除。
+-->
+<div id="root"></div>
+<script type="module" src="/src/lab/main.tsx"></script>
+</body>
+</html>

@@ -1,81 +1,6 @@
-.mobile-app,
-:root {
-    --mobile-border-soft: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
-    --mobile-page-x: clamp(1rem, 4vw, 1.35rem);
-    --mobile-border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    --mobile-border-medium: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    --mobile-border-strong: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    --mobile-border-emphasis: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    --mobile-border-bold: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
-    --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
-    --mobile-surface-raised: var(--fc-color-bg-elevated);
-    /*
-     * 玻璃面的底色分档。这几个都只在 glassEffect.css 里被引用——移动端的毛玻璃
-     * 统一在那儿声明，组件不要自己写 background/backdrop-filter，否则关闭开关时会漏。
-     */
-    --mobile-surface-control: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
-    --mobile-surface-menu: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
-    --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
-    --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
-    --mobile-surface-translucent: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
-    --mobile-surface-translucent-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
-    --mobile-surface-glass: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
-    --mobile-surface-panel: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
-    --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
-    --mobile-side-drawer-bg: var(--fc-color-bg-secondary);
-    --mobile-drawer-reveal-bg: var(--mobile-side-drawer-bg);
-    --mobile-divider: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 18%, transparent);
-    --mobile-inset-highlight-soft: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 12%, transparent);
-    --mobile-inset-highlight-strong: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 24%, transparent);
-    --mobile-shadow-control: 0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent), var(--mobile-inset-highlight);
-    --mobile-shadow-control-soft: 0 0.22rem 0.65rem color-mix(in srgb, var(--fc-color-text) 6%, transparent), var(--mobile-inset-highlight-soft);
-    --mobile-shadow-card: 0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent), var(--mobile-inset-highlight);
-    --mobile-shadow-card-hover: 0 0.4rem 1.2rem color-mix(in srgb, var(--fc-color-text) 11%, transparent), var(--mobile-inset-highlight);
-    --mobile-shadow-cover: 0 0.45rem 1.2rem color-mix(in srgb, var(--fc-color-text) 8%, transparent), var(--mobile-inset-highlight);
-    --mobile-shadow-subtle: 0 0.2rem 0.65rem color-mix(in srgb, var(--fc-color-text) 5%, transparent);
-    --mobile-shadow-floating: 0 1.25rem 3rem color-mix(in srgb, var(--fc-color-text) 18%, transparent), var(--mobile-inset-highlight-strong);
-    --mobile-shadow-floating-soft: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
-    --mobile-shadow-floating-compact: 0 1rem 2rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
-    --mobile-shadow-anchored-menu: 0 0.65rem 1.45rem color-mix(in srgb, var(--fc-color-text) 10%, transparent), var(--mobile-inset-highlight-soft);
-    --mobile-shadow-dialog: 0 1.15rem 2.6rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
-    --mobile-shadow-bottom-sheet: 0 -0.45rem 1.35rem color-mix(in srgb, var(--fc-color-text) 9%, transparent), var(--mobile-inset-highlight-soft);
-    --mobile-shadow-drawer-surface: none;
-    --mobile-shadow-primary-action: 0 0.55rem 1.1rem color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
-    --mobile-shadow-primary-soft: 0 0.35rem 0.95rem color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
-    --mobile-shadow-chip: 0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 14%, transparent);
-    /*
-     * 只有两档，别再往里加。真机实测（Redmi 24129RT7CC，深浅两套主题，底色 80/86/94 各测一遍）：
-     * blur 8 / 10 / 18 三者渲染结果完全无法分辨——模糊到 8px 时背后文字的高频细节已经全没了，
-     * 再往上加只是徒增每帧的合成开销。两档的区别不是“糊多少”，是“遮不遮得住”：
-     *   - glass-filter：背后内容认不出来
-     *   - glass-filter-soft：背后内容基本还读得出来（内联控件用）
-     */
-    --mobile-glass-filter: blur(8px) saturate(1.3);
-    --mobile-glass-filter-soft: blur(2px);
-    --mobile-radius-card: var(--fc-radius-xl);
-    --mobile-radius-field: var(--fc-radius-xl);
-    --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--fc-space-sm));
-    --mobile-radius-sheet: calc(var(--fc-radius-xl) + var(--fc-space-sm));
-    --mobile-top-action-size: 2.75rem;
-    --mobile-top-surface-size: 2.5rem;
-    --mobile-topbar-offset: calc(var(--fc-space-lg) + var(--fc-space-xs));
-    --mobile-font-weight-label: 650;
-    --mobile-font-weight-strong: 680;
-    --mobile-font-weight-heading: 720;
-    --mobile-font-weight-display: 760;
-    --mobile-drawer-edge-shadow-start: color-mix(in srgb, var(--fc-gray-1000) 25%, transparent);
-    --mobile-drawer-edge-shadow-middle: color-mix(in srgb, var(--fc-gray-1000) 15%, transparent);
-    --mobile-drawer-edge-shadow-end: color-mix(in srgb, var(--fc-gray-1000) 10%, transparent);
-}
-
-[data-theme="dark"] {
-    --mobile-drawer-edge-shadow-start: color-mix(in srgb, var(--fc-gray-1000) 80%, transparent);
-    --mobile-drawer-edge-shadow-middle: color-mix(in srgb, var(--fc-gray-1000) 60%, transparent);
-    --mobile-drawer-edge-shadow-end: color-mix(in srgb, var(--fc-gray-1000) 30%, transparent);
-}
-
 .mobile-app {
+    --mobile-nav-reserved-height: var(--mobile-nav-height);
+
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -95,27 +20,28 @@
 }
 
 .mobile-app .fc-btn--xs:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
-    padding-inline: max(var(--fc-space-sm), calc(var(--fc-space-xs) * 2));
+    padding-inline: max(var(--mobile-gap-inline), calc(var(--mobile-gap-text) * 2));
 }
 
 .mobile-app .fc-btn--sm:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
-    padding-inline: max(var(--fc-space-md), calc(var(--fc-space-sm) * 2));
+    padding-inline: max(var(--mobile-gap-item), calc(var(--mobile-gap-inline) * 2));
 }
 
 .mobile-app .fc-btn--md:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
-    padding-inline: max(var(--fc-space-lg), calc(var(--fc-space-md) * 2));
+    padding-inline: max(var(--mobile-gap-group), calc(var(--mobile-gap-item) * 2));
 }
 
 .mobile-app .fc-btn--lg:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
-    padding-inline: max(var(--fc-space-xl), calc(var(--fc-space-lg) * 2));
+    padding-inline: max(var(--mobile-gap-section), calc(var(--mobile-gap-group) * 2));
 }
 
 .mobile-app .fc-btn--xl:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
-    padding-inline: max(var(--fc-space-2xl), calc(var(--fc-space-xl) * 2));
+    padding-inline: max(var(--mobile-gap-section), calc(var(--mobile-gap-section) * 2));
 }
 
 .mobile-app-side-drawer-shell {
     position: relative;
+    isolation: isolate;
     display: flex;
     min-height: 0;
     flex: 1;
@@ -136,7 +62,7 @@
             0,
             0
     );
-    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
     will-change: transform;
     touch-action: pan-y;
 }
@@ -152,34 +78,43 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     border-left: solid 1px transparent;
-    transform: translate3d(var(--mobile-entry-drawer-shift, 0), 0, 0);
+    transform: translate3d(
+        var(--mobile-entry-drawer-shift, 0px),
+        0,
+        0
+    );
     transition:
-        transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-radius 260ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform var(--mobile-duration-base) var(--mobile-ease-standard),
+        border-radius var(--mobile-duration-base) var(--mobile-ease-standard),
+        box-shadow var(--mobile-duration-base) var(--mobile-ease-standard);
     will-change: transform;
     touch-action: pan-y;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface {
+/* 完整滑出的短暂窗口内禁止二次点击，页面栈只能在动画结束时提交一次。 */
+.mobile-app-side-drawer-shell.is-edge-back-committing .mobile-app-side-drawer-shell__surface {
+    pointer-events: none;
+}
+
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface {
     transition: none;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__drawer {
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__drawer {
     transition: none;
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface,
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface,
 .mobile-app-side-drawer-shell.is-open .mobile-app-side-drawer-shell__surface {
     border-left-color: var(--fc-color-border);
     border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
-    box-shadow: var(--mobile-shadow-drawer-surface);
+    box-shadow: none;
 }
 
 .mobile-app-side-drawer-shell__surface-close {
     position: absolute;
     inset: 0;
-    z-index: 60;
+    z-index: var(--mobile-z-overlay);
     display: block;
     padding: 0;
     border: 0;
@@ -193,10 +128,10 @@
     cursor: pointer;
     opacity: var(--mobile-entry-drawer-progress, 0);
     pointer-events: none;
-    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
-.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface-close {
+.mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface-close {
     transition: none;
 }
 
@@ -205,10 +140,11 @@
 }
 
 .mobile-app__content {
+    position: relative;
+    isolation: isolate;
     flex: 1;
     min-height: 0;
     box-sizing: border-box;
-    padding-top: env(safe-area-inset-top, 0);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -216,14 +152,106 @@
 }
 
 /*
- * 栈内页面容器：承载 push/pop 转场动画。
- * 布局必须和 .mobile-app__content 的内层保持一致，否则 .mobile-page 的 flex:1 + 滚动会塌。
+ * Tab 视图与页面栈都使用绝对叠层：底层页保持挂载，栈顶独立跟手移动。
+ * 这里保持完整高度，让滚动内容能经过 Tab 背后；交互安全距离由内容容器自行消费。
  */
-.mobile-app__page {
+.mobile-app__tab-view {
+    position: absolute;
+    z-index: 2;
+    top: var(--mobile-safe-top);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    box-sizing: border-box;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.mobile-app__tab-view[hidden] {
+    display: none;
+}
+
+.mobile-app__tab-view.is-active {
+    z-index: 2;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.mobile-app__tab-view.is-cross-tab-underlay {
+    z-index: 1;
+    visibility: visible;
+    transform: translate3d(var(--mobile-edge-back-underlay-shift, 0), 0, 0);
+}
+
+.mobile-page-transition-host {
+    position: relative;
+    isolation: isolate;
     display: flex;
     min-height: 0;
     flex: 1;
     flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+}
+
+.mobile-page-transition-host__layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+    /*
+     * 直接前驱必须保持可绘制。手势开始时才从 visibility:hidden 恢复会让 Android
+     * WebView 在首帧同时栅格化整页并建立 transform 层，表现为底层页面闪现。
+     */
+    visibility: visible;
+    pointer-events: none;
+}
+
+.mobile-page-transition-host__layer.is-underlay {
+    z-index: 1;
+}
+
+.mobile-page-transition-host__layer.is-top {
+    z-index: 2;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.mobile-page-transition-host__layer.is-underlay.is-edge-back-underlay {
+    transform: translate3d(var(--mobile-edge-back-underlay-shift, 0), 0, 0);
+}
+
+.mobile-page-transition-host__underlay-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: var(--mobile-z-overlay);
+    background: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
+    opacity: var(--mobile-edge-back-underlay-scrim-opacity, 0);
+    pointer-events: none;
+}
+
+.mobile-page-transition-host__layer.is-edge-back-foreground,
+.mobile-app__tab-view.is-edge-back-foreground {
+    z-index: var(--mobile-z-sticky);
+    visibility: visible;
+    border-left: var(--mobile-border);
+    box-shadow: none;
+    transform: translate3d(var(--mobile-edge-back-shift, 0), 0, 0);
+    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-app-side-drawer-shell.is-edge-back-direct .mobile-page-transition-host__layer.is-edge-back-foreground,
+.mobile-app-side-drawer-shell.is-edge-back-direct .mobile-app__tab-view.is-edge-back-foreground {
+    transition: none;
 }
 
 /*
@@ -234,7 +262,7 @@
 @keyframes mobile-page-enter-push {
     from {
         opacity: 0;
-        transform: translateX(18px);
+        transform: translateX(var(--mobile-gap-group));
     }
     to {
         opacity: 1;
@@ -245,7 +273,7 @@
 @keyframes mobile-page-enter-pop {
     from {
         opacity: 0;
-        transform: translateX(-18px);
+        transform: translateX(calc(var(--mobile-gap-group) * -1));
     }
     to {
         opacity: 1;
@@ -255,14 +283,19 @@
 
 /* push = 往里走，新页从右侧进；pop = 往回走，上一页从左侧回来。replace / none 不动。 */
 .mobile-app__page[data-mobile-nav="push"] {
-    animation: mobile-page-enter-push 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: mobile-page-enter-push var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
 .mobile-app__page[data-mobile-nav="pop"] {
-    animation: mobile-page-enter-pop 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: mobile-page-enter-pop var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .mobile-page-transition-host__layer.is-edge-back-foreground,
+    .mobile-app__tab-view.is-edge-back-foreground {
+        transition: none;
+    }
+
     .mobile-app__page[data-mobile-nav="push"],
     .mobile-app__page[data-mobile-nav="pop"] {
         animation: none;
@@ -271,11 +304,41 @@
 
 /* 移动端页面通用样式 */
 .mobile-page {
+    --mobile-page-local-bottom: var(--mobile-page-bottom);
+    --mobile-scroll-nav-spacer: max(
+        0px,
+        calc(var(--mobile-nav-reserved-height) - var(--mobile-safe-bottom))
+    );
+
+    min-width: 0;
+    max-width: 100%;
     flex: 1;
+    box-sizing: border-box;
+    overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     scrollbar-width: none;
+}
+
+/* 较高特异度确保各页面原有的 padding 简写不会重新截断 Tab 后方的滚动空间。 */
+.mobile-page:not(.mobile-nav-safe-fixed) {
+    padding-bottom: calc(
+        var(--mobile-page-local-bottom)
+        + var(--mobile-safe-bottom)
+        + var(--mobile-scroll-nav-spacer)
+    );
+    scroll-padding-bottom: calc(var(--mobile-page-local-bottom) + var(--mobile-nav-reserved-height));
+}
+
+/*
+ * 固定输入页和画布页不能把控件滚出 Tab 遮挡区，因此缩小它们的可用视口。
+ * 普通 .mobile-page 则只增加滚动内容尾部空间，页面本身仍延伸到机器底部。
+ */
+.mobile-nav-safe-fixed {
+    box-sizing: border-box;
+    padding-bottom: var(--mobile-nav-reserved-height);
 }
 
 .mobile-page::-webkit-scrollbar {
@@ -286,41 +349,41 @@
     margin: 0;
     overflow-wrap: anywhere;
     color: var(--fc-color-text);
-    font-size: clamp(2rem, 9vw, 2.65rem);
-    font-weight: var(--mobile-font-weight-display);
+    font-size: var(--mobile-text-display);
+    font-weight: var(--mobile-weight-strong);
     letter-spacing: 0;
-    line-height: 0.98;
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-page__eyebrow {
     display: block;
     color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1.2;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-page__search .fc-input__wrapper {
-    height: 3.25rem;
-    border: var(--mobile-border-soft);
+    height: var(--fc-control-height-xl);
+    border: var(--mobile-border);
     background: var(--mobile-surface-muted);
-    box-shadow: var(--mobile-inset-highlight-soft);
+    box-shadow: none;
 }
 
 .mobile-page__search .fc-input__field {
-    font-size: var(--fc-font-size-body);
-    font-weight: var(--fc-font-weight-medium);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-medium);
 }
 
 .mobile-page__card.fc-card {
     min-height: 0;
     background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-card);
+    box-shadow: var(--mobile-elevation-raised);
 }
 
 .mobile-page__card.fc-card--hoverable:hover {
     transform: none;
-    box-shadow: var(--mobile-shadow-card-hover);
+    box-shadow: var(--mobile-elevation-raised);
 }
 
 .mobile-project-card .fc-card__image-wrapper {
@@ -338,8 +401,8 @@
     height: auto;
     min-height: 0;
     justify-content: flex-start;
-    gap: 0.4rem;
-    padding: 0.9rem 1rem 1rem;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-group) var(--mobile-gap-group) var(--mobile-gap-group);
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
 }
@@ -356,23 +419,23 @@
 }
 
 .mobile-project-card .fc-card__title {
-    font-size: 1.1rem;
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.2;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-project-card .fc-card__description {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.45;
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-project-card .fc-card__extra-info,
 .mobile-project-card__meta {
     margin-top: 0;
     color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
 }
 
 /*
@@ -387,7 +450,7 @@
     justify-content: center;
     height: 100%;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--mobile-text-body-sm);
 }
 
 .mobile-page__error {
@@ -395,11 +458,11 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--fc-space-md);
+    gap: var(--mobile-gap-item);
     height: 100%;
     color: var(--fc-color-danger);
-    font-size: var(--fc-font-size-sm);
-    padding: var(--fc-space-xl);
+    font-size: var(--mobile-text-body-sm);
+    padding: var(--mobile-gap-section);
     text-align: center;
 }
 
@@ -407,14 +470,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--fc-space-md);
-    margin: 0 var(--fc-space-lg) var(--fc-space-md);
-    padding: var(--fc-space-sm) var(--fc-space-md);
+    gap: var(--mobile-gap-item);
+    margin: 0 var(--mobile-gap-group) var(--mobile-gap-item);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
     border: 1px solid var(--fc-color-danger-border);
-    border-radius: var(--fc-radius-md);
+    border-radius: var(--mobile-radius-field);
     background: var(--fc-color-danger-bg);
     color: var(--fc-color-danger);
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--mobile-text-body-sm);
 }
 
 .mobile-page__error-banner > span {
@@ -428,10 +491,10 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: var(--fc-space-md);
+    gap: var(--mobile-gap-item);
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    padding: var(--fc-space-xl);
+    font-size: var(--mobile-text-body-sm);
+    padding: var(--mobile-gap-section);
     text-align: center;
 }
 
@@ -441,16 +504,16 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
-    padding: 14px 15px;
-    border: var(--mobile-border-emphasis);
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-pad-card);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
     cursor: pointer;
-    box-shadow: var(--mobile-shadow-control);
+    box-shadow: var(--mobile-elevation-raised);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
@@ -464,7 +527,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--mobile-gap-item);
     min-width: 0;
 }
 
@@ -475,30 +538,30 @@
 
 .mobile-list-card__title {
     display: block;
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-label);
-    line-height: 1.35;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-snug);
     color: var(--fc-color-text);
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .mobile-list-card__description {
-    margin-top: var(--fc-space-xs);
+    margin-top: var(--mobile-gap-text);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.5;
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-list-card__meta {
     flex-shrink: 0;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.5;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-list-card__tag {
@@ -531,18 +594,18 @@
 
 .mobile-drawer-filter-stack {
     flex: 0 0 auto;
-    gap: 0.65rem;
+    gap: var(--mobile-gap-item);
 }
 
 .mobile-drawer-filter-group {
-    gap: 0.35rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-drawer-filter-group > span {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.2;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-drawer-segmented {
@@ -550,32 +613,32 @@
     min-width: 0;
     grid-auto-columns: minmax(0, 1fr);
     grid-auto-flow: column;
-    gap: 0.2rem;
-    padding: 0.22rem;
-    border: var(--mobile-border-soft);
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-text);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, transparent);
 }
 
 .mobile-drawer-segmented button {
     min-width: 0;
-    min-height: 2.05rem;
-    padding: 0 0.5rem;
+    min-height: var(--mobile-tap-min);
+    padding: 0 var(--mobile-gap-inline);
     border: 0;
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.1;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
     white-space: nowrap;
 }
 
 .mobile-drawer-segmented button.active {
     background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
-    box-shadow: var(--mobile-shadow-control-soft);
+    box-shadow: none;
 }
 
 .mobile-drawer-primary-action {
@@ -583,8 +646,28 @@
 }
 
 .mobile-drawer-empty {
-    padding: 2.5rem 1rem;
+    padding: var(--mobile-gap-section) var(--mobile-gap-group);
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--mobile-text-body-sm);
     text-align: center;
+}
+
+/*
+ * 视觉视口被用户拖动时，外壳整体跟着平移同样的距离，把平移抵消成视觉上的空操作。
+ * 详见 mobileKeyboardInset.ts 的 installKeyboardPanCompensation 注释。
+ * 只在真发生平移时才带上这个属性——常态不挂 transform，避免给整个外壳强制合成层。
+ */
+html[data-mobile-kb-pan="on"] .mobile-app {
+    transform: translateY(var(--fc-kb-pan, 0px));
+}
+
+/*
+ * 补偿用的 transform 会把外壳底边推到布局视口之下，document 的 scrollHeight 因此从 834
+ * 长到 1147，于是文档自己也能滚了——补偿量和文档滚动叠加，拖到底时顶栏又被带出屏幕。
+ * 这里把溢出夹掉，切断这个自激回路（实测 scrollHeight 稳定在 834、拖到底顶栏仍在 [40,100]）。
+ * 只在补偿生效期间生效，不改变常态下的文档行为。
+ */
+html[data-mobile-kb-pan="on"],
+html[data-mobile-kb-pan="on"] body {
+    overflow: hidden;
 }

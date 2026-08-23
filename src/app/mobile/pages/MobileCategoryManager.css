@@ -1,5 +1,5 @@
 .mobile-category-manager {
-    padding: 1rem var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: var(--mobile-gap-group) var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
     background: var(--fc-color-bg);
 }
 
@@ -7,29 +7,29 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: var(--fc-space-md);
-    margin-bottom: 0.85rem;
+    gap: var(--mobile-gap-item);
+    margin-bottom: var(--mobile-gap-item);
 }
 
 .mobile-category-manager__title {
     margin: 0;
     color: var(--fc-color-text);
-    font-size: clamp(1.65rem, 7vw, 2.15rem);
-    font-weight: var(--mobile-font-weight-display);
+    font-size: var(--mobile-text-display);
+    font-weight: var(--mobile-weight-strong);
     letter-spacing: 0;
-    line-height: 1.05;
+    line-height: var(--mobile-leading-tight) ;
 }
 
 /* 高度由 --fc-control-tap-min 统一；原先的 2.45rem 低于触控下限。 */
 .mobile-category-manager__head .fc-btn {
     flex: 0 0 auto;
     border-radius: var(--fc-radius-full);
-    padding-inline: 0.95rem;
+    padding-inline: var(--mobile-gap-group);
 }
 
 .mobile-category-manager__empty {
     min-height: 5rem;
-    border: var(--mobile-border-strong);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--mobile-surface-muted-soft);
 }
@@ -37,7 +37,7 @@
 .mobile-category-manager__list {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: var(--mobile-gap-inline);
 }
 
 .mobile-category-row {
@@ -47,23 +47,23 @@
     grid-template-columns: minmax(0, 1fr) 2.7rem;
     align-items: stretch;
     min-height: 3.75rem;
-    border: var(--mobile-border-strong);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-control);
+    box-shadow: var(--mobile-elevation-raised);
     overflow: hidden;
 }
 
 .mobile-category-row__main {
     display: flex;
     align-items: center;
-    gap: var(--fc-space-sm);
+    gap: var(--mobile-gap-inline);
     min-width: 0;
     padding:
-        0.75rem
-        var(--fc-space-sm)
-        0.75rem
-        calc(var(--fc-space-sm) + (var(--mobile-category-depth) * 0.95rem));
+        var(--mobile-pad-card-compact)
+        var(--mobile-gap-inline)
+        var(--mobile-pad-card-compact)
+        calc(var(--mobile-gap-inline) + (var(--mobile-category-depth) * var(--mobile-gap-group)));
     border: none;
     background: transparent;
     color: inherit;
@@ -89,14 +89,14 @@
 .mobile-category-row__body {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: var(--mobile-gap-text);
     min-width: 0;
 }
 
 .mobile-category-row__name {
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--mobile-font-weight-strong);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -104,8 +104,8 @@
 
 .mobile-category-row__meta {
     color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -117,7 +117,7 @@
     justify-content: center;
     width: 2.7rem;
     border: none;
-    border-left: var(--mobile-border-strong);
+    border-left: var(--mobile-border);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -127,29 +127,29 @@
 .mobile-category-dialog {
     width: min(23rem, 100%);
     box-sizing: border-box;
-    padding: var(--fc-space-lg);
-    border: var(--mobile-border-emphasis);
+    padding: var(--mobile-gap-group);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-floating);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
-    box-shadow: var(--mobile-shadow-floating-soft);
+    box-shadow: var(--mobile-elevation-floating);
 }
 
 .mobile-category-dialog__summary,
 .mobile-category-dialog__hint {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.5;
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-category-dialog__hint {
-    margin-top: var(--fc-space-sm);
+    margin-top: var(--mobile-gap-inline);
 }
 
 .mobile-category-dialog__actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--fc-space-sm);
-    margin-top: var(--fc-space-lg);
+    gap: var(--mobile-gap-inline);
+    margin-top: var(--mobile-gap-group);
 }
 
 .mobile-category-dialog__actions .fc-btn,
@@ -161,14 +161,14 @@
 .mobile-category-delete-options {
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-xs);
-    margin-top: var(--fc-space-md);
+    gap: var(--mobile-gap-text);
+    margin-top: var(--mobile-gap-item);
 }
 
 .mobile-category-parent-list {
     max-height: min(52vh, 24rem);
     overflow: auto;
-    padding-right: var(--fc-space-xs);
+    padding-right: var(--mobile-gap-text);
     scrollbar-width: none;
 }
 
@@ -182,18 +182,18 @@
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: 2.7rem;
+    min-height: var(--mobile-tap-min);
     padding:
-        var(--fc-space-sm)
-        var(--fc-space-md)
-        var(--fc-space-sm)
-        calc(var(--fc-space-md) + (var(--mobile-category-depth) * 0.95rem));
-    border: var(--mobile-border-emphasis);
+        var(--mobile-gap-inline)
+        var(--mobile-gap-item)
+        var(--mobile-gap-inline)
+        calc(var(--mobile-gap-item) + (var(--mobile-category-depth) * var(--mobile-gap-group)));
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-field);
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--fc-font-weight-medium);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
     text-align: left;
     cursor: pointer;
     touch-action: manipulation;

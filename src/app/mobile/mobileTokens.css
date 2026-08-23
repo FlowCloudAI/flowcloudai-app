@@ -1,0 +1,168 @@
+/*
+ * 移动端尺度与结构语义 token，iOS 与 Android 共用。
+ *
+ * token 挂在 touch density 根节点上，使挂到 body 的 Overlay、BottomSheet 与
+ * ActionMenu 也能继承同一标尺；桌面端 comfortable density 不命中本作用域。
+ * 业务样式只消费本文件的 token，完整约束见 designs/mobile-ui-baseline.md。
+ */
+:root[data-fc-density="touch"] {
+    /* 间距层级：text < inline < item < group < section。 */
+    --mobile-gap-text: var(--fc-space-xs);
+    --mobile-gap-inline: var(--fc-space-sm);
+    --mobile-gap-item: var(--fc-space-md);
+    --mobile-gap-group: var(--fc-space-lg);
+    --mobile-gap-section: var(--fc-space-xl);
+
+    --mobile-pad-card: var(--mobile-gap-group);
+    --mobile-pad-card-compact: var(--mobile-gap-item);
+    --mobile-pad-control: var(--mobile-gap-item);
+    --mobile-pad-sheet: var(--mobile-gap-group);
+    --mobile-page-top: var(--mobile-gap-group);
+    --mobile-page-bottom: var(--mobile-gap-section);
+    --mobile-page-x-base: clamp(1rem, 4vw, 1.35rem);
+    /* 左右取同一最大值，横屏挖孔不会让内容区变成不对称 gutter。 */
+    --mobile-page-x: max(
+        var(--mobile-page-x-base),
+        var(--mobile-safe-left),
+        var(--mobile-safe-right)
+    );
+
+    /* 字号只保留 5 档；flowcloudai-ui 在 touch density 下复用同一标尺。 */
+    --mobile-font-scale: 1;
+    --mobile-text-meta: calc(0.8125rem * var(--mobile-font-scale));
+    --mobile-text-body-sm: calc(0.9375rem * var(--mobile-font-scale));
+    --mobile-text-body: calc(1.0625rem * var(--mobile-font-scale));
+    --mobile-text-title: calc(1.375rem * var(--mobile-font-scale));
+    --mobile-text-display: calc(1.75rem * var(--mobile-font-scale));
+
+    --fc-font-size-2xs: var(--mobile-text-meta);
+    --fc-font-size-xs: var(--mobile-text-meta);
+    --fc-font-size-caption: var(--mobile-text-meta);
+    --fc-font-size-sm: var(--mobile-text-body-sm);
+    --fc-font-size-control: var(--mobile-text-body);
+    --fc-font-size-reading: var(--mobile-text-body);
+    --fc-font-size-md: var(--mobile-text-body);
+    --fc-font-size-body: var(--mobile-text-body);
+    --fc-font-size-lg: var(--mobile-text-title);
+    --fc-font-size-title-sm: var(--mobile-text-title);
+    --fc-font-size-xl: var(--mobile-text-display);
+
+    --mobile-weight-normal: 400;
+    --mobile-weight-medium: 500;
+    --mobile-weight-strong: 600;
+
+    --mobile-leading-tight: 1.25;
+    --mobile-leading-snug: 1.4;
+    --mobile-leading-normal: 1.6;
+
+    /* 页面内容默认无阴影；只有 raised 与脱离文档流的 floating 两档。 */
+    --mobile-border-color: color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    --mobile-border: 1px solid var(--mobile-border-color);
+    --mobile-divider-color: color-mix(in srgb, var(--fc-color-border) 50%, transparent);
+    --mobile-divider: 1px solid var(--mobile-divider-color);
+    /* 焦点与运行状态不是容器层次，单独使用轮廓而不是伪装成第三档阴影。 */
+    --mobile-focus-ring: 2px solid color-mix(in srgb, var(--fc-color-primary) 34%, transparent);
+    --mobile-status-ring: 1px solid color-mix(in srgb, var(--fc-color-primary) 34%, transparent);
+    --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
+
+    --mobile-surface-raised: var(--fc-color-bg-elevated);
+    --mobile-surface-control: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
+    --mobile-surface-menu: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
+    --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
+    --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    --mobile-surface-translucent: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    --mobile-surface-translucent-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    --mobile-surface-glass: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
+    --mobile-surface-panel: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+
+    --mobile-side-drawer-bg: var(--fc-color-bg-secondary);
+    --mobile-drawer-reveal-bg: var(--mobile-side-drawer-bg);
+    --mobile-drawer-edge-shadow-start: color-mix(in srgb, var(--fc-color-bg-overlay) 62%, transparent);
+    --mobile-drawer-edge-shadow-middle: color-mix(in srgb, var(--fc-color-bg-overlay) 38%, transparent);
+    --mobile-drawer-edge-shadow-end: color-mix(in srgb, var(--fc-color-bg-overlay) 24%, transparent);
+
+    /* 普通玻璃面只有“遮住内容”和“仍可辨认”两档；系统级 Tab 独立使用更强的 24px 模糊。 */
+    --mobile-glass-filter: blur(8px) saturate(1.3);
+    --mobile-glass-filter-soft: blur(2px);
+    --mobile-nav-glass-filter: blur(24px) saturate(1.3);
+    --mobile-nav-surface: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
+
+    --mobile-radius-card: var(--fc-radius-xl);
+    --mobile-radius-field: var(--fc-radius-xl);
+    --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--mobile-gap-inline));
+    --mobile-radius-sheet: calc(var(--fc-radius-xl) + var(--mobile-gap-inline));
+    --mobile-top-action-size: 2.75rem;
+    --mobile-top-surface-size: 2.5rem;
+    --mobile-topbar-offset: calc(var(--mobile-gap-group) + var(--mobile-gap-text));
+    /* 底栏高度同时容纳 48px 命中区、图标与标签；图标保持系统 Tab 的 24px 视觉尺寸。 */
+    --mobile-nav-content-height: calc(var(--mobile-tap-min) + var(--mobile-gap-item));
+    --mobile-nav-height: calc(var(--mobile-nav-content-height) + var(--mobile-safe-bottom));
+    --mobile-nav-icon-size: 1.5rem;
+    /* 封面占位字属于装饰图形，不参与正文的 5 档字号标尺。 */
+    --mobile-decorative-mark-size: 4.75rem;
+    --mobile-elevation-raised:
+        0 1px 2px color-mix(in srgb, var(--fc-color-text) 5%, transparent),
+        0 2px 8px color-mix(in srgb, var(--fc-color-text) 6%, transparent);
+    --mobile-elevation-floating:
+        0 8px 32px color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+
+    --mobile-z-base: 0;
+    --mobile-z-sticky: 10;
+    --mobile-z-nav: 20;
+    --mobile-z-drawer: 30;
+    --mobile-z-sheet: 40;
+    --mobile-z-overlay: 50;
+    --mobile-z-toast: 60;
+
+    /* 48 = max(iOS 44pt, Material 48dp)。 */
+    --mobile-tap-min: 3rem;
+    --mobile-tap-expand: var(--mobile-gap-inline);
+    --fc-control-tap-min: var(--mobile-tap-min);
+
+    /*
+     * iOS 由 env() 提供完整安全区；Android 由原生 WindowInsets 补入 native 值。
+     * 业务 CSS 不直接读取 env(safe-area-inset-*)。
+     */
+    --mobile-safe-top: max(env(safe-area-inset-top, 0px), var(--mobile-native-inset-top, 0px));
+    --mobile-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--mobile-native-inset-bottom, 0px));
+    --mobile-safe-left: max(env(safe-area-inset-left, 0px), var(--mobile-native-inset-left, 0px));
+    --mobile-safe-right: max(env(safe-area-inset-right, 0px), var(--mobile-native-inset-right, 0px));
+
+    --mobile-duration-fast: 120ms;
+    --mobile-duration-base: 220ms;
+    --mobile-duration-slow: 320ms;
+    --mobile-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+    --mobile-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+:root[data-fc-density="touch"][data-theme="dark"] {
+    --mobile-drawer-edge-shadow-start: color-mix(in srgb, var(--fc-color-bg-overlay) 90%, transparent);
+    --mobile-drawer-edge-shadow-middle: color-mix(in srgb, var(--fc-color-bg-overlay) 72%, transparent);
+    --mobile-drawer-edge-shadow-end: color-mix(in srgb, var(--fc-color-bg-overlay) 42%, transparent);
+}
+
+/* iOS Reduce Transparency 与 Android 高对比度都降级为不透明 surface。 */
+:root[data-fc-density="touch"][data-mobile-high-contrast="true"] {
+    --mobile-surface-control: var(--fc-color-bg-elevated);
+    --mobile-surface-menu: var(--fc-color-bg-elevated);
+    --mobile-surface-muted: var(--fc-color-bg-secondary);
+    --mobile-surface-muted-soft: var(--fc-color-bg-secondary);
+    --mobile-surface-translucent: var(--fc-color-bg-elevated);
+    --mobile-surface-translucent-strong: var(--fc-color-bg-elevated);
+    --mobile-surface-glass: var(--fc-color-bg-elevated);
+    --mobile-surface-panel: var(--fc-color-bg-elevated);
+    --mobile-surface-dialog: var(--fc-color-bg-elevated);
+    --mobile-glass-filter: none;
+    --mobile-glass-filter-soft: none;
+    --mobile-nav-glass-filter: none;
+    --mobile-nav-surface: var(--fc-color-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-fc-density="touch"] {
+        --mobile-duration-fast: 0ms;
+        --mobile-duration-base: 0ms;
+        --mobile-duration-slow: 0ms;
+    }
+}

@@ -37,24 +37,18 @@ export function useProjectImportController({onImported, onError}: ProjectImportC
         }
     }, [closeProgress, finishProgress, onError, onImported, startProgress])
 
-    const selectAndImport = useCallback(async () => {
+    const importFromPath = useCallback(async (inputPath: string) => {
         if (importing) return
-        const selectedPath = await openFileDialog({
-            multiple: false,
-            filters: [{name: '流云AI World', extensions: ['fcworld']}],
-        })
-        if (!selectedPath || Array.isArray(selectedPath)) return
-
         setImporting(true)
         try {
             const operationId = startProgress('import', '检查导入包')
-            const preview = await db_preview_project_fcworld(selectedPath, operationId)
+            const preview = await db_preview_project_fcworld(inputPath, operationId)
             closeProgress()
             if (preview.duplicateProject) {
                 setConflict(preview)
                 return
             }
-            await runImport(selectedPath, {mode: 'rename', projectName: preview.projectName})
+            await runImport(inputPath, {mode: 'rename', projectName: preview.projectName})
         } catch (error) {
             closeProgress()
             await onError(error)
@@ -62,6 +56,16 @@ export function useProjectImportController({onImported, onError}: ProjectImportC
             setImporting(false)
         }
     }, [closeProgress, importing, onError, runImport, startProgress])
+
+    const selectAndImport = useCallback(async () => {
+        if (importing) return
+        const selectedPath = await openFileDialog({
+            multiple: false,
+            filters: [{name: '流云AI World', extensions: ['fcworld']}],
+        })
+        if (!selectedPath || Array.isArray(selectedPath)) return
+        await importFromPath(selectedPath)
+    }, [importFromPath, importing])
 
     const rename = useCallback((projectName: string) => {
         if (!conflict || importing) return Promise.resolve()
@@ -84,6 +88,7 @@ export function useProjectImportController({onImported, onError}: ProjectImportC
         importing,
         conflict,
         progress,
+        importFromPath,
         selectAndImport,
         rename,
         overwrite,

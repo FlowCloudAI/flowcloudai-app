@@ -1,5 +1,14 @@
 .mobile-idea {
+    /*
+     * 软键盘接管：同 MobileAiChat，只重定义保留高度。
+     * 本页带 mobile-nav-safe-fixed，其 padding-bottom 读的就是这个变量；
+     * 正文 textarea 是 flex: 1 1 auto，父级 padding 变大它自然缩短，无需额外声明。
+     * 方案见 docs/mobile_keyboard_layout.md。
+     */
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
     position: relative;
+    transition: padding-bottom var(--fc-kb-transition, 0s);
     display: flex;
     min-height: 0;
     height: 100%;
@@ -28,8 +37,8 @@
     flex: 1 1 auto;
     flex-direction: column;
     justify-content: center;
-    gap: 0.08rem;
-    padding: 0 var(--fc-space-xs);
+    gap: var(--mobile-gap-text);
+    padding: 0 var(--mobile-gap-text);
 }
 
 .mobile-idea__title-text span,
@@ -41,15 +50,15 @@
 
 .mobile-idea__title-text span {
     color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.1;
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-idea__title-text small {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.1;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-idea__editor {
@@ -57,85 +66,85 @@
     min-height: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 0.85rem;
-    padding: 0.45rem var(--mobile-page-x) calc(0.8rem + env(safe-area-inset-bottom, 0));
+    gap: var(--mobile-gap-item);
+    padding: var(--mobile-gap-inline) var(--mobile-page-x) calc(var(--mobile-gap-item) + var(--mobile-safe-bottom));
 }
 
 .mobile-idea__meta {
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
-    gap: 0.7rem;
+    gap: var(--mobile-gap-item);
 }
 
 .mobile-idea__title-input {
     width: 100%;
-    min-height: 3.1rem;
+    min-height: var(--fc-control-height-lg);
     box-sizing: border-box;
-    padding: 0 var(--fc-space-lg);
+    padding: 0 var(--mobile-gap-group);
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-field);
     outline: 0;
     background: var(--mobile-surface-muted-soft);
     color: var(--fc-color-text);
     font: inherit;
-    font-size: 1.28rem;
-    font-weight: var(--mobile-font-weight-heading);
-    box-shadow: var(--mobile-inset-highlight-soft);
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
+    box-shadow: none;
 }
 
 .mobile-idea__title-input::placeholder,
 .mobile-idea__content::placeholder {
-    color: color-mix(in srgb, var(--fc-color-text-secondary) 72%, transparent);
+    color: var(--mobile-color-text-readable-tertiary);
 }
 
 .mobile-idea__select-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(7.25rem, 0.52fr);
-    gap: 0.65rem;
+    gap: var(--mobile-gap-item);
 }
 
 .mobile-idea__select-row label {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-idea__select-row span {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-label);
-    line-height: 1.1;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 /* 高度交给 flowcloudai-ui 的 --fc-control-tap-min（触控密度 = 44 像素），
    这里只管横向内边距与移动端质感；原先写死的 2.55rem 低于触控下限。 */
 .mobile-idea__select .fc-select__trigger {
-    padding: 0 0.78rem;
+    padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
     background: var(--mobile-surface-translucent);
-    box-shadow: var(--mobile-inset-highlight-soft);
+    box-shadow: none;
 }
 
 .mobile-idea__select .fc-select__value {
     overflow: hidden;
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--mobile-text-body-sm);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .mobile-idea__select .fc-select__dropdown {
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
-    border: var(--mobile-border-strong);
-    box-shadow: var(--mobile-shadow-anchored-menu);
+    border: var(--mobile-border);
+    box-shadow: var(--mobile-elevation-floating);
 }
 
 .mobile-idea__summary {
     display: flex;
     min-height: 1.25rem;
     align-items: center;
-    gap: 0.45rem;
+    gap: var(--mobile-gap-inline);
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -148,13 +157,13 @@
     display: inline-flex;
     min-height: 1.55rem;
     align-items: center;
-    padding: 0 0.58rem;
-    border: var(--mobile-border-soft);
+    padding: 0 var(--mobile-gap-inline);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-bg-secondary) 70%, transparent);
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-label);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
     white-space: nowrap;
 }
 
@@ -163,15 +172,15 @@
     min-height: 0;
     flex: 1 1 auto;
     box-sizing: border-box;
-    padding: var(--fc-space-lg);
-    border: var(--mobile-border-strong);
+    padding: var(--mobile-gap-group);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     outline: 0;
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
-    font-size: var(--fc-font-size-md);
-    line-height: 1.62;
+    font-size: var(--mobile-text-body);
+    line-height: var(--mobile-leading-normal);
     resize: none;
 }
 
@@ -183,5 +192,13 @@
 @media (max-width: 380px) {
     .mobile-idea__select-row {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* 键盘跟随的过渡降级为直接到位。对本方案没有损失：
+       收起方向本来就是吸附，升起方向少一段动画只是变成瞬移，布局终态完全一致。 */
+    .mobile-idea {
+        transition: none;
     }
 }

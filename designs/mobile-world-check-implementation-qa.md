@@ -1,18 +1,14 @@
 # 移动端设定检测实现 QA
 
+> **状态：结论记录（视觉证据已丢失）** ｜ QA 日期：2026-08-06
+>
+> 原始截图存放在当时 Windows 工作机的 `C:\Users\...\.codex\` 下，不在本仓库内，现已不可复核。
+> 本文只保留结论与判据描述；**结论无法再被证据反驳，引用时按“当时的判断”看待，不要当作现状**。
+> 后续设计 QA 一律按 `designs/audits/<主题>-<日期>/` 的做法把截图提交进仓库。
+
 ## 对照证据
 
-- 设计源：`E:\Projects\FlowCloudAI\app_main\designs\mobile-world-check.html`
-- 设计列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-list-v3.png`
-- 设计详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-detail.png`
-- 设计任务截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-task-v2.png`
-- 真机列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\12-list-final.png`
-- 真机详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\13-detail-final.png`
-- 真机任务截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\10-task-error-wrapped.png`
-- 真机详情滚动遮罩截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\20-detail-gradient-scrolled.png`
-- 列表并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-list-final.png`
-- 详情并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-detail-final.png`
-- 任务并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-task-final.png`
+- 设计源：`app_main/designs/mobile-world-check.html`
 
 ## 环境与归一化
 

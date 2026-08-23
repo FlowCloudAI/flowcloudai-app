@@ -49,8 +49,8 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
         <FloatingPanel open={!!moveTarget} onClose={onCloseMove} dismissible={!busy} title="移动分类" ariaLabel="移动分类" className="mobile-category-drawer-dialog">
             <div className="mobile-category-drawer-dialog__summary">将「{moveTarget?.name ?? ''}」移动到新的父分类。</div>
             <div className="mobile-category-drawer-parent-list">
-                <button type="button" className={`mobile-category-drawer-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`} disabled={busy} onClick={() => onMove(null)}>根级分类</button>
-                {moveCandidates.map(row => <button type="button" key={row.category.id} className={`mobile-category-drawer-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`} style={{'--mobile-category-drawer-depth': row.depth} as CSSProperties} disabled={busy} onClick={() => onMove(row.category.id)}>{row.category.name}</button>)}
+                <button type="button" className={`mobile-category-drawer-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`} aria-current={(moveTarget?.parent_id ?? null) === null ? 'true' : undefined} disabled={busy} onClick={() => onMove(null)}>根级分类</button>
+                {moveCandidates.map(row => <button type="button" key={row.category.id} className={`mobile-category-drawer-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`} aria-current={moveTarget?.parent_id === row.category.id ? 'true' : undefined} style={{'--mobile-category-drawer-depth': row.depth} as CSSProperties} disabled={busy} onClick={() => onMove(row.category.id)}>{row.category.name}</button>)}
             </div>
             <div className="mobile-category-drawer-dialog__actions"><Button type="button" variant="ghost" size="sm" radius="full" disabled={busy} onClick={onCloseMove}>取消</Button></div>
         </FloatingPanel>

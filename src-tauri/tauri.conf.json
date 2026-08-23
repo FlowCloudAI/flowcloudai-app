@@ -45,7 +45,7 @@
       "minSdkVersion": 26
     },
     "iOS": {
-      "minimumSystemVersion": "14.0",
+      "minimumSystemVersion": "16.2",
       "template": "src-tauri/ios/project.yml"
     },
     "targets": [

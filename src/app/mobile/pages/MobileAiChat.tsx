@@ -7,14 +7,10 @@ import {
     useState,
 } from 'react'
 import {useDrag} from '@use-gesture/react'
-import {createPortal, flushSync} from 'react-dom'
+import {createPortal} from 'react-dom'
 import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {useAlert} from 'flowcloudai-ui'
-import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {
-    getAppSettingsSnapshot,
-    subscribeAppSettings,
-} from '../../../features/settings/appSettingsStore'
+import {useAiController} from '../../../features/ai-chat/hooks/useAiController'
 import {
     normalizeConversationSettings,
     type AiToolAccessMode,
@@ -26,12 +22,9 @@ import {
     ai_export_conversation,
     type ConversationExportFormat,
     formatApiError,
-    setting_has_api_key,
     toApiError,
 } from '../../../api'
 import {logger} from '../../../shared/logger'
-import type {WorldCheckDiscussionParams} from '../../../features/project-editor/hooks/useWorldCheckController'
-import {type MobileTab} from '../MobileNav'
 import {
     type MobileAnchoredMenuItem,
     MobileAddIcon,
@@ -60,34 +53,12 @@ import {
     sortConversations,
     type AiConversationFilter,
     type AiConversationStatusFilter,
-    type ApiKeyAvailability,
     type ConversationLongPressState,
 } from './MobileAiChatUi'
+import type {MobileAiChatProps} from './MobileAiChat.types'
+import {runMobileViewTransition} from './mobileViewTransition'
+import {useMobileAiApiKeyAvailability} from './useMobileAiApiKeyAvailability'
 import './MobileAiChat.css'
-interface Props {
-    aiFocus: AiFocus
-    active: boolean
-    navigateToTab: (tab: MobileTab) => void
-    conversationDrawerOpen?: boolean
-    onOpenConversationDrawer?: () => void
-    onCloseConversationDrawer?: () => void
-    onStartReportDiscussionReady?: (
-        handler: ((params: WorldCheckDiscussionParams) => Promise<void>) | null,
-    ) => void
-}
-
-function runAiMenuContentTransition(update: () => void) {
-    if (
-        typeof document.startViewTransition !== 'function'
-        || window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-        update()
-        return
-    }
-
-    const transition = document.startViewTransition(() => flushSync(update))
-    void transition.finished.catch(() => undefined)
-}
 
 export default function MobileAiChat({
     aiFocus,
@@ -97,7 +68,7 @@ export default function MobileAiChat({
     onOpenConversationDrawer,
     onCloseConversationDrawer,
     onStartReportDiscussionReady,
-}: Props) {
+}: MobileAiChatProps) {
     const {showAlert} = useAlert()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
@@ -130,8 +101,6 @@ export default function MobileAiChat({
         return () => onStartReportDiscussionReady?.(null)
     }, [onStartReportDiscussionReady, startReportDiscussion])
 
-    const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
-    const [llmApiKeyAvailability, setLlmApiKeyAvailability] = useState<ApiKeyAvailability>('unknown')
     const [conversationSearch, setConversationSearch] = useState('')
     const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
@@ -197,6 +166,11 @@ export default function MobileAiChat({
     const hasConversationSearch = normalizedConversationSearch.length > 0
     const pluginsLoading = !pluginsReady
     const llmUnavailable = pluginsReady && plugins.length === 0
+    const llmApiKeyAvailability = useMobileAiApiKeyAvailability({
+        pluginId: activeLlmPluginId,
+        pluginsReady,
+        pluginUnavailable: llmUnavailable,
+    })
     const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
     const llmApiKeyChecking = pluginsReady
         && !llmUnavailable
@@ -291,39 +265,6 @@ export default function MobileAiChat({
         }
     }, [])
 
-    useEffect(() => {
-        if (!pluginsReady || llmUnavailable || !activeLlmPluginId) {
-            setLlmApiKeyAvailability('unknown')
-            return
-        }
-
-        let cancelled = false
-        setLlmApiKeyAvailability('checking')
-
-        setting_has_api_key(activeLlmPluginId)
-            .then(hasApiKey => {
-                if (cancelled) return
-                setLlmApiKeyAvailability(hasApiKey ? 'configured' : 'missing')
-            })
-            .catch(error => {
-                logger.error('[MobileAiChat] API Key 状态检查失败', error)
-                if (!cancelled) setLlmApiKeyAvailability('error')
-            })
-
-        return () => {
-            cancelled = true
-        }
-    }, [activeLlmPluginId, apiKeyRefreshTick, llmUnavailable, pluginsReady])
-
-    useEffect(() => {
-        const refreshApiKeyState = () => {
-            const hasApiKey = getAppSettingsSnapshot().apiKeyStatus[activeLlmPluginId]
-            setLlmApiKeyAvailability(hasApiKey ? 'configured' : 'missing')
-            setApiKeyRefreshTick(tick => tick + 1)
-        }
-        return subscribeAppSettings(refreshApiKeyState)
-    }, [activeLlmPluginId])
-
     const handleToolModeChange = useCallback(async (mode: AiToolAccessMode) => {
         if (mode === toolAccessMode) return
         if (mode === 'writer' && !writerModeAvailable) {
@@ -358,7 +299,7 @@ export default function MobileAiChat({
 
     const changeModelMenuMode = useCallback((mode: 'models' | 'plugins') => {
         if (mode === modelMenuMode) return
-        runAiMenuContentTransition(() => setModelMenuMode(mode))
+        runMobileViewTransition(() => setModelMenuMode(mode))
     }, [modelMenuMode])
 
     const closeTopMenu = useCallback(() => {
@@ -608,10 +549,6 @@ export default function MobileAiChat({
         }
     }, [showAlert])
 
-    const handleUnavailableMobileAiTool = useCallback((label: string) => {
-        void showAlert(`移动端暂未开放「${label}」入口。`, 'info', 'nonInvasive', 1800)
-    }, [showAlert])
-
     const handleAttachDocuments = useCallback(async () => {
         if (!activeConversation || isArchivedConversation) return
         try {
@@ -761,7 +698,7 @@ export default function MobileAiChat({
 
 
     return (
-        <div ref={pageRef} className="mobile-ai-chat" hidden={!active}>
+        <div ref={pageRef} className="mobile-ai-chat mobile-nav-safe-fixed" hidden={!active}>
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
             <MobilePageTopBar
                 className="mobile-ai-chat__topbar"
@@ -847,8 +784,6 @@ export default function MobileAiChat({
                 activeModelOptions={activeModelOptions} activeModelId={activeModelId}
                 onSelectModel={modelId => void handleSelectModel(modelId)} onSelectPlugin={pluginId => void handleSelectPlugin(pluginId)}
                 topMenuOpen={topMenuOpen} onCloseTopMenu={closeTopMenu} activeConversationMenuItems={activeConversationMenuItems}
-                onUnavailable={handleUnavailableMobileAiTool}
-                onGallery={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
                 onAttachDocuments={() => void handleAttachDocuments()} webSearchEnabled={webSearchEnabled} onToggleWebSearch={() => void toggleWebSearch()}
                 conversationControls={conversationControls} conversationActionTarget={conversationActionTarget}
                 onCloseConversationAction={() => setConversationActionTarget(null)} conversationActionMenuItems={conversationActionMenuItems}

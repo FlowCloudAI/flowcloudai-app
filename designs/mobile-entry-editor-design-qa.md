@@ -1,8 +1,11 @@
 # 移动端词条编辑设计 QA
 
-- source visual truth path: `C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\entry-editor-comparison\21-design-entry-editor-main.png`、`22-design-entry-editor-extras.png`
-- implementation screenshot path: `C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\entry-editor-comparison\24-design-editor-summary.png`、`25-design-editor-media.png`、`26-design-editor-relations.png`
-- comparison evidence: `C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\entry-editor-comparison\27-design-qa-comparison.png`
+> **状态：结论记录（视觉证据已丢失）** ｜ QA 日期：2026-08-03
+>
+> 原始截图存放在当时 Windows 工作机的 `C:\Users\...\.codex\` 下，不在本仓库内，现已不可复核。
+> 本文只保留结论与判据描述；**结论无法再被证据反驳，引用时按“当时的判断”看待，不要当作现状**。
+> 后续设计 QA 一律按 `designs/audits/<主题>-<日期>/` 的做法把截图提交进仓库。
+
 - viewport: 1440 × 1000；手机画布 390 × 844 CSS px
 - pixels and density: 原稿与实现截图均为 1440 × 1000 px，deviceScaleFactor 1，无密度换算
 - state: 主编辑摘要、图片展开、词条关系展开

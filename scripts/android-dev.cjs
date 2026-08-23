@@ -497,6 +497,15 @@ function parseDevices(output) {
     return devices
 }
 
+function isPhysicalAndroidDevice(adbPath, serial) {
+    try {
+        return runCapture(adbPath, ['-s', serial, 'shell', 'getprop', 'ro.kernel.qemu']).trim() !== '1'
+    } catch {
+        // 极早期真机可能尚不能执行 shell；本地 Android Emulator 的 serial 仍可可靠排除。
+        return !serial.startsWith('emulator-')
+    }
+}
+
 async function waitForDevice(adbPath, timeoutMs = ADB_WAIT_TIMEOUT_MS) {
     const start = Date.now()
     let warnedUnauthorized = false
@@ -593,6 +602,7 @@ async function waitForBoot(adbPath, serial, timeoutMs = ADB_WAIT_TIMEOUT_MS) {
 }
 
 async function main() {
+    const physicalOnly = process.argv.includes('--physical-only')
     const adbPath = findExecutable('adb')
     if (!adbPath) {
         throw new Error('未找到 adb，请先确认 Android SDK platform-tools 已加入 PATH 或设置 ANDROID_HOME/ANDROID_SDK_ROOT。')
@@ -605,14 +615,28 @@ async function main() {
         CARGO_PROFILE_DEV_STRIP: 'debuginfo',
     })
 
-    await prepareDevServerPorts()
-
     const emulatorPath = findExecutable('emulator')
     startServerIfNeeded(adbPath)
     let devices = parseDevices(runCapture(adbPath, ['devices']))
-    let serial = devices.find((item) => item.state === 'device')
+    const onlineDevices = devices.filter((item) => item.state === 'device')
+    if (physicalOnly && onlineDevices.length > 1) {
+        throw new Error(
+            `检测到多个在线 Android 设备：${onlineDevices.map((item) => item.serial).join(', ')}。` +
+            '真机 Dev 为避免 Tauri 按不稳定设备名称选错目标，要求只保留一台在线设备。'
+        )
+    }
+    let serial = physicalOnly
+        ? onlineDevices.find((item) => isPhysicalAndroidDevice(adbPath, item.serial))
+        : onlineDevices[0]
 
     if (!serial) {
+        if (physicalOnly) {
+            const unauthorized = devices.filter((item) => item.state === 'unauthorized')
+            const hint = unauthorized.length
+                ? `发现未授权设备：${unauthorized.map((item) => item.serial).join(', ')}。请在手机上允许 USB 调试后重试。`
+                : '请连接已开启 USB 调试的 Android 真机，并确认 `adb devices -l` 显示为 device。'
+            throw new Error(`未检测到在线 Android 真机。${hint}`)
+        }
         if (!emulatorPath) {
             throw new Error('未检测到已连接设备且未找到 emulator 命令，无法自动启动模拟器。')
         }
@@ -650,10 +674,14 @@ async function main() {
         )
     }
 
+    await prepareDevServerPorts()
+
     for (const port of DEV_SERVER_PORTS) {
         adbReverseReset(adbPath, serial, port)
     }
 
+    // Tauri 的位置参数匹配设备“名称”而非 serial，且部分厂商会在蓝牙名和型号间回退。
+    // 此处已保证真机模式只有一个在线设备，省略位置参数可让 Tauri 用 ADB serial 精确运行。
     const npmArgs = ['run', 'tauri', '--', 'android', 'dev', '--host', '127.0.0.1']
     const result =
         process.platform === 'win32'
@@ -678,7 +706,11 @@ async function main() {
     }
 }
 
-main().catch((error) => {
-    console.error(error.message || error)
-    process.exitCode = 1
-})
+module.exports = {configureAndroidNdkBuildEnv}
+
+if (require.main === module) {
+    main().catch((error) => {
+        console.error(error.message || error)
+        process.exitCode = 1
+    })
+}

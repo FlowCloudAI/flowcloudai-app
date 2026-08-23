@@ -1,15 +1,14 @@
 # 移动端设定检测设计 QA
 
+> **状态：结论记录（视觉证据已丢失）** ｜ QA 日期：2026-08-06
+>
+> 原始截图存放在当时 Windows 工作机的 `C:\Users\...\.codex\` 下，不在本仓库内，现已不可复核。
+> 本文只保留结论与判据描述；**结论无法再被证据反驳，引用时按“当时的判断”看待，不要当作现状**。
+> 后续设计 QA 一律按 `designs/audits/<主题>-<日期>/` 的做法把截图提交进仓库。
+
 ## 对照目标
 
-- 源视觉真值：`C:\Users\f1779\.codex\generated_images\019fc218-fd10-7570-9a67-09d52a01fdea\exec-98709364-8568-4348-afa6-1388224e4909.png`
-- 实现文件：`E:\Projects\FlowCloudAI\app_main\designs\mobile-world-check.html`
-- 最终列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-list-v3.png`
-- 详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-detail.png`
-- 任务监控截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-task-v2.png`
-- 深色列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-list-dark.png`
-- 360 像素列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-list-360-v2.png`
-- 最终并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\option-2-list-comparison-v2.png`
+- 实现文件：`app_main/designs/mobile-world-check.html`
 - 状态：浅色主题、报告列表、存在一个运行中任务、三份历史报告。
 
 ## 视口与密度归一化

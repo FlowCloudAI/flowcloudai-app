@@ -9,6 +9,8 @@ mod android_file_import;
 mod api_error;
 mod apis;
 mod auto_backup;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod desktop_file_open;
 mod document_context;
 mod layout;
 /// `#[doc(hidden)]` 仅为让集成测试（`tests/coastline_v2.rs`）访问 map 模块；非稳定公开 API。
@@ -74,8 +76,6 @@ use template::install_global_template_runtime;
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use std::process::exit;
 use std::sync::Arc;
 use tauri::{
     AppHandle, Emitter, Manager, Runtime, UriSchemeContext,
@@ -200,12 +200,19 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init());
 
+    // 单实例插件可能早于应用 setup 收到第二进程参数，桌面文件队列必须先注册。
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.manage(desktop_file_open::DesktopFileOpenState::default());
+
+    // macOS 由 Launch Services 原生复用应用实例；若在 setup 阶段启用单实例插件，
+    // 新进程可能在 `RunEvent::Opened` 交付文件 URL 前退出，导致 Finder 双击丢失。
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        desktop_file_open::queue_cli_arguments(app, args, Path::new(&cwd));
+    }));
+
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder
-        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
-            log::info!("Single instance detected, quitting.");
-            exit(0);
-        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
@@ -273,6 +280,15 @@ pub fn run() {
             app.manage(LayoutCacheState::new());
             app.manage(BackendReadyState::new());
             app.manage(TtsPlaybackState::default());
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                let cwd = std::env::current_dir().unwrap_or_default();
+                desktop_file_open::queue_cli_arguments(
+                    &app_handle,
+                    std::env::args().collect(),
+                    &cwd,
+                );
+            }
 
             // 加载设置
             let settings_path = app_handle
@@ -633,9 +649,20 @@ pub fn run() {
             db_append_from,
             suspend_webview,
             resume_webview,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            desktop_file_open::desktop_take_pending_file_open_requests,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                desktop_file_open::queue_opened_urls(app, urls);
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }
 
 // ── 初始化辅助 ────────────────────────────────────────────────────────────────

@@ -1,5 +1,9 @@
 # 海岸线自然化算法问题分析与重构方案
 
+> 状态：现行 ｜ 记录日期：2026-06-10 起持续更新
+>
+> §2 根因与 v2.1~v2.8 的问题演化链已摘成开发记录 `docs/devlog/2026-06-10-海岸线-八轮实测修正.md`（在工作区根仓库，不在本仓）。**参数、公式与实测数据以本文为准。**
+
 > 对象：`src-tauri/src/map/coastline.rs`（入口 `build_natural_coastline_polygon`）
 > 关联：`constants.rs`（默认参数）、`types.rs`（`CoastlineParams` 协议）、前端 `src/features/maps/components/WorldMapPanel.tsx`（质量档位参数下发）
 > 日期：2026-06-10

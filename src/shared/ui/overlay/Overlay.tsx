@@ -9,7 +9,7 @@ const SHEET_TRANSITION_MS = 280
 
 type OverlayStyle = CSSProperties & {'--fc-overlay-transition-duration': string}
 
-type OverlayVariant = 'floating' | 'sheet'
+type OverlayVariant = 'floating' | 'sheet' | 'fullscreen'
 
 interface OverlayProps {
     open: boolean
@@ -57,17 +57,50 @@ export default function Overlay({
         dismissibleRef.current = dismissible
     })
 
-    // 开启即挂载并触发进场；关闭先播放退场再卸载。
+    /*
+     * Sheet 开启时先挂载 closed 态，完整绘制一帧后再进入 open 态。只排一个 rAF 时，
+     * React 的 mounted 重渲染和 active 更新可能落进同一绘制帧，移动 WebView 就会
+     * 直接显示最终位置。关闭同理：过渡结束后再保留一个完整 closed 帧才卸载。
+     * Floating 沿用原时序，避免移动端修复改变桌面弹窗手感。
+     */
     useEffect(() => {
+        let mountedFrame = 0
+        let activeFrame = 0
+        let closedFrame = 0
+        let unmountFrame = 0
+        let timer = 0
+
         if (open) {
             setMounted(true)
-            const raf = requestAnimationFrame(() => setActive(true))
-            return () => cancelAnimationFrame(raf)
+            setActive(false)
+            mountedFrame = window.requestAnimationFrame(() => {
+                if (variant === 'sheet') {
+                    activeFrame = window.requestAnimationFrame(() => setActive(true))
+                } else {
+                    setActive(true)
+                }
+            })
+        } else {
+            setActive(false)
+            timer = window.setTimeout(() => {
+                if (variant === 'sheet') {
+                    closedFrame = window.requestAnimationFrame(() => {
+                        unmountFrame = window.requestAnimationFrame(() => setMounted(false))
+                    })
+                } else {
+                    setMounted(false)
+                }
+            }, transitionDurationMs)
         }
-        setActive(false)
-        const timer = setTimeout(() => setMounted(false), transitionDurationMs)
-        return () => clearTimeout(timer)
-    }, [open, transitionDurationMs])
+
+        return () => {
+            window.clearTimeout(timer)
+            window.cancelAnimationFrame(mountedFrame)
+            window.cancelAnimationFrame(activeFrame)
+            window.cancelAnimationFrame(closedFrame)
+            window.cancelAnimationFrame(unmountFrame)
+        }
+    }, [open, transitionDurationMs, variant])
 
     useEffect(() => {
         if (variant !== 'floating') {

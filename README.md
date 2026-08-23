@@ -25,6 +25,8 @@ cargo test
 
 ### iOS
 
+iOS 客户端最低支持 iOS 16.2。
+
 iOS 环境检查、真机调试、Archive 与 IPA 导出统一见
 [`docs/tauri_ios_debug_and_release.md`](docs/tauri_ios_debug_and_release.md)。首次在 Mac 上进入仓库后先执行：
 
@@ -73,7 +75,7 @@ app_main/
 
 ## 许可证与贡献方式
 
-- 许可证：本仓库当前未发现独立 `LICENSE`，以 FlowCloudAI 顶层授权策略执行。  
+- 许可证：`app_main/LICENSE`。  
 - PR 需补充 `npm run lint`、`npm run build`、`cd src-tauri && cargo test` 结果与关键复现步骤。  
 - 提交信息默认中文，描述风险与回退策略。  
 

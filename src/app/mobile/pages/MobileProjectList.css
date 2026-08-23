@@ -1,5 +1,5 @@
 .mobile-project-list {
-    padding: 1rem var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: var(--mobile-gap-group) var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
     background: var(--fc-color-bg);
 }
 
@@ -7,8 +7,8 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: var(--fc-space-md);
-    margin-bottom: 1.05rem;
+    gap: var(--mobile-gap-item);
+    margin-bottom: var(--mobile-gap-group);
 }
 
 .mobile-project-list__hero-copy {
@@ -16,7 +16,7 @@
 }
 
 .mobile-project-list__eyebrow {
-    margin-bottom: 0.15rem;
+    margin-bottom: var(--mobile-gap-text);
 }
 
 .mobile-project-list__create {
@@ -32,7 +32,7 @@
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
     font: inherit;
-    box-shadow: var(--mobile-shadow-primary-action);
+    box-shadow: var(--mobile-elevation-floating);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
@@ -46,24 +46,24 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--fc-space-sm);
-    margin-bottom: var(--fc-space-md);
+    gap: var(--mobile-gap-inline);
+    margin-bottom: var(--mobile-gap-item);
 }
 
 .mobile-project-list__import.fc-btn {
-    min-height: 2.9rem;
+    min-height: var(--mobile-tap-min);
     border-radius: var(--fc-radius-full);
-    padding-inline: var(--fc-space-lg);
+    padding-inline: var(--mobile-gap-group);
 }
 
 .mobile-project-list__cards {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: var(--mobile-gap-item);
 }
 
 .mobile-project-card {
-    border: var(--mobile-border-strong);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     overflow: hidden;
 }

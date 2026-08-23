@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
 
   <!-- AndroidTV support -->
@@ -13,7 +14,6 @@
     android:usesCleartextTraffic="${usesCleartextTraffic}">
     <activity
       android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
-      android:screenOrientation="portrait"
       android:launchMode="singleTask"
       android:label="@string/main_activity_title"
       android:name=".MainActivity"
@@ -27,6 +27,27 @@
         <!-- AndroidTV support -->
         <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
       </intent-filter>
+        <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
+        <intent-filter>
+            <action android:name="android.intent.action.SEND" />
+            <action android:name="android.intent.action.SEND_MULTIPLE" />
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:mimeType="application/x-fcplugin" />
+            <data android:pathPattern=".*\\.fcplug" />
+        </intent-filter>
+        <intent-filter>
+            <action android:name="android.intent.action.SEND" />
+            <action android:name="android.intent.action.SEND_MULTIPLE" />
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:mimeType="application/x-fcworld" />
+            <data android:pathPattern=".*\\.fcworld" />
+        </intent-filter>
+
+        <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
     </activity>
 
     <provider

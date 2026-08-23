@@ -36,6 +36,7 @@ import {
     openWorldCheckTaskMonitor,
     useWorldCheckTaskStore,
 } from '../../features/project-editor/stores/worldCheckTaskStore'
+import DesktopFileOpenController from '../../features/desktop-file-open/DesktopFileOpenController'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
@@ -1512,6 +1513,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
                     placement="right"
                 />
             </div>
+            <DesktopFileOpenController onOpenProject={handleOpenProject}/>
             <EntryEditModal/>
             <AiConfirmModal/>
             <StartupUpdatePrompt/>

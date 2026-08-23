@@ -1,7 +1,7 @@
 .mobile-entry-list {
     --mobile-entry-card-color: var(--fc-color-primary);
 
-    padding: 0 var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
     background: var(--fc-color-bg);
 }
 
@@ -16,20 +16,20 @@
 }
 
 .mobile-entry-list__topbar {
-    margin-bottom: 0.35rem;
+    margin-bottom: var(--mobile-gap-text);
 }
 
 .mobile-entry-list__hero {
     min-width: 0;
-    margin-bottom: 0.95rem;
+    margin-bottom: var(--mobile-gap-group);
 }
 
 .mobile-entry-list__eyebrow {
-    margin-bottom: 0.15rem;
+    margin-bottom: var(--mobile-gap-text);
 }
 
 .mobile-entry-list__toolbar {
-    margin-bottom: var(--fc-space-md);
+    margin-bottom: var(--mobile-gap-item);
 }
 
 .mobile-entry-list__search {
@@ -39,12 +39,12 @@
 .mobile-entry-list__filters {
     display: flex;
     gap: 0;
-    margin-bottom: 1.1rem;
-    padding: var(--fc-space-xs);
-    border: var(--mobile-border-bold);
+    margin-bottom: var(--mobile-gap-group);
+    padding: var(--mobile-gap-text);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-floating);
     background: var(--mobile-surface-muted);
-    box-shadow: var(--mobile-inset-highlight-soft), var(--fc-shadow-xs);
+    box-shadow: none;
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -57,18 +57,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    min-height: 2.45rem;
+    gap: var(--mobile-gap-text);
+    min-height: var(--mobile-tap-min);
     min-width: max-content;
-    padding: 0 0.9rem;
+    padding: 0 var(--mobile-gap-group);
     border: 0;
     border-radius: var(--mobile-radius-field);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1.2;
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
@@ -77,28 +77,28 @@
 .mobile-entry-list__filter.active {
     background: var(--mobile-surface-raised);
     color: var(--mobile-entry-type-color, var(--fc-color-primary));
-    box-shadow: var(--mobile-shadow-control-soft);
+    box-shadow: none;
 }
 
 .mobile-entry-list__grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-    gap: 0.95rem 0.75rem;
+    gap: var(--mobile-gap-group) var(--mobile-gap-item);
 }
 
 /* 列表底部的「加载更多」兜底按钮（滚到底会自动预取，这里是可发现的按钮通道）。 */
 .mobile-entry-list__more {
     display: flex;
     justify-content: center;
-    padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-xl);
+    padding: var(--mobile-gap-item) var(--mobile-gap-group) var(--mobile-gap-section);
 }
 
 .mobile-entry-card {
     --mobile-entry-card-color: var(--fc-color-primary);
 
     position: relative;
-    border: var(--mobile-border-strong);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
@@ -135,6 +135,7 @@
 
 .mobile-entry-card__placeholder {
     position: relative;
+    isolation: isolate;
     display: block;
     overflow: hidden;
     background:
@@ -153,14 +154,14 @@
 .mobile-entry-card__placeholder-mark {
     position: absolute;
     z-index: 1;
-    top: var(--fc-space-3xl);
-    right: var(--fc-space-lg);
+    top: var(--mobile-gap-section);
+    right: var(--mobile-gap-group);
     color: color-mix(in srgb, var(--mobile-entry-card-color) 72%, var(--fc-color-text-on-primary));
     opacity: 0.34;
     font-family: var(--fc-font-family-art);
-    font-size: 4.75rem;
-    font-weight: var(--fc-font-weight-normal);
-    line-height: 1;
+    font-size: var(--mobile-decorative-mark-size);
+    font-weight: var(--mobile-weight-normal);
+    line-height: var(--mobile-leading-tight) ;
     user-select: none;
 }
 
@@ -173,17 +174,17 @@
 .mobile-entry-card__tag {
     display: inline-flex;
     align-items: center;
-    gap: var(--fc-space-xs);
+    gap: var(--mobile-gap-text);
     max-width: 100%;
-    padding: 0.28rem 0.55rem;
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
     border: 1px solid color-mix(in srgb, var(--mobile-entry-card-color) 18%, var(--fc-color-border));
     border-radius: var(--fc-radius-full);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.1;
-    box-shadow: var(--mobile-shadow-chip);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
+    box-shadow: none;
 }
 
 .mobile-entry-card__tag-icon {
@@ -193,7 +194,7 @@
     width: 1em;
     height: 1em;
     flex-shrink: 0;
-    line-height: 1;
+    line-height: var(--mobile-leading-tight) ;
     color: var(--mobile-entry-card-color);
 }
 
@@ -206,8 +207,8 @@
     height: auto;
     min-height: 0;
     justify-content: flex-start;
-    gap: 0.35rem;
-    padding: 0.8rem 0.85rem 0.75rem;
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-item) var(--mobile-gap-item) var(--mobile-gap-item);
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
 }
@@ -220,24 +221,24 @@
 }
 
 .mobile-entry-card .fc-card__title {
-    font-size: var(--fc-font-size-body);
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.16;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-entry-card .fc-card__description {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.38;
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-entry-card .fc-card__extra-info,
 .mobile-entry-date {
     margin-top: auto;
     color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1.2;
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 @media (min-width: 42rem) {

@@ -30,6 +30,7 @@
 :root:not([data-glass-effect="enabled"]) .mobile-app {
     --mobile-glass-filter: none;
     --mobile-glass-filter-soft: none;
+    --mobile-nav-glass-filter: none;
     --mobile-surface-translucent: var(--fc-color-bg-elevated);
     --mobile-surface-translucent-strong: var(--fc-color-bg-elevated);
     --mobile-surface-glass: var(--fc-color-bg-elevated);
@@ -37,6 +38,7 @@
     --mobile-surface-dialog: var(--fc-color-bg-elevated);
     --mobile-surface-control: var(--fc-color-bg-elevated);
     --mobile-surface-menu: var(--fc-color-bg-elevated);
+    --mobile-nav-surface: var(--fc-color-bg);
 }
 
 :root .fc-overlay__panel--floating,
@@ -148,4 +150,11 @@
     background: var(--mobile-surface-panel);
     -webkit-backdrop-filter: var(--mobile-glass-filter-soft);
     backdrop-filter: var(--mobile-glass-filter-soft);
+}
+
+/* Tab 是覆盖页面底部的系统级材质，强于普通浮层；内容安全距离由 MobileApp 统一预留。 */
+:root .mobile-nav {
+    background: var(--mobile-nav-surface);
+    -webkit-backdrop-filter: var(--mobile-nav-glass-filter);
+    backdrop-filter: var(--mobile-nav-glass-filter);
 }

@@ -174,7 +174,7 @@ export default function MobileIdea({
     ]
 
     return (
-        <div ref={pageRef} className="mobile-idea">
+        <div ref={pageRef} className="mobile-idea mobile-nav-safe-fixed">
             {drawerRoot ? createPortal(
                 <MobileIdeaDrawer controller={controller} onClose={onCloseIdeaDrawer}/>,
                 drawerRoot,
@@ -226,6 +226,7 @@ export default function MobileIdea({
                     <input
                         className="mobile-idea__title-input"
                         value={controller.draftTitle}
+                        aria-label="灵感标题"
                         onChange={event => controller.setDraftTitle(event.target.value)}
                         placeholder="标题（可选）"
                     />
@@ -264,6 +265,7 @@ export default function MobileIdea({
                     ref={contentRef}
                     className="mobile-idea__content"
                     value={controller.draftContent}
+                    aria-label="灵感正文"
                     onChange={event => controller.setDraftContent(event.target.value)}
                     placeholder="写下一个灵感、片段、设定疑问或待整理素材…"
                     autoFocus

@@ -412,6 +412,7 @@ export function MobileSettingsPluginsSection({
                     />
                     <Input
                         type="password"
+                        aria-label="插件访问密钥"
                         value={apiKeyDraft}
                         onValueChange={onApiKeyDraftChange}
                         placeholder={apiKeyPlaceholder}
@@ -475,6 +476,7 @@ export function MobileSettingsPluginsSection({
                     <div className="mobile-settings-plugin-search-row">
                         <Input
                             value={pluginSearch}
+                            aria-label="搜索插件"
                             onValueChange={value => {
                                 setMarketPage(1)
                                 onPluginSearchChange(value)
@@ -499,6 +501,7 @@ export function MobileSettingsPluginsSection({
                                     key={value}
                                     type="button"
                                     className={`mobile-settings-plugin-filter__segment${pluginKindFilter === value ? ' is-active' : ''}`}
+                                    aria-pressed={pluginKindFilter === value}
                                     onClick={() => {
                                         setMarketPage(1)
                                         onPluginKindFilterChange(value as PluginKindFilter)

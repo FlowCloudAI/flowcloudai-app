@@ -421,6 +421,7 @@ export default function MobileCategoryDrawer({
                 <div className="mobile-category-drawer__search">
                     <Input
                         placeholder="搜索分类…"
+                        aria-label="搜索分类"
                         value={searchText}
                         onValueChange={setSearchText}
                         prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>}

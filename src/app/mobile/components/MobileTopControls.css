@@ -18,15 +18,15 @@
     --mobile-page-topbar-bg-visible-5: 0%;
 
     position: relative;
-    z-index: 8;
+    z-index: var(--mobile-z-sticky);
     display: grid;
     flex: 0 0 auto;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--mobile-gap-inline);
     min-height: calc(var(--mobile-top-surface-size) + var(--mobile-topbar-offset));
     box-sizing: border-box;
-    margin-bottom: 0.6rem;
+    margin-bottom: var(--mobile-gap-inline);
     padding: var(--mobile-topbar-offset) var(--mobile-page-topbar-x) 0;
     background: linear-gradient(
         180deg,
@@ -44,8 +44,8 @@
 }
 
 .mobile-page-topbar--edge-to-edge {
-    margin-right: calc(var(--mobile-page-topbar-x) * -1);
-    margin-left: calc(var(--mobile-page-topbar-x) * -1);
+    width: calc(100% + var(--mobile-page-topbar-x) * 2);
+    transform: translateX(calc(var(--mobile-page-topbar-x) * -1));
 }
 
 .mobile-page-topbar__side,
@@ -84,7 +84,7 @@
     width: 100%;
     height: 100%;
     place-items: center;
-    line-height: 1;
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-top-control-svg {
@@ -108,6 +108,18 @@
     stroke-width: 2.8;
 }
 
+.mobile-check-icon {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.35;
+}
+
 .mobile-top-control-svg--inline {
     width: 1em;
     height: 1em;
@@ -116,6 +128,7 @@
 
 .mobile-top-action-pill {
     position: relative;
+    isolation: isolate;
     display: inline-flex;
     align-items: center;
     flex: 0 0 auto;
@@ -123,7 +136,7 @@
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
     padding: 0;
-    border: var(--mobile-border-medium);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     /*
@@ -132,7 +145,7 @@
      * 胶囊突然消失会在形态连续的动画里插进一个断点——旧元素没了、新元素还没长开，
      * 观感上就是断一下。叠加期那点密度差远比断点轻。
      */
-    transition: opacity 120ms ease;
+    transition: opacity var(--mobile-duration-fast) var(--mobile-ease-standard);
 }
 
 .mobile-top-action-pill:has(.mobile-top-action-pill__button:only-child) {
@@ -158,18 +171,18 @@
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-primary);
-    line-height: 1;
+    line-height: var(--mobile-leading-tight) ;
     box-shadow: none;
 }
 
 .mobile-top-action-pill__button--add {
-    font-size: 1.75rem;
-    font-weight: var(--fc-font-weight-medium);
+    font-size: var(--mobile-text-display);
+    font-weight: var(--mobile-weight-medium);
 }
 
 .mobile-top-action-pill__button--more {
-    font-size: 1.45rem;
-    font-weight: var(--mobile-font-weight-heading);
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
 }
 
 .mobile-top-action-pill__button:active {
@@ -184,7 +197,7 @@
 .mobile-anchored-menu-layer {
     position: fixed;
     inset: 0;
-    z-index: 30;
+    z-index: var(--mobile-z-sheet);
     background: transparent;
     pointer-events: auto;
     contain: paint;
@@ -203,7 +216,7 @@
     --mobile-anchored-menu-anchor-height: var(--mobile-top-surface-size);
     --mobile-anchored-menu-anchor-border-color: color-mix(in srgb, var(--fc-color-border) 68%, transparent);
     --mobile-anchored-menu-content-offset: -0.18rem;
-    --mobile-anchored-menu-radius: calc(var(--mobile-radius-floating) + var(--fc-space-xs));
+    --mobile-anchored-menu-radius: calc(var(--mobile-radius-floating) + var(--mobile-gap-text));
     /*
      * 锚点的实际胶囊圆角。不能用 --fc-radius-full：9999px 在插值到最终圆角的路上，
      * 绝大部分时间都仍然大于"盒高一半"而被钳制成胶囊，直到最后几帧才掉下来，
@@ -219,11 +232,11 @@
      * 收起用加速曲线、快一点——收起时用户已经做完决定，减速曲线的长尾
      * 会把最后那点位移拖成「卡了一下」的观感。
      */
-    --mobile-anchored-menu-duration: 220ms;
-    --mobile-anchored-menu-duration-close: 170ms;
-    --mobile-anchored-menu-exit-fade: 50ms;
-    --mobile-anchored-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --mobile-anchored-menu-ease-close: cubic-bezier(0.4, 0, 1, 1);
+    --mobile-anchored-menu-duration: var(--mobile-duration-base);
+    --mobile-anchored-menu-duration-close: var(--mobile-duration-base);
+    --mobile-anchored-menu-exit-fade: var(--mobile-duration-fast);
+    --mobile-anchored-menu-ease: var(--mobile-ease-standard);
+    --mobile-anchored-menu-ease-close: var(--mobile-ease-exit);
     /*
      * 内容的收起态裁剪框，跟着玻璃盒的锚点矩形走，默认贴右上角。
      * 注意坐标系差一个纵向 padding：内容盒是容器的内容盒，比容器border盒矮 2 * --fc-space-md、
@@ -231,7 +244,7 @@
      */
     --mobile-anchored-menu-content-clip-top: 0px;
     --mobile-anchored-menu-content-clip-right: 0px;
-    --mobile-anchored-menu-content-clip-bottom: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--fc-space-md));
+    --mobile-anchored-menu-content-clip-bottom: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--mobile-gap-item));
     --mobile-anchored-menu-content-clip-left: calc(100% - var(--mobile-anchored-menu-anchor-width));
 
     position: absolute;
@@ -241,7 +254,7 @@
     width: min(15.75rem, calc(100% - 2rem));
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-top) - 1rem));
     box-sizing: border-box;
-    padding: var(--fc-space-md) 0;
+    padding: var(--mobile-gap-item) 0;
     overflow: hidden;
     border-radius: var(--mobile-anchored-menu-radius);
     background: transparent;
@@ -274,7 +287,7 @@
         width var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
         height var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
         border-radius var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
-        border-color 110ms ease 110ms;
+        border-color var(--mobile-duration-fast) var(--mobile-ease-standard) var(--mobile-duration-fast);
     will-change: width, height, border-radius;
 }
 
@@ -285,7 +298,6 @@
     border-radius: var(--mobile-anchored-menu-anchor-radius);
     transition-duration: var(--mobile-anchored-menu-duration-close);
     transition-timing-function: var(--mobile-anchored-menu-ease-close);
-    transition-delay: 0ms;
 }
 
 /*
@@ -301,7 +313,7 @@
  * 另外 --closing 撤销时动画随之消失、opacity 立刻回到 1，中途反悔重开不会残留半透明。
  */
 .mobile-anchored-menu--closing::before {
-    animation: mobile-anchored-menu-exit-fade var(--mobile-anchored-menu-exit-fade) ease
+    animation: mobile-anchored-menu-exit-fade var(--mobile-anchored-menu-exit-fade) var(--mobile-ease-exit)
         calc(var(--mobile-anchored-menu-duration-close) - var(--mobile-anchored-menu-exit-fade)) forwards;
 }
 
@@ -325,13 +337,14 @@
     z-index: 1;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     opacity: 1;
     scrollbar-width: none;
     transform: translateY(0);
     clip-path: inset(0 0 0 0);
     transition:
-        opacity 130ms ease 55ms,
-        transform 170ms cubic-bezier(0.22, 1, 0.36, 1) 35ms,
+        opacity var(--mobile-duration-fast) var(--mobile-ease-standard),
+        transform var(--mobile-duration-base) var(--mobile-ease-standard),
         clip-path var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease);
 }
 
@@ -345,9 +358,8 @@
         var(--mobile-anchored-menu-content-clip-bottom)
         var(--mobile-anchored-menu-content-clip-left)
     );
-    transition-duration: 110ms, 110ms, var(--mobile-anchored-menu-duration-close);
-    transition-timing-function: ease, cubic-bezier(0.22, 1, 0.36, 1), var(--mobile-anchored-menu-ease-close);
-    transition-delay: 0ms;
+    transition-duration: var(--mobile-duration-fast), var(--mobile-duration-fast), var(--mobile-anchored-menu-duration-close);
+    transition-timing-function: var(--mobile-ease-exit), var(--mobile-ease-exit), var(--mobile-anchored-menu-ease-close);
 }
 
 .mobile-anchored-menu--left {
@@ -366,7 +378,7 @@
 
 .mobile-anchored-menu--placement-top {
     --mobile-anchored-menu-content-offset: 0.18rem;
-    --mobile-anchored-menu-content-clip-top: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--fc-space-md));
+    --mobile-anchored-menu-content-clip-top: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--mobile-gap-item));
     --mobile-anchored-menu-content-clip-bottom: 0px;
 
     top: auto;
@@ -393,8 +405,8 @@
     grid-template-columns: 1.35rem 1.9rem minmax(0, 1fr);
     align-items: center;
     width: 100%;
-    min-height: 3.15rem;
-    padding: 0.48rem 1.25rem;
+    min-height: var(--mobile-tap-min);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-section);
     border: 0;
     background: transparent;
     color: var(--fc-color-text);
@@ -423,22 +435,22 @@
     align-items: center;
     justify-content: center;
     color: currentColor;
-    line-height: 1;
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-anchored-menu__text {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.12rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-anchored-menu__text > span {
     overflow: hidden;
     color: inherit;
-    font-size: var(--fc-font-size-body);
-    font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.2;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -446,8 +458,8 @@
 .mobile-anchored-menu__text small {
     overflow: hidden;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.15;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -477,16 +489,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    /* 降级同样要走变量，JS 的卸载时机才会跟着一起缩短。 */
-    .mobile-anchored-menu {
-        --mobile-anchored-menu-duration: 1ms;
-        --mobile-anchored-menu-duration-close: 1ms;
-        --mobile-anchored-menu-exit-fade: 1ms;
-    }
-
     .mobile-anchored-menu::before,
     .mobile-anchored-menu__content {
-        transition-delay: 0ms;
-        transition-duration: 1ms;
+        transition: none;
+        animation: none;
     }
 }

@@ -47,7 +47,12 @@ export default function MobileEntryDetailEditView(p: Props) {
         })}</div> : <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>}
     </div> : null
 
-    return <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
+    return <div
+        className="mobile-page mobile-entry-detail mobile-entry-detail--edit"
+        data-mobile-editing="true"
+        data-immersive-open={p.immersiveOpen || undefined}
+        inert={p.immersiveOpen}
+    >
         <MobilePageTopBar className="mobile-entry-detail__edit-topbar" sticky edgeToEdge ariaLabel="词条编辑操作"
             left={<MobileTopActionPill actions={[{key: 'cancel', label: '取消编辑', icon: <MobileBackIcon/>, disabled: p.saving, onClick: p.onCancel}]}/>} center={<div className="mobile-entry-detail__edit-heading"><span>编辑词条</span><small>{p.saving ? '保存中…' : p.isDirty ? '有未保存修改' : '已同步'}</small></div>} right={<MobileTopActionPill actions={[{key: 'save', label: p.saving ? '保存中' : '保存词条', icon: <MobileEntryDetailActionIcon type={p.saving ? 'more' : 'save'}/>, kind: 'add', disabled: p.saving, onClick: p.onSave}]}/>}/>
         {p.error && <div className="mobile-page__error-banner" role="alert"><span>{p.error}</span></div>}

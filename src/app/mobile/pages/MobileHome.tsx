@@ -612,6 +612,7 @@ export default function MobileHome({
                     {projects.length > WORLD_PAGE_SIZE || searchText ? (
                         <Input
                             placeholder="搜索世界"
+                            aria-label="搜索世界"
                             value={searchText}
                             onValueChange={value => {
                                 setSearchText(value)

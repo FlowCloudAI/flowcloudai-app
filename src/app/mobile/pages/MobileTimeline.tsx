@@ -31,7 +31,7 @@ export default function MobileTimeline({params, push, pop}: Props) {
     }, [params.projectId, push])
 
     return (
-        <div className="mobile-page mobile-timeline-page">
+        <div className="mobile-page mobile-nav-safe-fixed mobile-timeline-page">
             <MobilePageTopBar
                 className="mobile-timeline-page__topbar"
                 center={<h1 className="mobile-timeline-page__title">时间线</h1>}

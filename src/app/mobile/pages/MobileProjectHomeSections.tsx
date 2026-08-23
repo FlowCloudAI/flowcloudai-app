@@ -13,6 +13,8 @@ export interface ProjectHomeTool {
     key: string
     label: string
     meta: string
+    disabled?: boolean
+    unavailableReason?: string
 }
 
 interface ProjectHomeHeroProps {
@@ -179,10 +181,14 @@ export function ProjectHomeToolGrid({tools, onSelectTool}: ProjectHomeToolGridPr
                         type="button"
                         key={tool.key}
                         className="mobile-project-home__tool"
+                        aria-label={tool.disabled && tool.unavailableReason
+                            ? `${tool.label}，${tool.unavailableReason}`
+                            : undefined}
+                        disabled={tool.disabled}
                         onClick={() => onSelectTool(tool)}
                     >
                         <span>{tool.label}</span>
-                        <small>{tool.meta}</small>
+                        <small>{tool.unavailableReason ?? tool.meta}</small>
                     </button>
                 ))}
             </div>

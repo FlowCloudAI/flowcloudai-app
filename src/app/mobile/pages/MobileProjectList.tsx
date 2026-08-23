@@ -251,6 +251,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
             <div className="mobile-project-list__toolbar">
                 <Input
                     placeholder="搜索项目…"
+                    aria-label="搜索项目"
                     value={searchText}
                     onValueChange={setSearchText}
                     className="mobile-page__search"

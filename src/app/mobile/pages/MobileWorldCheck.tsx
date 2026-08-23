@@ -542,18 +542,21 @@ export default function MobileWorldCheck({params, pop, push, setBeforeLeave, sta
                                 <span>目标词条</span>
                                 <Input
                                     value={targetEntryQuery}
+                                    aria-label="目标词条"
                                     onValueChange={updateTargetEntryQuery}
                                     placeholder="输入词条名前缀搜索"
                                     radius="md"
                                 />
                                 {selectedTargetEntry && <small>已选择：{selectedTargetEntry.title}</small>}
-                                <div className="mobile-world-check-generate__entries">
+                                <div className="mobile-world-check-generate__entries" role="listbox" aria-label="目标词条候选">
                                     {entriesLoading ? (
                                         <span>正在加载词条…</span>
                                     ) : targetEntryOptions.length > 0 ? targetEntryOptions.map((entry) => (
                                         <button
                                             key={entry.id}
                                             type="button"
+                                            role="option"
+                                            aria-selected={entry.id === targetEntryId}
                                             className={entry.id === targetEntryId ? 'is-active' : ''}
                                             onClick={() => selectTargetEntry(entry)}
                                         >

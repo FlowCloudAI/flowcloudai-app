@@ -6,6 +6,8 @@ use std::io::BufWriter;
 
 #[cfg(target_os = "android")]
 use crate::android_file_import::{copy_android_file_uri_to_dir, is_android_file_uri};
+#[cfg(any(target_os = "ios", test))]
+use tauri::Url;
 
 const COVER_THUMB_MAX_EDGE: u32 = 640;
 const PROJECT_COVER_THUMB_MAX_EDGE: u32 = 1280;
@@ -43,6 +45,21 @@ fn ensure_image_path_allowed(paths: &PathsState, path: &Path) -> Result<PathBuf,
 
 fn should_keep_existing_image(path: &Path, target_dir: &Path) -> bool {
     path.starts_with(target_dir)
+}
+
+/// iOS 文件选择器返回 `file://` URL，而 Rust 文件 API 需要解码后的本地绝对路径。
+/// 普通路径保持原样，确保同一导入命令仍可接受应用内部生成的路径。
+#[cfg(any(target_os = "ios", test))]
+fn resolve_ios_file_dialog_path(raw_path: &str) -> Result<PathBuf, String> {
+    if !raw_path.starts_with("file:") {
+        return Ok(PathBuf::from(raw_path));
+    }
+
+    let file_url =
+        Url::parse(raw_path).map_err(|error| format!("无法解析 iOS 图片文件 URL: {error}"))?;
+    file_url
+        .to_file_path()
+        .map_err(|_| "iOS 图片文件 URL 不是可访问的本地路径".to_string())
 }
 
 fn build_entry_thumbnails_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
@@ -482,7 +499,9 @@ pub fn import_entry_images(
             } else {
                 PathBuf::from(&path)
             };
-            #[cfg(not(target_os = "android"))]
+            #[cfg(target_os = "ios")]
+            let path_buf = resolve_ios_file_dialog_path(&path)?;
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             let path_buf = PathBuf::from(&path);
 
             Ok(FCImage {
@@ -686,6 +705,30 @@ pub async fn db_ensure_entry_cover_thumbnail(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolves_ios_file_dialog_url_with_spaces_and_unicode() {
+        let temp = tempfile::tempdir().expect("应创建临时目录");
+        let expected = temp.path().join("图片 IMG 3576.jpeg");
+        std::fs::write(&expected, b"test image bytes").expect("应创建临时图片");
+        let file_url = Url::from_file_path(&expected).expect("应创建本地文件 URL");
+        let resolved =
+            resolve_ios_file_dialog_path(file_url.as_str()).expect("应解析 iOS 文件 URL");
+
+        assert_eq!(resolved, expected);
+        assert!(resolved.exists(), "解码后的路径应能被 Rust 文件 API 访问");
+    }
+
+    #[test]
+    fn keeps_plain_ios_file_dialog_path_unchanged() {
+        let expected = std::env::temp_dir().join("plain-image.jpeg");
+        let raw_path = expected.to_string_lossy().to_string();
+
+        assert_eq!(
+            resolve_ios_file_dialog_path(&raw_path).expect("应保留普通文件路径"),
+            expected
+        );
+    }
 
     #[test]
     fn project_cover_thumbnail_limits_long_edge() {

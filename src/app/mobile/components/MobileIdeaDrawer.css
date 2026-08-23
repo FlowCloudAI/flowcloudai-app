@@ -5,11 +5,12 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: var(--mobile-gap-item);
     padding:
-        calc(env(safe-area-inset-top, 0) + 1.05rem)
-        1.05rem
-        calc(env(safe-area-inset-bottom, 0) + 1.1rem);
+        calc(var(--mobile-safe-top) + var(--mobile-pad-sheet))
+        max(var(--mobile-pad-sheet), var(--mobile-safe-right))
+        calc(var(--mobile-safe-bottom) + var(--mobile-pad-sheet))
+        max(var(--mobile-pad-sheet), var(--mobile-safe-left));
     color: var(--fc-color-text);
 }
 
@@ -22,21 +23,21 @@
     flex: 0 0 auto;
     align-items: flex-end;
     justify-content: space-between;
-    gap: var(--fc-space-lg);
-    padding: 0 0.2rem;
+    gap: var(--mobile-gap-group);
+    padding: 0 var(--mobile-gap-text);
 }
 
 .mobile-idea-drawer__header span {
     color: var(--fc-color-text);
-    font-size: 1.55rem;
-    font-weight: var(--mobile-font-weight-display);
-    line-height: 1.1;
+    font-size: var(--mobile-text-display);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-idea-drawer__header small {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: var(--fc-line-height-tight);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
     white-space: nowrap;
 }
 
@@ -58,24 +59,24 @@
 
 /* 同 MobileIdea：高度由 --fc-control-tap-min 统一，不再各页写死。 */
 .mobile-idea-drawer__select .fc-select__trigger {
-    padding: 0 0.82rem;
+    padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
     background: var(--mobile-surface-translucent);
-    box-shadow: var(--mobile-inset-highlight-soft);
+    box-shadow: none;
 }
 
 .mobile-idea-drawer__select .fc-select__value {
     overflow: hidden;
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--mobile-font-weight-strong);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .mobile-idea-drawer__select .fc-select__dropdown {
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
-    border: var(--mobile-border-strong);
-    box-shadow: var(--mobile-shadow-anchored-menu);
+    border: var(--mobile-border);
+    box-shadow: var(--mobile-elevation-floating);
 }
 
 .mobile-idea-drawer__list {
@@ -83,8 +84,9 @@
     min-height: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--mobile-gap-text);
     overflow-y: auto;
+    overscroll-behavior: contain;
     scrollbar-width: none;
 }
 
@@ -97,12 +99,12 @@
     box-sizing: border-box;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.65rem;
+    gap: var(--mobile-gap-item);
     width: 100%;
     min-height: 3.18rem;
-    padding: 0.52rem 0.68rem;
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
     border: 1px solid transparent;
-    border-radius: 0.9rem;
+    border-radius: var(--mobile-radius-card);
     background: transparent;
     color: var(--fc-color-text);
     font: inherit;
@@ -125,7 +127,7 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.16rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-idea-drawer__item-main strong,
@@ -138,15 +140,15 @@
 
 .mobile-idea-drawer__item-main strong {
     color: inherit;
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-strong);
-    line-height: 1.22;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-idea-drawer__item-main small {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.25;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-idea-drawer__item-meta {
@@ -154,10 +156,10 @@
     max-width: 6.2rem;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.12rem;
+    gap: var(--mobile-gap-text);
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.2;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-idea-drawer__item.active .mobile-idea-drawer__item-main small,

@@ -12,9 +12,9 @@
 .mobile-timeline-page__title {
     margin: 0;
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.2;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-timeline-page__content {
@@ -31,7 +31,7 @@
 
 .mobile-timeline-page .project-timeline > .fc-op-viewport-empty {
     align-items: flex-start;
-    padding: var(--fc-space-md) var(--mobile-page-x);
+    padding: var(--mobile-gap-item) var(--mobile-page-x);
     box-sizing: border-box;
 }
 
@@ -41,8 +41,8 @@
 }
 
 .mobile-timeline-page .project-timeline__layout {
-    gap: var(--fc-space-sm);
-    padding: var(--fc-space-sm) var(--mobile-page-x) var(--fc-space-md);
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-inline) var(--mobile-page-x) var(--mobile-gap-item);
 }
 
 .mobile-timeline-page .project-timeline__event-panel {
@@ -60,7 +60,7 @@
     min-height: 2.75rem;
     flex-direction: row;
     align-items: center;
-    padding: 0 var(--fc-space-sm);
+    padding: 0 var(--mobile-gap-inline);
     box-sizing: border-box;
 }
 
@@ -82,8 +82,8 @@
 }
 
 .mobile-timeline-page .project-timeline__event-open {
-    min-height: 2.75rem;
-    padding-inline: var(--fc-space-sm);
+    min-height: var(--mobile-tap-min);
+    padding-inline: var(--mobile-gap-inline);
 }
 
 .mobile-timeline-page .project-timeline__timeline-header-actions {
@@ -95,9 +95,9 @@
 
 .mobile-timeline-page .timeline-zoom__btn,
 .mobile-timeline-page .timeline-zoom__level {
-    min-height: 2.75rem;
+    min-height: var(--mobile-tap-min);
 }
 
 .mobile-timeline-page .timeline-zoom__btn {
-    width: 2.75rem;
+    width: var(--mobile-tap-min);
 }

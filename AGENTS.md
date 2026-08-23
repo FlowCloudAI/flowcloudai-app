@@ -4,6 +4,14 @@
 
 `app_main` 是 FlowCloudAI 的 Tauri + React（TypeScript）主应用，同时承载 Windows、Linux、macOS、Android 与 iOS 外壳，提供世界观建模、关系图编辑、地图展示与插件入口。
 
+## 文档入口
+
+本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `归档` / `结论记录` / `失效`），先看状态再决定要不要读。`docs/`、`plans/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
+
+**问题排查记录（问题 → 根因 → 方案）不放本仓**，统一在工作区根 `docs/devlog/`，索引 `docs/devlog/README.md`。`app_main` 是 devlog 里条目最多的仓库——动移动端、构建链路、地图渲染前先扫一眼，多数坑已经踩过。
+
+跨子项目文档在工作区根 `docs/README.md`。**写、移、删文档前先读根 `AGENTS.md` §9 文档规约**——状态标记、放置规则、devlog 格式、证据要求都在那里。
+
 ## 构建 / 运行 / 测试 / lint
 
 ```bash
@@ -36,6 +44,7 @@ macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri
 
 - `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
 - `src-tauri/Info.macos.plist` 与 `src-tauri/icons/fcplug.icns`、`fcworld.icns` 是 macOS 自定义文件类型和 Finder 图标的长期来源；Windows 仍由 `tauri.conf.json` + NSIS `DefaultIcon` 使用 `.ico`。不要给 `fileAssociations` 添加当前 schema 不支持的 `icon` 字段，也不要把 macOS 文件类型配置写入生成的 `.app/Contents/Info.plist`。
+- `.fcworld` / `.fcplug` 的桌面系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列：Windows/Linux 由单实例参数转发，macOS 由 `RunEvent::Opened` 转发，再由 `src/features/desktop-file-open/DesktopFileOpenController.tsx` 串行消费并进入现有导入/安装确认。macOS 禁止在 setup 阶段启用 `tauri-plugin-single-instance`，否则新进程可能在 Launch Services 交付文件 URL 前退出并吞掉 Finder 双击事件；任何平台都不能在原生事件回调中绕过确认直接改数据。
 - `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
 - `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄，macOS 下也必须保留；原生窗口边框负责缩放不等于可以把该变量设为 `0`。
 - `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规。启用 `zoomHotkeysEnabled` 时，桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。修改共享 CSP/capability 后要回归 Windows、Linux 与移动端，不能把它们当成纯 Mac 配置。
@@ -108,7 +117,7 @@ IOS_BUILD_NUMBER=42 npm run ios:archive
 
 ## Android 调试与打包（主要在 Windows）
 
-Android 当前的固定入口是 `package.json` 中的脚本；[`docs/tauri_android_dev_debugging.md`](docs/tauri_android_dev_debugging.md) 记录模拟器网络故障的原因与排查方式。Android Studio/SDK、Platform Tools、NDK、Rust Android targets 与至少一个 AVD 应先准备好。
+Android 当前的固定入口是 `package.json` 中的脚本；模拟器网络故障的原因与排查方式记录在工作区 `docs/devlog/2026-08-16-android-模拟器-vite-不可达.md`（该文件在根仓库，不在本仓）。Android Studio/SDK、Platform Tools、NDK、Rust Android targets 与至少一个 AVD 应先准备好。
 
 ### 调试入口
 
@@ -151,7 +160,9 @@ npm run android:build:signed:apk
 
 ```text
 app_main/
-├── designs/           # 正式界面修改前的单文件 HTML 设计稿
+├── designs/           # 正式界面修改前的单文件 HTML 设计稿与设计审计包
+├── docs/              # 项目文档（索引：docs/README.md）
+├── plans/             # 开放中的计划，完成后合并进 docs/ 或删除
 ├── src/               # 页面、路由、编辑器与状态层
 ├── src-tauri/         # Tauri 命令、窗口、文件、插件桥接
 ├── public/            # 前端静态资源
@@ -170,6 +181,7 @@ app_main/
 - 设计前先核对真实入口、所属 Tab、触发动作和背后页面；不同 Tab、不同业务板块或不会同时出现的状态必须拆成独立设计稿，禁止为了展示方便拼成同一界面。浮层稿必须使用它实际出现时的页面作为背景上下文。
 - 同一方案的后续反馈应原地修改同一个 HTML 文件；除非用户要求对比多个方向，否则不要为每轮反馈复制新文件。
 - 优先用 CSS 自定义属性模拟 `--fc-*` 语义令牌，保持与应用主题、圆角、间距和控件密度一致；不在设计稿中复制生产组件实现或业务逻辑。
+- **设计 QA 的截图、矢量源等证据必须提交进仓库**，统一放 `designs/audits/<主题>-<日期>/`。指向仓库外临时目录（`.codex/`、系统 Temp、其他机器的用户目录）的证据等于没有证据——2026-08 已有 5 篇设计 QA 因此失去可复核性。
 - 交付设计稿时提供文件路径并列出需要用户确认的关键点。用户确认后再按该文件实现正式界面；实现过程中若必须偏离已确认设计，应先说明原因和影响。
 
 ## 安全 / 禁止事项
@@ -186,10 +198,27 @@ app_main/
 
 ## 项目特有坑点
 
+- **移动端返回与抽屉拖动态必须隔离**：`useMobileSideDrawerGesture` 同时采样两类横向手势，但
+  侧边抽屉只能通过 `is-drawer-dragging` 改变 surface 圆角、边框和遮罩；页面边缘返回只能通过
+  `is-edge-back-direct` 控制前景页 transform。禁止重新引入同时命中外壳与页面层的泛化
+  `is-dragging`，否则 Android WebView 会在手势开始和取消回弹结束时各闪一次。修改这组状态或
+  selector 时必须运行 `mobilePageTransition.test.mjs`，并在真机分别慢拖与取消回弹。
+
 - `app_main/src-tauri/tauri.conf.json` 的桌面/iOS `devUrl` 与 `app_main/vite.config.ts` 必须对齐（`5175`，HMR `1421`）；Android 覆盖为 `5176`/`1422`，三处同步规则见 Android 章节。
 - Windows 无边框透明窗口与 macOS 隐藏 Overlay 窗口都对初始化顺序敏感；macOS 禁止在隐藏 WKWebView 的 `requestAnimationFrame` 中显示窗口。
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
 - macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
+- **移动端原生键盘指标架构当前已回退**：2026-08-20 的 `a781f94` 撤销了 iOS/Android 原生键盘 frame/insets、共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 键盘专用布局。现行代码回到 `visualViewport` 只判断输入态、底部 Tab 不因输入而隐藏的旧基线；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。归档设计和 devlog 只能用于复盘，不能当作现行实现约束。重新引入前必须先形成双端方案，并分别完成系统/第三方键盘、AI composer、灵感正文和含输入 Bottom Sheet 的真机动画验收。
 
-文档同步时间：2026-08-16 23:33:51 +08:00
+- **Android 键盘只有 `visualViewport` 一个可用来源**（2026-08-23 真机实测，Xiaomi / Android 16 / WebView 143）：
+  `navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——`overlaysContent = true` 写入被接受且
+  回读为 true，但 `env(keyboard-inset-height)` 与 `boundingRect` 恒为 0、`geometrychange` 一次都不触发，不要依赖它。
+  `interactive-widget` 的三个取值在 iOS（WebKit 根本没实现）和 Android（实测逐项相同）都不产生任何差异，
+  **不要再为键盘问题去改这个 viewport meta**。另外 targetSdk 35+ 强制 edge-to-edge 后 IME **不 resize 窗口**，
+  布局视口恒为全屏高——所以「外壳固定 + Tab 绝对定位在屏幕底部被键盘盖住」这套结构在 Android 上天然成立，
+  不需要原生代码；但 Chromium 只在 IME 落位后上报一次高度，**逐帧跟随做不到**，要逐帧必须接原生
+  `WindowInsetsAnimationCallback`。完整数据与 6 条被排除的误判见
+  `docs/devlog/2026-08-23-android-软键盘布局接管.md`（工作区根仓）。
+
+文档同步时间：2026-08-23 02:25:00 +08:00

@@ -111,6 +111,10 @@ const initApp = async () => {
         syncShellBackdrop(platformInfo, nextSettings.shell_acrylic_enabled)
     })
 
+    // 原生移动壳必须先知道这里是「跟随系统」还是显式主题。尤其在 iOS 上，
+    // 若把尚未解析的 system 提前强制成 light，会反过来让 WebView 的媒体查询也变亮。
+    document.documentElement.setAttribute('data-theme-preference', initialTheme)
+
     // 在 React 渲染前同步写入 data-theme，避免首帧闪白
     const resolvedTheme = initialTheme === 'system'
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

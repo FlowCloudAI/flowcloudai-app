@@ -1,6 +1,6 @@
 # FlowCloudAI iOS 调试与打包
 
-本文只描述 `app_main` 的 iOS 流程。Windows、Android 与桌面端命令不受这些脚本影响；iOS 生成工程仍位于已忽略的 `src-tauri/gen/apple`，可随时重建。
+本文只描述 `app_main` 的 iOS 流程。客户端最低支持 iOS 16.2；Windows、Android 与桌面端命令不受这些脚本影响。iOS 生成工程仍位于已忽略的 `src-tauri/gen/apple`，可随时重建。
 
 ## 1. 首次准备
 

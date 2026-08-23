@@ -1,4 +1,5 @@
-import {AlertProvider, ContextMenuProvider, ThemeProvider} from 'flowcloudai-ui'
+import {useLayoutEffect} from 'react'
+import {AlertProvider, ContextMenuProvider, ThemeProvider, useTheme} from 'flowcloudai-ui'
 // @ts-expect-error - CSS 导入，无需类型声明
 import 'flowcloudai-ui/style'
 import type {PlatformInfo} from '../../api'
@@ -11,9 +12,20 @@ interface AppShellProps {
     platformInfo: PlatformInfo
 }
 
+function ThemePreferenceSync() {
+    const {theme} = useTheme()
+
+    useLayoutEffect(() => {
+        document.documentElement.setAttribute('data-theme-preference', theme)
+    }, [theme])
+
+    return null
+}
+
 export default function AppShell({initialTheme, platformInfo}: AppShellProps) {
     return (
         <ThemeProvider defaultTheme={initialTheme} density={resolveDensity(platformInfo)}>
+            <ThemePreferenceSync/>
             <ContextMenuProvider>
                 <AlertProvider>
                     <TourProvider>

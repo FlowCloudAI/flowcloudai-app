@@ -172,6 +172,7 @@ export default function MobileProjectHome({
     }, [navigateToTab, projectId, setAiFocus])
 
     const handleSelectTool = useCallback((tool: ProjectHomeTool) => {
+        if (tool.disabled) return
         if (tool.key === 'relation') {
             push({type: 'relationGraph', params: {projectId, displayName: '关系图谱'}})
             return
@@ -184,8 +185,7 @@ export default function MobileProjectHome({
             push({type: 'worldCheck', params: {projectId, displayName: '设定检测'}})
             return
         }
-        void showAlert(`移动端暂未开放「${tool.label}」，可以先在桌面端使用。`, 'info', 'nonInvasive', 2400)
-    }, [projectId, push, showAlert])
+    }, [projectId, push])
 
     const handleRename = useCallback(async (name: string) => {
         setRenaming(true)
@@ -308,7 +308,7 @@ export default function MobileProjectHome({
     const advancedTools: ProjectHomeTool[] = [
         {key: 'relation', label: '关系图谱', meta: `${formatNumber(relationCount)} 关系`},
         {key: 'timeline', label: '时间线', meta: '时序'},
-        {key: 'map', label: '世界地图', meta: '地图'},
+        {key: 'map', label: '世界地图', meta: '地图', disabled: true, unavailableReason: '仅桌面端'},
         {key: 'check', label: '设定检测', meta: internalLinkCount > 0 ? `${formatNumber(internalLinkCount)} 内链` : '质检'},
     ]
     const projectMenuItems: MobileAnchoredMenuItem[] = [
@@ -476,6 +476,7 @@ export default function MobileProjectHome({
             >
                 <textarea
                     value={descriptionDraft}
+                    aria-label="项目描述"
                     onChange={(event) => setDescriptionDraft(event.currentTarget.value)}
                     disabled={descriptionSaving}
                     placeholder="项目描述"

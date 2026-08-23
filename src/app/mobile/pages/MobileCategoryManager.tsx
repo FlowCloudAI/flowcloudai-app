@@ -278,6 +278,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                     <button
                         type="button"
                         className={`mobile-category-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`}
+                        aria-current={(moveTarget?.parent_id ?? null) === null ? 'true' : undefined}
                         disabled={busy}
                         onClick={() => void handleMoveToParent(null)}
                     >
@@ -288,6 +289,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                             type="button"
                             key={row.category.id}
                             className={`mobile-category-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`}
+                            aria-current={moveTarget?.parent_id === row.category.id ? 'true' : undefined}
                             style={{'--mobile-category-depth': row.depth} as CSSProperties}
                             disabled={busy}
                             onClick={() => void handleMoveToParent(row.category.id)}

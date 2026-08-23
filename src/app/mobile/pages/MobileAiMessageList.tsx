@@ -41,9 +41,11 @@ export default function MobileAiMessageList({
     onCompactRetryMessage,
     onContinueMessage,
 }: MobileAiMessageListProps) {
+    const showEmptyState = messages.length === 0 && !isStreaming
+
     return (
-        <main className="mobile-ai-chat__messages">
-            {messages.length === 0 && !isStreaming && (
+        <main className={`mobile-ai-chat__messages${showEmptyState ? ' mobile-ai-chat__messages--empty' : ''}`}>
+            {showEmptyState && (
                 <div className="mobile-ai-chat__empty">
                     <p>开始 AI 对话</p>
                     <span>{focusEntryId ? '围绕当前词条继续创作。' : '与 AI 讨论世界观设定、资料整理和后续创作。'}</span>

@@ -1,5 +1,5 @@
 .mobile-bottom-sheet-layer {
-    z-index: 90;
+    z-index: var(--mobile-z-sheet);
     padding-bottom: 0;
     background: transparent;
 }
@@ -13,15 +13,16 @@
     width: 100%;
     max-height: min(82vh, 44rem);
     box-sizing: border-box;
-    padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
+    padding: var(--mobile-gap-item) var(--mobile-gap-group) calc(var(--mobile-gap-group) + var(--mobile-safe-bottom));
     overflow-y: auto;
+    overscroll-behavior: contain;
     border: var(--mobile-glass-border);
     border-bottom: 0;
     border-radius: var(--mobile-radius-sheet) var(--mobile-radius-sheet) 0 0;
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
-    box-shadow: var(--mobile-shadow-bottom-sheet);
+    box-shadow: var(--mobile-elevation-floating);
     transform: translateY(var(--mobile-bottom-sheet-drag-offset));
-    transition: transform 100ms ease;
+    transition: transform var(--mobile-duration-fast) var(--mobile-ease-standard);
     overscroll-behavior: contain;
     scrollbar-width: none;
 }
@@ -37,7 +38,7 @@
 .mobile-bottom-sheet__handle {
     width: 2.65rem;
     height: 0.25rem;
-    margin: 0 auto 0.9rem;
+    margin: 0 auto var(--mobile-gap-group);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-text-secondary) 38%, transparent);
     touch-action: none;

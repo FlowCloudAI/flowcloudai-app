@@ -375,6 +375,14 @@ export function MobileBackIcon() {
     )
 }
 
+export function MobileCheckIcon() {
+    return (
+        <svg className="mobile-check-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M5 12.5 9.2 16.7 19 6.8"/>
+        </svg>
+    )
+}
+
 export function MobileMenuIcon({className = 'mobile-top-control-svg'}: {className?: string}) {
     return (
         <svg className={className} viewBox="0 0 24 24" focusable="false" aria-hidden="true">

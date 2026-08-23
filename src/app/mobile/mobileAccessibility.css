@@ -1,0 +1,30 @@
+/*
+ * iOS/Android 共用的移动端可读性与触控基线。
+ *
+ * 作用域只认 ThemeProvider 写入的 touch density；桌面 comfortable density 不会命中。
+ * 输入框内部的清除/数字步进按钮是一个组合控件，不能被公共 48px 规则强行撑开。
+ */
+
+:root[data-fc-density="touch"] {
+    --mobile-color-text-readable-tertiary: var(--fc-color-text-secondary);
+    --fc-color-text-tertiary: var(--mobile-color-text-readable-tertiary);
+}
+
+:root[data-fc-density="touch"] body :where(input, textarea)::placeholder {
+    color: var(--mobile-color-text-readable-tertiary);
+    opacity: 1;
+}
+
+:root[data-fc-density="touch"] body :where(
+    button:not(.fc-input__action, .fc-input__stepper-btn),
+    [role="button"],
+    summary
+) {
+    min-inline-size: var(--fc-control-tap-min);
+    min-block-size: var(--fc-control-tap-min);
+}
+
+/* 首页速记按钮原有双 class 规则会覆盖公共基线，在移动端显式回到 48px。 */
+:root[data-fc-density="touch"] .mobile-home__idea-form .fc-btn {
+    min-block-size: var(--fc-control-tap-min);
+}

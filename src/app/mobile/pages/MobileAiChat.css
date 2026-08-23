@@ -1,7 +1,16 @@
 .mobile-ai-chat {
     --mobile-ai-topbar-space: 4.25rem;
     --mobile-ai-composer-space: 8.25rem;
+    /*
+     * 软键盘接管：只重定义保留高度，不给具体元素散写键盘偏移。
+     * 这样 __composer 的 `bottom: var(--mobile-nav-reserved-height)` 等既有声明一行都不用改。
+     * --fc-kb 由 mobileKeyboardInset.ts 写入，iOS 上不写 → 回落 0px → 与接入前逐字等价。
+     * 方案见 docs/mobile_keyboard_layout.md。
+     */
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
     position: relative;
+    isolation: isolate;
     display: flex;
     min-height: 0;
     height: 100%;
@@ -21,7 +30,7 @@
     top: 0;
     right: 0;
     left: 0;
-    z-index: 20;
+    z-index: var(--mobile-z-sticky);
     grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
@@ -46,14 +55,43 @@
 }
 
 .mobile-ai-drawer {
+    --mobile-ai-drawer-control-height: var(--fc-control-height-md);
+
     display: flex;
     box-sizing: border-box;
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    gap: var(--fc-space-lg);
+    gap: var(--mobile-gap-group);
     overflow-x: hidden;
-    padding: calc(env(safe-area-inset-top, 0) + 1.05rem) 1.05rem calc(env(safe-area-inset-bottom, 0) + 1.1rem);
+    padding:
+        calc(var(--mobile-safe-top) + var(--mobile-pad-sheet))
+        max(var(--mobile-pad-sheet), var(--mobile-safe-right))
+        calc(var(--mobile-safe-bottom) + var(--mobile-pad-sheet))
+        max(var(--mobile-pad-sheet), var(--mobile-safe-left));
+}
+
+/* 搜索与两组筛选共用 44px 视觉表面，避免字体较小时仍保留大号控件体量。 */
+.mobile-ai-drawer .mobile-drawer-search .fc-input__field {
+    font-size: var(--mobile-text-body-sm);
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented {
+    height: var(--mobile-ai-drawer-control-height);
+    box-sizing: border-box;
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented button {
+    position: relative;
+    height: 100%;
+    min-height: 0;
+}
+
+.mobile-ai-drawer .mobile-drawer-segmented button::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-text) - 1px);
+    inset-inline: 0;
+    content: '';
 }
 
 .mobile-ai-drawer__list {
@@ -62,9 +100,10 @@
     min-width: 0;
     flex: 1;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--mobile-gap-text);
     overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: contain;
     scrollbar-width: none;
 }
 
@@ -78,12 +117,12 @@
     box-sizing: border-box;
     grid-template-columns: minmax(0, 1fr) 2.35rem;
     align-items: center;
-    gap: 0.2rem;
+    gap: var(--mobile-gap-text);
     width: 100%;
     min-height: 3.2rem;
-    padding: 0.18rem;
+    padding: var(--mobile-gap-text);
     border: 1px solid transparent;
-    border-radius: 0.9rem;
+    border-radius: var(--mobile-radius-card);
     background: transparent;
     color: var(--fc-color-text);
     font: inherit;
@@ -114,7 +153,8 @@
 }
 
 .mobile-ai-drawer__item.is-streaming {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 34%, transparent);
+    outline: var(--mobile-status-ring);
+    outline-offset: -1px;
 }
 
 .mobile-ai-drawer__item.has-unread-reply::before {
@@ -132,11 +172,11 @@
 .mobile-ai-drawer__item-content {
     display: grid;
     min-width: 0;
-    min-height: 2.68rem;
+    min-height: var(--mobile-tap-min);
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.34rem 0.12rem 0.34rem 0.62rem;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-text) var(--mobile-gap-text) var(--mobile-gap-text) var(--mobile-gap-item);
     border: 0;
     background: transparent;
     color: inherit;
@@ -154,15 +194,15 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.16rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-ai-drawer__item-main strong {
     overflow: hidden;
     color: inherit;
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-strong);
-    line-height: 1.22;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -171,8 +211,8 @@
 .mobile-ai-drawer__item-meta {
     overflow: hidden;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.25;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -184,15 +224,15 @@
 
 .mobile-ai-drawer__item-more {
     display: inline-grid;
-    width: 2.35rem;
-    height: 2rem;
+    width: var(--mobile-tap-min);
+    height: var(--mobile-tap-min);
     place-items: center;
     border: 0;
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: 0.95rem;
+    font-size: var(--mobile-text-body-sm);
     letter-spacing: 0;
     cursor: pointer;
     touch-action: manipulation;
@@ -216,27 +256,41 @@
 }
 
 .mobile-ai-model-pill {
+    /* 视觉表面跟随标准顶栏 40px Token；透明命中层仍补足移动端 48px 触摸基线。 */
+    --fc-control-tap-min: var(--mobile-top-surface-size);
+
     display: inline-flex;
+    position: relative;
     width: fit-content;
     max-width: 100%;
     min-width: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
     align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0 0.7rem;
+    justify-content: flex-start;
+    gap: var(--mobile-gap-inline);
+    padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     color: var(--fc-color-primary);
     font: inherit;
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-heading);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
+    text-align: left;
     cursor: pointer;
-    transition: opacity 120ms ease, transform 120ms ease;
+    transition:
+        opacity var(--mobile-duration-fast) var(--mobile-ease-standard),
+        transform var(--mobile-duration-fast) var(--mobile-ease-standard);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+}
+
+.mobile-ai-model-pill::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-text));
+    inset-inline: 0;
+    content: '';
 }
 
 .mobile-ai-model-pill span {
@@ -253,8 +307,8 @@
 
 .mobile-ai-model-pill--wide span {
     flex: 1;
-    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
-    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, var(--fc-color-text) 0, var(--fc-color-text) calc(100% - var(--mobile-gap-section)), transparent 100%);
+    mask-image: linear-gradient(90deg, var(--fc-color-text) 0, var(--fc-color-text) calc(100% - var(--mobile-gap-section)), transparent 100%);
 }
 
 .mobile-ai-model-pill svg {
@@ -299,8 +353,8 @@
     }
 
     ::view-transition-group(mobile-ai-model-menu) {
-        animation-duration: 220ms;
-        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+        animation-duration: var(--mobile-duration-base);
+        animation-timing-function: var(--mobile-ease-standard);
     }
 
     ::view-transition-old(mobile-ai-model-menu),
@@ -312,7 +366,7 @@
 .mobile-ai-model-menu__row {
     grid-template-columns: 1.55rem minmax(0, 1fr);
     min-height: 3rem;
-    padding: 0.46rem 1rem 0.46rem 0.95rem;
+    padding: var(--mobile-gap-inline) var(--mobile-gap-group) var(--mobile-gap-inline) var(--mobile-gap-group);
 }
 
 .mobile-ai-model-menu__row .mobile-anchored-menu__check,
@@ -330,7 +384,7 @@
 .mobile-ai-model-menu__row .mobile-anchored-menu__text small,
 .mobile-ai-conversation-menu .mobile-anchored-menu__text > span,
 .mobile-ai-conversation-menu .mobile-anchored-menu__text small {
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--mobile-text-meta);
 }
 
 .mobile-ai-model-menu__row.active {
@@ -341,59 +395,81 @@
     visibility: hidden;
 }
 
-.mobile-ai-model-menu__row.active .mobile-anchored-menu__check::before {
-    color: currentColor;
-    content: "✓";
-    font-size: 1.15rem;
-    font-weight: var(--mobile-font-weight-display);
-    line-height: 1;
-}
-
 .mobile-ai-model-menu__row .mobile-ai-svg {
-    width: 1.15rem;
-    height: 1.15rem;
+    width: 1.375rem;
+    height: 1.375rem;
     stroke-width: 2.3;
 }
 
 .mobile-ai-tool-mode-menu {
-    width: min(10.75rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
-    padding: 0.42rem;
-    border-radius: calc(var(--fc-radius-xl) + 0.25rem);
+    --mobile-ai-tool-mode-title-size: calc(0.875rem * var(--mobile-font-scale));
+    --mobile-ai-tool-mode-description-size: calc(0.71875rem * var(--mobile-font-scale));
+
+    width: min(9.75rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
+    padding: var(--mobile-gap-text);
+    border-radius: var(--mobile-radius-card);
 }
 
 .mobile-ai-tool-mode-menu__row {
-    grid-template-columns: 2.05rem minmax(0, 1fr);
-    min-height: 2.8rem;
-    padding: 0.42rem 0.68rem;
-    border-radius: var(--fc-radius-xl);
+    position: relative;
+    grid-template-columns: 1.375rem minmax(0, 1fr);
+    column-gap: var(--mobile-gap-inline);
+    min-height: calc(var(--mobile-tap-min) + var(--mobile-gap-text));
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
 }
 
 .mobile-ai-tool-mode-menu__row.active {
-    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
+    background: transparent;
     color: var(--fc-color-primary);
-    font-weight: var(--fc-font-weight-semibold);
 }
 
-.mobile-ai-tool-mode-menu__row--reader.active {
-    background: color-mix(in srgb, var(--fc-color-success-bg) 72%, transparent);
-    color: var(--fc-color-success);
+.mobile-ai-tool-mode-menu__row.active::before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 2px;
+    height: calc(var(--mobile-tap-min) - var(--mobile-gap-item));
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-primary);
+    content: '';
+    transform: translateY(-50%);
 }
 
-.mobile-ai-tool-mode-menu__row--writer.active {
-    background: color-mix(in srgb, var(--fc-color-warning-bg) 72%, transparent);
-    color: var(--fc-color-warning);
+.mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text {
+    gap: 0;
+}
+
+.mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text > .mobile-ai-tool-mode-menu__label {
+    display: flex;
+    align-items: center;
+    gap: var(--mobile-gap-text);
+    font-size: var(--mobile-ai-tool-mode-title-size);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight);
+}
+
+.mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text small {
+    font-size: var(--mobile-ai-tool-mode-description-size);
+    font-weight: var(--mobile-weight-normal);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-ai-tool-mode-menu__row .mobile-ai-svg {
-    width: 1.8rem;
-    height: 1.8rem;
-    stroke-width: 1.8;
+    width: 1.375rem;
+    height: 1.375rem;
+}
+
+.mobile-ai-tool-mode-menu__label .mobile-check-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: 0 0 auto;
+    stroke-width: 2;
 }
 
 .mobile-ai-model-menu__divider {
     height: 1px;
-    margin: 0.35rem 1.15rem;
-    background: var(--mobile-divider);
+    margin: var(--mobile-gap-text) var(--mobile-gap-group);
+    background: var(--mobile-divider-color);
 }
 
 .mobile-ai-chat__messages {
@@ -401,23 +477,34 @@
     min-height: 0;
     flex: 1;
     flex-direction: column;
-    gap: var(--fc-space-md);
+    gap: var(--mobile-gap-item);
     overflow-y: auto;
-    padding: var(--mobile-ai-topbar-space) var(--mobile-page-x) var(--mobile-ai-composer-space);
+    overscroll-behavior: contain;
+    /*
+     * 消息列表既是绝对定位输入区的下方内容、又用固定 rem 预留空间，两者都不会自动跟着
+     * 父级 padding 变——所以这里必须显式补上键盘多出来的那一段，否则末条消息会被输入区盖住。
+     */
+    padding: var(--mobile-ai-topbar-space) var(--mobile-page-x)
+        calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
     background: var(--fc-color-bg);
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);
-    scroll-padding-bottom: var(--mobile-ai-composer-space);
+    scroll-padding-bottom: calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
     display: none;
 }
 
+/* 空状态后的零高度滚动锚点不应凭 flex gap 制造一段可滚动距离。 */
+.mobile-ai-chat__messages--empty {
+    gap: 0;
+}
+
 .mobile-ai-chat__message {
     display: grid;
     width: 100%;
-    gap: var(--fc-space-sm);
+    gap: var(--mobile-gap-inline);
 }
 
 .mobile-ai-chat__empty {
@@ -426,8 +513,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--fc-space-lg);
-    padding: 1rem 0 4rem;
+    gap: var(--mobile-gap-group);
+    padding: var(--mobile-gap-group) 0 var(--mobile-gap-section);
     color: var(--fc-color-text-secondary);
     text-align: center;
 }
@@ -435,25 +522,31 @@
 .mobile-ai-chat__empty p {
     margin: 0;
     color: var(--fc-color-text);
-    font-size: 1.35rem;
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.25;
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-ai-chat__empty > span {
     max-width: 17rem;
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.55;
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
 }
 
 .mobile-ai-chat__composer {
     position: absolute;
     right: 0;
-    bottom: 0;
+    /*
+     * 页面通过 padding 缩短普通流内容，但绝对定位不会停在 padding 上方；
+     * 因此输入区必须显式消费与常驻 Tab 相同的保留高度。
+     */
+    bottom: var(--mobile-nav-reserved-height);
     left: 0;
-    z-index: 20;
+    /* 升起走过渡、收起吸附，方向由 --fc-kb-transition 决定，见 mobileKeyboardInset.ts */
+    transition: bottom var(--fc-kb-transition, 0s);
+    z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;
-    padding: 0.2rem clamp(0.65rem, 2.5vw, 1.1rem) 0.18rem;
+    padding: var(--mobile-gap-text) var(--mobile-page-x) var(--mobile-gap-text);
     background: linear-gradient(
         180deg,
         transparent 0%,
@@ -463,46 +556,73 @@
 }
 
 .mobile-ai-composer-card {
+    /*
+     * 输入区是高频紧凑工具栏：胶囊由 4px/8px 的纵横 padding 自然撑开，
+     * 圆形图标按钮与胶囊视觉高度一致；两类按钮再用透明命中层补到约 44px。
+     * 局部关闭公共 48px 控件下限，避免把这个例外扩散到其他移动端页面。
+     */
+    --mobile-ai-composer-icon-size: calc(
+        var(--mobile-tap-min) - var(--mobile-gap-item) - var(--mobile-gap-inline)
+    );
+    --mobile-ai-composer-outline-width: 0.125rem;
+    --mobile-ai-composer-more-size: calc(
+        var(--mobile-ai-composer-icon-size) - var(--mobile-ai-composer-outline-width)
+    );
+    --mobile-ai-composer-send-size: calc(
+        var(--mobile-ai-composer-icon-size) + var(--mobile-gap-text)
+    );
+    --mobile-ai-composer-card-min-height: calc(
+        var(--mobile-tap-min) + var(--mobile-tap-min) + var(--mobile-gap-item)
+    );
+    --mobile-ai-composer-icon-hit-size: calc(var(--mobile-tap-min) - var(--mobile-gap-text));
+    --mobile-ai-composer-send-stroke-width: 0.125rem;
+    --fc-control-tap-min: 0;
+
     display: flex;
+    min-height: var(--mobile-ai-composer-card-min-height);
+    box-sizing: border-box;
     flex-direction: column;
-    gap: 0.55rem;
-    padding: 0.72rem;
-    border: var(--mobile-border-medium);
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    border: var(--mobile-border);
     border-radius: var(--mobile-radius-sheet);
     /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
 }
 
 .mobile-ai-composer-card textarea {
     display: block;
+    flex: 1 1 auto;
     width: 100%;
     min-height: 1.95rem;
     max-height: 7.5rem;
     box-sizing: border-box;
-    padding: 0.2rem 0.15rem;
+    padding: var(--mobile-gap-text) var(--mobile-gap-text);
     border: 0;
     outline: 0;
     background: transparent;
     color: var(--fc-color-text);
     font: inherit;
-    font-size: var(--fc-font-size-md);
-    line-height: 1.45;
+    font-size: var(--mobile-text-body);
+    line-height: var(--mobile-leading-snug);
     resize: none;
 }
 
 .mobile-ai-composer-card textarea::placeholder {
-    color: color-mix(in srgb, var(--fc-color-text-secondary) 72%, transparent);
+    color: var(--mobile-color-text-readable-tertiary);
 }
 
 .mobile-ai-composer-card__status {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--mobile-text-meta);
 }
 
 .mobile-ai-composer-card__bar {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
-    gap: var(--fc-space-md);
+    gap: var(--mobile-gap-inline);
+    margin-top: auto;
 }
 
 .mobile-ai-composer-card__chips,
@@ -510,24 +630,46 @@
     display: inline-flex;
     min-width: 0;
     align-items: center;
-    gap: 0.45rem;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-ai-composer-card__actions {
+    gap: var(--mobile-gap-group);
 }
 
 .mobile-ai-composer-card__chip {
     display: inline-flex;
-    min-height: 1.85rem;
+    position: relative;
     align-items: center;
-    gap: 0.28rem;
-    padding: 0 0.58rem;
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-label);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-snug);
     cursor: pointer;
     touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__chip::after {
+    position: absolute;
+    inset-block: calc(0px - var(--mobile-gap-inline));
+    inset-inline: 0;
+    content: '';
+}
+
+.mobile-ai-composer-card__icon-btn::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--mobile-ai-composer-icon-hit-size);
+    height: var(--mobile-ai-composer-icon-hit-size);
+    transform: translate(-50%, -50%);
+    content: '';
 }
 
 .mobile-ai-composer-card__chip .mobile-ai-svg {
@@ -566,19 +708,28 @@
 
 .mobile-ai-composer-card__icon-btn {
     display: inline-grid;
-    width: 2.18rem;
-    height: 2.18rem;
+    position: relative;
+    width: var(--mobile-ai-composer-more-size);
+    height: var(--mobile-ai-composer-more-size);
+    min-width: var(--mobile-ai-composer-more-size);
+    min-height: var(--mobile-ai-composer-more-size);
     box-sizing: border-box;
     padding: 0;
     place-items: center;
-    border: var(--mobile-border);
+    border: var(--mobile-ai-composer-outline-width) solid currentColor;
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
+    background: transparent;
     color: var(--fc-color-text);
     font: inherit;
     cursor: pointer;
-    box-shadow: var(--mobile-inset-highlight-soft);
+    box-shadow: none;
     touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__icon-btn .mobile-top-control-svg--add {
+    width: var(--mobile-gap-group);
+    height: var(--mobile-gap-group);
+    stroke-width: 3;
 }
 
 .mobile-ai-composer-card__icon-btn .mobile-ai-svg {
@@ -588,17 +739,25 @@
 }
 
 .mobile-ai-composer-card__icon-btn--send {
+    width: var(--mobile-ai-composer-send-size);
+    height: var(--mobile-ai-composer-send-size);
+    min-width: var(--mobile-ai-composer-send-size);
+    min-height: var(--mobile-ai-composer-send-size);
     border: 0;
-    border-radius: 50%;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
     box-shadow: none;
 }
 
 .mobile-ai-composer-card__icon-btn--send .mobile-ai-svg {
-    width: 1.22rem;
-    height: 1.22rem;
-    stroke-width: 2.4;
+    width: var(--mobile-gap-group);
+    height: var(--mobile-gap-group);
+    stroke-width: var(--mobile-ai-composer-send-stroke-width);
+}
+
+.mobile-ai-composer-card__icon-btn--send .mobile-ai-svg :is(path, rect) {
+    vector-effect: non-scaling-stroke;
 }
 
 .mobile-ai-composer-card__icon-btn:disabled {
@@ -609,14 +768,14 @@
 .mobile-ai-settings-card {
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: var(--mobile-gap-item);
 }
 
 .mobile-ai-more-sheet__quick {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--fc-space-sm);
-    margin-bottom: var(--fc-space-md);
+    gap: var(--mobile-gap-inline);
+    margin-bottom: var(--mobile-gap-item);
 }
 
 .mobile-ai-more-sheet__quick button {
@@ -625,17 +784,30 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    padding: 0.55rem 0.25rem;
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-text);
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--mobile-surface-translucent);
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-label);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
     cursor: pointer;
     touch-action: manipulation;
+}
+
+.mobile-ai-more-sheet__quick button small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-ai-more-sheet__quick button:disabled {
+    border-color: var(--mobile-divider-color);
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-text-secondary);
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 .mobile-ai-more-sheet__quick button.active {
@@ -647,21 +819,21 @@
 .mobile-ai-settings-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.6rem;
+    gap: var(--mobile-gap-inline);
 }
 
 .mobile-ai-setting-field {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-ai-setting-field span,
 .mobile-ai-setting-prompt span {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--mobile-font-weight-label);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
 }
 
 .mobile-ai-setting-field input,
@@ -676,21 +848,21 @@
 }
 
 .mobile-ai-setting-field input {
-    min-height: 2.45rem;
-    padding: 0 0.72rem;
+    min-height: var(--fc-control-height-lg);
+    padding: 0 var(--mobile-gap-item);
 }
 
 .mobile-ai-setting-penalty-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.6rem;
+    gap: var(--mobile-gap-inline);
 }
 
 .mobile-ai-setting-penalty-card {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 0.42rem;
+    gap: var(--mobile-gap-inline);
     padding: 0;
 }
 
@@ -699,41 +871,42 @@
     min-width: 0;
     align-items: baseline;
     justify-content: space-between;
-    gap: 0.45rem;
-    line-height: 1.2;
+    gap: var(--mobile-gap-inline);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-ai-setting-penalty-field strong {
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.2;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-ai-setting-penalty-field small {
     overflow: hidden;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.15;
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .mobile-ai-setting-penalty-field input {
-    min-height: 2.25rem;
+    min-height: var(--fc-control-height-lg);
 }
 
 .mobile-ai-setting-prompt {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: var(--mobile-gap-text);
 }
 
 .mobile-ai-setting-prompt textarea {
     height: 8.4rem;
     min-height: 8.4rem;
-    padding: 0.5rem 0.38rem 0.5rem 0.75rem;
-    line-height: 1.45;
+    padding: var(--mobile-gap-inline) var(--mobile-gap-inline) var(--mobile-gap-inline) var(--mobile-gap-item);
+    line-height: var(--mobile-leading-snug);
     overflow-y: auto;
+    overscroll-behavior: contain;
     resize: vertical;
     scrollbar-color: color-mix(in srgb, var(--fc-color-text-secondary) 42%, transparent) transparent;
     scrollbar-gutter: stable;
@@ -760,5 +933,10 @@
         animation: none;
         transition: none;
         transform: none;
+    }
+
+    /* 键盘跟随的过渡降级为直接到位，布局终态与开启动效时完全一致 */
+    .mobile-ai-chat__composer {
+        transition: none;
     }
 }

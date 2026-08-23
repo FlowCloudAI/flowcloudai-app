@@ -305,6 +305,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
             <div className="mobile-entry-list__toolbar">
                 <Input
                     placeholder="搜索词条…"
+                    aria-label="搜索词条"
                     value={searchText}
                     onValueChange={handleSearch}
                     className="mobile-page__search mobile-entry-list__search"

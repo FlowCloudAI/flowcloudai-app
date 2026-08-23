@@ -285,7 +285,8 @@ export function MobileSettingsTemplatesSection({
                 <textarea
                     className="mobile-settings-textarea"
                     value={defaultPrompt}
-                    style={{fontSize: `${editorFontSize}px`}}
+                    aria-label="应用感知自定义指令"
+                    style={{fontSize: `max(${editorFontSize}px, var(--mobile-text-body))`}}
                     placeholder="可选"
                     onChange={event => onDefaultPromptChange(event.currentTarget.value)}
                 />
@@ -320,8 +321,9 @@ export function MobileSettingsTemplatesSection({
                         <textarea
                             className="mobile-settings-textarea mobile-settings-textarea--template"
                             value={draft}
+                            aria-label={`${document.meta.title}模板内容`}
                             spellCheck={false}
-                            style={{fontSize: `${editorFontSize}px`}}
+                            style={{fontSize: `max(${editorFontSize}px, var(--mobile-text-body))`}}
                             onChange={event => {
                                 setDraft(event.currentTarget.value)
                                 setValidationError(null)

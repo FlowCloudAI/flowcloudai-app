@@ -172,7 +172,7 @@ export function MobileEntryDetailView({
 
             {viewImages.length > 0 && (
                 <div className="mobile-entry-detail__images mobile-entry-detail__images--view">
-                    <div className="mobile-entry-detail__image-grid">
+                    <div className="mobile-entry-detail__image-grid" data-mobile-horizontal-scroll="true">
                         {viewImages.map((image, index) => {
                             const src = toEntryImageSrc(image)
                             return (

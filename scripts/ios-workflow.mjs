@@ -40,6 +40,7 @@ function printHelp() {
 命令：
   doctor              检查 Xcode、Rust、CocoaPods、签名与生成工程
   init                初始化或更新 src-tauri/gen/apple
+  assert-generated    检查生成工程是否与仓库内 iOS 配置一致
   sync-icons          将受 Git 跟踪的 iOS AppIcon 同步到生成工程
   dev                 热更新调试，可追加设备名称或 --open
   run                 使用已打包前端运行，适合稳定性回归
@@ -135,6 +136,33 @@ function syncIosAppIcons() {
     copyFileSync(join(iosIconSourceDir, fileName), join(generatedIosAppIconDir, fileName))
   }
   console.log(`[iOS] 已从 src-tauri/icons/ios 同步 ${fileNames.length} 个 AppIcon 文件。`)
+}
+
+function inspectGeneratedIosDeploymentTarget() {
+  const expected = tauriConfig.bundle?.iOS?.minimumSystemVersion
+  const generatedProjectPath = join(generatedAppleDir, 'project.yml')
+  if (!expected) {
+    return { ok: false, detail: 'src-tauri/tauri.conf.json 未声明 iOS minimumSystemVersion' }
+  }
+  if (!existsSync(generatedProjectPath)) {
+    return { ok: false, detail: '生成工程不存在；请执行 npm run ios:init' }
+  }
+
+  const generatedProject = readFileSync(generatedProjectPath, 'utf8')
+  const generatedMatch = generatedProject.match(/^\s+iOS:\s*["']?([^\s"'#]+)["']?\s*$/m)
+  const actual = generatedMatch?.[1]
+  if (!actual) {
+    return { ok: false, detail: '生成工程没有可识别的 iOS deploymentTarget' }
+  }
+  return actual === expected
+    ? { ok: true, detail: `iOS ${actual}` }
+    : { ok: false, detail: `仓库要求 iOS ${expected}，生成工程仍为 iOS ${actual}；请重新执行 npm run ios:init` }
+}
+
+function assertGeneratedIosDeploymentTarget() {
+  const status = inspectGeneratedIosDeploymentTarget()
+  if (!status.ok) throw new Error(status.detail)
+  console.log(`[iOS] 生成工程最低版本已同步：${status.detail}`)
 }
 
 function assertFlagAbsent(args, flag) {
@@ -303,6 +331,13 @@ function doctor() {
     iconStatus.detail,
     existsSync(join(generatedAppleDir, 'project.yml')),
   )
+  const deploymentTargetStatus = inspectGeneratedIosDeploymentTarget()
+  add(
+    deploymentTargetStatus.ok,
+    'iOS 最低版本',
+    deploymentTargetStatus.detail,
+    existsSync(join(generatedAppleDir, 'project.yml')),
+  )
 
   const signingIdentities = capture('security', ['find-identity', '-v', '-p', 'codesigning'])
   const signingOutput = `${signingIdentities.stdout ?? ''}\n${signingIdentities.stderr ?? ''}`
@@ -344,6 +379,7 @@ function doctor() {
 
 async function buildIpa(mode, exportMethod, debug, forwardedArgs) {
   requireSigningTeam()
+  assertGeneratedIosDeploymentTarget()
   syncIosAppIcons()
   assertFlagAbsent(forwardedArgs, '--export-method')
   assertFlagAbsent(forwardedArgs, '--build-number')
@@ -384,14 +420,19 @@ async function main() {
       runTauri(['ios', 'init', ...forwardedArgs])
       syncIosAppIcons()
       break
+    case 'assert-generated':
+      assertGeneratedIosDeploymentTarget()
+      break
     case 'sync-icons':
       syncIosAppIcons()
       break
     case 'dev':
+      assertGeneratedIosDeploymentTarget()
       syncIosAppIcons()
       runTauri(['ios', 'dev', ...forwardedArgs])
       break
     case 'run':
+      assertGeneratedIosDeploymentTarget()
       syncIosAppIcons()
       runTauri(['ios', 'run', ...forwardedArgs])
       break
@@ -406,6 +447,7 @@ async function main() {
       break
     case 'archive': {
       requireSigningTeam()
+      assertGeneratedIosDeploymentTarget()
       syncIosAppIcons()
       assertFlagAbsent(forwardedArgs, '--build-number')
       assertFlagAbsent(forwardedArgs, '--config')

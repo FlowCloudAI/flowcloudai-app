@@ -12,16 +12,16 @@
 .mobile-relation-graph-page__title {
     margin: 0;
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-heading);
-    line-height: 1.2;
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-relation-graph-page__graph {
     display: flex;
     min-height: 0;
     flex: 1;
-    margin: var(--fc-space-sm) var(--mobile-page-x) var(--fc-space-md);
+    margin: var(--mobile-gap-inline) var(--mobile-page-x) var(--mobile-gap-item);
     overflow: hidden;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
@@ -36,7 +36,7 @@
 
 .mobile-relation-graph-page .project-relation-graph > .fc-op-header {
     justify-content: flex-end;
-    padding: var(--fc-space-sm);
+    padding: var(--mobile-gap-inline);
     background: var(--fc-color-bg);
 }
 
@@ -50,7 +50,7 @@
 }
 
 .mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-button {
-    min-height: 2.75rem;
+    min-height: var(--mobile-tap-min);
 }
 
 .mobile-relation-graph-page .project-relation-graph .fc-op-viewport {
@@ -58,10 +58,10 @@
 }
 
 .mobile-relation-graph-page__sheet-title {
-    margin: 0 0 var(--fc-space-md);
+    margin: 0 0 var(--mobile-gap-item);
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--mobile-font-weight-heading);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
 }
 
 .mobile-relation-graph-page__relations-host {
@@ -90,8 +90,8 @@
     }
 
     .mobile-relation-graph-page .react-flow__controls button {
-        width: 2.75rem;
-        height: 2.75rem;
+        width: var(--mobile-tap-min);
+        height: var(--mobile-tap-min);
     }
 
     .mobile-relation-graph-page .rg-layout-dialog {
