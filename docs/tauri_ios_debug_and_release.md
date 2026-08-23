@@ -52,13 +52,20 @@ Mac 和 iPhone 连接同一局域网，iPhone 已启用开发者模式并信任 
 npm run ios:dev -- "iPhone 在 Xcode 中显示的名称"
 ```
 
+当前 iOS 键盘专项调试期间，这条命令会默认把开发入口设为 `/lab.html`，应用启动后直接显示
+`src/lab/ios` 的键盘测试页面，不需要再手写 `--config`。如需临时覆盖入口，可显式传入 Tauri
+`--config`；该默认值只作用于 `ios:dev`，不影响 `ios:run`、IPA、Android 或桌面端。
+
 需要在 Xcode 中查看完整运行日志时：
 
 ```zsh
 npm run ios:dev -- "iPhone 在 Xcode 中显示的名称" --open
 ```
 
-热更新模式会让 iPhone 访问 Mac 上的 Vite 服务。首次运行应允许“本地网络”权限；若页面一直停在“正在启动”，先确认两台设备同网、macOS 防火墙未拦截 5175 端口，并检查终端/Xcode 是否出现开发服务器连接错误。
+热更新模式会让 iPhone 访问 Mac 上的 Vite 服务。跟踪的 XcodeGen 模板通过
+`NSAllowsLocalNetworking` 只放行局域网 HTTP，不关闭公网请求的 ATS 保护；它与 iOS
+“本地网络”隐私权限是两层独立限制。首次运行应允许该权限。若页面一直停在“正在启动”，
+先确认两台设备同网、macOS 防火墙未拦截 5175 端口，并检查终端/Xcode 是否出现开发服务器连接错误。
 
 ### 使用打包后的前端回归
 
@@ -151,7 +158,13 @@ artifacts/ios/flowcloudai-ios-v<Version>-b<Build Number>-<导出方式>.ipa.sha2
 
 ### iPhone 无法访问 `http://<Mac IP>:5175`
 
-这是热更新链路的局域网问题：在 iPhone 的“设置 > 隐私与安全性 > 本地网络”允许流云AI，确认同网后重启 App。也可用 `npm run ios:run` 判断业务本身是否正常。
+这是热更新链路的局域网问题：
+
+1. 确认最新安装包的 `Info.plist` 包含 `NSAppTransportSecurity > NSAllowsLocalNetworking = true`。跟踪模板修改后需重新执行 `npm run ios:init` 生成 Xcode 工程，不要只修改 `src-tauri/gen/apple`。
+2. 在 iPhone 的“设置 > 隐私与安全性 > 本地网络”允许流云AI；如果之前拒绝过，必须在这里手动打开。
+3. 确认 Mac 和 iPhone 同网且 5175 端口未被防火墙拦截，然后完全退出并重启 App。
+
+也可用 `npm run ios:run` 判断业务本身是否正常；该命令不依赖局域网 Vite 服务。
 
 ### Signing / Provisioning Profile 失败
 

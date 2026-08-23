@@ -10,15 +10,13 @@ import {
     configureNative,
     type KbNativeState,
     nativeAvailable,
+    onNativeReady,
     requestNativeState,
 } from './kbNative'
 import {
     ceilingValue,
-    currentInteractiveWidget,
     type InsetSource,
-    type InteractiveWidget,
     setInsetSource,
-    setInteractiveWidget,
 } from './keyboardInset'
 import {
     buildReport,
@@ -33,15 +31,15 @@ import {
 const SOURCES: Array<{ value: InsetSource; label: string }> = [
     {value: 'off', label: '不处理'},
     {value: 'visual-viewport', label: 'vv'},
-    {value: 'native-event', label: '原生事件'},
+    {value: 'native-event', label: '原生事件（默认）'},
     {value: 'native-frame', label: '原生逐帧'},
 ]
 
-const WIDGETS: InteractiveWidget[] = ['resizes-visual', 'resizes-content', 'overlays-content']
+const DEFAULT_SOURCE: InsetSource = 'native-event'
 
 export default function IosControls(): React.ReactElement {
-    const [source, setSource] = useState<InsetSource>('off')
-    const [widget, setWidget] = useState<string>(currentInteractiveWidget())
+    const [source, setSource] = useState<InsetSource>(DEFAULT_SOURCE)
+    const [bridgeConnected, setBridgeConnected] = useState(nativeAvailable())
     const [observersRemoved, setObserversRemoved] = useState(false)
     const [clamp, setClamp] = useState(false)
     const [insetNever, setInsetNever] = useState(false)
@@ -56,14 +54,49 @@ export default function IosControls(): React.ReactElement {
     const [stats, setStats] = useState(tapStats())
 
     useEffect(() => {
+        let prepared = false
+        const prepareDefaultCandidate = () => {
+            if (prepared || !nativeAvailable()) return
+            prepared = true
+            setBridgeConnected(true)
+
+            /*
+             * 测试页默认直接进入待验收候选，而不是让真机每次先复现一次已知故障：
+             * - 摘掉 WKWebView 自带的键盘 frame 观察者，阻止整页/顶栏被自动平移；
+             * - 关闭安全区自动 inset，避免 scrollView 成为第二个布局 owner；
+             * - 展开时使用 UIKeyboardWillChangeFrame 的真实目标、时长与曲线驱动内部内容区；
+             * - 收起事件拿不到有效时长时，再由 keyboardLayoutGuide 逐帧跟随兜底。
+             *
+             * 前两项在当前 WebView 会话不可逆，因此只放在 VITE_LAB 专用入口，尚未接入业务页。
+             */
+            configureNative({
+                pushPerFrame: true,
+                insetAdjustmentNever: true,
+                removeWebKitObservers: true,
+            })
+            setInsetSource(DEFAULT_SOURCE)
+            setObserversRemoved(true)
+            setInsetNever(true)
+        }
+
+        const disposeReady = onNativeReady(prepareDefaultCandidate)
+        prepareDefaultCandidate()
+        return () => {
+            disposeReady()
+            setInsetSource('off')
+            configureNative({pushPerFrame: false})
+        }
+    }, [])
+
+    useEffect(() => {
         const timer = window.setInterval(() => setStats(tapStats()), 500)
         return () => window.clearInterval(timer)
     }, [])
 
     useEffect(() => {
-        setModeLabel(`inset=${source} widget=${widget} suppress=${observersRemoved} clamp=${clamp}`
+        setModeLabel(`inset=${source} suppress=${observersRemoved} clamp=${clamp}`
             + ` insetNever=${insetNever} resizeWV=${resizeWebView} filler=${filler}`)
-    }, [source, widget, observersRemoved, clamp, insetNever, resizeWebView, filler])
+    }, [source, observersRemoved, clamp, insetNever, resizeWebView, filler])
 
     useEffect(() => {
         setKeyboardLabel(thirdParty ? '第三方键盘' : '系统键盘')
@@ -80,11 +113,6 @@ export default function IosControls(): React.ReactElement {
         configureNative({pushPerFrame: next === 'native-frame' || next === 'native-event'})
     }, [])
 
-    const applyWidget = useCallback((next: InteractiveWidget) => {
-        setInteractiveWidget(next)
-        setWidget(currentInteractiveWidget())
-    }, [])
-
     const makeReport = useCallback(async () => {
         const index = reportIndex + 1
         setReportIndex(index)
@@ -97,8 +125,8 @@ export default function IosControls(): React.ReactElement {
             <div className="lab-controls-title">实验控制台 · iOS（依赖 MobileUiBridge 原生桥）</div>
             <div className="lab-row">
                 <span className="lab-tag">原生桥</span>
-                <span className={nativeAvailable() ? 'lab-ok' : 'lab-bad'}>
-                    {nativeAvailable() ? '已连接' : '未连接'}
+                <span className={bridgeConnected ? 'lab-ok' : 'lab-bad'}>
+                    {bridgeConnected ? '已连接 · 默认候选已启用' : '未连接'}
                 </span>
                 <span className="lab-tag">点击→呼出</span>
                 <span>{stats.summoned}/{stats.cold}{stats.pending > 0 ? ` (${stats.pending} 待判)` : ''}</span>
@@ -115,18 +143,6 @@ export default function IosControls(): React.ReactElement {
                         className={source === item.value ? 'lab-btn lab-btn-on' : 'lab-btn'}
                         onClick={() => applySource(item.value)}
                     >{item.label}</button>
-                ))}
-            </div>
-
-            <div className="lab-row">
-                <span className="lab-tag">interactive-widget</span>
-                {WIDGETS.map(item => (
-                    <button
-                        key={item}
-                        type="button"
-                        className={widget === item ? 'lab-btn lab-btn-on' : 'lab-btn'}
-                        onClick={() => applyWidget(item)}
-                    >{item.replace('-content', '-c').replace('-visual', '-v')}</button>
                 ))}
             </div>
 
@@ -157,12 +173,12 @@ export default function IosControls(): React.ReactElement {
                 <button
                     type="button"
                     className={insetNever ? 'lab-btn lab-btn-on' : 'lab-btn'}
+                    disabled={insetNever}
                     onClick={() => {
-                        const next = !insetNever
-                        setInsetNever(next)
-                        configureNative({insetAdjustmentNever: next})
+                        setInsetNever(true)
+                        configureNative({insetAdjustmentNever: true})
                     }}
-                >inset 行为 never
+                >inset 行为 never（本会话锁定）
                 </button>
                 <button
                     type="button"

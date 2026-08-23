@@ -248,10 +248,51 @@ UIKit/WebKit API 可以测量键盘，但截至 2026-08-23，没有公开文档�
 实验还观测到系统可短暂报告超出稳定终值的高度、`evaluateJavaScript` 跨进程推送只能达到约 25～40fps，
 以及交互式收起可能给出 `duration=0`，所以“原生实测”本身也不能保证网页逐帧无抖动。
 
-### 7.2 iOS 后续设计边界
+### 7.2 2026-08-24 iOS 真机实验结果
 
-在新的 iPhone 真机方案通过前，维持当前基线：**不向 iOS 发布 `--fc-kb`，不恢复 frame resize，不移除
-WebKit 观察者，也不同时让 WKWebView 和页面消费同一键盘高度。**
+设备为 iPhone 15 Pro（`iPhone16,1`）/ iOS 26.6，入口为 `VITE_LAB` 专用测试页。最终候选维持全屏
+`WKWebView`，不缩短 `webView.frame`，并采用以下单一布局 owner：
+
+1. 从 viewport meta 删除未被 WKWebView 识别的 `interactive-widget`，旧 WebView 不再以它作为前提；
+2. 移除 WKWebView 自带的键盘 frame 观察者，并把外层 scroll view 的 inset 行为设为 `never`，阻止顶栏、
+   Tab 和整个页面一起被平移；
+3. 展开阶段消费 `UIKeyboardWillChangeFrame` 的实际目标高度、系统时长与曲线，由页面只写一个 `--fc-kb`；
+4. 交互式收起等 `duration=0` 场景临时使用 `keyboardLayoutGuide` 逐帧兜底；
+5. 收到 `UIKeyboardDidHideNotification` 后无条件把 `--fc-kb` 归零并重新标定探针，避免底部遮挡填充块残留。
+
+项目负责人在同一真机上比较“不处理”、`visualViewport`、原生事件和原生逐帧后，确认**原生事件效果最好**。
+当前实验轮次还实际暴露并修复了三类问题：默认未启用候选导致顶栏和 Tab 随 WKWebView 平移；
+`interactive-widget` 被忽略的控制台警告；键盘收起后最后一个非零探针帧导致遮挡块不消失。
+
+这项结果只验收了实验页候选和当前系统键盘，不自动等同于正式业务页、iOS 16.2、第三方输入法、外接键盘或
+iPad 浮动键盘已经通过。
+
+### 7.3 AI 页与灵感页接入评估
+
+页面布局层**可以复用**：`MobileAiChat.css` 和 `MobileIdea.css` 已共同消费 `--fc-kb`，只会重定义
+`--mobile-nav-reserved-height`，不会移动整只应用壳，也不会再创建第二套键盘高度变量。因此只要 iOS 能像
+Android 一样提供单一、可信的 `--fc-kb`，消息区会缩短、输入区会贴住键盘，灵感正文会在剩余高度内滚动。
+
+原生接管层目前**不能只对这两页安全启用**。阻止 WKWebView 自动平移的关键动作是
+`removeObserver:webView name:UIKeyboard* object:nil`；它作用于共享 WKWebView，且当前会话内不可逆。若进入
+AI/灵感时才开启，离开后词条编辑、项目表单、设置输入、Bottom Sheet 等输入面也无法恢复 WebKit 原有避让。
+把它接到两页表面上，实际会变成“全应用 iOS 键盘接管”，超出了两页改动的影响范围。
+
+旧 WebView 的边界也在这里：键盘通知、`keyboardLayoutGuide` 和 CSS 变量均覆盖项目的 iOS 16.2 下限，
+`interactive-widget` 已被移除；但“摘除 WebKit 内部观察者”的有效性依赖具体 WebKit 注册实现，不是可承诺
+跨版本稳定的公开开关。iOS 16.2 真机至少需要单独回归，不能用 iOS 26.6 的结果代替。
+
+因此当前结论是：
+
+- **两页 CSS 无需重写，具备接入条件；**
+- **实验原生桥不得直接接入正式 `MobileApp`；**
+- 若选择正式落地，必须按“全应用共享 WKWebView 接管”立项，先盘点并适配所有移动输入面，再在 iOS 16.2
+  与当前 iOS 上分别验收；若范围仍严格限定 AI/灵感两页，则维持现有 WebKit owner，不能同时写 `--fc-kb`。
+
+### 7.4 iOS 后续设计边界
+
+在生产级全应用方案通过前，维持当前基线：**不向正式 iOS `MobileApp` 发布 `--fc-kb`，不恢复 frame
+resize，不在业务入口移除 WebKit 观察者，也不同时让 WKWebView 和页面消费同一键盘高度。**
 
 后续试验必须按以下顺序推进：
 

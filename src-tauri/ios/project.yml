@@ -56,6 +56,10 @@ targets:
         # 只在代码里设 preferredFrameRateRange 无效。键盘跟随需要满 120Hz 采样。
         CADisableMinimumFrameDurationOnPhone: true
         NSLocalNetworkUsageDescription: 开发模式需要连接同一局域网内的 FlowCloudAI 开发服务器。
+        # 真机 devUrl 是 Mac 局域网 IP 上的 HTTP 服务。这里只放行本地网络，
+        # 不关闭公网请求的 ATS 保护。本地网络隐私权限仍由系统单独控制。
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:

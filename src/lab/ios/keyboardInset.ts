@@ -17,7 +17,6 @@ import {logToNative, nativeToPageTime, onNativeEvent, onNativeFrame, requestNati
 import {normalizeProbeHeight, probeFloorValue, setProbeFloor} from './kbTrace'
 
 export type InsetSource = 'off' | 'visual-viewport' | 'native-event' | 'native-frame'
-export type InteractiveWidget = 'resizes-visual' | 'resizes-content' | 'overlays-content'
 
 /**
  * UIViewAnimationCurve 7（键盘专用曲线）没有公开定义。
@@ -166,6 +165,19 @@ function calibrateProbeFloor(): void {
     })
 }
 
+/**
+ * 收起终态必须由 DidHide 明确落零。
+ *
+ * 交互式收起通常没有可用动画时长，页面会临时改用逐帧探针；但跨进程推送可能停在
+ * keyboardLayoutGuide 的最后一个非零采样点。只依赖“下一帧自然到零”会让 --fc-kb
+ * 和底部填充块永久残留，因此两种原生来源都在系统确认隐藏后走这条收尾路径。
+ */
+function settleKeyboardHide(): void {
+    followPerFrame = false
+    apply(0, '0s', 'settle:DidHide')
+    window.setTimeout(calibrateProbeFloor, 400)
+}
+
 export function setInsetSource(next: InsetSource): void {
     for (const dispose of disposers) dispose()
     disposers = []
@@ -229,6 +241,9 @@ export function setInsetSource(next: InsetSource): void {
                 + `|arrival=${arrivalOffset.toFixed(1)}|startup=${startupOffsetMs.toFixed(1)}|delay=${delay.toFixed(1)}`)
             beginStartupProbe(event.t, event.target)
         }))
+        disposers.push(onNativeEvent(event => {
+            if (event.name === 'UIKeyboardDidHideNotification') settleKeyboardHide()
+        }))
         return
     }
 
@@ -274,10 +289,7 @@ export function setInsetSource(next: InsetSource): void {
          * 只保留 DidHide→0：键盘确定消失后落零是安全的。
          */
         disposers.push(onNativeEvent(event => {
-            if (event.name === 'UIKeyboardDidHideNotification') {
-                apply(0, '0s', 'settle:DidHide')
-                window.setTimeout(calibrateProbeFloor, 400)
-            }
+            if (event.name === 'UIKeyboardDidHideNotification') settleKeyboardHide()
         }))
     }
 }
@@ -338,31 +350,6 @@ export function startupOffset(): number {
 
 export function insetSource(): InsetSource {
     return source
-}
-
-/**
- * 运行期改 viewport meta 的 interactive-widget。
- *
- * WebKit 的 MetaViewportInteractiveWidgetEnabled 在 Cocoa 平台默认开启，
- * 而 overlays-content 会让 WKWebView 跳过 -[UIScrollView _adjustForAutomaticKeyboardInfo:]，
- * 也就是跳过"把整页顶上去"这件事——这是唯一一个不需要原生代码就能关掉它的开关。
- * 但它是否在本机这版 WebKit 上真的生效，只能实测。
- */
-export function setInteractiveWidget(value: InteractiveWidget): void {
-    const meta = document.querySelector('meta[name=viewport]')
-    if (!meta) return
-    const content = meta.getAttribute('content') ?? ''
-    const without = content
-        .split(',')
-        .map(part => part.trim())
-        .filter(part => part.length > 0 && !part.startsWith('interactive-widget'))
-    without.push(`interactive-widget=${value}`)
-    meta.setAttribute('content', without.join(', '))
-}
-
-export function currentInteractiveWidget(): string {
-    const content = document.querySelector('meta[name=viewport]')?.getAttribute('content') ?? ''
-    return content.match(/interactive-widget=([\w-]+)/)?.[1] ?? '未设置'
 }
 
 /*

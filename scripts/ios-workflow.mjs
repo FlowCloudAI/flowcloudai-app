@@ -15,6 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { networkInterfaces } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
@@ -25,6 +26,7 @@ const tauriDir = join(repoRoot, 'src-tauri')
 const generatedAppleDir = join(tauriDir, 'gen', 'apple')
 const iosIconSourceDir = join(tauriDir, 'icons', 'ios')
 const generatedIosAppIconDir = join(generatedAppleDir, 'Assets.xcassets', 'AppIcon.appiconset')
+const generatedIosInfoPlistPath = join(generatedAppleDir, 'FlowCloudAI_iOS', 'Info.plist')
 const tauriBin = join(repoRoot, 'node_modules', '.bin', 'tauri')
 const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
 const tauriConfig = JSON.parse(readFileSync(join(tauriDir, 'tauri.conf.json'), 'utf8'))
@@ -42,7 +44,7 @@ function printHelp() {
   init                初始化或更新 src-tauri/gen/apple
   assert-generated    检查生成工程是否与仓库内 iOS 配置一致
   sync-icons          将受 Git 跟踪的 iOS AppIcon 同步到生成工程
-  dev                 热更新调试，可追加设备名称或 --open
+  dev                 热更新调试，默认打开 iOS 键盘测试页；可追加设备名称或 --open
   run                 使用已打包前端运行，适合稳定性回归
   build-debug         生成 debugging IPA
   build-release-test  生成注册设备测试 IPA
@@ -165,10 +167,81 @@ function assertGeneratedIosDeploymentTarget() {
   console.log(`[iOS] 生成工程最低版本已同步：${status.detail}`)
 }
 
+function inspectGeneratedIosLocalNetworking() {
+  if (!existsSync(generatedIosInfoPlistPath)) {
+    return { ok: false, detail: '生成工程没有 Info.plist；请执行 npm run ios:init' }
+  }
+
+  const infoPlist = readFileSync(generatedIosInfoPlistPath, 'utf8')
+  const ats = infoPlist.match(
+    /<key>NSAppTransportSecurity<\/key>\s*<dict>([\s\S]*?)<\/dict>/,
+  )?.[1]
+  const allowsLocalNetworking = ats
+    ? /<key>NSAllowsLocalNetworking<\/key>\s*<true\s*\/>/.test(ats)
+    : false
+
+  return allowsLocalNetworking
+    ? { ok: true, detail: 'NSAllowsLocalNetworking = true' }
+    : {
+        ok: false,
+        detail: '生成工程未放行局域网 HTTP devUrl；请重新执行 npm run ios:init',
+      }
+}
+
+function assertGeneratedIosLocalNetworking() {
+  const status = inspectGeneratedIosLocalNetworking()
+  if (!status.ok) throw new Error(status.detail)
+  console.log(`[iOS] 生成工程已放行局域网 devUrl：${status.detail}`)
+}
+
 function assertFlagAbsent(args, flag) {
   if (args.some((arg) => arg === flag || arg.startsWith(`${flag}=`))) {
     throw new Error(`${flag} 由当前 npm 命令固定，请不要重复传入。`)
   }
+}
+
+/**
+ * 解析 Vite 在真机调试时必须绑定的局域网地址。
+ *
+ * iPhone 上的 `localhost` 指向手机自身，没有 `adb reverse` 那样的端口转发可用，
+ * 因此 devUrl 只能写 Mac 的局域网 IP；写 localhost 会让 WebView 一直停在加载页。
+ * 顺带把结果写回 `TAURI_DEV_HOST`，保证 Tauri 与 `vite.config.ts` 绑定同一个地址。
+ */
+function resolveIosLanDevHost() {
+  const preset = process.env.TAURI_DEV_HOST?.trim()
+  if (preset) return preset
+
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family === 'IPv4' && !entry.internal) return entry.address
+    }
+  }
+  return null
+}
+
+/**
+ * 打开键盘实验页。
+ *
+ * 用构建期环境变量而不是 devUrl 路径：Tauri 在 iOS 上把 WebView 的 origin 固定为 localhost，
+ * devUrl 的 path 会被丢弃（2026-08-24 真机实测，两个不同 devUrl 的构建 origin 都是 localhost），
+ * 所以 `devUrl=.../lab.html` 这类做法在真机上永远进不去实验页。
+ * `src/main.tsx` 读同名变量决定挂载 IosLab 还是 AppShell。
+ *
+ * 仍然要解析局域网地址：真机访问不到 Mac 的 localhost，iOS 也没有 adb reverse 那样的端口转发。
+ */
+function enableIosKeyboardLab() {
+  const host = resolveIosLanDevHost()
+  if (!host) {
+    throw new Error(
+      '未找到可用的局域网 IPv4 地址。真机 iOS 调试必须让 iPhone 通过局域网访问 Mac 上的 Vite，'
+      + '请确认已连接 Wi-Fi，或显式设置 TAURI_DEV_HOST。',
+    )
+  }
+
+  // Tauri 随后据此注入子进程；vite.config.ts 第一优先读的就是这个变量。
+  process.env.TAURI_DEV_HOST = host
+  process.env.VITE_LAB = '1'
+  console.log(`[iOS] 开发入口已切换为键盘测试页（VITE_LAB=1，dev host ${host}）`)
 }
 
 function resolveBuildNumber(required) {
@@ -338,6 +411,13 @@ function doctor() {
     deploymentTargetStatus.detail,
     existsSync(join(generatedAppleDir, 'project.yml')),
   )
+  const localNetworkingStatus = inspectGeneratedIosLocalNetworking()
+  add(
+    localNetworkingStatus.ok,
+    'iOS 局域网 devUrl',
+    localNetworkingStatus.detail,
+    existsSync(join(generatedAppleDir, 'project.yml')),
+  )
 
   const signingIdentities = capture('security', ['find-identity', '-v', '-p', 'codesigning'])
   const signingOutput = `${signingIdentities.stdout ?? ''}\n${signingIdentities.stderr ?? ''}`
@@ -419,16 +499,20 @@ async function main() {
       requireSigningTeam()
       runTauri(['ios', 'init', ...forwardedArgs])
       syncIosAppIcons()
+      assertGeneratedIosLocalNetworking()
       break
     case 'assert-generated':
       assertGeneratedIosDeploymentTarget()
+      assertGeneratedIosLocalNetworking()
       break
     case 'sync-icons':
       syncIosAppIcons()
       break
     case 'dev':
       assertGeneratedIosDeploymentTarget()
+      assertGeneratedIosLocalNetworking()
       syncIosAppIcons()
+      enableIosKeyboardLab()
       runTauri(['ios', 'dev', ...forwardedArgs])
       break
     case 'run':

@@ -12,17 +12,46 @@ import './i18n' // 初始化 i18n
 import './glassEffect.css'
 import './assets/fonts/fonts.css'
 
+/*
+ * 真机没有 DevTools 时的兜底显示。
+ *
+ * 后端 log 只有能连上调试器才看得到；模块脚本挂掉时 React 根本没跑起来，
+ * #root 是空的，屏幕上只有白屏——2026-08-24 排查 iOS 实验页正是卡在这里，
+ * 三条 MIME 错误一条都没显示出来。所以错误必须画在页面上。
+ */
+function showFatalError(detail: unknown): void {
+    const root = document.getElementById('root')
+    if (!root) return
+
+    let box = document.getElementById('fc-fatal-error')
+    if (!box) {
+        box = document.createElement('pre')
+        box.id = 'fc-fatal-error'
+        box.style.cssText = [
+            'position:fixed', 'inset:0', 'z-index:2147483647',
+            'margin:0', 'padding:16px', 'overflow:auto',
+            'background:#1a0d0d', 'color:#ffb4a2',
+            'font:12px/1.5 ui-monospace,Menlo,monospace',
+            'white-space:pre-wrap', 'word-break:break-all',
+        ].join(';')
+        document.body.appendChild(box)
+    }
+    box.textContent += `${String(detail)}\n\n`
+}
+
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
 // JS 运行时错误 & 未捕获 Promise rejection
 window.addEventListener('error', (e) => {
     const src = e.filename ? ` @ ${e.filename}:${e.lineno}` : ''
     logger.error(`[GlobalError] ${e.message}${src}`)
+    showFatalError(`[GlobalError] ${e.message}${src}`)
 })
 window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason instanceof Error
         ? `${e.reason.message}\n${e.reason.stack ?? ''}`
         : String(e.reason)
     logger.error(`[UnhandledRejection] ${reason.slice(0, 400)}`)
+    showFatalError(`[UnhandledRejection] ${reason.slice(0, 400)}`)
 })
 
 // CSP 违规（能精确定位被拦截的资源/指令）
@@ -137,4 +166,38 @@ const initApp = async () => {
     )
 }
 
-initApp().catch(logger.error)
+/*
+ * 键盘实验入口（仅 dev，且 VITE_LAB=1）。
+ *
+ * 走构建期开关而不是独立的 lab.html：Tauri 在 iOS 上把 WebView 的 origin 固定为 localhost，
+ * devUrl 里的路径会被丢弃，所以任何「靠 URL 进入实验页」的做法在真机上都到不了
+ * （2026-08-24 真机实测：两个不同 devUrl 的构建，origin 都是 localhost）。
+ * 挂在 main.tsx 上还顺带继承了本文件顶部的全局错误捕获。
+ */
+function mountKeyboardLab(): void {
+    void (async () => {
+        try {
+            const [{default: IosLab}] = await Promise.all([
+                import('./lab/ios/IosLab'),
+                import('./lab/shared/lab.css'),
+            ])
+            createRoot(document.getElementById('root')!).render(
+                <StrictMode>
+                    <IosLab/>
+                </StrictMode>,
+            )
+        } catch (error) {
+            logger.error(`[Lab] 实验页加载失败: ${String(error)}`)
+            showFatalError(error)
+        }
+    })()
+}
+
+if (import.meta.env.DEV && import.meta.env.VITE_LAB === '1') {
+    mountKeyboardLab()
+} else {
+    initApp().catch((error: unknown) => {
+        logger.error(String(error))
+        showFatalError(error)
+    })
+}
