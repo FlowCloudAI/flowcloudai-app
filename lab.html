@@ -14,7 +14,7 @@
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
           name="viewport"/>
     <link rel="icon" type="image/svg+xml" href="/icon.svg"/>
-    <title>FlowCloudAI</title>
+    <title>FlowCloudAI 键盘实验（dev）</title>
     <style>
         /*
          * 关键渲染路径 CSS —— 内联在此，WebView 解析 HTML 后立即生效，
@@ -90,7 +90,13 @@
     </style>
 </head>
 <body>
+<!--
+    键盘实验页的独立入口（**仅 dev**）。
+    没有登记进 vite build 的 input，所以不会进生产产物；
+    npm run ios:dev 起来后在 WebView 里访问 /lab.html 即可。
+    实验结束后连同 src/lab 一起删除。
+-->
 <div id="root"></div>
-<script type="module" src="/src/main.tsx"></script>
+<script type="module" src="/src/lab/main.tsx"></script>
 </body>
 </html>
