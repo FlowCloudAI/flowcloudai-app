@@ -1,10 +1,12 @@
 /*
- * iOS 系统可访问性桥接：把 Dynamic Type 与降低透明度写入共享 WebView 的 CSS 环境。
- * React 仍负责界面；本文件不承载业务状态，也不依赖生成目录中的具体 WebView 层级。
+ * iOS 系统 UI 桥接：把 Dynamic Type、降低透明度和键盘原生事务写入共享 WebView。
+ * React 仍负责界面；原生层只提供系统事实，不承载业务状态，也不改 WKWebView 几何。
  */
 
+#import <QuartzCore/QuartzCore.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <math.h>
 
 static NSString *const FCAMobileUiMessageHandlerName = @"flowcloudaiMobileUi";
 
@@ -68,6 +70,276 @@ static void FCAPerformHaptic(NSString *kind) {
     [generator selectionChanged];
 }
 
+#pragma mark - 正式键盘桥
+
+/*
+ * iOS 没有 Android WindowInsets 的清零入口。正式方案保持 WKWebView 全屏，摘掉它自己注册的
+ * frame 观察器，再把 UIKeyboard 目标/时长/曲线发布给 Web 内容。收起方向 duration=0 时，
+ * keyboardLayoutGuide 探针只作为逐帧兜底；任何路径都不改 webView.frame/contentOffset。
+ */
+@interface FCAKeyboardInsetCoordinator : NSObject
+
+@property (nonatomic, weak) WKWebView *webView;
+@property (nonatomic, weak) WKWebView *suppressedWebView;
+@property (nonatomic, weak) UIView *probe;
+@property (nonatomic, weak) UIView *probeHost;
+@property (nonatomic, strong) CADisplayLink *link;
+@property (nonatomic, assign) BOOL active;
+@property (nonatomic, assign) BOOL keyboardVisible;
+@property (nonatomic, assign) CGFloat probeFloor;
+@property (nonatomic, assign) CGFloat lastPushedInset;
+@property (nonatomic, assign) NSTimeInterval sampleUntil;
+
+- (void)enableWithWebView:(WKWebView *)webView;
+- (CGFloat)probeKeyboardHeightUsingPresentation:(BOOL)usePresentation;
+- (void)publishKind:(NSString *)kind
+               inset:(CGFloat)inset
+            duration:(NSTimeInterval)duration
+               curve:(NSInteger)curve;
+- (void)publishKind:(NSString *)kind
+               inset:(CGFloat)inset
+            duration:(NSTimeInterval)duration
+               curve:(NSInteger)curve
+          nativeTime:(NSTimeInterval)nativeTime;
+
+@end
+
+@implementation FCAKeyboardInsetCoordinator
+
++ (instancetype)shared {
+    static FCAKeyboardInsetCoordinator *instance;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        instance = [[FCAKeyboardInsetCoordinator alloc] init];
+    });
+    return instance;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+        for (NSNotificationName name in @[
+            UIKeyboardWillChangeFrameNotification,
+            UIKeyboardWillHideNotification,
+            UIKeyboardDidHideNotification,
+        ]) {
+            [center addObserver:self
+                       selector:@selector(handleKeyboardNotification:)
+                           name:name
+                         object:nil];
+        }
+    }
+    return self;
+}
+
+- (void)enableWithWebView:(WKWebView *)webView {
+    if (!webView) {
+        return;
+    }
+    if (self.webView != webView) {
+        [self.probe removeFromSuperview];
+        self.probe = nil;
+        self.probeHost = nil;
+        self.webView = webView;
+        self.probeFloor = 0.0;
+        self.lastPushedInset = 0.0;
+    }
+    self.active = YES;
+    [self installProbeIfNeeded];
+    webView.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    [self suppressWebKitKeyboardAvoidanceIfNeeded];
+
+    /* React 安装全局接收函数后才发送 ready，保证初始 available 快照不会丢。 */
+    CGFloat rawInset = self.keyboardVisible ? [self probeKeyboardHeightUsingPresentation:NO] : 0.0;
+    CGFloat initialInset = rawInset <= self.probeFloor + 0.75 ? 0.0 : rawInset;
+    [self publishKind:@"ready" inset:initialInset duration:0.0 curve:7];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [self calibrateProbeFloorIfHidden];
+    });
+}
+
+- (void)installProbeIfNeeded {
+    if (self.probe || !self.webView) {
+        return;
+    }
+    UIView *host = self.webView.window.rootViewController.view ?: self.webView.superview;
+    if (!host) {
+        return;
+    }
+    UIView *probe = [[UIView alloc] initWithFrame:CGRectZero];
+    probe.userInteractionEnabled = NO;
+    probe.alpha = 0.0;
+    probe.backgroundColor = UIColor.clearColor;
+    probe.translatesAutoresizingMaskIntoConstraints = NO;
+    [host addSubview:probe];
+
+    UILayoutGuide *guide = host.keyboardLayoutGuide;
+    if (@available(iOS 17.0, *)) {
+        host.keyboardLayoutGuide.usesBottomSafeArea = NO;
+    }
+    [NSLayoutConstraint activateConstraints:@[
+        [probe.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [probe.widthAnchor constraintEqualToConstant:1.0],
+        [probe.heightAnchor constraintEqualToConstant:1.0],
+        [probe.topAnchor constraintEqualToAnchor:guide.topAnchor],
+    ]];
+    self.probe = probe;
+    self.probeHost = host;
+    [host layoutIfNeeded];
+}
+
+- (CGFloat)probeKeyboardHeightUsingPresentation:(BOOL)usePresentation {
+    WKWebView *webView = self.webView;
+    UIView *probe = self.probe;
+    UIWindow *window = webView.window;
+    if (!probe || !window) {
+        return 0.0;
+    }
+    CGRect frame = probe.frame;
+    if (usePresentation) {
+        CALayer *presentation = probe.layer.presentationLayer;
+        if (presentation) {
+            frame = presentation.frame;
+        }
+    }
+    CGPoint top = [probe.superview convertPoint:CGPointMake(0.0, CGRectGetMinY(frame)) toView:nil];
+    return MAX(0.0, CGRectGetHeight(window.bounds) - top.y);
+}
+
+- (void)calibrateProbeFloorIfHidden {
+    if (!self.active || self.keyboardVisible || !self.probeHost) {
+        return;
+    }
+    [self.probeHost layoutIfNeeded];
+    self.probeFloor = [self probeKeyboardHeightUsingPresentation:NO];
+}
+
+- (void)suppressWebKitKeyboardAvoidanceIfNeeded {
+    WKWebView *webView = self.webView;
+    if (!webView || self.suppressedWebView == webView) {
+        return;
+    }
+    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+    /*
+     * 只摘会修改 frame/inset 的四个观察者。DidShow 必须保留，WebKit 仍用它完成
+     * RevealFocusedElementDeferrer，普通滚动表单才能在键盘到位后显现焦点元素。
+     */
+    for (NSNotificationName name in @[
+        UIKeyboardWillShowNotification,
+        UIKeyboardWillHideNotification,
+        UIKeyboardWillChangeFrameNotification,
+        UIKeyboardDidChangeFrameNotification,
+    ]) {
+        [center removeObserver:webView name:name object:nil];
+    }
+    self.suppressedWebView = webView;
+}
+
+- (void)startFrameSamplingFor:(NSTimeInterval)seconds {
+    self.sampleUntil = MAX(self.sampleUntil, CACurrentMediaTime() + seconds);
+    if (self.link) {
+        return;
+    }
+    self.link = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick:)];
+    self.link.preferredFrameRateRange = CAFrameRateRangeMake(60.0, 120.0, 120.0);
+    [self.link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopFrameSampling {
+    [self.link invalidate];
+    self.link = nil;
+}
+
+- (void)tick:(CADisplayLink *)link {
+    if (!self.active || !self.webView.window) {
+        [self stopFrameSampling];
+        return;
+    }
+    CGFloat rawInset = [self probeKeyboardHeightUsingPresentation:YES];
+    CGFloat inset = rawInset <= self.probeFloor + 0.75 ? 0.0 : rawInset;
+    if (fabs(inset - self.lastPushedInset) > 0.4) {
+        self.lastPushedInset = inset;
+        [self publishKind:@"frame" inset:inset duration:0.0 curve:7 nativeTime:link.timestamp * 1000.0];
+    }
+    if (CACurrentMediaTime() > self.sampleUntil) {
+        [self stopFrameSampling];
+    }
+}
+
+- (void)handleKeyboardNotification:(NSNotification *)notification {
+    if (!self.active || !self.webView.window) {
+        return;
+    }
+    if ([notification.name isEqualToString:UIKeyboardDidHideNotification]) {
+        self.keyboardVisible = NO;
+        self.lastPushedInset = 0.0;
+        [self stopFrameSampling];
+        [self publishKind:@"didHide" inset:0.0 duration:0.0 curve:7];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [self calibrateProbeFloorIfHidden];
+        });
+        return;
+    }
+
+    NSDictionary *info = notification.userInfo;
+    CGRect endFrame = [info[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    UIWindow *window = self.webView.window;
+    CGFloat windowHeight = CGRectGetHeight(window.bounds);
+    CGFloat target = MAX(0.0, windowHeight - CGRectGetMinY(endFrame));
+    if ([notification.name isEqualToString:UIKeyboardWillHideNotification]) {
+        target = 0.0;
+    }
+    self.keyboardVisible = target > 0.0;
+    NSTimeInterval duration = [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+    NSInteger curve = [info[UIKeyboardAnimationCurveUserInfoKey] integerValue];
+    [self publishKind:@"willChange" inset:target duration:duration curve:curve];
+    [self startFrameSamplingFor:MAX(2.0, duration + 0.8)];
+}
+
+- (void)publishKind:(NSString *)kind
+               inset:(CGFloat)inset
+            duration:(NSTimeInterval)duration
+               curve:(NSInteger)curve {
+    [self publishKind:kind
+                inset:inset
+             duration:duration
+                curve:curve
+           nativeTime:CACurrentMediaTime() * 1000.0];
+}
+
+- (void)publishKind:(NSString *)kind
+               inset:(CGFloat)inset
+            duration:(NSTimeInterval)duration
+               curve:(NSInteger)curve
+          nativeTime:(NSTimeInterval)nativeTime {
+    WKWebView *webView = self.webView;
+    if (!webView) {
+        return;
+    }
+    NSDictionary *payload = @{
+        @"kind": kind,
+        @"inset": @(MAX(0.0, inset)),
+        @"duration": @(MAX(0.0, duration)),
+        @"curve": @(curve),
+        @"nativeTime": @(nativeTime),
+        @"probeFloor": @(MAX(0.0, self.probeFloor)),
+    };
+    NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    if (!data) {
+        return;
+    }
+    NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    NSString *script = [NSString stringWithFormat:
+        @"window.__flowcloudaiApplyIosKeyboardInset&&window.__flowcloudaiApplyIosKeyboardInset(%@);",
+        json];
+    [webView evaluateJavaScript:script completionHandler:nil];
+}
+
+@end
+
 @interface FCAMobileUiMessageHandler : NSObject <WKScriptMessageHandler>
 @end
 
@@ -89,6 +361,8 @@ static void FCAPerformHaptic(NSString *kind) {
         FCAApplyTheme(value);
     } else if ([type isEqualToString:@"haptic"]) {
         FCAPerformHaptic(value);
+    } else if ([type isEqualToString:@"keyboard"] && [value isEqualToString:@"enable"]) {
+        [[FCAKeyboardInsetCoordinator shared] enableWithWebView:message.webView];
     }
 }
 
@@ -221,6 +495,7 @@ static const NSUInteger FCAKbLabMaxFrames = 2400; /* 约 20 秒 @120Hz */
 @property (nonatomic, assign) CGFloat originalWebViewHeight;
 @property (nonatomic, assign) CGFloat lastPushedKb;
 @property (nonatomic, assign) BOOL autoLog;
+@property (nonatomic, assign) BOOL labActive;
 @property (nonatomic, assign) NSUInteger flushFrom;
 @property (nonatomic, assign) NSUInteger eventFlushFrom;
 @property (nonatomic, assign) NSUInteger transitionIndex;
@@ -484,6 +759,9 @@ static const NSUInteger FCAKbLabMaxFrames = 2400; /* 约 20 秒 @120Hz */
 #pragma mark 键盘通知
 
 - (void)handleKeyboardNotification:(NSNotification *)notification {
+    if (!self.labActive) {
+        return;
+    }
     UIWindow *window = [self hostWindow];
     NSDictionary *info = notification.userInfo;
     CGRect endFrame = [info[UIKeyboardFrameEndUserInfoKey] CGRectValue];
@@ -634,6 +912,16 @@ static const NSUInteger FCAKbLabMaxFrames = 2400; /* 约 20 秒 @120Hz */
     if (![command isKindOfClass:[NSString class]]) {
         return;
     }
+    if (!self.labActive) {
+        self.labActive = YES;
+        NSLog(@"FCKB|active|webview=%@|host=%@|probe=%d|window=%.0fx%.0f|safeBottom=%.0f",
+              NSStringFromClass(self.webView.class),
+              self.webView.superview ? NSStringFromClass(self.webView.superview.class) : @"nil",
+              self.probe != nil,
+              self.webView.window ? CGRectGetWidth(self.webView.window.bounds) : 0.0,
+              self.webView.window ? CGRectGetHeight(self.webView.window.bounds) : 0.0,
+              self.webView.window ? self.webView.window.safeAreaInsets.bottom : 0.0);
+    }
 
     if ([command isEqualToString:@"configure"]) {
         NSNumber *pushPerFrame = payload[@"pushPerFrame"];
@@ -715,12 +1003,4 @@ static void FCAInstallKeyboardLab(void) {
     [controller removeScriptMessageHandlerForName:FCAKbLabHandlerName];
     [controller addScriptMessageHandler:lab name:FCAKbLabHandlerName];
     [lab evaluate:@"window.__fcKbLabNativeReady=true;window.__fcKbLab&&window.__fcKbLab.onNativeReady&&window.__fcKbLab.onNativeReady();"];
-    /* 这行同时是 syslog 通道的连通性自检：看不到它就说明轨迹只能走页面复制按钮 */
-    NSLog(@"FCKB|install|webview=%@|host=%@|probe=%d|window=%.0fx%.0f|safeBottom=%.0f",
-          NSStringFromClass(webView.class),
-          webView.superview ? NSStringFromClass(webView.superview.class) : @"nil",
-          lab.probe != nil,
-          webView.window ? CGRectGetWidth(webView.window.bounds) : 0.0,
-          webView.window ? CGRectGetHeight(webView.window.bounds) : 0.0,
-          webView.window ? webView.window.safeAreaInsets.bottom : 0.0);
 }

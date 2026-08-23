@@ -12,6 +12,7 @@ const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', 
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
 const mobileAiChatSource = readFileSync(new URL('./pages/MobileAiChat.tsx', import.meta.url), 'utf8')
+const mobileAiMessageScrollSource = readFileSync(new URL('./pages/useMobileAiMessageScroll.ts', import.meta.url), 'utf8')
 const mobileIdeaSource = readFileSync(new URL('./pages/MobileIdea.tsx', import.meta.url), 'utf8')
 const mobileTimelineSource = readFileSync(new URL('./pages/MobileTimeline.tsx', import.meta.url), 'utf8')
 const mobileRelationGraphSource = readFileSync(new URL('./pages/MobileRelationGraph.tsx', import.meta.url), 'utf8')
@@ -185,7 +186,16 @@ test('AI 空消息态不重复避让键盘且不会把拖动升级成视觉视�
     assert.match(messagesRule, /scroll-padding-bottom:\s*var\(--mobile-ai-composer-space\)/)
     assert.doesNotMatch(messagesRule, /--mobile-keyboard-extra/)
     assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{[\s\S]*?gap:\s*0;[\s\S]*?overflow-y:\s*hidden;[\s\S]*?overscroll-behavior:\s*none;[\s\S]*?touch-action:\s*none;/)
-    assert.match(mobileAiChatSource, /container\.scrollTop = messageListEmpty \? 0 : container\.scrollHeight/)
+    assert.match(mobileAiMessageScrollSource, /container\.scrollTop = messageListEmpty \? 0 : container\.scrollHeight/)
+})
+
+test('移动 AI 首次进入新对话，灵感页打开时不抢输入焦点', () => {
+    assert.doesNotMatch(mobileAiChatSource, /initialConversationRestoreAttemptedRef/)
+    assert.doesNotMatch(mobileAiChatSource, /activeHistoryConversation/)
+    assert.doesNotMatch(mobileAiChatSource, /switchConversation\([^)]*conversations\[0\]/)
+    assert.doesNotMatch(mobileIdeaSource, /\bautoFocus\b/)
+    // 用户主动点“新建灵感”仍可直接开始输入；只取消页面挂载时的隐式聚焦。
+    assert.match(mobileIdeaSource, /controller\.startNewIdea\(\)[\s\S]*requestAnimationFrame\(\(\) => contentRef\.current\?\.focus\(\)\)/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {

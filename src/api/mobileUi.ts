@@ -2,18 +2,32 @@
  * 移动端原生 UI 反馈适配层。
  *
  * Android 通过 JavascriptInterface，iOS 通过 WKScriptMessageHandler；业务组件只使用
- * success / warning / selection 三种语义，不感知原生 API，也不会影响桌面浏览器。
+ * 语义化触觉反馈与键盘遮挡快照，不感知原生 API，也不会影响桌面浏览器。
  */
 
 export type MobileHapticKind = 'success' | 'warning' | 'selection'
 export type AndroidNavigationMode = 'buttons' | 'gesture' | 'unknown'
 
-export interface AndroidKeyboardInsetSnapshot {
-    /** 当前 APK 是否提供原生 IME Insets 桥；false 时调用方应保留旧 WebView 降级路径 */
+export interface MobileKeyboardInsetSnapshot {
+    /** 当前宿主是否提供原生键盘桥；false 时调用方应保留 visualViewport 降级路径 */
     available: boolean
-    /** 软键盘从窗口底部遮挡的 CSS 像素 */
+    /** 软键盘从窗口底部遮挡的 CSS 像素（原生 point 与 viewport CSS px 在本应用中一一对应） */
     inset: number
     visible: boolean
+}
+
+export type AndroidKeyboardInsetSnapshot = MobileKeyboardInsetSnapshot
+
+export type IosKeyboardInsetUpdateKind = 'ready' | 'willChange' | 'frame' | 'didHide'
+
+/** iOS 原生键盘事务；willChange 驱动 CSS 过渡，frame 只用于零时长收起和启动标定。 */
+export interface IosKeyboardInsetUpdate {
+    kind: IosKeyboardInsetUpdateKind
+    inset: number
+    duration: number
+    curve: number
+    nativeTime: number
+    probeFloor: number
 }
 
 interface AndroidMobileUiBridge {
@@ -24,17 +38,31 @@ interface AndroidMobileUiBridge {
 }
 
 interface IosMessageHandler {
-    postMessage: (payload: {type: 'haptic'; value: MobileHapticKind}) => void
+    postMessage: (payload:
+        | {type: 'haptic'; value: MobileHapticKind}
+        | {type: 'keyboard'; value: 'enable'}) => void
 }
 
 type MobileBridgeWindow = Window & {
     flowcloudaiMobileUi?: AndroidMobileUiBridge
     __flowcloudaiApplyAndroidKeyboardInset?: (inset: number, visible: boolean) => void
+    __flowcloudaiApplyIosKeyboardInset?: (payload: unknown) => void
     webkit?: {
         messageHandlers?: {
             flowcloudaiMobileUi?: IosMessageHandler
         }
     }
+}
+
+const IOS_KEYBOARD_UPDATE_KINDS = new Set<IosKeyboardInsetUpdateKind>([
+    'ready',
+    'willChange',
+    'frame',
+    'didHide',
+])
+
+function finiteNumber(value: unknown, fallback = 0): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
 /**
@@ -70,6 +98,49 @@ export function installAndroidKeyboardInsetListener(
     return () => {
         if (bridgeWindow.__flowcloudaiApplyAndroidKeyboardInset === receive) {
             delete bridgeWindow.__flowcloudaiApplyAndroidKeyboardInset
+        }
+    }
+}
+
+/**
+ * 订阅 iOS 原生键盘事务并启用本次 WKWebView 会话的单一布局 owner。
+ *
+ * `enable` 会让原生层停止 WKWebView 自带的整页避让；该操作在当前 WebView 会话不可逆，
+ * 因此只允许移动壳层按平台在应用级安装，业务页面不得自行开关。
+ */
+export function installIosKeyboardInsetListener(
+    listener: (update: IosKeyboardInsetUpdate) => void,
+): () => void {
+    const bridgeWindow = window as MobileBridgeWindow
+    const receive = (payload: unknown) => {
+        if (!payload || typeof payload !== 'object') return
+        const raw = payload as Record<string, unknown>
+        if (typeof raw.kind !== 'string'
+            || !IOS_KEYBOARD_UPDATE_KINDS.has(raw.kind as IosKeyboardInsetUpdateKind)) return
+
+        listener({
+            kind: raw.kind as IosKeyboardInsetUpdateKind,
+            inset: Math.max(0, finiteNumber(raw.inset)),
+            duration: Math.max(0, finiteNumber(raw.duration)),
+            curve: Math.trunc(finiteNumber(raw.curve, 7)),
+            nativeTime: finiteNumber(raw.nativeTime),
+            probeFloor: Math.max(0, finiteNumber(raw.probeFloor)),
+        })
+    }
+
+    bridgeWindow.__flowcloudaiApplyIosKeyboardInset = receive
+    try {
+        bridgeWindow.webkit?.messageHandlers?.flowcloudaiMobileUi?.postMessage({
+            type: 'keyboard',
+            value: 'enable',
+        })
+    } catch {
+        // 桥尚未安装时保持 unavailable；visualViewport 继续承担输入态检测，不参与布局。
+    }
+
+    return () => {
+        if (bridgeWindow.__flowcloudaiApplyIosKeyboardInset === receive) {
+            delete bridgeWindow.__flowcloudaiApplyIosKeyboardInset
         }
     }
 }

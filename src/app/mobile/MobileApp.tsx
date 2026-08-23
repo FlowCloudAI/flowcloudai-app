@@ -122,8 +122,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
     const {
         active: mobileInputModeActive,
+        keyboardVisible,
         dismissFocusedInput,
-    } = useMobileInputMode(mobileAppRef, {writeKeyboardInset: platformInfo.os === 'android'})
+    } = useMobileInputMode(mobileAppRef, {
+        keyboardInsetPlatform: platformInfo.os === 'android' || platformInfo.os === 'ios'
+            ? platformInfo.os
+            : null,
+    })
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -678,6 +683,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                             <MobileAiChat
                                 {...pageProps}
                                 active={activeTab === 'ai'}
+                                keyboardVisible={keyboardVisible}
                                 conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
                                 onOpenConversationDrawer={openAiConversationDrawer}
                                 onCloseConversationDrawer={closeCategoryDrawer}

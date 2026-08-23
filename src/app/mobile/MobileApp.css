@@ -14,6 +14,23 @@
     overflow: hidden;
 }
 
+/*
+ * iOS 摘掉 WKWebView 的整页避让后，普通滚动页也要获得可滚到键盘上方的尾部空间。
+ * Android 不进入该选择器，继续保持已验收的“仅 AI/灵感消费 Insets”行为。
+ */
+html[data-mobile-keyboard-owner='ios'] .mobile-app {
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
+}
+
+/* Portal 不继承 .mobile-app 的布局盒；浮动/底部面板单独缩到可见键盘上方。 */
+html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--sheet) {
+    bottom: var(--fc-kb, 0px);
+    transition:
+        opacity var(--fc-overlay-transition),
+        bottom var(--fc-kb-transition, 0s);
+}
+
 /* 移动端普通按钮默认采用胶囊规范；显式形状、图标按钮和按钮组仍由组件调用方决定。 */
 .mobile-app .fc-btn:not([class*='fc-btn--radius-']):not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only):not(.fc-btn-group .fc-btn) {
     --btn-radius: var(--fc-radius-full);
@@ -339,6 +356,13 @@
 .mobile-nav-safe-fixed {
     box-sizing: border-box;
     padding-bottom: var(--mobile-nav-reserved-height);
+    transition: padding-bottom var(--fc-kb-transition, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-nav-safe-fixed {
+        transition: none;
+    }
 }
 
 .mobile-page::-webkit-scrollbar {

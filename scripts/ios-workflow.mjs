@@ -44,7 +44,7 @@ function printHelp() {
   init                初始化或更新 src-tauri/gen/apple
   assert-generated    检查生成工程是否与仓库内 iOS 配置一致
   sync-icons          将受 Git 跟踪的 iOS AppIcon 同步到生成工程
-  dev                 热更新调试，默认打开 iOS 键盘测试页；可追加设备名称或 --open
+  dev                 热更新调试，默认打开 iOS 键盘测试页；追加 --app 打开正式业务入口
   run                 使用已打包前端运行，适合稳定性回归
   build-debug         生成 debugging IPA
   build-release-test  生成注册设备测试 IPA
@@ -229,7 +229,7 @@ function resolveIosLanDevHost() {
  *
  * 仍然要解析局域网地址：真机访问不到 Mac 的 localhost，iOS 也没有 adb reverse 那样的端口转发。
  */
-function enableIosKeyboardLab() {
+function configureIosDevEntry(labEnabled) {
   const host = resolveIosLanDevHost()
   if (!host) {
     throw new Error(
@@ -240,8 +240,9 @@ function enableIosKeyboardLab() {
 
   // Tauri 随后据此注入子进程；vite.config.ts 第一优先读的就是这个变量。
   process.env.TAURI_DEV_HOST = host
-  process.env.VITE_LAB = '1'
-  console.log(`[iOS] 开发入口已切换为键盘测试页（VITE_LAB=1，dev host ${host}）`)
+  process.env.VITE_LAB = labEnabled ? '1' : '0'
+  console.log(`[iOS] 开发入口：${labEnabled ? '键盘测试页' : '正式业务页'}`
+    + `（VITE_LAB=${process.env.VITE_LAB}，dev host ${host}）`)
 }
 
 function resolveBuildNumber(required) {
@@ -512,8 +513,8 @@ async function main() {
       assertGeneratedIosDeploymentTarget()
       assertGeneratedIosLocalNetworking()
       syncIosAppIcons()
-      enableIosKeyboardLab()
-      runTauri(['ios', 'dev', ...forwardedArgs])
+      configureIosDevEntry(!forwardedArgs.includes('--app'))
+      runTauri(['ios', 'dev', ...forwardedArgs.filter((argument) => argument !== '--app')])
       break
     case 'run':
       assertGeneratedIosDeploymentTarget()

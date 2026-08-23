@@ -14,6 +14,7 @@
       {
         "title": "流云AI",
         "label": "main",
+        "create": false,
         "width": 800,
         "height": 600,
         "minWidth": 600,

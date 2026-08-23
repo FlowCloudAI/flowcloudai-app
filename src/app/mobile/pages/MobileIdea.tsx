@@ -268,7 +268,6 @@ export default function MobileIdea({
                     aria-label="灵感正文"
                     onChange={event => controller.setDraftContent(event.target.value)}
                     placeholder="写下一个灵感、片段、设定疑问或待整理素材…"
-                    autoFocus
                 />
             </main>
 

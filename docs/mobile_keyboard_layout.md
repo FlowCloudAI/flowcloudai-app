@@ -1,6 +1,6 @@
 # 移动端软键盘布局接管方案
 
-> 状态：Android 已验收，iOS 独立设计中 ｜ 日期：2026-08-23 ｜ 适用：`app_main` 移动端
+> 状态：Android 已验收；iOS 已正式接入、待业务页真机验收 ｜ 日期：2026-08-24 ｜ 适用：`app_main` 移动端
 >
 > 本文描述当前架构、兼容边界与验收标准。2026-08-23 纯前端预测方案的真机录屏保留在
 > [`designs/audits/android-键盘布局-2026-08-23/`](../designs/audits/android-键盘布局-2026-08-23/)，
@@ -8,8 +8,9 @@
 
 ## 1. 结论
 
-Android 软键盘高度必须由原生 `WindowInsetsCompat.Type.ime()` 提供，WebView 不再参与键盘布局。
-前端只消费原生发布的实际遮挡高度 `--fc-kb`，不预测、不记忆历史高度、不移动整个外壳。
+Android 软键盘高度由原生 `WindowInsetsCompat.Type.ime()` 提供；iOS 由
+`UIKeyboardWillChangeFrameNotification` 提供目标、时长与曲线，零时长收起再临时读取
+`keyboardLayoutGuide`。前端统一只消费原生发布的遮挡高度 `--fc-kb`，不改变 WebView/应用根几何。
 
 这条路径同时解决两个问题：
 
@@ -19,8 +20,9 @@ Android 软键盘高度必须由原生 `WindowInsetsCompat.Type.ime()` 提供，
 键盘布局只有一个 owner：**Android 原生负责测量和时序，页面内部布局负责消费。**
 禁止再叠加 WebView 自动避让、前端高度预测、根节点 transform 或第二套键盘动画。
 
-这条结论是 Android 的现行实现，不是跨平台实现。iOS 可以复用“单一 owner、固定外壳、页面内部消费、
-输入态与几何测量分离”这些架构约束，但不能直接复用 Android 的 Insets 拦截代码；详见 §7.1。
+键盘布局仍只有一个 owner，但原生来源按平台互斥：Android 安装 Insets 适配器，iOS 安装 UIKeyboard
+适配器，浏览器/旧桥只用 `visualViewport` 判断输入态而不写布局。iOS 不能复用 Android 的 Insets
+拦截代码，因此两端的原生实现与验收状态仍必须分开记录；详见 §7。
 
 ## 2. 产品目标
 
@@ -165,6 +167,11 @@ AI 页父级 padding 已经按 `--mobile-nav-reserved-height` 缩短，composer 
 
 空消息态关闭纵向滚动并在消息区域使用 `touch-action: none`，但不得覆盖 composer/textarea 的可信聚焦路径。
 
+非空消息区在键盘从关闭变为展开时读取既有 `autoScroll` 状态：只有用户原本位于底部跟随状态，才在
+键盘动画缩短消息区的过程中继续把容器校正到 `scrollHeight`；用户已经上滑查看历史时不得抢回底部。
+实现同时监听原生 Insets 帧、容器尺寸变化和 iOS CSS 过渡结束，旧 WebView 缺少 `ResizeObserver` 时仍可由
+原生帧与过渡结束事件完成校正。禁止改用 `scrollIntoView`，避免滚动链把页面或视觉视口一起带动。
+
 ### 5.4 输入模式与布局测量分离
 
 `useMobileInputMode` 仍负责：
@@ -200,12 +207,12 @@ AI 页父级 padding 已经按 `--mobile-nav-reserved-height` 缩短，composer 
 | 平台 | 布局高度来源 | WebView 行为 | 当前范围 |
 | --- | --- | --- | --- |
 | Android API 26+ / 任意 WebView | 原生 `WindowInsetsCompat.Type.ime()` | IME Insets 在进入 WebView 前归零，WebView 保持全屏 | AI 聊天、灵感 |
-| iOS 16.2+ | 仍由 WKWebView 现有行为处理 | 不写 `--fc-kb`，避免二次缩短 | 本次不变 |
-| 浏览器预览/旧 APK | `visualViewport` 只用于输入模式兜底 | 不作为布局验收依据 | 静态测试 |
+| iOS 16.2+ | `UIKeyboardWillChangeFrame`；零时长收起用 `keyboardLayoutGuide` | 摘掉 WKWebView frame 观察者，WebView 保持全屏 | 全移动壳层；AI/灵感为主验收页 |
+| 浏览器预览/旧 APK/桥未就绪 | `visualViewport` 只用于输入模式兜底 | 不写 `--fc-kb`，不作为布局验收依据 | 静态测试 |
 
-iOS 不能直接启用 Android 路径。当前 `MobileApp` 只在 `platformInfo.os === 'android'` 时打开
-`writeKeyboardInset`；iOS 的 `visualViewport` 只用于输入模式判断，不写 `--fc-kb`。这是有意的平台隔离，
-不是缺失接线。IOS-005 仍是独立未解决项。
+iOS 没有启用 Android 路径。`MobileApp` 把 `platformInfo.os` 映射为 `android | ios | null`，
+`mobileKeyboardInset.ts` 每次只安装一个原生监听器；Android 回调不会写 iOS 的过渡变量，iOS 代码也不引用
+`MainActivity.kt`。共享的只有 `--fc-kb` 与页面保留高度契约。
 
 ### 7.1 iOS 适用性结论
 
@@ -239,14 +246,13 @@ UIKit/WebKit API 可以测量键盘，但截至 2026-08-23，没有公开文档�
 [`designs/audits/mobile-keyboard-probe-2026-08-20/`](../designs/audits/mobile-keyboard-probe-2026-08-20/)
 与 [`designs/ios-mobile-hig-gap-audit.md`](../designs/ios-mobile-hig-gap-audit.md#ios-005键盘布局曾依赖-webview-推断页面与-tab-无法稳定分配空间)。
 
-当前 iOS 原生桥还保留一套 `src/lab/ios` 专用探针：`keyboardLayoutGuide` + `CADisplayLink` 采样，按需试验
-逐帧 JavaScript 推送、夹紧 scroll view、缩短 WKWebView frame 或移除 WebKit 键盘通知观察者。该探针目前
-由 `FCAApplyMobileUiEnvironment()` 安装，并未按实验路由隔离；布局变更开关默认关闭，所以不会把 Android
-方案隐式用于 iOS，但普通页面仍会注册通知并产生诊断日志。iOS 发布前应单独将其门控或移除。
+仓库仍保留 `src/lab/ios` 专用探针，用于对照逐帧推送、夹紧 scroll view、缩短 WKWebView frame 等失败或
+诊断方案。它与正式 `FCAKeyboardInsetCoordinator` 分离；正式业务页不会启动实验采样，也不会刷 `FCKB`
+轨迹。实验处理器只有收到实验页命令后才置为 active，保留真机复盘能力而不占用生产键盘事务。
 
-这套探针不能视为生产方案：移除 WebKit 观察者依赖 WebKit 内部通知行为且运行期不可逆，不应成为发布路径。
-实验还观测到系统可短暂报告超出稳定终值的高度、`evaluateJavaScript` 跨进程推送只能达到约 25～40fps，
-以及交互式收起可能给出 `duration=0`，所以“原生实测”本身也不能保证网页逐帧无抖动。
+正式接入仍有明确风险：移除 WebKit 观察者依赖 WKWebView 当前通过 `NSNotificationCenter` 注册这组通知的
+实现事实，运行期不可逆，并不是 Apple 提供的“关闭键盘避让”开关。因此代码可覆盖 iOS 16.2，不等于已经
+证明所有 16.2 WebKit 构建都一致；最低系统真机仍是发布闸门。
 
 ### 7.2 2026-08-24 iOS 真机实验结果
 
@@ -267,43 +273,50 @@ UIKit/WebKit API 可以测量键盘，但截至 2026-08-23，没有公开文档�
 这项结果只验收了实验页候选和当前系统键盘，不自动等同于正式业务页、iOS 16.2、第三方输入法、外接键盘或
 iPad 浮动键盘已经通过。
 
-### 7.3 AI 页与灵感页接入评估
+### 7.3 iOS 正式接入结构
 
-页面布局层**可以复用**：`MobileAiChat.css` 和 `MobileIdea.css` 已共同消费 `--fc-kb`，只会重定义
-`--mobile-nav-reserved-height`，不会移动整只应用壳，也不会再创建第二套键盘高度变量。因此只要 iOS 能像
-Android 一样提供单一、可信的 `--fc-kb`，消息区会缩短、输入区会贴住键盘，灵感正文会在剩余高度内滚动。
+2026-08-24 已按“全应用共享 WKWebView 接管”接入正式移动壳层，而不是进入 AI/灵感时才临时打开：
 
-原生接管层目前**不能只对这两页安全启用**。阻止 WKWebView 自动平移的关键动作是
-`removeObserver:webView name:UIKeyboard* object:nil`；它作用于共享 WKWebView，且当前会话内不可逆。若进入
-AI/灵感时才开启，离开后词条编辑、项目表单、设置输入、Bottom Sheet 等输入面也无法恢复 WebKit 原有避让。
-把它接到两页表面上，实际会变成“全应用 iOS 键盘接管”，超出了两页改动的影响范围。
+1. `FCAMobileUiMessageHandler` 接收 `{type:'keyboard', value:'enable'}`，把当前 `message.webView` 交给
+   `FCAKeyboardInsetCoordinator`；
+2. coordinator 把外层 `contentInsetAdjustmentBehavior` 设为 `never`，并只移除 WKWebView 的
+   WillShow/WillHide/WillChange/DidChange frame 观察者；保留 DidShow，让 WebKit 继续兑现焦点元素 reveal；
+3. 展开阶段发布 `UIKeyboardWillChangeFrame` 的目标、duration 与 curve。页面使用真机拟合过的 curve 7，
+   并把实际事务时长写入 `--fc-kb-transition`；
+4. duration 为 0 时不把目标瞬间写到底，而由 `keyboardLayoutGuide` 的 presentation frame 临时跟随；
+   DidHide 永远强制归零，随后重新标定 iOS 16 上可能不为 0 的 guide floor；
+5. `mobileKeyboardInset.ts` 维护单一快照供输入模式订阅，CSS 变量仍直接写 document root，不经 React state。
 
-旧 WebView 的边界也在这里：键盘通知、`keyboardLayoutGuide` 和 CSS 变量均覆盖项目的 iOS 16.2 下限，
-`interactive-widget` 已被移除；但“摘除 WebKit 内部观察者”的有效性依赖具体 WebKit 注册实现，不是可承诺
-跨版本稳定的公开开关。iOS 16.2 真机至少需要单独回归，不能用 iOS 26.6 的结果代替。
+UIKit 在真机上曾短暂报告 `143 → 587 → 401.7`、`401.7 → 629.7 → 401.7` 的瞬时目标。iOS 分支沿用实验页
+验证过的“稳定目标上限”：只把连续 220ms 未被新目标替换的系统实测值记为可信上限，并按窗口高度保存；
+这不是 Android 的焦点前预测，也不会在键盘通知前抬升页面。Android 分支既不读取该值，也不写
+`--fc-kb-transition`。
 
-因此当前结论是：
+页面分配如下：
 
-- **两页 CSS 无需重写，具备接入条件；**
-- **实验原生桥不得直接接入正式 `MobileApp`；**
-- 若选择正式落地，必须按“全应用共享 WKWebView 接管”立项，先盘点并适配所有移动输入面，再在 iOS 16.2
-  与当前 iOS 上分别验收；若范围仍严格限定 AI/灵感两页，则维持现有 WebKit owner，不能同时写 `--fc-kb`。
+- AI/灵感继续复用原有 `--mobile-nav-reserved-height`，composer、消息区和 textarea 不新增平台分支；
+- iOS 普通 `.mobile-page` 在同一个变量下获得可滚到键盘上方的尾部空间；
+- Portal 的 floating/sheet 浮层在 iOS 下缩到键盘上方，覆盖 AI 更多设置与项目表单；
+- 沉浸正文编辑器保留自己已有的 `visualViewport` 内层工作区 owner，外层 Overlay 不再叠加 `--fc-kb`，
+  避免二次缩短；
+- Android 不命中 iOS 数据属性选择器，`MainActivity.kt`、Insets 拦截和已验收的 AI/灵感范围均未修改。
 
-### 7.4 iOS 后续设计边界
+### 7.4 iOS 当前验证边界
 
-在生产级全应用方案通过前，维持当前基线：**不向正式 iOS `MobileApp` 发布 `--fc-kb`，不恢复 frame
-resize，不在业务入口移除 WebKit 观察者，也不同时让 WKWebView 和页面消费同一键盘高度。**
+正式代码已经通过 18 项键盘专项测试、ESLint、TypeScript/Vite 生产构建，以及以最低部署目标
+`arm64-apple-ios16.2-simulator` 进行的 Xcode debug 编译。该结果证明接口、前端布局和 Objective-C 可构建，
+**不等于 iOS 业务页交互已经验收。**
 
-后续试验必须按以下顺序推进：
+当前必须保留的发布闸门：
 
-1. 先把 `UIKeyboardLayoutGuide` / keyboard frame 作为只读诊断，区分停靠、浮动、分离及外接键盘；
-2. 先证明能够用受支持的公开 API 稳定消除 WKWebView 自动平移，再允许 iOS 进入自定义布局 owner 模式；
-3. 只有单一 owner 成立后，才可复用现有 `--fc-kb` CSS 消费层；不得重新设计第二套页面布局变量；
-4. 至少覆盖 iOS 16.2 与当前 iOS、系统/第三方输入法、交互式收起、转屏、iPad 浮动键盘和外接键盘；
-5. IOS-005 的底部 Tab 目标需在真机确认：停靠键盘时隐藏/不可交互，浮动或外接键盘不得误隐藏。
+1. iPhone 15 Pro / iOS 26.6 上分别验收 AI 空/长消息、灵感短/长正文、AI 更多设置和至少一个普通设置输入；
+2. 连续 20 次首次/重复展开与系统收起，确认顶栏坐标不动、输入区不先跳、DidHide 后 `--fc-kb=0`；
+3. iOS 16.2 真机单独验证 observer removal 仍能压住 WKWebView 自动平移，不能用当前系统代替；
+4. 覆盖第三方输入法、候选栏变化、交互式收起、转屏、iPad 浮动/分离键盘和外接键盘；
+5. Android 后续再做一次真机非回归；当前只能确认 Android 原生文件零改动、专项测试仍覆盖原 Insets 链路。
 
-如果找不到受支持的 WKWebView 自动平移关闭手段，则 iOS 必须继续让 WKWebView 成为键盘布局 owner，前端
-只能做输入态和页面级滚动约束，不能再叠加实际键盘高度。这是平台能力边界，不用预测值或强拉 scroll 修补。
+若某个旧 WebKit 不再通过这组通知实现自动避让，必须让 iOS 接管整体回退到 WebKit owner；不能在同一会话
+同时保留 WebKit 平移和 `--fc-kb`。禁止用 frame resize、根 transform、预测聚焦高度或强拉 scroll 兜底。
 
 ## 8. 验证
 

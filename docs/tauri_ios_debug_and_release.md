@@ -56,6 +56,12 @@ npm run ios:dev -- "iPhone 在 Xcode 中显示的名称"
 `src/lab/ios` 的键盘测试页面，不需要再手写 `--config`。如需临时覆盖入口，可显式传入 Tauri
 `--config`；该默认值只作用于 `ios:dev`，不影响 `ios:run`、IPA、Android 或桌面端。
 
+正式业务页键盘回归使用 `--app`；该参数由仓库脚本消费，不会转发给 Tauri：
+
+```bash
+npm run ios:dev -- "iPhone 在 Xcode 中显示的名称" --app
+```
+
 需要在 Xcode 中查看完整运行日志时：
 
 ```zsh

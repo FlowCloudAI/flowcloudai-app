@@ -8,7 +8,9 @@
 > 2026-08-23 Android 单端重新引入了更窄的原生 IME 测量路径：固定 WebView，只发布实际遮挡给
 > AI/灵感内部布局，不恢复 iOS frame 调整、共享 Tab 显隐或 Portal 键盘架构；该路径已在目标 Android
 > 真机完成实际触控验收。iOS 仅复用单一布局 owner 等架构约束，不能直接复用 Android Insets 接管机制，
-> IOS-005 仍未解决。完整分析见 [`docs/mobile_keyboard_layout.md`](../docs/mobile_keyboard_layout.md#71-ios-适用性结论)。
+> IOS-005 当时仍未解决。2026-08-24 iOS 真机实验确认原生事件候选后，已以独立 iOS 适配器接入正式
+> `MobileApp`；当前代码/模拟器构建通过，业务页与 iOS 16.2 真机仍待验收。完整分析见
+> [`docs/mobile_keyboard_layout.md`](../docs/mobile_keyboard_layout.md#73-ios-正式接入结构)。
 
 ## 1. 结论
 
@@ -52,7 +54,7 @@
 |---|---|---|
 | IOS-001 | 最低支持版本提升到 iOS 16.2+ | 不再为 iOS 14/15 维护 `color-mix()` 双套 fallback |
 | IOS-002 | 使用小型 iOS 原生桥接支持 Dynamic Type | 原生层只暴露系统字号等级；业务 UI 继续通过共享字体 token 消费 |
-| IOS-005 | 停靠软键盘展开时隐藏底部 Tab | 该产品目标保留，但原生指标实现已回退；重新设计前，现行版本不隐藏 Tab，也不声明页面/Portal 的自定义键盘空间所有权 |
+| IOS-005 | 停靠软键盘展开时由键盘覆盖底部 Tab | iOS 已接入全应用单一键盘 owner；不移动 WebView/根壳，页面与 Portal 内部分配遮挡空间，待双版本真机验收 |
 | IOS-017 | 正式实现 iPad 自适应布局 | 复用现有 store、API 和领域组件，只新增 regular-width 壳层 |
 | IOS-018 | 保留 React 手势并补跟手进度 | 不改造为原生页面栈；iOS/Android 共用进度、取消区间和专项测试 |
 | IOS-019 | 使用 iOS 原生桥接读取降低透明度/提高对比度 | 与 Dynamic Type 共用轻量辅助功能桥接层，Windows/Android 不依赖该实现 |
@@ -68,7 +70,7 @@
 | IOS-002 | 已实现，待最大辅助字号逐页视觉验收 | `MobileApp` 加载 touch-density 的 13/15/17/22/28px 五档移动语义字号；iOS 原生桥通过 `UIFontMetrics` 写入缩放倍率，Android 使用 `Configuration.fontScale`，变量挂在 touch 根节点，因此页面和 portal 浮层一致，桌面 comfortable density 不受影响 |
 | IOS-003 | 已实现并通过 iPhone 真机验收 | iOS/Android 共用的 touch-density 输入字号已提升到 17px；iPhone 聚焦、失焦后的页面比例与导航由项目负责人确认通过 |
 | IOS-004 | 已实现，待双端横屏验收 | 页面、顶栏、AI 输入区、底栏与三类侧抽屉统一消费左右安全区；主内容取基础 gutter 与两侧安全区的最大值，兼容 iOS 横屏及 Android edge-to-edge |
-| IOS-005 | iOS 原生指标方案已回退，待重新设计 | iOS 仍保持回退基线：`visualViewport` 只参与输入态判断，不改应用根高度；底部 Tab 不因输入而隐藏。Android-only `WindowInsetsCompat` 路径已通过目标真机验收，但 iOS 没有对应的公开 Insets 清零入口，不能直接启用 `--fc-kb`，也不代表 IOS-005 已解决 |
+| IOS-005 | 已重新接入，待业务页与 iOS 16.2 真机验收 | iOS 使用 UIKeyboard 原生事件、零时长收起的 keyboardLayoutGuide 兜底和独立 WKWebView observer 抑制，发布同一 `--fc-kb`；不改 WebView frame/根高度。18 项专项测试、lint、前端构建和 iOS 16.2 simulator debug 构建通过；iPhone 15 Pro 实验页候选已通过，但正式 AI/灵感、普通表单和最低系统真机仍未验收。Android Insets 路径未改 |
 | IOS-006 | 已实现，待双主题视觉验收 | touch density 将仍需阅读的三级文字与 placeholder 提升到 secondary 文本基线；浅色主背景约 6.29:1，深色抬升面约 5.23:1，桌面主题 token 不变 |
 | IOS-008 | 已实现，待页面巡检 | touch density 为原生按钮、`role="button"` 和 `summary` 统一设置 48×48 最小命中区，一次满足 iOS 44pt 与 Material 48dp，并排除 Input 内部组合式清除/步进按钮；共享 MessageBox 操作也随移动根作用域放大，桌面不受影响 |
 | IOS-014 | 已实现 | 移动端在后端 ready 后直接调用 `showWindow()`，不再依赖可能被隐藏 WKWebView 暂停的 `requestAnimationFrame`；iOS 16.2 simulator debug 原生构建通过 |

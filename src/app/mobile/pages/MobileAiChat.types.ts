@@ -7,6 +7,7 @@ import type {MobileTab} from '../MobileNav'
 export interface MobileAiChatProps {
     aiFocus: AiFocus
     active: boolean
+    keyboardVisible: boolean
     navigateToTab: (tab: MobileTab) => void
     conversationDrawerOpen?: boolean
     onOpenConversationDrawer?: () => void

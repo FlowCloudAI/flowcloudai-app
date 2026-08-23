@@ -265,6 +265,37 @@ pub fn run() {
                 app.handle().plugin(log_builder.build())?;
             }
 
+            // ── 主窗口 ────────────────────────────────────────────────────────────
+            // `tauri.conf.json` 里 `create: false`，改由这里创建。原因是 iOS 的
+            // `inputAccessoryView` 只能在 builder 阶段设定——wry 把它存成构造期 ivar，
+            // 窗口建成后无法再改。窗口属性仍以 `tauri.conf.json` 及平台覆盖文件为唯一来源，
+            // 这里只读取合并后的配置，不重复声明任何属性。
+            // 位置必须早于下面所有 `get_webview_window("main")` 的使用。
+            {
+                let window_config = app
+                    .config()
+                    .app
+                    .windows
+                    .iter()
+                    .find(|window| window.label == "main")
+                    .ok_or("tauri.conf.json 缺少 label 为 main 的窗口配置")?
+                    .clone();
+
+                #[allow(unused_mut)]
+                let mut window_builder =
+                    tauri::WebviewWindowBuilder::from_config(app.handle(), &window_config)?;
+
+                // iOS 在 WKWebView 聚焦表单控件时会自动挂一条系统辅助栏（‹ › / 完成）。
+                // 它不属于应用的设计语言，而且会计入 UIKit 上报的键盘高度，返回 None 移除。
+                #[cfg(target_os = "ios")]
+                {
+                    window_builder =
+                        window_builder.with_input_accessory_view_builder(|_webview| None);
+                }
+
+                window_builder.build()?;
+            }
+
             // 禁用 release 模式下的 WebView 右键菜单
             #[cfg(not(debug_assertions))]
             if let Some(window) = app.get_webview_window("main") {

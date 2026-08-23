@@ -1,15 +1,16 @@
 /*
  * 移动端输入/编辑模式协调器。
  *
- * 统一监听文本焦点、原生 Android IME、visualViewport 与页面声明的整页编辑态；壳层据此
+ * 统一监听文本焦点、原生键盘事件、visualViewport 与页面声明的整页编辑态；壳层据此
  * 安排返回键和预测式返回手势。底部 Tab 不再随键盘隐藏。
  *
  * 关于「回写布局」：这里曾经**完全不**把键盘高度写回布局，因为 WKWebView 会自行避让键盘，
  * 再手动缩短根节点就是二次收缩（见 `docs/devlog/2026-08-18-ios-输入视口-二次缩短.md`）。
- * 该禁令对 iOS 仍然成立。但 2026-08-23 真机实测确认 Android/Chromium **不做**这套自动避让——
+ * 2026-08-23 真机实测确认 Android/Chromium **不做**这套自动避让——
  * IME 弹出时 `contentOffset`、`scrollTop` 全程为 0，窗口也不被 resize——所以那里不存在可二次补偿的对象。
  * Android 的布局高度改由原生 WindowInsets 桥直接写入 `--fc-kb`；visualViewport 只保留为
- * iOS 与旧桥环境的输入态检测兜底，不再参与 Android 布局。方案见 `docs/mobile_keyboard_layout.md`。
+ * 旧桥环境的输入态检测兜底。2026-08-24 iOS 真机又确认，关闭 WKWebView 自带整页避让后可由
+ * UIKeyboard 原生事件写入同一变量；两端适配器互斥，均不改应用根高度。方案见文档。
  */
 
 import {type RefObject, useCallback, useEffect, useState} from 'react'
@@ -20,8 +21,9 @@ import {
     isMobileInputModeActive,
 } from './mobileInputMode'
 import {
+    type MobileKeyboardInsetPlatform,
     mobileKeyboardInsetState,
-    setMobileKeyboardInsetEnabled,
+    setMobileKeyboardInsetPlatform,
     subscribeMobileKeyboardInset,
 } from './mobileKeyboardInset'
 
@@ -42,19 +44,21 @@ function hasActiveEditingRegion(root: HTMLElement): boolean {
 
 export interface MobileInputModeController {
     active: boolean
+    keyboardVisible: boolean
     dismissFocusedInput: () => boolean
 }
 
 export interface MobileInputModeOptions {
-    /** 是否把键盘遮挡高度写进 `--fc-kb`。仅 Android 打开，原因见文件头注释 */
-    writeKeyboardInset?: boolean
+    /** 移动壳层唯一的原生键盘布局来源；null 时只做 visualViewport 输入态降级检测。 */
+    keyboardInsetPlatform?: MobileKeyboardInsetPlatform
 }
 
 export function useMobileInputMode(
     rootRef: RefObject<HTMLDivElement | null>,
-    {writeKeyboardInset = false}: MobileInputModeOptions = {},
+    {keyboardInsetPlatform = null}: MobileInputModeOptions = {},
 ): MobileInputModeController {
     const [active, setActive] = useState(false)
+    const [keyboardVisible, setKeyboardVisible] = useState(false)
 
     const dismissFocusedInput = useCallback(() => {
         const focused = document.activeElement
@@ -64,9 +68,9 @@ export function useMobileInputMode(
     }, [])
 
     useEffect(() => {
-        setMobileKeyboardInsetEnabled(writeKeyboardInset)
-        return () => setMobileKeyboardInsetEnabled(false)
-    }, [writeKeyboardInset])
+        setMobileKeyboardInsetPlatform(keyboardInsetPlatform)
+        return () => setMobileKeyboardInsetPlatform(null)
+    }, [keyboardInsetPlatform])
 
     useEffect(() => {
         let frame = 0
@@ -116,14 +120,15 @@ export function useMobileInputMode(
                 focusViewportHeight || stableViewportHeight || window.innerHeight,
             )
             const nativeKeyboard = mobileKeyboardInsetState()
-            const keyboardVisible = writeKeyboardInset && nativeKeyboard.available
+            const nextKeyboardVisible = keyboardInsetPlatform && nativeKeyboard.available
                 ? nativeKeyboard.visible
                 : viewport.keyboardVisible
-            if (textInputFocused && keyboardVisible) keyboardSeenForFocus = true
+            setKeyboardVisible(nextKeyboardVisible)
+            if (textInputFocused && nextKeyboardVisible) keyboardSeenForFocus = true
 
             const nextActive = isMobileInputModeActive({
                 textInputFocused,
-                keyboardVisible,
+                keyboardVisible: nextKeyboardVisible,
                 keyboardSeenForFocus,
                 editingRegionActive: hasActiveEditingRegion(root),
             })
@@ -142,7 +147,7 @@ export function useMobileInputMode(
                 }, 180)
             }
 
-            if (!textInputFocused && !keyboardVisible) {
+            if (!textInputFocused && !nextKeyboardVisible) {
                 focusedInput = null
                 focusViewportHeight = 0
                 keyboardSeenForFocus = false
@@ -203,7 +208,7 @@ export function useMobileInputMode(
             window.visualViewport?.removeEventListener('resize', scheduleUpdate)
             window.visualViewport?.removeEventListener('scroll', scheduleUpdate)
         }
-    }, [rootRef, writeKeyboardInset])
+    }, [keyboardInsetPlatform, rootRef])
 
-    return {active, dismissFocusedInput}
+    return {active, keyboardVisible, dismissFocusedInput}
 }

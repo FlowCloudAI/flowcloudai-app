@@ -58,11 +58,13 @@ import {
 import type {MobileAiChatProps} from './MobileAiChat.types'
 import {runMobileViewTransition} from './mobileViewTransition'
 import {useMobileAiApiKeyAvailability} from './useMobileAiApiKeyAvailability'
+import {useMobileAiMessageScroll} from './useMobileAiMessageScroll'
 import './MobileAiChat.css'
 
 export default function MobileAiChat({
     aiFocus,
     active,
+    keyboardVisible,
     navigateToTab,
     conversationDrawerOpen = false,
     onOpenConversationDrawer,
@@ -73,9 +75,6 @@ export default function MobileAiChat({
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
-    const lastScrollTopRef = useRef(0)
-    const scrollFrameRef = useRef<number | null>(null)
-    const initialConversationRestoreAttemptedRef = useRef(false)
 
     const controller = useAiController(aiFocus)
     const {
@@ -214,45 +213,17 @@ export default function MobileAiChat({
                                     : '发消息或按住说话'
 
     const messageListEmpty = messages.length === 0 && !isStreaming
-    useEffect(() => {
-        if (!active || scrollFrameRef.current !== null || (!messageListEmpty && !autoScroll)) return
-        scrollFrameRef.current = window.requestAnimationFrame(() => {
-            scrollFrameRef.current = null
-            const container = messagesEndRef.current?.parentElement
-            if (container) container.scrollTop = messageListEmpty ? 0 : container.scrollHeight
-            if (messageListEmpty) {
-                lastScrollTopRef.current = 0
-                setAutoScroll(true)
-            }
-        })
-    }, [active, activeConversationId, autoScroll, messageListEmpty, messages.length, setAutoScroll, streamingBlocks])
-
-    useEffect(() => {
-        const container = messagesEndRef.current?.parentElement
-        if (!container) return
-        const handleScroll = () => {
-            const {scrollTop, scrollHeight, clientHeight} = container
-            const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-            if (scrollTop < lastScrollTopRef.current && distanceFromBottom > 50) {
-                setAutoScroll(false)
-            } else if (distanceFromBottom <= 50) {
-                setAutoScroll(true)
-            }
-            lastScrollTopRef.current = scrollTop
-        }
-        container.addEventListener('scroll', handleScroll, {passive: true})
-        return () => container.removeEventListener('scroll', handleScroll)
-    }, [setAutoScroll])
-
-    useEffect(() => {
-        if (initialConversationRestoreAttemptedRef.current || conversations.length === 0) return
-        initialConversationRestoreAttemptedRef.current = true
-
-        const activeHistoryConversation = activeConversationId
-            ? conversations.find((conversation) => conversation.id === activeConversationId)
-            : null
-        void switchConversation(activeHistoryConversation?.id ?? conversations[0].id)
-    }, [conversations, activeConversationId, switchConversation])
+    useMobileAiMessageScroll({
+        active,
+        activeConversationId,
+        autoScroll,
+        keyboardVisible,
+        messageCount: messages.length,
+        messageListEmpty,
+        messagesEndRef,
+        setAutoScroll,
+        streamingBlocks,
+    })
 
     useEffect(() => {
         setDrawerRoot(document.getElementById('mobile-ai-conversation-drawer-root'))
@@ -263,9 +234,6 @@ export default function MobileAiChat({
             const conversationLongPress = conversationLongPressRef.current
             if (conversationLongPress?.timerId != null) {
                 window.clearTimeout(conversationLongPress.timerId)
-            }
-            if (scrollFrameRef.current !== null) {
-                window.cancelAnimationFrame(scrollFrameRef.current)
             }
         }
     }, [])

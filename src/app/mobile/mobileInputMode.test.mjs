@@ -6,16 +6,24 @@ import {
     getMobileViewportState,
     isMobileInputModeActive,
 } from './mobileInputMode.ts'
-import {installAndroidKeyboardInsetListener} from '../../api/mobileUi.ts'
+import {
+    installAndroidKeyboardInsetListener,
+    installIosKeyboardInsetListener,
+} from '../../api/mobileUi.ts'
+import {shouldFollowMobileAiKeyboardRise} from './pages/mobileAiMessageScroll.ts'
 import {readFileSync} from 'node:fs'
 import {URL} from 'node:url'
 
 const inputModeHookSource = readFileSync(new URL('./useMobileInputMode.ts', import.meta.url), 'utf8')
 const mobileKeyboardInsetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
 const mobileUiSource = readFileSync(new URL('../../api/mobileUi.ts', import.meta.url), 'utf8')
+const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
-const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
+const mobileAiMessageScrollSource = readFileSync(
+    new URL('./pages/useMobileAiMessageScroll.ts', import.meta.url),
+    'utf8',
+)
 const mainActivitySource = readFileSync(new URL(
     '../../../src-tauri/gen/android/app/src/main/java/cn/flowcloudai/www/MainActivity.kt',
     import.meta.url,
@@ -24,6 +32,16 @@ const androidManifestSource = readFileSync(new URL(
     '../../../src-tauri/gen/android/app/src/main/AndroidManifest.xml',
     import.meta.url,
 ), 'utf8')
+const iosBridgeSource = readFileSync(new URL(
+    '../../../src-tauri/ios/Sources/MobileUiBridge.m',
+    import.meta.url,
+), 'utf8')
+const iosProductionBridgeSource = iosBridgeSource.split('#pragma mark - 键盘布局实验桥')[0]
+const tauriLibSource = readFileSync(new URL('../../../src-tauri/src/lib.rs', import.meta.url), 'utf8')
+const tauriConfig = JSON.parse(readFileSync(
+    new URL('../../../src-tauri/tauri.conf.json', import.meta.url),
+    'utf8',
+))
 const immersiveEditorSource = readFileSync(new URL('./pages/MobileEntryImmersiveEditor.tsx', import.meta.url), 'utf8')
 const entryEditViewSource = readFileSync(new URL('./pages/MobileEntryDetailEditView.tsx', import.meta.url), 'utf8')
 const entryDetailCss = readFileSync(new URL('./pages/MobileEntryDetail.css', import.meta.url), 'utf8')
@@ -150,16 +168,58 @@ test('原生桥用 getter 补初值并用固定回调接后续帧', () => {
     }
 })
 
-test('键盘接管默认关闭，且只重定义保留高度而不散写偏移', () => {
-    // 默认关闭是 iOS 的零回归保证：同一份布局在 iOS 上会复现顶栏离屏。
-    assert.match(mobileKeyboardInsetSource, /let enabled = false/)
-    assert.match(mobileKeyboardInsetSource, /export function setMobileKeyboardInsetEnabled/)
+test('iOS 桥由移动壳层显式启用，并把原生事务规范化后交给布局层', () => {
+    const previousWindow = globalThis.window
+    const posts = []
+    const bridgeWindow = {
+        webkit: {
+            messageHandlers: {
+                flowcloudaiMobileUi: {postMessage: payload => posts.push(payload)},
+            },
+        },
+    }
+    globalThis.window = bridgeWindow
+
+    try {
+        const updates = []
+        const dispose = installIosKeyboardInsetListener(update => updates.push(update))
+        assert.deepEqual(posts, [{type: 'keyboard', value: 'enable'}])
+
+        bridgeWindow.__flowcloudaiApplyIosKeyboardInset({
+            kind: 'willChange',
+            inset: 401.75,
+            duration: 0.383,
+            curve: 7,
+            nativeTime: 1234,
+            probeFloor: 68,
+        })
+        assert.deepEqual(updates, [{
+            kind: 'willChange',
+            inset: 401.75,
+            duration: 0.383,
+            curve: 7,
+            nativeTime: 1234,
+            probeFloor: 68,
+        }])
+
+        dispose()
+        assert.equal('__flowcloudaiApplyIosKeyboardInset' in bridgeWindow, false)
+    } finally {
+        if (previousWindow === undefined) delete globalThis.window
+        else globalThis.window = previousWindow
+    }
+})
+
+test('键盘接管按平台互斥安装，且页面只重定义保留高度', () => {
+    assert.match(mobileKeyboardInsetSource, /let platform: MobileKeyboardInsetPlatform = null/)
+    assert.match(mobileKeyboardInsetSource, /export function setMobileKeyboardInsetPlatform/)
+    assert.match(mobileKeyboardInsetSource, /next === 'android'[\s\S]*installAndroidKeyboardInsetListener[\s\S]*installIosKeyboardInsetListener/)
 
     // 调用方必须按平台显式打开。
-    assert.match(inputModeHookSource, /writeKeyboardInset/)
+    assert.match(inputModeHookSource, /keyboardInsetPlatform/)
     assert.match(
-        readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8'),
-        /writeKeyboardInset:\s*platformInfo\.os === 'android'/,
+        mobileAppSource,
+        /platformInfo\.os === 'android' \|\| platformInfo\.os === 'ios'/,
     )
 
     // 接入方式是重定义保留高度，不是给元素散写键盘偏移。
@@ -170,20 +230,78 @@ test('键盘接管默认关闭，且只重定义保留高度而不散写偏移',
     }
 })
 
+test('AI 消息区只在键盘升起前已跟随底部时继续贴底', () => {
+    assert.equal(shouldFollowMobileAiKeyboardRise({
+        active: true,
+        autoScroll: true,
+        keyboardRising: true,
+        messageListEmpty: false,
+    }), true)
+    for (const override of [
+        {active: false},
+        {autoScroll: false},
+        {keyboardRising: false},
+        {messageListEmpty: true},
+    ]) {
+        assert.equal(shouldFollowMobileAiKeyboardRise({
+            active: true,
+            autoScroll: true,
+            keyboardRising: true,
+            messageListEmpty: false,
+            ...override,
+        }), false)
+    }
+
+    assert.match(inputModeHookSource, /keyboardVisible: boolean/)
+    assert.match(mobileAppSource, /keyboardVisible=\{keyboardVisible\}/)
+    assert.match(mobileAiMessageScrollSource, /keyboardVisible && !keyboardWasVisibleRef\.current/)
+    assert.match(mobileAiMessageScrollSource, /subscribeMobileKeyboardInset\(scheduleScrollToBottom\)/)
+    assert.match(mobileAiMessageScrollSource, /new ResizeObserver\(scheduleScrollToBottom\)/)
+    assert.match(mobileAiMessageScrollSource, /container\.scrollTop = container\.scrollHeight/)
+    assert.doesNotMatch(mobileAiMessageScrollSource, /scrollIntoView/)
+})
+
 test('Android 布局只消费原生实际 Insets，不再预测或自演过渡', () => {
-    assert.match(mobileKeyboardInsetSource, /installAndroidKeyboardInsetListener\(publish\)/)
+    assert.match(mobileKeyboardInsetSource, /installAndroidKeyboardInsetListener\(snapshot => publish\(snapshot\)\)/)
     assert.match(mobileKeyboardInsetSource, /style\.setProperty\('--fc-kb'/)
     assert.match(inputModeHookSource, /mobileKeyboardInsetState\(\)/)
     assert.match(inputModeHookSource, /subscribeMobileKeyboardInset\(scheduleUpdate\)/)
 
     for (const source of [mobileKeyboardInsetSource, inputModeHookSource]) {
-        assert.doesNotMatch(source, /localStorage/)
         assert.doesNotMatch(source, /predictMobileKeyboardInset/)
         assert.doesNotMatch(source, /applyMobileKeyboardInset/)
         assert.doesNotMatch(source, /installKeyboardPanCompensation/)
     }
-    assert.doesNotMatch(mobileAiChatCss, /--fc-kb-transition/)
-    assert.doesNotMatch(mobileIdeaCss, /--fc-kb-transition/)
+    // 共享 CSS 可以声明过渡槽，但 Android 发布路径不会写入时长，始终退化为 0s。
+    assert.match(mobileKeyboardInsetSource, /if \(platform === 'ios'\) root\.style\.setProperty\('--fc-kb-transition', transition\)/)
+})
+
+test('iOS 正式桥保持 WebView 全屏并只在零时长收起时使用逐帧兜底', () => {
+    assert.match(iosProductionBridgeSource, /UIKeyboardWillChangeFrameNotification/)
+    assert.match(iosProductionBridgeSource, /UIKeyboardDidHideNotification/)
+    assert.match(iosProductionBridgeSource, /keyboardLayoutGuide/)
+    assert.match(iosProductionBridgeSource, /contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever/)
+    assert.match(iosProductionBridgeSource, /removeObserver:webView name:name object:nil/)
+    assert.match(iosProductionBridgeSource, /@"window\.__flowcloudaiApplyIosKeyboardInset/)
+    assert.doesNotMatch(iosProductionBridgeSource, /webView\.frame\s*=/)
+    assert.doesNotMatch(iosProductionBridgeSource, /contentOffset\s*=/)
+
+    assert.match(mobileKeyboardInsetSource, /if \(update\.duration <= 0\)[\s\S]*iosFollowPerFrame = true/)
+    assert.match(mobileKeyboardInsetSource, /if \(update\.kind === 'didHide'\)[\s\S]*inset: 0, visible: false/)
+    assert.match(mobileKeyboardInsetSource, /IOS_KEYBOARD_CURVE/)
+    assert.match(mobileKeyboardInsetSource, /fc-kb-ceiling:/)
+    assert.match(mobileAppCss, /transition: padding-bottom var\(--fc-kb-transition, 0s\)/)
+    assert.match(mobileAppCss, /data-mobile-keyboard-owner='ios'[\s\S]*\.fc-overlay--floating, \.fc-overlay--sheet/)
+    assert.match(mobileAiChatCss, /transition: bottom var\(--fc-kb-transition, 0s\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__composer::after[\s\S]*height: var\(--fc-kb, 0px\)/)
+})
+
+test('iOS 表单辅助栏在主窗口构造阶段关闭', () => {
+    const mainWindow = tauriConfig.app.windows.find(window => window.label === 'main')
+    assert.equal(mainWindow?.create, false)
+    assert.match(tauriLibSource, /WebviewWindowBuilder::from_config/)
+    assert.match(tauriLibSource, /with_input_accessory_view_builder\(\|_webview\| None\)/)
+    assert.doesNotMatch(iosProductionBridgeSource, /inputAssistantItem/)
 })
 
 test('原生层兼容旧 WebView，并阻止 WebView 成为第二个键盘布局 owner', () => {

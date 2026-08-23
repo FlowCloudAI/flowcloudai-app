@@ -4,7 +4,7 @@
     /*
      * 软键盘接管：只重定义保留高度，不给具体元素散写键盘偏移。
      * 这样 __composer 的 `bottom: var(--mobile-nav-reserved-height)` 等既有声明一行都不用改。
-     * --fc-kb 由 mobileKeyboardInset.ts 写入，iOS 上不写 → 回落 0px → 与接入前逐字等价。
+     * --fc-kb 由 mobileKeyboardInset.ts 按平台写入；Android/iOS 原生来源互斥。
      * 方案见 docs/mobile_keyboard_layout.md。
      */
     --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
@@ -554,6 +554,23 @@
         color-mix(in srgb, var(--fc-color-bg) 72%, transparent) 24%,
         var(--fc-color-bg) 72%
     );
+    transition: bottom var(--fc-kb-transition, 0s);
+}
+
+/*
+ * 原生事件与键盘图层可能存在个位数像素的起步差；把 composer 底色延伸到机器底部，
+ * 缝隙只会露出同色面而不会闪出 Tab。DidHide 把 --fc-kb 归零后该块立即消失。
+ */
+.mobile-ai-chat__composer::after {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: var(--fc-kb, 0px);
+    background: var(--fc-color-bg);
+    content: '';
+    pointer-events: none;
+    transition: height var(--fc-kb-transition, 0s);
 }
 
 .mobile-ai-composer-card {
@@ -938,6 +955,10 @@
 
     /* 键盘跟随的过渡降级为直接到位，布局终态与开启动效时完全一致 */
     .mobile-ai-chat__composer {
+        transition: none;
+    }
+
+    .mobile-ai-chat__composer::after {
         transition: none;
     }
 }
