@@ -1,4 +1,5 @@
 .mobile-idea {
+    --mobile-idea-keyboard-safe-reduction: 0px;
     /*
      * 软键盘接管：同 MobileAiChat，只重定义保留高度。
      * 本页带 mobile-nav-safe-fixed，其 padding-bottom 读的就是这个变量；
@@ -16,6 +17,11 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
+}
+
+/* 键盘本身已覆盖底部安全区；展开时只保留编辑器的常规页面间距。 */
+html[data-mobile-keyboard-owner='ios'] .mobile-idea {
+    --mobile-idea-keyboard-safe-reduction: min(var(--fc-kb, 0px), var(--mobile-safe-bottom));
 }
 
 .mobile-idea-svg {
@@ -66,7 +72,11 @@
     flex: 1 1 auto;
     flex-direction: column;
     gap: var(--mobile-gap-item);
-    padding: var(--mobile-gap-inline) var(--mobile-page-x) calc(var(--mobile-gap-item) + var(--mobile-safe-bottom));
+    padding: var(--mobile-gap-inline) var(--mobile-page-x) calc(
+        var(--mobile-gap-item)
+        + var(--mobile-safe-bottom)
+        - var(--mobile-idea-keyboard-safe-reduction)
+    );
 }
 
 .mobile-idea__meta {

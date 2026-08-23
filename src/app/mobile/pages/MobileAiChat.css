@@ -1,6 +1,7 @@
 .mobile-ai-chat {
     --mobile-ai-topbar-space: 4.25rem;
     --mobile-ai-composer-space: 8.25rem;
+    --mobile-ai-keyboard-gap: 0px;
     /*
      * 软键盘接管：只重定义保留高度，不给具体元素散写键盘偏移。
      * 这样 __composer 的 `bottom: var(--mobile-nav-reserved-height)` 等既有声明一行都不用改。
@@ -19,6 +20,11 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
+}
+
+/* iOS 移除系统输入附件栏后，给输入卡与键盘上沿保留一档紧凑呼吸空间。 */
+html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
+    --mobile-ai-keyboard-gap: min(var(--fc-kb, 0px), var(--mobile-gap-inline));
 }
 
 .mobile-ai-chat[hidden] {
@@ -543,7 +549,7 @@
      * 页面通过 padding 缩短普通流内容，但绝对定位不会停在 padding 上方；
      * 因此输入区必须显式消费与常驻 Tab 相同的保留高度。
      */
-    bottom: var(--mobile-nav-reserved-height);
+    bottom: calc(var(--mobile-nav-reserved-height) + var(--mobile-ai-keyboard-gap));
     left: 0;
     z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;

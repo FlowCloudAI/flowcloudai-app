@@ -4,12 +4,12 @@
 > 审计对象：`app_main/src/app/mobile`、共享 UI 组件、iOS 最低版本配置
 > 规范基线：`designs/apple-ios-ui-ux-design-guidelines.md`、Apple HIG、项目 `AGENTS.md`
 > 证据类型：iPhone 17 / iOS 26.5 模拟器运行截图 + 源码静态核查 + 4 个 Kimi CLI 与 3 个 Claude CLI 审计线程的候选项交叉复核
-> 状态补充：IOS-005 的原生键盘指标方案已于 2026-08-20 由 `a781f94` 回退；标签 `mobile-keyboard-native-v1-2026-08-20` 保留回退前代码和证据。本文其余审计结论不受影响。
-> 2026-08-23 Android 单端重新引入了更窄的原生 IME 测量路径：固定 WebView，只发布实际遮挡给
-> AI/灵感内部布局，不恢复 iOS frame 调整、共享 Tab 显隐或 Portal 键盘架构；该路径已在目标 Android
-> 真机完成实际触控验收。iOS 仅复用单一布局 owner 等架构约束，不能直接复用 Android Insets 接管机制，
-> IOS-005 当时仍未解决。2026-08-24 iOS 真机实验确认原生事件候选后，已以独立 iOS 适配器接入正式
-> `MobileApp`；当前代码/模拟器构建通过，业务页与 iOS 16.2 真机仍待验收。完整分析见
+> 状态补充：IOS-005 第一版原生键盘指标方案曾于 2026-08-20 由 `a781f94` 回退；标签
+> `mobile-keyboard-native-v1-2026-08-20` 保留回退前代码和证据。2026-08-23 Android 以更窄的原生 IME
+> Insets 路径重新接入并通过目标真机验收；2026-08-24 iOS 经独立真机实验后改用 UIKeyboard 事件、
+> `keyboardLayoutGuide` 零时长兜底和 Wry 构造期附件栏配置，正式业务页核心路径已在 iPhone 15 Pro /
+> iOS 26.6 验收。两端只共享 `--fc-kb` 页面契约，不共享原生接线；iOS 16.2、第三方输入法与 iPad 矩阵
+> 继续作为发布闸门。完整分析见
 > [`docs/mobile_keyboard_layout.md`](../docs/mobile_keyboard_layout.md#73-ios-正式接入结构)。
 
 ## 1. 结论
@@ -124,9 +124,9 @@
 
 - **证据**：`MobileApp.css:78-90` 使用固定 `100vh/100dvh` 壳层；普通页面没有全局 `visualViewport` 键盘避让。横屏聚焦首页输入时，键盘附件栏覆盖中间 Tab，只剩首页与设置部分可见。
 - **影响**：输入时仍可切换 Tab，可能意外离开当前上下文；横屏下底栏还会被键盘附件栏部分遮挡，既不可读也不可可靠操作。
-- **目标方案**：停靠软键盘出现时隐藏并禁用底部 Tab；浮动键盘与外接键盘不隐藏。页面外壳不整体移动，AI 只压缩 Messages，灵感正文内部滚动，前景 Bottom Sheet 优先于背景页。该目标需要重新设计，不能直接恢复归档实现。
-- **实现状态**：iOS 原生 frame/insets、共享 `occludedBottom` store、Tab 原生显隐、页面/Portal 键盘专用布局及 iOS focus reveal guard 已由 `a781f94` 回退。现行 iOS 仍沿用 `visualViewport` 输入态检测且不隐藏 Tab；Android 后续新增的固定 WebView + 原生 IME 测量只服务 Android AI/灵感布局，不在 iOS 写 `--fc-kb`。IOS-005 继续标记为未解决。回退前代码可从标签 `mobile-keyboard-native-v1-2026-08-20` 检出比较。
-- **2026-08-23 复核**：Android 的“读取 IME 后向 WebView 清零”依赖 `WindowInsetsCompat` 分发链，WKWebView 没有公开的直接等价入口。`UIKeyboardLayoutGuide` 与键盘通知能测量遮挡，但不能同时关闭 WebKit 的自动 focus reveal；WebKit 的 `interactive-widget` / VirtualKeyboard API 仍未实现，iOS 26 的 `obscuredContentInsets` 又不兼容本项目 iOS 16.2 下限且不是键盘 opt-out。故 iOS 只能复用单一 owner、固定外壳和内部消费原则，不能复制 Android 接线。当前禁止恢复 frame resize、移除 WebKit 通知观察者或直接打开 `--fc-kb`；详见[权威键盘文档](../docs/mobile_keyboard_layout.md#71-ios-适用性结论)。
+- **目标方案**：停靠软键盘出现时让底部 Tab 保持在机器底部并由系统键盘覆盖，不把 Tab 抬到键盘上方。页面外壳不整体移动，AI 只压缩 Messages，灵感正文内部滚动，前景 Bottom Sheet 优先于背景页；浮动键盘与外接键盘必须单独验收。
+- **实现状态**：目标设备已关闭。Android 读取并拦截 `WindowInsetsCompat.Type.ime()` 后发布 `--fc-kb`；iOS 摘掉 WKWebView 的 frame 通知观察者，使用 `UIKeyboardWillChangeFrame` 与 `keyboardLayoutGuide` 发布同一变量。两端原生来源互斥，均不改变 WebView 几何。AI/灵感内部区域消费高度，iOS 系统附件栏在 Wry 构造期移除；iPhone 15 Pro / iOS 26.6 核心业务页已验收。
+- **历史与边界**：2026-08-23 的结论“Android 接线不能直接移植 iOS”仍成立；后续是单独实现 iOS adapter，不是复制 Insets。回退前代码仍可从标签 `mobile-keyboard-native-v1-2026-08-20` 比较。iOS 16.2、第三方输入法、横屏、iPad 浮动/分离键盘和外接键盘尚未覆盖，详见[权威键盘文档](../docs/mobile_keyboard_layout.md#74-ios-业务页验收与发布边界)。
 
 ### IOS-006：浅色与深色的占位/三级文字对比度不足
 
@@ -261,7 +261,7 @@
 ### 第一批：阻断 iOS 验收
 
 1. 将最低支持版本统一提升到 iOS 16.2，并同步配置与文档。
-2. 修复 16px 输入、Dynamic Type、左右安全区；重新设计停靠键盘下的 Tab、页面和前景浮层空间所有权，禁止直接恢复已回退的原生指标实现。
+2. 修复 16px 输入、Dynamic Type、左右安全区；停靠键盘的 Tab、页面和前景浮层空间所有权已完成目标设备实现，发布前继续补最低系统、第三方输入法和 iPad 验收。
 3. 提升三级文字对比度，统一 44pt 点击区。
 
 ### 第二批：完成 VoiceOver/键盘基线

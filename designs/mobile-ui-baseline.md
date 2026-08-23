@@ -3,6 +3,7 @@
 > 适用范围：`app_main` 移动端壳层（`src/app/mobile/**`）及被其消费的共享组件。iOS 与 Android 共用同一套 React/CSS，本规范同时对两端生效。
 > 文档定位：**这是「尺度与结构」的规范，不是视觉风格指南。** 它只回答「用哪个值、值放在哪」，不回答「好不好看」。风格另开文档，且必须建立在本规范之上。
 > 建立日期：2026-08-18
+> 键盘平台契约更新：2026-08-24
 > 配套文档：`designs/apple-ios-ui-ux-design-guidelines.md`（Apple 平台细则）、`designs/ios-mobile-hig-gap-audit.md`（历史差距审计）
 
 ---
@@ -334,7 +335,7 @@ L1 token 一律挂在 `:root[data-fc-density="touch"]` 上，**不挂在 `.mobil
 | 字号缩放 | Dynamic Type | `Configuration.fontScale` | 共用根变量 `--mobile-font-scale`，两端各自原生桥接 |
 | 按压反馈 | 变暗 / 轻微缩放 | Material state layer | 统一 `:active` token；Android 额外允许 ripple |
 | 触觉反馈 | Haptic Engine | `VibrationEffect` | 统一语义层（成功 / 警告 / 选择），各自映射 |
-| 软键盘 | 当前交由 WKWebView 默认行为，IOS-005 仍未解决 | 原生 `WindowInsetsCompat.Type.ime()` 发布实际遮挡量，WebView 保持全屏且不再消费 IME；目标真机已验收 | 2026-08-20 的双端共享方案仍保持回退；2026-08-23 只恢复 Android AI/灵感的窄路径。两端都不隐藏 Tab，iOS 不消费 `--fc-kb`；iOS 只能复用单一 owner 等布局契约，不能复制 Android Insets 接管，详见 `docs/mobile_keyboard_layout.md` |
+| 软键盘 | 原生 `UIKeyboard` frame 事件发布实际遮挡量，`keyboardLayoutGuide` 处理零时长事务；目标真机已验收 | 原生 `WindowInsetsCompat.Type.ime()` 发布实际遮挡量，WebView 保持全屏且不再消费 IME；目标真机已验收 | 2026-08-20 被回退的「双端共享一套原生接管」仍属历史方案；现行两端原生来源互斥，只共享 `--fc-kb` 内部布局契约。WebView/应用外壳不改几何，Tab 保持机器底部并被键盘覆盖，AI/灵感各自分配内部空间；详见 `docs/mobile_keyboard_layout.md` |
 | 材质降级 | Reduce Transparency | 高对比度设置 | 触发时强制实色高对比 surface |
 
 **规则：新增任何平台相关行为，必须先在本表加一行，两列都填写后再实现。**

@@ -1,6 +1,6 @@
 # 移动端软键盘布局接管方案
 
-> 状态：Android 已验收；iOS 已正式接入、待业务页真机验收 ｜ 日期：2026-08-24 ｜ 适用：`app_main` 移动端
+> 状态：Android 与 iOS 目标真机核心路径已验收；跨版本/输入法/iPad 矩阵待补 ｜ 日期：2026-08-24 ｜ 适用：`app_main` 移动端
 >
 > 本文描述当前架构、兼容边界与验收标准。2026-08-23 纯前端预测方案的真机录屏保留在
 > [`designs/audits/android-键盘布局-2026-08-23/`](../designs/audits/android-键盘布局-2026-08-23/)，
@@ -30,7 +30,7 @@ Android 软键盘高度由原生 `WindowInsetsCompat.Type.ime()` 提供；iOS �
 
 1. 固定顶栏不离开屏幕；
 2. WebView 与应用外壳保持全屏，不整体移动或缩短；
-3. AI 消息区缩短，composer 贴在键盘上沿；
+3. AI 消息区缩短，composer 跟随键盘上沿并保留页面定义的小间距；
 4. 灵感正文缩短并由 textarea 内部滚动；
 5. 底部 Tab 保持在机器底部并被键盘覆盖，不出现在键盘上方；
 6. 空消息态没有伪滚动，用户拖动时页面不抖；
@@ -149,9 +149,9 @@ AI 聊天页与灵感页继续复用现有 `--mobile-nav-reserved-height`：
 键盘收起时 `--fc-kb = 0px`，布局退化到正常 Tab 保留高度。键盘展开时：
 
 - `.mobile-nav` 仍绝对定位在机器底部，被系统键盘覆盖；
-- AI composer 的 `bottom` 变为实际键盘高度；
+- AI composer 的 `bottom` 变为实际键盘高度；iOS 在移除系统附件栏后另加一档紧凑间距；
 - `mobile-nav-safe-fixed` 的内部可用空间按相同高度缩短；
-- 灵感 textarea 在 flex 容器中缩短并保持内部滚动。
+- 灵感 textarea 在 flex 容器中缩短并保持内部滚动；iOS 键盘展开时扣除已被键盘覆盖的底部安全区，避免重复留白。
 
 ### 5.3 消息列表不能重复消费键盘高度
 
@@ -187,6 +187,16 @@ AI 页父级 padding 已经按 `--mobile-nav-reserved-height` 缩短，composer 
 - 在 `focusin` 预测键盘高度；
 - 写入 `--fc-kb`；
 - 根据 `visualViewport.offsetTop` 移动 `.mobile-app`。
+
+### 5.5 首次进入与焦点策略
+
+键盘布局稳定后，页面入口不得再主动制造一次无用户意图的键盘事务：
+
+- 移动端进入 AI Tab 时创建或复用空白草稿，不自动恢复最近一条历史对话；
+- 灵感页加载时不自动聚焦正文；只有用户明确点击“新建灵感”等编辑动作后才聚焦；
+- AI 非空消息区只有在键盘升起前已经跟随底部时才继续贴底，用户上滑阅读历史时不能抢回最新消息。
+
+这三项属于焦点与滚动策略，不参与 `--fc-kb` 高度计算。
 
 ## 6. 已移除的历史方案
 
@@ -285,7 +295,10 @@ iPad 浮动键盘已经通过。
    并把实际事务时长写入 `--fc-kb-transition`；
 4. duration 为 0 时不把目标瞬间写到底，而由 `keyboardLayoutGuide` 的 presentation frame 临时跟随；
    DidHide 永远强制归零，随后重新标定 iOS 16 上可能不为 0 的 guide floor；
-5. `mobileKeyboardInset.ts` 维护单一快照供输入模式订阅，CSS 变量仍直接写 document root，不经 React state。
+5. `mobileKeyboardInset.ts` 维护单一快照供输入模式订阅，CSS 变量仍直接写 document root，不经 React state；
+6. 主窗口在 `tauri.conf.json` 中设为 `create: false`，setup 阶段从合并后的同一份窗口配置构造，iOS 再调用
+   `with_input_accessory_view_builder(|_| None)` 移除系统的“上一项/下一项/完成”附件栏。窗口尺寸、透明度和
+   平台覆盖仍由配置文件负责，Rust 不复制第二份窗口属性。
 
 UIKit 在真机上曾短暂报告 `143 → 587 → 401.7`、`401.7 → 629.7 → 401.7` 的瞬时目标。iOS 分支沿用实验页
 验证过的“稳定目标上限”：只把连续 220ms 未被新目标替换的系统实测值记为可信上限，并按窗口高度保存；
@@ -294,29 +307,46 @@ UIKit 在真机上曾短暂报告 `143 → 587 → 401.7`、`401.7 → 629.7 →
 
 页面分配如下：
 
-- AI/灵感继续复用原有 `--mobile-nav-reserved-height`，composer、消息区和 textarea 不新增平台分支；
+- AI/灵感继续复用原有 `--mobile-nav-reserved-height`；iOS 只在页面边界追加间距校正：AI 输入卡与键盘上沿
+  保留 `--mobile-gap-inline`（当前约 8px），灵感编辑器键盘展开时扣掉重复的 `safe-area-inset-bottom`，
+  最终保留 `--mobile-gap-item`（当前约 12px）。Android 不命中这些选择器；
 - iOS 普通 `.mobile-page` 在同一个变量下获得可滚到键盘上方的尾部空间；
 - Portal 的 floating/sheet 浮层在 iOS 下缩到键盘上方，覆盖 AI 更多设置与项目表单；
 - 沉浸正文编辑器保留自己已有的 `visualViewport` 内层工作区 owner，外层 Overlay 不再叠加 `--fc-kb`，
   避免二次缩短；
 - Android 不命中 iOS 数据属性选择器，`MainActivity.kt`、Insets 拦截和已验收的 AI/灵感范围均未修改。
 
-### 7.4 iOS 当前验证边界
+### 7.4 iOS 业务页验收与发布边界
 
-正式代码已经通过 18 项键盘专项测试、ESLint、TypeScript/Vite 生产构建，以及以最低部署目标
-`arm64-apple-ios16.2-simulator` 进行的 Xcode debug 编译。该结果证明接口、前端布局和 Objective-C 可构建，
-**不等于 iOS 业务页交互已经验收。**
+正式代码已经通过 21 项键盘专项测试、ESLint、TypeScript/Vite 生产构建、macOS `cargo check`，并在
+iPhone 15 Pro（`iPhone16,1`）/ iOS 26.6 上完成 Xcode 真机编译、签名、安装和启动。项目负责人随后在
+正式业务入口验收了 AI/灵感键盘布局、系统附件栏移除和两页最终间距，确认当前目标设备核心路径通过。
+
+本轮真机过程中还确认：顶栏不再跟随视觉视口平移、Tab 保持在机器底部并由键盘覆盖、DidHide 后底部填充
+归零；AI 打开新对话、灵感不自动聚焦，非空消息在原本贴底时才随键盘继续贴底。未单独归档 iOS 业务页录屏，
+因此代码、测试、构建日志和项目负责人的实际触控验收共同构成当前证据边界。
 
 当前必须保留的发布闸门：
 
-1. iPhone 15 Pro / iOS 26.6 上分别验收 AI 空/长消息、灵感短/长正文、AI 更多设置和至少一个普通设置输入；
-2. 连续 20 次首次/重复展开与系统收起，确认顶栏坐标不动、输入区不先跳、DidHide 后 `--fc-kb=0`；
+1. 补做 AI 长消息/流式消息、灵感长正文、AI 更多设置和普通设置输入的完整重复回归；
+2. 连续 20 次首次/重复展开与系统收起，记录顶栏坐标、输入区轨迹和 DidHide 后 `--fc-kb=0`；
 3. iOS 16.2 真机单独验证 observer removal 仍能压住 WKWebView 自动平移，不能用当前系统代替；
 4. 覆盖第三方输入法、候选栏变化、交互式收起、转屏、iPad 浮动/分离键盘和外接键盘；
-5. Android 后续再做一次真机非回归；当前只能确认 Android 原生文件零改动、专项测试仍覆盖原 Insets 链路。
+5. Android 补一次真机非回归；当前代码按 iOS 数据属性隔离，Android 原生 Insets 文件未修改。
 
 若某个旧 WebKit 不再通过这组通知实现自动避让，必须让 iOS 接管整体回退到 WebKit owner；不能在同一会话
 同时保留 WebKit 平移和 `--fc-kb`。禁止用 frame resize、根 transform、预测聚焦高度或强拉 scroll 兜底。
+
+### 7.5 iOS 系统输入附件栏实验与最终方案
+
+业务页最初仍显示 WKWebView 自带的焦点切换和完成栏。第一轮只清空
+`webView.inputAssistantItem.leadingBarButtonGroups` / `trailingBarButtonGroups`；真机确认按钮完全没有消失，
+说明这组 API 管的是输入辅助快捷项，不是 WKWebView 的表单附件栏。该实验代码和断言已全部删除。
+
+最终使用 Tauri 2.11 / Wry 0.55 提供的 `with_input_accessory_view_builder`，在 WebView 构造阶段返回 `None`。
+这是框架明确提供的 iOS 扩展，不需要在业务代码里查找 `WKContentView`、动态子类化或 swizzle 私有类；但
+Tauri 文档同时把这项接口标为依赖尚未稳定的 `objc2_ui_kit`，升级 Tauri/Wry 小版本时必须重新编译并真机
+验证。由于构造完成后不能补设，`create: false` 与 setup 手动构造主窗口是最终方案的一部分，不能单独删除。
 
 ## 8. 验证
 
@@ -370,8 +400,9 @@ Insets + JavascriptInterface，不依赖 WebView 键盘 API”的架构，仍需
 
 ## 9. 当前未覆盖项
 
-- iOS 的停靠键盘、浮动键盘与外接键盘空间所有权尚未重新设计；
+- iOS 16.2 真机、第三方输入法、候选栏变化、横屏、iPad 浮动/分离键盘与外接键盘仍需专项验收；
 - 含输入控件的 Bottom Sheet、词条沉浸编辑等 Portal 尚未接入 Android `--fc-kb`；
 - API 26～29 的 Insets 动画由 AndroidX 兼容层提供，仍需低版本设备或模拟器验证；
 - 原生逐帧 JavaScript 发布是否在低端设备掉帧，只能通过真机录屏/帧时间确认；
-- 新原生路径已有 ADB/CDP 逐帧诊断和目标真机实际触控验收；尚未单独归档新版真机录屏。
+- Android 新原生路径已有 ADB/CDP 逐帧诊断和目标真机实际触控验收；iOS 业务页已有实际触控验收，但两端
+  均尚未单独归档现行方案的新版真机录屏。

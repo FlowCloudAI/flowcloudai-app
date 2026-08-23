@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-23
+> 更新日期：2026-08-24
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -54,7 +54,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [Mobile_world.md](Mobile_world.md) | 现行 | 2026-08-02 | 移动端世界观/词条能力缺口与方案。§7 持续记录实现进展，含 10 处未完成项。总计划见 `../plans/ANDROID-01.md` |
-| [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-23 | **移动端软键盘布局接管方案**：Android 原生 `WindowInsetsCompat` 提供实际 IME 高度、进入 WebView 前归零 IME inset，前端只通过 `--fc-kb` 压缩 AI/灵感内部区域；已通过目标真机实际触控验收。兼容旧 WebView，不再使用历史高度预测、整壳 transform 或自演键盘动画；iOS 只复用布局契约，不能直接复用 Insets 接管机制，IOS-005 仍独立未解决 |
+| [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-24 | **移动端软键盘布局接管方案与完整复盘**：Android 用 `WindowInsetsCompat`，iOS 用 `UIKeyboard` 事件与 `keyboardLayoutGuide` 兜底；两端共享 `--fc-kb` 内部布局契约但保持原生来源互斥。记录预测/整壳移动等失败方案、旧 WebView 边界、系统输入附件栏的构造期移除、AI/灵感差异化间距及目标真机验收。跨系统版本、第三方输入法与 iPad 矩阵仍是发布闸门 |
 | [mobile_keyboard_platform_diff.html](mobile_keyboard_platform_diff.html) | 历史教学模型 | 2026-08-23 | 并排演示旧纯前端方案中的视觉视口平移与“预让修复”。只用于理解被替换方案为何失败；现行 Android 已改用原生实际 Insets，不能用该模型验收当前实现 |
 
 > 移动端的问题排查记录（返回手势、键盘布局、WebView 光栅化、TLS、图标安全区等 7 篇）已迁至 `docs/devlog/`，见 §8。
@@ -85,8 +85,8 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
-| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-20 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；软键盘原生指标方案已标记回退 |
-| [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-23 | 移动端对 iOS 规范的差距审计；IOS-005 已恢复为未解决，并补充 Android 现行方案不能直接移植 iOS 的平台依据与设计边界 |
+| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界 |
+| [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
 | [../designs/mobile-entry-editor-ai-review-design-qa.md](../designs/mobile-entry-editor-ai-review-design-qa.md) | 结论记录 | 2026-08-02 | 移动端词条编辑与 AI 差异审阅 QA |
@@ -104,6 +104,8 @@
 | --- | --- | --- |
 | [mobile-ai-mode-menu-redesign-2026-08-19](../designs/audits/mobile-ai-mode-menu-redesign-2026-08-19/README.md) | 2026-08-19 | AI 模式菜单轻量化，选定 Marker-Only 方案。含实现 QA 与交付清单，Android 真机核对通过 |
 | [mobile-ai-svg-icons-2026-08-19](../designs/audits/mobile-ai-svg-icons-2026-08-19/README.md) | 2026-08-19 | 五枚 AI 操作图标。审计通过，已接入代码并完成 Android 真机视觉核对 |
+| [android-键盘布局-2026-08-23](../designs/audits/android-键盘布局-2026-08-23/README.md) | 2026-08-23 | 被替换的纯前端键盘方案录屏与新原生 Insets 路径的目标真机验收说明；现行机制以键盘权威文档为准 |
+| [mobile-keyboard-probe-2026-08-20](../designs/audits/mobile-keyboard-probe-2026-08-20/README.md) | 2026-08-20 | iPhone 15 Pro / iOS 26.6 的 WKWebView 键盘行为探针，固定了 `interactive-widget`、视觉视口平移和安全区事实 |
 | [ios-input-viewport-2026-08-18](../designs/audits/ios-input-viewport-2026-08-18/README.md) | 2026-08-18 | iOS 输入视口回归验证，iPhone 17 Pro / iOS 26.5 模拟器，8 张过程截图。问题→方案摘要见 `docs/devlog/2026-08-18-ios-输入视口-二次缩短.md` |
 | [mobile-entry-immersive-keyboard-2026-08-18](../designs/audits/mobile-entry-immersive-keyboard-2026-08-18/README.md) | 2026-08-18 | 沉浸编辑键盘上方窄缝透出下层页面的修复，前后对比截图。问题→方案摘要见 `docs/devlog/2026-08-18-移动端沉浸编辑-键盘窄缝.md` |
 | [mobile-platform-contract-2026-08-18](../designs/audits/mobile-platform-contract-2026-08-18/README.md) | 2026-08-18 | 主题与系统栏同步。**iOS 已验证；Android 仅代码实现，缺 debug APK + ADB 运行证据** |

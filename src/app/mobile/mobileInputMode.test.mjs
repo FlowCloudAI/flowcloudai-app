@@ -20,6 +20,7 @@ const mobileUiSource = readFileSync(new URL('../../api/mobileUi.ts', import.meta
 const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
+const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
 const mobileAiMessageScrollSource = readFileSync(
     new URL('./pages/useMobileAiMessageScroll.ts', import.meta.url),
     'utf8',
@@ -302,6 +303,13 @@ test('iOS 表单辅助栏在主窗口构造阶段关闭', () => {
     assert.match(tauriLibSource, /WebviewWindowBuilder::from_config/)
     assert.match(tauriLibSource, /with_input_accessory_view_builder\(\|_webview\| None\)/)
     assert.doesNotMatch(iosProductionBridgeSource, /inputAssistantItem/)
+})
+
+test('iOS 键盘上沿间距按 AI 与灵感页面分别校正', () => {
+    assert.match(mobileAiChatCss, /data-mobile-keyboard-owner='ios'[\s\S]*--mobile-ai-keyboard-gap:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-gap-inline\)\)/)
+    assert.match(mobileAiChatCss, /bottom:\s*calc\(var\(--mobile-nav-reserved-height\) \+ var\(--mobile-ai-keyboard-gap\)\)/)
+    assert.match(mobileIdeaCss, /data-mobile-keyboard-owner='ios'[\s\S]*--mobile-idea-keyboard-safe-reduction:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-safe-bottom\)\)/)
+    assert.match(mobileIdeaCss, /var\(--mobile-safe-bottom\)[\s\S]*- var\(--mobile-idea-keyboard-safe-reduction\)/)
 })
 
 test('原生层兼容旧 WebView，并阻止 WebView 成为第二个键盘布局 owner', () => {
