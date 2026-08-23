@@ -172,3 +172,24 @@ test('聚焦时先按学到的键盘高度让位，避免视觉视口被平移',
     // 乐观让位必须有宽限期回退，否则「只聚焦不弹键盘」（硬件键盘等）会让布局空让一块。
     assert.match(insetSource, /PREDICTION_GRACE_MS/)
 })
+
+test('抵消视觉视口平移，且夹掉溢出防自激', () => {
+    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+
+    // 键盘弹出后布局视口仍比可视区高，用户能把视觉视口拖进差值里且松手不回弹，
+    // 顶栏会被拖出屏幕、Tab 与余量露出。挡不住（overflow/overscroll-behavior 实测无效），
+    // 只能让外壳跟着 offsetTop 平移同样距离，把它抵消成视觉上的空操作。
+    assert.match(insetSource, /export function installKeyboardPanCompensation/)
+    assert.match(insetSource, /--fc-kb-pan/)
+    assert.match(inputModeHookSource, /installKeyboardPanCompensation\(\)/)
+
+    assert.match(mobileAppCss, /html\[data-mobile-kb-pan="on"\]\s*\.mobile-app\s*\{[\s\S]*?transform:\s*translateY\(var\(--fc-kb-pan/)
+
+    // 补偿用的 transform 会把外壳底边推到布局视口之下，document.scrollHeight 从 834 长到 1147，
+    // 文档自己也能滚，补偿量与文档滚动叠加又把顶栏带出屏幕。必须一并夹掉溢出。
+    assert.match(mobileAppCss, /html\[data-mobile-kb-pan="on"\],\s*\n\s*html\[data-mobile-kb-pan="on"\] body\s*\{[\s\S]*?overflow:\s*hidden/)
+
+    // 只在真发生平移时才挂 transform：常态挂着等于给整个外壳强制合成层，
+    // AGENTS.md §5.1 记着 Chromium 上会撞 tile 内存上限。
+    assert.doesNotMatch(mobileAppCss, /\.mobile-app\s*\{[^}]*will-change:\s*transform/)
+})

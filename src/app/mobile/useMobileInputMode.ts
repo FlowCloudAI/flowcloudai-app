@@ -21,6 +21,7 @@ import {
 } from './mobileInputMode'
 import {
     applyMobileKeyboardInset,
+    installKeyboardPanCompensation,
     predictMobileKeyboardInset,
     resetMobileKeyboardInset,
     setMobileKeyboardInsetEnabled,
@@ -66,7 +67,12 @@ export function useMobileInputMode(
 
     useEffect(() => {
         setMobileKeyboardInsetEnabled(writeKeyboardInset)
-        return () => setMobileKeyboardInsetEnabled(false)
+        if (!writeKeyboardInset) return () => setMobileKeyboardInsetEnabled(false)
+        const disposePan = installKeyboardPanCompensation()
+        return () => {
+            disposePan()
+            setMobileKeyboardInsetEnabled(false)
+        }
     }, [writeKeyboardInset])
 
     useEffect(() => {

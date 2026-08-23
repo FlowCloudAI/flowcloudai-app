@@ -38,7 +38,8 @@
 | 需求3 输入区缝隙 | **0**（贴合） | 无常驻输入区 |
 | 需求4 Tab顶 − 键盘顶 | **+205**（被盖住） | **+205**（被盖住） |
 
-键盘高 312.92，键盘顶在 521.5。
+键盘高 312.92，键盘顶在 521.5。**键盘弹出后连续用力上拖三次**（`visualViewport.offsetTop`
+拖满到 312.9），以上屏幕坐标一个都不变，`document.scrollHeight` 稳定在 834。
 
 ## 3. 实现结构
 
@@ -112,7 +113,44 @@
 - **必须有宽限期回退**（`PREDICTION_GRACE_MS`）：只聚焦不弹键盘（接了硬件键盘等）时，
   超时后退回 `0`，否则布局会一直空让一块。
 
-### 3.5 高度来源与平滑
+### 3.5 视觉视口平移必须抵消，挡不住
+
+键盘弹出后布局视口（834）仍比可视区（521.5）高，Chromium 允许用户把**视觉视口**拖进这
+312.5px 的差值里去看被键盘挡住的部分。实测拖一下 `visualViewport.offsetTop` 就到 227，
+**松手不回弹**：固定顶栏被拖出屏幕、底部 Tab 和让出的余量全部露出来，需求 1 和 5 当场失效。
+期间 `scrollTop` / `scrollY` 与内层滚动区全程为 0——动的只有视觉视口。
+
+**挡不住，只能抵消。** 已验证无效的方向：
+
+- `html, body { overflow: hidden }` + `overscroll-behavior: none`
+- 把外壳缩到可视区高度——它只是让手势被可滚动的内层消费掉，换个没内容的页面照样能拖
+- 把 Tab 改成 `position: fixed`——反而重新制造了可视区之下的内容，平移照旧
+
+而且**「Tab 被键盘盖住」和「拖不动」在 Android 上互斥**：被盖住就要求可视区之下存在内容，
+那就必然存在可拖区间。所以保留「被盖住」，转而抵消平移。
+
+做法是外壳整体跟着 `offsetTop` 平移同样距离，屏幕坐标恒定不变，平移在视觉上成为空操作：
+
+```css
+html[data-mobile-kb-pan="on"] .mobile-app {
+    transform: translateY(var(--fc-kb-pan, 0px));
+}
+```
+
+**必须同时夹掉溢出**，否则自激：补偿用的 transform 把外壳底边推到布局视口之下，
+`document.scrollHeight` 从 834 长到 1147，文档自己也能滚了，补偿量与文档滚动叠加，
+拖到底时顶栏又被带出屏幕。加上这段后 `scrollHeight` 稳定在 834：
+
+```css
+html[data-mobile-kb-pan="on"],
+html[data-mobile-kb-pan="on"] body { overflow: hidden; }
+```
+
+两条都**只在真的发生平移时挂**（`data-mobile-kb-pan`），常态下不加 transform——
+避免给整个外壳强制独立合成层，`AGENTS.md` §5.1 记着 Chromium 上这么做会撞 tile 内存上限。
+同理不加 `will-change`。
+
+### 3.6 高度来源与平滑
 
 `--fc-kb` 由 `mobileKeyboardInset.ts` 写入，数值来自 `useMobileInputMode` 已有的
 `getMobileViewportState().keyboardInset`——**不新写一套测量**，那套已有 Node 测试覆盖。
@@ -126,7 +164,7 @@
 
 「变矮但没到 0」（候选栏收掉、换小键盘）同样吸附：滞后会让布局比真实键盘高，读起来像输入区莫名变厚。
 
-### 3.6 iOS 的接缝在哪
+### 3.7 iOS 的接缝在哪
 
 `mobileKeyboardInset.ts` 的 `setMobileKeyboardInsetEnabled(os === 'android')` 是唯一的平台开关。
 iOS 转正时**只需把这个判断放开并提供 iOS 的高度来源**，页面 CSS 一行都不用动。

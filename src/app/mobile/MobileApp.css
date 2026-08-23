@@ -651,3 +651,23 @@
     font-size: var(--mobile-text-body-sm);
     text-align: center;
 }
+
+/*
+ * 视觉视口被用户拖动时，外壳整体跟着平移同样的距离，把平移抵消成视觉上的空操作。
+ * 详见 mobileKeyboardInset.ts 的 installKeyboardPanCompensation 注释。
+ * 只在真发生平移时才带上这个属性——常态不挂 transform，避免给整个外壳强制合成层。
+ */
+html[data-mobile-kb-pan="on"] .mobile-app {
+    transform: translateY(var(--fc-kb-pan, 0px));
+}
+
+/*
+ * 补偿用的 transform 会把外壳底边推到布局视口之下，document 的 scrollHeight 因此从 834
+ * 长到 1147，于是文档自己也能滚了——补偿量和文档滚动叠加，拖到底时顶栏又被带出屏幕。
+ * 这里把溢出夹掉，切断这个自激回路（实测 scrollHeight 稳定在 834、拖到底顶栏仍在 [40,100]）。
+ * 只在补偿生效期间生效，不改变常态下的文档行为。
+ */
+html[data-mobile-kb-pan="on"],
+html[data-mobile-kb-pan="on"] body {
+    overflow: hidden;
+}

@@ -96,6 +96,8 @@ function write(inset: number): void {
 
 function clear(): void {
     predictionUntil = 0
+    document.documentElement.style.removeProperty('--fc-kb-pan')
+    delete document.documentElement.dataset.mobileKbPan
     const root = document.documentElement
     root.style.removeProperty('--fc-kb')
     root.style.removeProperty('--fc-kb-transition')
@@ -149,6 +151,57 @@ export function applyMobileKeyboardInset(inset: number, keyboardVisible: boolean
     predictionUntil = 0
     if (currentInset === 0) return
     write(0)
+}
+
+/*
+ * 视觉视口平移补偿。
+ *
+ * 键盘弹出后布局视口（834）仍比可视区（521.5）高，Chromium 允许用户把**视觉视口**
+ * 拖进这 312.5px 的差值里去看被键盘挡住的部分。实测拖一下 `visualViewport.offsetTop`
+ * 就到 227，且**松手不回弹**：固定顶栏被拖出屏幕、底部 Tab 和让出的余量全露出来，
+ * 需求 1 和 5 当场失效。期间 `scrollTop` / `scrollY` 以及内层滚动区全程为 0——
+ * 动的只有视觉视口，页面自己一动没动。
+ *
+ * 这个平移**挡不住**：`overflow: hidden`、`overscroll-behavior: none` 实测均无效；
+ * 把外壳缩到可视区高度也只是让手势被可滚动的内层消费掉，换个没内容的页面照样能拖。
+ * 「Tab 被键盘盖住」本身就要求可视区之下存在内容，也就必然存在可拖区间——
+ * 想同时做到「Tab 被盖住」和「拖不动」在 Android 上是互斥的。
+ *
+ * 所以不去阻止平移，而是**抵消**它：外壳整体跟着 `offsetTop` 平移同样的距离，
+ * 于是屏幕坐标恒定不变，平移在视觉上成为空操作。实测拖动后
+ * 顶栏仍 [40,100]、输入区缝隙仍为 0、Tab 仍在键盘之下 205px。
+ *
+ * 只在真的发生平移时才挂 transform：常态下不加，避免给整个外壳强制独立合成层——
+ * `AGENTS.md` §5.1 记着 Chromium 上这么做会撞 tile 内存上限。同理不加 `will-change`。
+ */
+const PAN_ATTRIBUTE = 'mobileKbPan'
+
+function syncPan(): void {
+    const root = document.documentElement
+    const offset = window.visualViewport?.offsetTop ?? 0
+    if (!enabled || offset <= 0.5) {
+        delete root.dataset[PAN_ATTRIBUTE]
+        root.style.removeProperty('--fc-kb-pan')
+        return
+    }
+    root.style.setProperty('--fc-kb-pan', `${offset.toFixed(2)}px`)
+    root.dataset[PAN_ATTRIBUTE] = 'on'
+}
+
+/** 挂上平移补偿。返回卸载函数；卸载时必须清干净，否则关掉特性后外壳会留着一个 transform */
+export function installKeyboardPanCompensation(): () => void {
+    const viewport = window.visualViewport
+    if (!viewport) return () => undefined
+    viewport.addEventListener('scroll', syncPan)
+    viewport.addEventListener('resize', syncPan)
+    syncPan()
+    return () => {
+        viewport.removeEventListener('scroll', syncPan)
+        viewport.removeEventListener('resize', syncPan)
+        const root = document.documentElement
+        delete root.dataset[PAN_ATTRIBUTE]
+        root.style.removeProperty('--fc-kb-pan')
+    }
 }
 
 export function resetMobileKeyboardInset(): void {
