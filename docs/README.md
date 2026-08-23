@@ -54,7 +54,8 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [Mobile_world.md](Mobile_world.md) | 现行 | 2026-08-02 | 移动端世界观/词条能力缺口与方案。§7 持续记录实现进展，含 10 处未完成项。总计划见 `../plans/ANDROID-01.md` |
-| [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-23 | **移动端软键盘布局接管方案**：`--fc-kb` + 重定义 `--mobile-nav-reserved-height` 的接入方式、升起平滑/收起吸附的不对称处理、iOS 接缝位置。当前只在 Android 的 AI 聊天页与灵感页启用。含 3 条「不要再动」的平台结论与 4 项未覆盖项 |
+| [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-23 | **移动端软键盘布局接管方案**：Android 原生 `WindowInsetsCompat` 提供实际 IME 高度、进入 WebView 前归零 IME inset，前端只通过 `--fc-kb` 压缩 AI/灵感内部区域；已通过目标真机实际触控验收。兼容旧 WebView，不再使用历史高度预测、整壳 transform 或自演键盘动画；iOS 只复用布局契约，不能直接复用 Insets 接管机制，IOS-005 仍独立未解决 |
+| [mobile_keyboard_platform_diff.html](mobile_keyboard_platform_diff.html) | 历史教学模型 | 2026-08-23 | 并排演示旧纯前端方案中的视觉视口平移与“预让修复”。只用于理解被替换方案为何失败；现行 Android 已改用原生实际 Insets，不能用该模型验收当前实现 |
 
 > 移动端的问题排查记录（返回手势、键盘布局、WebView 光栅化、TLS、图标安全区等 7 篇）已迁至 `docs/devlog/`，见 §8。
 
@@ -85,7 +86,7 @@
 | --- | --- | --- | --- |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-20 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；软键盘原生指标方案已标记回退 |
-| [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-20 | 移动端对 iOS 规范的差距审计；IOS-005 已恢复为未解决，历史实现保留供对照 |
+| [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-23 | 移动端对 iOS 规范的差距审计；IOS-005 已恢复为未解决，并补充 Android 现行方案不能直接移植 iOS 的平台依据与设计边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
 | [../designs/mobile-entry-editor-ai-review-design-qa.md](../designs/mobile-entry-editor-ai-review-design-qa.md) | 结论记录 | 2026-08-02 | 移动端词条编辑与 AI 差异审阅 QA |

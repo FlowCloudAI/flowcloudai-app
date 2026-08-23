@@ -209,16 +209,16 @@ app_main/
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
 - macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
-- **移动端原生键盘指标架构当前已回退**：2026-08-20 的 `a781f94` 撤销了 iOS/Android 原生键盘 frame/insets、共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 键盘专用布局。现行代码回到 `visualViewport` 只判断输入态、底部 Tab 不因输入而隐藏的旧基线；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。归档设计和 devlog 只能用于复盘，不能当作现行实现约束。重新引入前必须先形成双端方案，并分别完成系统/第三方键盘、AI composer、灵感正文和含输入 Bottom Sheet 的真机动画验收。
+- **2026-08-20 的双端原生键盘架构仍保持回退**：`a781f94` 撤销了 iOS/Android 共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 通用键盘布局；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。2026-08-23 重新引入的是范围更窄的 **Android-only** 路径，只服务 AI composer 与灵感正文，不恢复共享 store、不改变 Tab 位置、不写 iOS 布局。iOS 仍按未解决问题独立设计与真机验收。
 
-- **Android 键盘只有 `visualViewport` 一个可用来源**（2026-08-23 真机实测，Xiaomi / Android 16 / WebView 143）：
+- **Android 键盘布局的唯一高度来源是原生 `WindowInsetsCompat.Type.ime()`**：
+  Activity 使用 `adjustResize` 兼容旧 Android/WebView 的 Insets 派发，但不缩短、不 padding、不平移 WebView；读取原始 IME 后，在传给 WebView 前把 IME 类型归零，避免新版 WebView 再次处理。动画期间只发布 `WindowInsetsAnimationCompat.Callback.onProgress` 的实际帧，禁止把 `onApplyWindowInsets` 提前到达的终点与中间帧混写，也禁止前端历史高度预测、250ms 自演过渡和整壳 transform。前端唯一落地点是 `--fc-kb`，只由 AI/灵感页通过 `--mobile-nav-reserved-height` 消费；`visualViewport` 只保留给 iOS/旧桥的输入态检测，不得写 Android 布局。
+
+  2026-08-23 真机实测（Xiaomi / Android 16 / WebView 143）还确认：
   `navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——`overlaysContent = true` 写入被接受且
   回读为 true，但 `env(keyboard-inset-height)` 与 `boundingRect` 恒为 0、`geometrychange` 一次都不触发，不要依赖它。
   `interactive-widget` 的三个取值在 iOS（WebKit 根本没实现）和 Android（实测逐项相同）都不产生任何差异，
-  **不要再为键盘问题去改这个 viewport meta**。另外 targetSdk 35+ 强制 edge-to-edge 后 IME **不 resize 窗口**，
-  布局视口恒为全屏高——所以「外壳固定 + Tab 绝对定位在屏幕底部被键盘盖住」这套结构在 Android 上天然成立，
-  不需要原生代码；但 Chromium 只在 IME 落位后上报一次高度，**逐帧跟随做不到**，要逐帧必须接原生
-  `WindowInsetsAnimationCallback`。完整数据与 6 条被排除的误判见
-  `docs/devlog/2026-08-23-android-软键盘布局接管.md`（工作区根仓）。
+  **不要再为键盘问题去改这个 viewport meta**。完整现行方案、兼容边界与验收项见
+  `docs/mobile_keyboard_layout.md`。
 
-文档同步时间：2026-08-23 02:25:00 +08:00
+文档同步时间：2026-08-23 +08:00

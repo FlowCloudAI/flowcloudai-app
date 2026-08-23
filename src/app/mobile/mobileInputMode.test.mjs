@@ -6,15 +6,24 @@ import {
     getMobileViewportState,
     isMobileInputModeActive,
 } from './mobileInputMode.ts'
-import {
-    MOBILE_KEYBOARD_RISE_TRANSITION,
-    resolveMobileKeyboardTransition,
-} from './mobileKeyboardInset.ts'
+import {installAndroidKeyboardInsetListener} from '../../api/mobileUi.ts'
 import {readFileSync} from 'node:fs'
 import {URL} from 'node:url'
 
 const inputModeHookSource = readFileSync(new URL('./useMobileInputMode.ts', import.meta.url), 'utf8')
+const mobileKeyboardInsetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+const mobileUiSource = readFileSync(new URL('../../api/mobileUi.ts', import.meta.url), 'utf8')
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
+const mobileAiChatCss = readFileSync(new URL('./pages/MobileAiChat.css', import.meta.url), 'utf8')
+const mobileIdeaCss = readFileSync(new URL('./pages/MobileIdea.css', import.meta.url), 'utf8')
+const mainActivitySource = readFileSync(new URL(
+    '../../../src-tauri/gen/android/app/src/main/java/cn/flowcloudai/www/MainActivity.kt',
+    import.meta.url,
+), 'utf8')
+const androidManifestSource = readFileSync(new URL(
+    '../../../src-tauri/gen/android/app/src/main/AndroidManifest.xml',
+    import.meta.url,
+), 'utf8')
 const immersiveEditorSource = readFileSync(new URL('./pages/MobileEntryImmersiveEditor.tsx', import.meta.url), 'utf8')
 const entryEditViewSource = readFileSync(new URL('./pages/MobileEntryDetailEditView.tsx', import.meta.url), 'utf8')
 const entryDetailCss = readFileSync(new URL('./pages/MobileEntryDetail.css', import.meta.url), 'utf8')
@@ -115,27 +124,36 @@ test('聚焦期间补采样键盘可见性，系统收起未派发 resize 时仍
     assert.match(inputModeHookSource, /const scheduleUpdate = \(\) => \{\s*if \(frame\) cancelAnimationFrame\(frame\)\s*frame = requestAnimationFrame\(update\)\s*}/)
 })
 
-test('键盘升起走过渡、收起吸附', () => {
-    // 升起：拿到终值时 IME 还在动（真机实测 focusin → vv.resize 仅 60~75ms，
-    // 而 IME 滑入约 200~300ms），这段过渡有对齐余地。
-    assert.equal(resolveMobileKeyboardTransition(0, 312.5), MOBILE_KEYBOARD_RISE_TRANSITION)
+test('原生桥用 getter 补初值并用固定回调接后续帧', () => {
+    const previousWindow = globalThis.window
+    const bridgeWindow = {
+        flowcloudaiMobileUi: {
+            getKeyboardInset: () => 312.5,
+            isKeyboardVisible: () => true,
+        },
+    }
+    globalThis.window = bridgeWindow
 
-    // 收起：拿到 0 时键盘早已消失，任何过渡都只是滞后。
-    assert.equal(resolveMobileKeyboardTransition(312.5, 0), '0s')
+    try {
+        const snapshots = []
+        const dispose = installAndroidKeyboardInsetListener(snapshot => snapshots.push(snapshot))
+        assert.deepEqual(snapshots, [{available: true, inset: 312.5, visible: true}])
 
-    // 变矮但没到 0（候选栏收掉、换小键盘）同样吸附：
-    // 滞后会让布局比真实键盘高，读起来像输入区莫名变厚。
-    assert.equal(resolveMobileKeyboardTransition(312.5, 289), '0s')
+        bridgeWindow.__flowcloudaiApplyAndroidKeyboardInset(-1, true)
+        assert.deepEqual(snapshots.at(-1), {available: true, inset: 0, visible: false})
 
-    // 高度不变时按吸附处理，不重复起一段动画。
-    assert.equal(resolveMobileKeyboardTransition(312.5, 312.5), '0s')
+        dispose()
+        assert.equal('__flowcloudaiApplyAndroidKeyboardInset' in bridgeWindow, false)
+    } finally {
+        if (previousWindow === undefined) delete globalThis.window
+        else globalThis.window = previousWindow
+    }
 })
 
 test('键盘接管默认关闭，且只重定义保留高度而不散写偏移', () => {
-    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
     // 默认关闭是 iOS 的零回归保证：同一份布局在 iOS 上会复现顶栏离屏。
-    assert.match(insetSource, /let enabled = false/)
-    assert.match(insetSource, /export function setMobileKeyboardInsetEnabled/)
+    assert.match(mobileKeyboardInsetSource, /let enabled = false/)
+    assert.match(mobileKeyboardInsetSource, /export function setMobileKeyboardInsetEnabled/)
 
     // 调用方必须按平台显式打开。
     assert.match(inputModeHookSource, /writeKeyboardInset/)
@@ -152,44 +170,38 @@ test('键盘接管默认关闭，且只重定义保留高度而不散写偏移',
     }
 })
 
-test('聚焦时先按学到的键盘高度让位，避免视觉视口被平移', () => {
-    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+test('Android 布局只消费原生实际 Insets，不再预测或自演过渡', () => {
+    assert.match(mobileKeyboardInsetSource, /installAndroidKeyboardInsetListener\(publish\)/)
+    assert.match(mobileKeyboardInsetSource, /style\.setProperty\('--fc-kb'/)
+    assert.match(inputModeHookSource, /mobileKeyboardInsetState\(\)/)
+    assert.match(inputModeHookSource, /subscribeMobileKeyboardInset\(scheduleUpdate\)/)
 
-    // 真机实测：聚焦位于「键盘弹出后可视区」之下的输入框时，Chromium 会平移视觉视口
-    // （visualViewport.offsetTop 0 → 312.9）去露出它，把固定顶栏推出屏幕上方。
-    // 该平移一旦发生就收不回来（scrollTo / scrollTop / overflow:hidden 均实测无效），
-    // 唯一可行的是让它压根不发生——聚焦时就把位置让开。
-    assert.match(insetSource, /export function predictMobileKeyboardInset/)
-    assert.match(inputModeHookSource, /predictMobileKeyboardInset\(\)/)
-
-    // 必须在 focusin 里做，而不是等 visualViewport.resize——那时平移已经发生了。
-    const focusIn = inputModeHookSource.slice(inputModeHookSource.indexOf('const handleFocusIn'))
-    assert.match(focusIn.slice(0, 600), /predictMobileKeyboardInset/)
-
-    // 没学到高度就不让位：宁可这一次被平移，也不猜一个值。
-    assert.match(insetSource, /if \(learned <= 0\) return false/)
-
-    // 乐观让位必须有宽限期回退，否则「只聚焦不弹键盘」（硬件键盘等）会让布局空让一块。
-    assert.match(insetSource, /PREDICTION_GRACE_MS/)
+    for (const source of [mobileKeyboardInsetSource, inputModeHookSource]) {
+        assert.doesNotMatch(source, /localStorage/)
+        assert.doesNotMatch(source, /predictMobileKeyboardInset/)
+        assert.doesNotMatch(source, /applyMobileKeyboardInset/)
+        assert.doesNotMatch(source, /installKeyboardPanCompensation/)
+    }
+    assert.doesNotMatch(mobileAiChatCss, /--fc-kb-transition/)
+    assert.doesNotMatch(mobileIdeaCss, /--fc-kb-transition/)
 })
 
-test('抵消视觉视口平移，且夹掉溢出防自激', () => {
-    const insetSource = readFileSync(new URL('./mobileKeyboardInset.ts', import.meta.url), 'utf8')
+test('原生层兼容旧 WebView，并阻止 WebView 成为第二个键盘布局 owner', () => {
+    assert.match(androidManifestSource, /android:windowSoftInputMode="adjustResize"/)
+    assert.match(mainActivitySource, /WindowInsetsCompat\.Type\.ime\(\)/)
+    assert.match(mainActivitySource, /WindowInsetsAnimationCompat\.Callback/)
+    assert.match(mainActivitySource, /mobileImeAnimationDepth == 0/)
+    assert.match(mainActivitySource, /override fun onProgress[\s\S]*updateMobileKeyboardInset\(insets\)/)
+    assert.match(mainActivitySource, /setInsets\(WindowInsetsCompat\.Type\.ime\(\), Insets\.NONE\)/)
+    assert.match(mainActivitySource, /setVisible\(WindowInsetsCompat\.Type\.ime\(\), false\)/)
+    assert.match(mainActivitySource, /__flowcloudaiApplyAndroidKeyboardInset/)
+    assert.match(mainActivitySource, /fun getKeyboardInset\(\): Double/)
+    assert.match(mainActivitySource, /fun isKeyboardVisible\(\): Boolean/)
+    assert.match(mobileUiSource, /__flowcloudaiApplyAndroidKeyboardInset/)
 
-    // 键盘弹出后布局视口仍比可视区高，用户能把视觉视口拖进差值里且松手不回弹，
-    // 顶栏会被拖出屏幕、Tab 与余量露出。挡不住（overflow/overscroll-behavior 实测无效），
-    // 只能让外壳跟着 offsetTop 平移同样距离，把它抵消成视觉上的空操作。
-    assert.match(insetSource, /export function installKeyboardPanCompensation/)
-    assert.match(insetSource, /--fc-kb-pan/)
-    assert.match(inputModeHookSource, /installKeyboardPanCompensation\(\)/)
-
-    assert.match(mobileAppCss, /html\[data-mobile-kb-pan="on"\]\s*\.mobile-app\s*\{[\s\S]*?transform:\s*translateY\(var\(--fc-kb-pan/)
-
-    // 补偿用的 transform 会把外壳底边推到布局视口之下，document.scrollHeight 从 834 长到 1147，
-    // 文档自己也能滚，补偿量与文档滚动叠加又把顶栏带出屏幕。必须一并夹掉溢出。
-    assert.match(mobileAppCss, /html\[data-mobile-kb-pan="on"\],\s*\n\s*html\[data-mobile-kb-pan="on"\] body\s*\{[\s\S]*?overflow:\s*hidden/)
-
-    // 只在真发生平移时才挂 transform：常态挂着等于给整个外壳强制合成层，
-    // AGENTS.md §5.1 记着 Chromium 上会撞 tile 内存上限。
-    assert.doesNotMatch(mobileAppCss, /\.mobile-app\s*\{[^}]*will-change:\s*transform/)
+    // WebView 和应用壳层都保持原始几何；只有业务页的保留高度消费 --fc-kb。
+    assert.doesNotMatch(mainActivitySource, /setPadding\([^)]*mobileKeyboard/)
+    assert.doesNotMatch(mainActivitySource, /layoutParams[\s\S]{0,120}mobileKeyboard/)
+    assert.doesNotMatch(mobileAppCss, /data-mobile-kb-pan/)
+    assert.doesNotMatch(mobileAppCss, /--fc-kb-pan/)
 })

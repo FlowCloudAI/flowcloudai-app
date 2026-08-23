@@ -25,14 +25,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.abs
 
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
   private var mobileSafeInsets: Insets = Insets.NONE
+  @Volatile private var mobileKeyboardInsetCssPixels = 0f
+  @Volatile private var mobileKeyboardVisible = false
+  private var mobileImeAnimationDepth = 0
+  private var mobileKeyboardPublishScheduled = false
 
   companion object {
     init {
@@ -71,6 +77,7 @@ class MainActivity : TauriActivity() {
     this.webView = webView
     webView.addJavascriptInterface(MobileUiJavascriptBridge(), "flowcloudaiMobileUi")
     pushMobileUiEnvironment()
+    scheduleMobileKeyboardInsetPush()
     ViewCompat.requestApplyInsets(window.decorView)
     if (AndroidRuntimeWorkarounds.isX86_64_16KbPageEnvironment) {
       // Android 16KB x86_64 模拟器上的 WebView/GPU 组合可能只渲染黑屏，改用软件层绘制。
@@ -82,6 +89,7 @@ class MainActivity : TauriActivity() {
   override fun onResume() {
     super.onResume()
     pushMobileUiEnvironment()
+    scheduleMobileKeyboardInsetPush()
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
@@ -95,10 +103,87 @@ class MainActivity : TauriActivity() {
       mobileSafeInsets = windowInsets.getInsets(
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
+      /*
+       * IME 动画开始后，系统会先把终点 Insets 送到布局，再开始派发中间帧。若这里把终点也
+       * 推给页面，就会形成“终点 -> 中间帧 -> 终点”的回跳；动画期间只认 onProgress。
+       */
+      if (mobileImeAnimationDepth == 0) updateMobileKeyboardInset(windowInsets)
       pushMobileUiEnvironment()
-      windowInsets
+
+      /*
+       * WebView 始终保持全屏，不能再自行消费 IME，否则旧版 adjustResize 与新版 WebView
+       * visual viewport 会和页面的 --fc-kb 形成双重避让。原始值已在上方读取，这里只对
+       * 传给子 View 的 IME 类型归零。
+       */
+      WindowInsetsCompat.Builder(windowInsets)
+        .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
+        .setVisible(WindowInsetsCompat.Type.ime(), false)
+        .build()
     }
+    ViewCompat.setWindowInsetsAnimationCallback(
+      window.decorView,
+      object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+        override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+          super.onPrepare(animation)
+          if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) {
+            mobileImeAnimationDepth += 1
+          }
+        }
+
+        override fun onProgress(
+          insets: WindowInsetsCompat,
+          @Suppress("UNUSED_PARAMETER")
+          runningAnimations: MutableList<WindowInsetsAnimationCompat>
+        ): WindowInsetsCompat {
+          if (mobileImeAnimationDepth > 0) updateMobileKeyboardInset(insets)
+          return insets
+        }
+
+        override fun onEnd(animation: WindowInsetsAnimationCompat) {
+          super.onEnd(animation)
+          if (animation.typeMask and WindowInsetsCompat.Type.ime() == 0) return
+
+          mobileImeAnimationDepth = (mobileImeAnimationDepth - 1).coerceAtLeast(0)
+          if (mobileImeAnimationDepth == 0) {
+            ViewCompat.getRootWindowInsets(window.decorView)?.let(::updateMobileKeyboardInset)
+          }
+        }
+      }
+    )
     ViewCompat.requestApplyInsets(window.decorView)
+  }
+
+  /** 把物理像素换算为 CSS 像素，只在数值确实变化时安排一帧 JS 写入。 */
+  private fun updateMobileKeyboardInset(windowInsets: WindowInsetsCompat) {
+    val density = resources.displayMetrics.density.coerceAtLeast(1f)
+    val inset = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      .coerceAtLeast(0) / density
+    val visible = inset > 0f
+    if (abs(inset - mobileKeyboardInsetCssPixels) < 0.05f
+      && visible == mobileKeyboardVisible) return
+
+    mobileKeyboardInsetCssPixels = inset
+    mobileKeyboardVisible = visible
+    scheduleMobileKeyboardInsetPush()
+  }
+
+  /** 同一显示帧内只执行一次 evaluateJavascript，并始终读取该帧最新的 Insets。 */
+  private fun scheduleMobileKeyboardInsetPush() {
+    val target = webView ?: return
+    if (mobileKeyboardPublishScheduled) return
+    mobileKeyboardPublishScheduled = true
+    target.postOnAnimation {
+      mobileKeyboardPublishScheduled = false
+      if (webView !== target) return@postOnAnimation
+
+      val inset = String.format(Locale.US, "%.2f", mobileKeyboardInsetCssPixels)
+      val visible = mobileKeyboardVisible
+      target.evaluateJavascript(
+        "if (typeof window.__flowcloudaiApplyAndroidKeyboardInset === 'function') " +
+          "window.__flowcloudaiApplyAndroidKeyboardInset($inset, $visible); true",
+        null
+      )
+    }
   }
 
   private fun dispatchAndroidBackEvent(name: String, progress: Float? = null) {
@@ -156,6 +241,13 @@ class MainActivity : TauriActivity() {
   }
 
   private inner class MobileUiJavascriptBridge {
+    /** React 晚于首个 Insets 到达时，通过同步快照补齐当前值。 */
+    @JavascriptInterface
+    fun getKeyboardInset(): Double = mobileKeyboardInsetCssPixels.toDouble()
+
+    @JavascriptInterface
+    fun isKeyboardVisible(): Boolean = mobileKeyboardVisible
+
     @JavascriptInterface
     fun getNavigationMode(): String {
       val resourceId = resources.getIdentifier(

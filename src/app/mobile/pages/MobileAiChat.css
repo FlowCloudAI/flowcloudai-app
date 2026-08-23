@@ -481,24 +481,27 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     /*
-     * 消息列表既是绝对定位输入区的下方内容、又用固定 rem 预留空间，两者都不会自动跟着
-     * 父级 padding 变——所以这里必须显式补上键盘多出来的那一段，否则末条消息会被输入区盖住。
+     * 父级 mobile-nav-safe-fixed 已按键盘高度缩短消息区；这里仅预留输入区自身高度。
+     * 再叠加键盘额外高度会重复避让，键盘展开后连空态都会产生伪滚动距离。
      */
     padding: var(--mobile-ai-topbar-space) var(--mobile-page-x)
-        calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
+        var(--mobile-ai-composer-space);
     background: var(--fc-color-bg);
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);
-    scroll-padding-bottom: calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra, 0px));
+    scroll-padding-bottom: var(--mobile-ai-composer-space);
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
     display: none;
 }
 
-/* 空状态后的零高度滚动锚点不应凭 flex gap 制造一段可滚动距离。 */
+/* 空态没有合法的纵向滚动；同时在消息区截断手势，避免升级成 visualViewport 平移。 */
 .mobile-ai-chat__messages--empty {
     gap: 0;
+    overflow-y: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
 }
 
 .mobile-ai-chat__message {
@@ -542,8 +545,6 @@
      */
     bottom: var(--mobile-nav-reserved-height);
     left: 0;
-    /* 升起走过渡、收起吸附，方向由 --fc-kb-transition 决定，见 mobileKeyboardInset.ts */
-    transition: bottom var(--fc-kb-transition, 0s);
     z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;
     padding: var(--mobile-gap-text) var(--mobile-page-x) var(--mobile-gap-text);

@@ -8,7 +8,6 @@
     --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
     --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
     position: relative;
-    transition: padding-bottom var(--fc-kb-transition, 0s);
     display: flex;
     min-height: 0;
     height: 100%;

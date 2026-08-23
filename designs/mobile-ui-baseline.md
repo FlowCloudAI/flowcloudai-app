@@ -334,7 +334,7 @@ L1 token 一律挂在 `:root[data-fc-density="touch"]` 上，**不挂在 `.mobil
 | 字号缩放 | Dynamic Type | `Configuration.fontScale` | 共用根变量 `--mobile-font-scale`，两端各自原生桥接 |
 | 按压反馈 | 变暗 / 轻微缩放 | Material state layer | 统一 `:active` token；Android 额外允许 ripple |
 | 触觉反馈 | Haptic Engine | `VibrationEffect` | 统一语义层（成功 / 警告 / 选择），各自映射 |
-| 软键盘 | 当前交由 WKWebView 默认行为 | 当前交由 Android WebView 默认行为 | 原生指标方案已于 2026-08-20 回退；现行仅用 `visualViewport` 判断输入态且不隐藏 Tab，下一版必须重新设计并完成双端真机验收 |
+| 软键盘 | 当前交由 WKWebView 默认行为，IOS-005 仍未解决 | 原生 `WindowInsetsCompat.Type.ime()` 发布实际遮挡量，WebView 保持全屏且不再消费 IME；目标真机已验收 | 2026-08-20 的双端共享方案仍保持回退；2026-08-23 只恢复 Android AI/灵感的窄路径。两端都不隐藏 Tab，iOS 不消费 `--fc-kb`；iOS 只能复用单一 owner 等布局契约，不能复制 Android Insets 接管，详见 `docs/mobile_keyboard_layout.md` |
 | 材质降级 | Reduce Transparency | 高对比度设置 | 触发时强制实色高对比 surface |
 
 **规则：新增任何平台相关行为，必须先在本表加一行，两列都填写后再实现。**

@@ -1,63 +1,140 @@
 # 移动端软键盘布局接管方案
 
-> 状态：现行 ｜ 日期：2026-08-23 ｜ 适用：`app_main` 移动端
+> 状态：Android 已验收，iOS 独立设计中 ｜ 日期：2026-08-23 ｜ 适用：`app_main` 移动端
 >
-> 本文是**方案说明**（该怎么写、边界在哪）。「当初踩了什么坑、怎么测出来的」是开发记录，
-> 见工作区根 [`docs/devlog/2026-08-23-android-软键盘布局接管.md`](../../docs/devlog/2026-08-23-android-软键盘布局接管.md)。
-> 真机证据在 [`designs/audits/android-键盘布局-2026-08-23/`](../designs/audits/android-键盘布局-2026-08-23/)。
+> 本文描述当前架构、兼容边界与验收标准。2026-08-23 纯前端预测方案的真机录屏保留在
+> [`designs/audits/android-键盘布局-2026-08-23/`](../designs/audits/android-键盘布局-2026-08-23/)，
+> 仅用于说明历史问题，不再代表现行实现。
 
-## 1. 目标形态
+## 1. 结论
 
-移动端外壳是「固定顶栏 + 内部滚动区 + 常驻输入区 + 底部 Tab」。软键盘弹出时要求：
+Android 软键盘高度必须由原生 `WindowInsetsCompat.Type.ime()` 提供，WebView 不再参与键盘布局。
+前端只消费原生发布的实际遮挡高度 `--fc-kb`，不预测、不记忆历史高度、不移动整个外壳。
 
-1. 固定顶栏**绝不**离开屏幕；
-2. 键盘只压缩内部区域，外壳本身不移动、不缩放；
-3. 常驻输入区贴在键盘上沿；
-4. 底部 Tab **被键盘盖住**，不占用键盘上方任何空间；
-5. 键盘上方不露出下层；
-6. 跟随系统键盘，不出现「先错误抬升再回弹」；
-7. 真手指点击必须可靠唤起键盘——**最高优先级，任何降低唤起率的做法一律否决**；
-8. 长输入框与底部输入框都要满足以上各条。
+这条路径同时解决两个问题：
 
-## 2. 当前落地范围
+- 旧 WebView 不需要 `visualViewport`、VirtualKeyboard API 或 Chromium 的后续修复；
+- 新 WebView 收到的 IME inset 被归零，不会再自行缩短、滚动或平移视觉视口，与旧版本保持同一语义。
 
-| 平台 | 状态 | 说明 |
-| --- | --- | --- |
-| Android | **已启用** | 纯前端，无原生代码 |
-| iOS | **未启用，留接缝** | `--fc-kb` 恒为 `0px`，布局退化成启用前的行为，零回归 |
+键盘布局只有一个 owner：**Android 原生负责测量和时序，页面内部布局负责消费。**
+禁止再叠加 WebView 自动避让、前端高度预测、根节点 transform 或第二套键盘动画。
 
-页面范围：**AI 聊天页**（`MobileAiChat`）与**灵感页**（`MobileIdea`）。其余移动端页面未接入。
+这条结论是 Android 的现行实现，不是跨平台实现。iOS 可以复用“单一 owner、固定外壳、页面内部消费、
+输入态与几何测量分离”这些架构约束，但不能直接复用 Android 的 Insets 拦截代码；详见 §7.1。
 
-**已在真机验收**（Xiaomi 24129RT7CC / Android 16 / WebView 143，2026-08-23）。两页实测：
+## 2. 产品目标
 
-| | AI 聊天页 | 灵感页 |
-| --- | --- | --- |
-| `visualViewport.offsetTop` | 0 | 0 |
-| 需求1 顶栏（屏幕坐标） | `[40, 100]` 可见 | `[40, 100]` 可见 |
-| 需求2 内区被压缩 | — | 编辑区底 `521.5` = 键盘顶 |
-| 需求3 输入区缝隙 | **0**（贴合） | 无常驻输入区 |
-| 需求4 Tab顶 − 键盘顶 | **+205**（被盖住） | **+205**（被盖住） |
+移动端外壳是「固定顶栏 + 内部滚动区 + 常驻输入区 + 底部 Tab」。停靠软键盘展开时要求：
 
-键盘高 312.92，键盘顶在 521.5。**键盘弹出后连续用力上拖三次**（`visualViewport.offsetTop`
-拖满到 312.9），以上屏幕坐标一个都不变，`document.scrollHeight` 稳定在 834。
+1. 固定顶栏不离开屏幕；
+2. WebView 与应用外壳保持全屏，不整体移动或缩短；
+3. AI 消息区缩短，composer 贴在键盘上沿；
+4. 灵感正文缩短并由 textarea 内部滚动；
+5. 底部 Tab 保持在机器底部并被键盘覆盖，不出现在键盘上方；
+6. 空消息态没有伪滚动，用户拖动时页面不抖；
+7. 输入区只随系统报告的实际 inset 变化，不出现预测造成的先上跳再回落；
+8. touch/pointer 路径不改写焦点，真手指点击必须可靠唤起输入法。
 
-## 3. 实现结构
+## 3. 现成方案调研
 
-### 3.1 唯一入口是一个 CSS 变量
+### 3.1 CatGo 与 HuLa 证明了原生 Insets 路径
 
-键盘遮挡高度写在 `documentElement` 的 `--fc-kb` 上，布局只吃这一个变量。
+[CatGo Android 说明](https://github.com/Hello-QM/catgo-LRG/blob/main/deploy/android/README.md) 与
+[HuLa MainActivity](https://github.com/HuLaSpark/HuLa/blob/master/src-tauri/gen/android/app/src/main/java/com/hula/app/MainActivity.kt)
+都使用：
 
-**不走 React state。** 逐帧 `setState` 会把布局更新压进 React 调度，这正是「跟不上键盘」最常见的自制原因。
-写 CSS 变量则由样式系统直接驱动合成。
+- Manifest 设置 `android:windowSoftInputMode="adjustResize"`；
+- `WindowInsetsCompat.Type.ime()` 读取系统实际键盘高度；
+- 原生根视图根据 IME 高度调整布局。
 
-### 3.2 复用已有的保留高度变量，不新建一套
+这证明 Tauri Android 可以绕开 WebView 版本差异，由系统 Insets 提供键盘高度。CatGo 还把原生
+`MainActivity.kt` 保存为 canonical override，避免 `tauri android init` 覆盖修改。
 
-外壳早已具备本方案需要的两个前提：
+但两者都把 IME 高度作为 `android.R.id.content` 的 bottom padding，等于缩短整个 WebView。
+这会把 app_main 的底部 Tab 一起抬到键盘上方，违反 §2；它们也只处理终点式 Insets，没有覆盖
+app_main 要求的内部区域所有权，因此不能原样复制。
 
-- `.mobile-nav` 是 `position: absolute; bottom: 0`——它本来就在屏幕底部，能被键盘盖住（需求 4）；
-- 所有需要避让 Tab 的地方都读同一个 `--mobile-nav-reserved-height`。
+### 3.2 Tauri 没有统一默认值
 
-因此**接入方式是在页面根上重定义这个变量**，而不是给每个元素加键盘偏移：
+[Tauri PR #13277](https://github.com/tauri-apps/tauri/pull/13277) 仍未合并。维护者明确指出，缩小整个
+WebView 是否合适必须由应用自行决定，因为并非所有页面都能承受键盘展开后的窄 WebView。
+
+因此 app_main 不等待 Tauri 默认行为，也不把 `adjustResize` 当作完整解决方案；它只用于保证旧 Android
+能够可靠派发 IME Insets，实际 WebView 几何仍由 app_main 明确控制。
+
+### 3.3 rust-expo-example 不属于同一运行模型
+
+[rust-expo-example](https://github.com/RohitLuthra19/rust-expo-example) 的 Android/iOS 由 Expo/React Native
+运行，Tauri 只包装桌面 Web 构建。它不经过 Tauri Android WebView，不能作为本问题的实现依据。
+
+## 4. Android 实现结构
+
+### 4.1 原生读取实际 IME Insets
+
+`MainActivity.configureMobileWindowInsets()` 在 `window.decorView` 上安装两条互补路径：
+
+- `OnApplyWindowInsetsListener`：提供初始值和配置变化后的稳定值；IME 动画期间，它提前送达的终点只用于
+  拦截下发，不发布给页面；
+- `WindowInsetsAnimationCompat.Callback.onProgress()`：发布键盘动画的实际中间帧。
+
+动画结束后再从 root Insets 确认终值。这样不会把 `onApplyWindowInsets` 的终点与 `onProgress` 的中间帧
+交错成“终点 → 中间帧 → 终点”，也就是本轮概率性先跳后回的直接时序原因。
+
+原生保留系统栏与刘海 Insets 的既有处理，只把 IME 高度转换为 CSS 像素。相同数值不重复发布，
+同一帧内多次变化会合并到下一次 `postOnAnimation`，避免把 JavaScript 调用堆进 UI 线程队列。
+
+Manifest 保留 `adjustResize`。AndroidX 官方说明，在 API 29 及以下，如果窗口不是
+`SOFT_INPUT_ADJUST_RESIZE`，IME 变化可能不会触发 Insets listener；因此该声明是 API 26 最低版本的
+兼容条件，不代表允许系统缩短 WebView。
+
+### 4.2 WebView 不再接收 IME Insets
+
+原生读取 IME 后，通过 `WindowInsetsCompat.Builder` 把传给子层的 `Type.ime()` 设为 `Insets.NONE`。
+系统栏和刘海仍正常下发。
+
+这一步统一 WebView 行为：
+
+- M139 以前的 WebView 本来不会用 IME 改 visual viewport；
+- M139+ 新增的 visual viewport resize 被显式关闭；
+- M144 的 `focus({preventScroll:true})` 修复不再是前置条件；
+- WebView 认为自身仍是完整全屏视口，焦点元素不会因为“键盘后的窄可视区”触发二次平移。
+
+Android 官方说明：原生消费某类 Insets 后应把该类型归零再传给 WebView，避免双重 padding；若要退出
+现代 WebView viewport resize，也必须在 Insets 进入 WebView 前拦截。参见
+[Understand window insets in WebView](https://developer.android.com/develop/ui/views/layout/webapps/understand-window-insets)。
+
+### 4.3 原生桥只发布状态，不改 WebView 尺寸
+
+Android 注入的 `flowcloudaiMobileUi` 暴露当前 IME 高度与可见性，动画期间调用固定的全局接收函数。
+前端桥未安装时，原生仍保留最新快照；React 挂载后会立即读取，不依赖某个事件是否碰巧发生。
+
+原生禁止：
+
+- 给 `android.R.id.content` 或 WebView 增加 IME padding；
+- 修改 `layoutParams.height`、`translationY` 或 WebView frame；
+- 同时让 WebView resize 再给前端发布同一高度。
+
+历史上“先应用最终高度、再按动画帧改 WebView 尺寸”会让原生布局、WebView viewport 和网页重排竞争，
+即使终点正确，动画仍会剧烈抖动。
+
+## 5. 前端消费规则
+
+### 5.1 唯一布局输入是 `--fc-kb`
+
+`mobileKeyboardInset.ts` 接收原生快照并直接写：
+
+```ts
+document.documentElement.style.setProperty('--fc-kb', '<actual inset>px');
+```
+
+不走 React state；React 只订阅“键盘是否可见”以维护返回键/输入模式状态。布局变化由 CSS 变量直接完成。
+
+若运行在旧 APK、浏览器预览或桥尚未就绪，输入模式判断可以继续用 `visualViewport` 兜底；**兜底值不得写入
+`--fc-kb`**，避免旧问题重新成为布局路径。
+
+### 5.2 页面只重定义已有保留高度
+
+AI 聊天页与灵感页继续复用现有 `--mobile-nav-reserved-height`：
 
 ```css
 .mobile-ai-chat,
@@ -67,163 +144,180 @@
 }
 ```
 
-`--mobile-keyboard-extra` 是「键盘比 Tab 保留高度多出来的部分」。键盘收起时它是 `0`，
-`--mobile-nav-reserved-height` 退化成 `--mobile-nav-height`，与接入前逐字等价。
+键盘收起时 `--fc-kb = 0px`，布局退化到正常 Tab 保留高度。键盘展开时：
 
-这样做的收益：`.mobile-ai-chat__composer { bottom: var(--mobile-nav-reserved-height) }`、
-`.mobile-nav-safe-fixed { padding-bottom: var(--mobile-nav-reserved-height) }` 等**既有声明一行都不用改**，
-现有断言这些声明的测试也继续通过。
+- `.mobile-nav` 仍绝对定位在机器底部，被系统键盘覆盖；
+- AI composer 的 `bottom` 变为实际键盘高度；
+- `mobile-nav-safe-fixed` 的内部可用空间按相同高度缩短；
+- 灵感 textarea 在 flex 容器中缩短并保持内部滚动。
 
-### 3.3 只有绝对定位的滚动区需要额外补 `--mobile-keyboard-extra`
+### 5.3 消息列表不能重复消费键盘高度
 
-普通流内容被父级 padding 缩短即可；**绝对定位元素不会停在 padding 上方**，
-用固定 rem 预留空间的滚动区也不会自动跟着变。AI 聊天页的消息列表两者都占，所以要显式加：
+AI 页父级 padding 已经按 `--mobile-nav-reserved-height` 缩短，composer 也按同一变量定位。因此消息列表只
+预留 composer 自身高度：
 
 ```css
 .mobile-ai-chat__messages {
-    padding-bottom: calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra));
-    scroll-padding-bottom: calc(var(--mobile-ai-composer-space) + var(--mobile-keyboard-extra));
+    padding-bottom: var(--mobile-ai-composer-space);
+    scroll-padding-bottom: var(--mobile-ai-composer-space);
 }
 ```
 
-灵感页不需要：`.mobile-idea` 带 `mobile-nav-safe-fixed`，正文 `textarea` 是 `flex: 1 1 auto`，
-父级 padding 变大它自然缩短。
+空消息态关闭纵向滚动并在消息区域使用 `touch-action: none`，但不得覆盖 composer/textarea 的可信聚焦路径。
 
-### 3.4 聚焦时必须先让位，否则视觉视口会被平移（**最关键的一条**）
+### 5.4 输入模式与布局测量分离
 
-真机实测：聚焦一个位于「键盘弹出后可视区」之下的输入框时，Chromium 会**平移视觉视口**去露出它——
-`visualViewport.offsetTop` 从 `0` 跳到 `312.9`，而页面里**所有元素的 `getBoundingClientRect()` 一动不动**。
-后果是固定顶栏被推出屏幕上方（布局 `y=40` − `312.9` < 0）、底部 Tab 被抬到键盘正上方，
-正是需求 1 和 4 的失败形态。**它与本方案是否写 inset 无关**，关掉整个特性照样发生，是应用的既有行为。
+`useMobileInputMode` 仍负责：
 
-这次平移**收不回来**。以下均实测无效，`offsetTop` 恒为 `312.9`：
+- 文本焦点与整页编辑状态；
+- 键盘出现后系统收起但焦点保留的状态转换；
+- 返回键先退出输入模式；
+- iOS 与旧 APK 的 `visualViewport` 兜底检测。
 
-- `window.scrollTo(0, 0)`
-- `document.scrollingElement.scrollTop = 0`
-- 给 `html, body` 加 `overflow: hidden`（实验页有这条，一度以为是它免疫的原因，实测证否）
+它不再负责：
 
-**唯一可行的是让它压根不发生**：预先把 `--fc-kb` 置成键盘高度、让输入区落进将来的可视区，
-再真手指点击，`offsetTop` 全程为 0。所以 `focusin` 时就按**上次学到的**键盘高度乐观让位
-（`predictMobileKeyboardInset()`），等真实高度到达再校正。
+- 从 viewport 计算 Android 布局高度；
+- 在 `focusin` 预测键盘高度；
+- 写入 `--fc-kb`；
+- 根据 `visualViewport.offsetTop` 移动 `.mobile-app`。
 
-两条约束：
+## 6. 已移除的历史方案
 
-- **没学到高度就不让位**——宁可这一次被平移，也不猜一个值。所以一台设备**首次**聚焦仍会平移一次，
-  之后按视口高度分键持久化（`fc-mobile-kb:<innerHeight>`），转屏/分屏各学各的。
-- **必须有宽限期回退**（`PREDICTION_GRACE_MS`）：只聚焦不弹键盘（接了硬件键盘等）时，
-  超时后退回 `0`，否则布局会一直空让一块。
+以下代码不得恢复：
 
-### 3.5 视觉视口平移必须抵消，挡不住
+- `fc-mobile-kb:<innerHeight>` 的 localStorage 高度学习；
+- `predictMobileKeyboardInset()` 与 900ms 宽限期；
+- 自演的 250ms `--fc-kb-transition`；
+- `--fc-kb-pan`、`data-mobile-kb-pan` 与整壳 `translateY()`；
+- 通过 `window.scrollTo()`、`scrollTop`、`overflow:hidden` 强拉 visual viewport；
+- touch/pointer 事件里的 `focus()`、`focus({preventScroll:true})` 或 `preventDefault()`。
 
-键盘弹出后布局视口（834）仍比可视区（521.5）高，Chromium 允许用户把**视觉视口**拖进这
-312.5px 的差值里去看被键盘挡住的部分。实测拖一下 `visualViewport.offsetTop` 就到 227，
-**松手不回弹**：固定顶栏被拖出屏幕、底部 Tab 和让出的余量全部露出来，需求 1 和 5 当场失效。
-期间 `scrollTop` / `scrollY` 与内层滚动区全程为 0——动的只有视觉视口。
+预测值先于真实键盘到达，命中时看似平滑，未命中时就会表现为输入框先跳到错误位置再回归；整壳 transform
+则把页面滚动、视觉视口平移与 CSS 合成混在一起，是空消息态拖动抖动的直接放大器。
 
-**挡不住，只能抵消。** 已验证无效的方向：
+## 7. 平台边界
 
-- `html, body { overflow: hidden }` + `overscroll-behavior: none`
-- 把外壳缩到可视区高度——它只是让手势被可滚动的内层消费掉，换个没内容的页面照样能拖
-- 把 Tab 改成 `position: fixed`——反而重新制造了可视区之下的内容，平移照旧
+| 平台 | 布局高度来源 | WebView 行为 | 当前范围 |
+| --- | --- | --- | --- |
+| Android API 26+ / 任意 WebView | 原生 `WindowInsetsCompat.Type.ime()` | IME Insets 在进入 WebView 前归零，WebView 保持全屏 | AI 聊天、灵感 |
+| iOS 16.2+ | 仍由 WKWebView 现有行为处理 | 不写 `--fc-kb`，避免二次缩短 | 本次不变 |
+| 浏览器预览/旧 APK | `visualViewport` 只用于输入模式兜底 | 不作为布局验收依据 | 静态测试 |
 
-而且**「Tab 被键盘盖住」和「拖不动」在 Android 上互斥**：被盖住就要求可视区之下存在内容，
-那就必然存在可拖区间。所以保留「被盖住」，转而抵消平移。
+iOS 不能直接启用 Android 路径。当前 `MobileApp` 只在 `platformInfo.os === 'android'` 时打开
+`writeKeyboardInset`；iOS 的 `visualViewport` 只用于输入模式判断，不写 `--fc-kb`。这是有意的平台隔离，
+不是缺失接线。IOS-005 仍是独立未解决项。
 
-做法是外壳整体跟着 `offsetTop` 平移同样距离，屏幕坐标恒定不变，平移在视觉上成为空操作：
+### 7.1 iOS 适用性结论
 
-```css
-html[data-mobile-kb-pan="on"] .mobile-app {
-    transform: translateY(var(--fc-kb-pan, 0px));
-}
-```
+**结论：当前 Android 方案不能原样用于 iOS；能复用的是布局契约，不能复用的是平台接管机制。**
 
-**必须同时夹掉溢出**，否则自激：补偿用的 transform 把外壳底边推到布局视口之下，
-`document.scrollHeight` 从 834 长到 1147，文档自己也能滚了，补偿量与文档滚动叠加，
-拖到底时顶栏又被带出屏幕。加上这段后 `scrollHeight` 稳定在 834：
+Android 能在 Insets 下发链路中读取 `Type.ime()`，随后把这一类 Insets 归零再交给 WebView。iOS 的公开
+UIKit/WebKit API 可以测量键盘，但截至 2026-08-23，没有公开文档提供“在 WKWebView 接收键盘影响前，
+只消费并清零键盘 inset”的直接等价接口：
 
-```css
-html[data-mobile-kb-pan="on"],
-html[data-mobile-kb-pan="on"] body { overflow: hidden; }
-```
+- [`UIKeyboardLayoutGuide`](https://developer.apple.com/documentation/uikit/adjusting-your-layout-with-keyboard-layout-guide)
+  能表示键盘占据的原生布局空间，并可用
+  [`followsUndockedKeyboard`](https://developer.apple.com/documentation/uikit/uikeyboardlayoutguide/followsundockedkeyboard)
+  跟随浮动键盘；它适合约束 UIKit 视图，却不会自动关闭 WKWebView 内部的聚焦元素 reveal / 视觉视口平移；
+- [`UIKeyboardWillChangeFrameNotification`](https://developer.apple.com/documentation/uikit/uiresponder/keyboardwillchangeframenotification)
+  提供起止 frame、时长和曲线，属于动画前通知，不是与键盘像素逐帧同步的 frame 流；
+- WebKit 的 [`interactive-widget`](https://bugs.webkit.org/show_bug.cgi?id=259770) 与
+  [`VirtualKeyboard API`](https://bugs.webkit.org/show_bug.cgi?id=230225) 仍未实现；WebKit 还记录了 iOS 26
+  WKWebView 在根节点不可滚动时仍平移视觉视口的
+  [未解决问题](https://bugs.webkit.org/show_bug.cgi?id=311821)；
+- iOS 26 新增的
+  [`WKWebView.obscuredContentInsets`](https://developer.apple.com/documentation/webkit/wkwebview/obscuredcontentinsets)
+  用于声明被客户端工具栏等 UI 遮住的区域并缩短 layout viewport。它不覆盖本项目 iOS 16.2 最低版本，
+  官方语义也不是关闭系统键盘的自动 focus reveal，因此不能作为旧系统兼容方案；
+- `setMinimumViewportInset:maximumViewportInset:` 从 iOS 15.5 可用，但它描述外围 UI 的最小/最大状态，
+  为 `sv*` / `lv*` 提供范围，不是动态键盘接管接口。
 
-两条都**只在真的发生平移时挂**（`data-mobile-kb-pan`），常态下不加 transform——
-避免给整个外壳强制独立合成层，`AGENTS.md` §5.1 记着 Chromium 上这么做会撞 tile 内存上限。
-同理不加 `will-change`。
+本仓 iPhone 15 Pro / iOS 26.6 的真实 WKWebView 探针也验证了差异：布局视口不变，视觉视口缩短，WebKit
+会为聚焦元素平移整页；`interactive-widget` 三种取值均被忽略，`navigator.virtualKeyboard` 不存在。
+直接缩短 `WKWebView.frame` 虽可阻止平移，却会移动整套 WebView 几何，并已在后续真机实现中出现双重消费、
+键盘呼出中断等回归后被撤销。详见
+[`designs/audits/mobile-keyboard-probe-2026-08-20/`](../designs/audits/mobile-keyboard-probe-2026-08-20/)
+与 [`designs/ios-mobile-hig-gap-audit.md`](../designs/ios-mobile-hig-gap-audit.md#ios-005键盘布局曾依赖-webview-推断页面与-tab-无法稳定分配空间)。
 
-### 3.6 高度来源与平滑
+当前 iOS 原生桥还保留一套 `src/lab/ios` 专用探针：`keyboardLayoutGuide` + `CADisplayLink` 采样，按需试验
+逐帧 JavaScript 推送、夹紧 scroll view、缩短 WKWebView frame 或移除 WebKit 键盘通知观察者。该探针目前
+由 `FCAApplyMobileUiEnvironment()` 安装，并未按实验路由隔离；布局变更开关默认关闭，所以不会把 Android
+方案隐式用于 iOS，但普通页面仍会注册通知并产生诊断日志。iOS 发布前应单独将其门控或移除。
 
-`--fc-kb` 由 `mobileKeyboardInset.ts` 写入，数值来自 `useMobileInputMode` 已有的
-`getMobileViewportState().keyboardInset`——**不新写一套测量**，那套已有 Node 测试覆盖。
+这套探针不能视为生产方案：移除 WebKit 观察者依赖 WebKit 内部通知行为且运行期不可逆，不应成为发布路径。
+实验还观测到系统可短暂报告超出稳定终值的高度、`evaluateJavaScript` 跨进程推送只能达到约 25～40fps，
+以及交互式收起可能给出 `duration=0`，所以“原生实测”本身也不能保证网页逐帧无抖动。
 
-两个方向的处理**不对称**，这是实测结论不是偏好：
+### 7.2 iOS 后续设计边界
 
-| 方向 | 处理 | 依据 |
-| --- | --- | --- |
-| 升起 | CSS 过渡（默认 250ms ease-out） | `focusin → visualViewport.resize` 实测 60~75ms，而 IME 滑入约 200~300ms，拿到终值时键盘还在动，过渡有对齐余地 |
-| 收起 | **直接吸附，无过渡** | 拿到 `0` 时键盘早已消失，过渡纯粹是滞后 |
+在新的 iPhone 真机方案通过前，维持当前基线：**不向 iOS 发布 `--fc-kb`，不恢复 frame resize，不移除
+WebKit 观察者，也不同时让 WKWebView 和页面消费同一键盘高度。**
 
-「变矮但没到 0」（候选栏收掉、换小键盘）同样吸附：滞后会让布局比真实键盘高，读起来像输入区莫名变厚。
+后续试验必须按以下顺序推进：
 
-### 3.7 iOS 的接缝在哪
+1. 先把 `UIKeyboardLayoutGuide` / keyboard frame 作为只读诊断，区分停靠、浮动、分离及外接键盘；
+2. 先证明能够用受支持的公开 API 稳定消除 WKWebView 自动平移，再允许 iOS 进入自定义布局 owner 模式；
+3. 只有单一 owner 成立后，才可复用现有 `--fc-kb` CSS 消费层；不得重新设计第二套页面布局变量；
+4. 至少覆盖 iOS 16.2 与当前 iOS、系统/第三方输入法、交互式收起、转屏、iPad 浮动键盘和外接键盘；
+5. IOS-005 的底部 Tab 目标需在真机确认：停靠键盘时隐藏/不可交互，浮动或外接键盘不得误隐藏。
 
-`mobileKeyboardInset.ts` 的 `setMobileKeyboardInsetEnabled(os === 'android')` 是唯一的平台开关。
-iOS 转正时**只需把这个判断放开并提供 iOS 的高度来源**，页面 CSS 一行都不用动。
+如果找不到受支持的 WKWebView 自动平移关闭手段，则 iOS 必须继续让 WKWebView 成为键盘布局 owner，前端
+只能做输入态和页面级滚动约束，不能再叠加实际键盘高度。这是平台能力边界，不用预测值或强拉 scroll 修补。
 
-## 4. 平台差异（改之前必读）
+## 8. 验证
 
-### 4.1 为什么 Android 能这么简单
-
-- WebKit 的自动键盘避让（`_adjustForAutomaticKeyboardInfo`）会把外层 scrollView 的
-  `adjustedContentInset.bottom` 与 `contentOffset.y` 一起设成键盘高度，`position: fixed` 不跟随 → 顶栏离屏。
-  **Chromium 没有这段代码**，实测滚动量全程为 0。
-- `targetSdk 35+` 强制 edge-to-edge 后 IME **不 resize 窗口**，布局视口恒为全屏高，
-  所以「Tab 在屏幕底部被盖住」天然成立。
-
-### 4.2 为什么 iOS 不能直接照抄
-
-同一份 CSS 在 iOS 上会**复现顶栏离屏**：WebKit 已经把整页顶上去了，页面再让出一个键盘高度就是双重补偿。
-iOS 要启用，前置条件是先摘掉 WKWebView 的键盘观察者（实验代码在 `src-tauri/ios/Sources/MobileUiBridge.m`，尚未转正）。
-
-### 4.3 不要再动的东西
-
-- **`interactive-widget`**：两端真机实测三个取值都不产生差异，iOS 上 WebKit 根本没实现。不要为键盘问题改它。
-- **VirtualKeyboard API**：`navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——
-  `overlaysContent = true` 写入被接受，但 `env(keyboard-inset-height)` 与 `boundingRect` 恒为 0、`geometrychange` 不触发。
-- **逐帧跟随**：Chromium 只在 IME 落位后上报一次高度，Web API 层面做不到逐帧。要逐帧只能接原生
-  `WindowInsetsAnimationCallback`。
-
-## 5. 红线
-
-- **禁止**在 touch 路径（`touchstart` / `pointerdown` / `mousedown`）里调用 `focus()`、`focus({preventScroll})`
-  或 `preventDefault()`。这会打断「可信手势 → 聚焦 → 唤起输入法」，直接损害需求 7。
-- **焦点存在 ≠ 键盘可见**：键盘被收起时焦点仍在，接硬件键盘则有焦点无键盘。
-  **不要用焦点状态代理键盘状态**，唤起率统计也必须按点击计数而不是按 `focus` 计数。
-- 新增页面接入时**只重定义 `--mobile-nav-reserved-height`**，不要给具体元素散写键盘偏移。
-
-## 6. 验证
+静态与构建：
 
 ```bash
-cd app_main
-npm run lint && npm run build
 npm run test:mobile-shell
+npm run lint
+npm run build
 ```
 
-真机（Android）：`npm run android:dev:device`，然后在 AI 聊天页与灵感页分别确认——
-顶栏不动、输入区贴键盘上沿、Tab 被盖住、长正文可滚到底、收起无滞后。
+Android 原生构建使用 `package.json` 中现行的 debug APK 脚本；最终必须安装到目标真机，不能用浏览器/Vite
+空壳替代。至少覆盖：
 
-判据要看**屏幕坐标**而不是布局坐标：`rect.top − visualViewport.offsetTop`。
-只看 `getBoundingClientRect()` 会得到「一切正常」的假象——视觉视口被平移时元素布局坐标根本不变。
+1. Xiaomi / Android 16 / WebView 143 的首次聚焦与连续 20 次展开/收起；
+2. AI 空消息、长消息、流式消息和切换会话；
+3. 灵感短正文、长正文、光标在末尾和输入法候选栏高度变化；
+4. 三键导航与全面屏手势导航；
+5. 讯飞与至少一种第三方输入法；
+6. 转屏、分屏、硬件键盘；
+7. 键盘动画期间顶栏屏幕坐标稳定、composer 与键盘上沿无缝；
+8. Tab 不出现在键盘上方，键盘收起后布局恢复；
+9. 空消息态 `scrollHeight === clientHeight`、`scrollTop === 0`，连续拖动不抖；
+10. 真手指点击可靠唤起键盘，不能只用 `adb shell input tap`。
 
-> 原生侧未改动时，可以跳过 `cargo`：起 `TAURI_ENV_PLATFORM=android npx vite`、
-> `adb reverse tcp:5176 tcp:5176` 与 `tcp:1422`，让设备上已装的 dev APK 直接加载新前端。
-> `chrome://inspect` 或 `adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>` 可拿到完整 DevTools。
+通过前端测试或 APK 编译只证明代码可构建，不代表键盘动画已经验收。Android 官方也明确指出 API 29 默认
+可能出现终点正确但动画不同步的跳变；逐帧行为必须看真实设备。参见
+[Control and animate the software keyboard](https://developer.android.com/develop/ui/views/layout/sw-keyboard)。
 
-## 7. 未覆盖项
+### 8.1 2026-08-23 Android 真机诊断与验收结果
 
-- **需求 6 只做到「一步到位 + 升起平滑」**，不是真正的逐帧跟随（见 §4.3）。
-- **需求 7 未做真手指压测**：既有数据全部来自 `adb shell input tap` 注入，不能作为唤起率证据。
-- **首次聚焦仍会被平移一次**（还没学到键盘高度），第二次起正常。
-- 灵感页正文与键盘之间仍留有约 48px：`.mobile-idea__editor` 的 `--mobile-safe-bottom` 在键盘遮住导航栏时
-  其实不必再预留。属于观感打磨，不违反需求。
-- 输入法只验证过讯飞（MIUI 版），搜狗未测；只验证过三键导航，全面屏手势未测。
-- 只接入了 AI 聊天页与灵感页；含输入的 Bottom Sheet、词条沉浸编辑等未接入。
+设备：Xiaomi 24129RT7CC / Android 16 / Android System WebView 143.0.7499.192 / ARM debug。
+
+- 完整 Tauri debug 包已构建、安装并启动；Activity 为当前前台窗口，近期日志未出现 native/Chromium fatal；
+- 原生快照终值为 `--fc-kb: 312.92px`，`visualViewport.height` 全程保持 `834.46px`、
+  `offsetTop=0`、`scrollY=0`，说明 WebView 没有成为第二个键盘布局 owner；
+- 展开终态 composer bottom 为 `521.54px`，恰好等于 `834.46 - 312.92`，与键盘上沿无缝；
+- 单次独立展开采到 41 个变化点，`--fc-kb` 从 `0` 单调增加到 `312.92`；composer top 从
+  `610.46px` 单调移动到 `405.54px`，没有反向回跳；
+- 单次独立收起采到 40 个变化点，`--fc-kb` 从 `312.92` 单调减少到 `0`；composer top 单调回到
+  `610.46px`，没有反向回跳；
+- 空消息区在键盘展开后执行一次 ADB 上滑，顶栏、空状态与 composer 的终态位置未变化。
+
+随后项目负责人在目标真机上完成实际触控验收，确认当前方案通过：键盘展开后的空消息态不再可滚动抖动，
+输入框不再概率性先向上跳后回落。至此，本轮 Android 核心阻断问题在 Xiaomi / Android 16 / WebView 143
+目标环境关闭；前述逐帧数据保留为验收结论的机制证据。
+
+该验收不自动外推到第三方输入法、API 26～29 或真正的旧版 WebView。旧 WebView 的兼容性依据是“系统
+Insets + JavascriptInterface，不依赖 WebView 键盘 API”的架构，仍需在可控旧设备补运行证据；§8 的完整
+矩阵继续作为跨设备回归要求，而不是否定本次目标设备验收。
+
+## 9. 当前未覆盖项
+
+- iOS 的停靠键盘、浮动键盘与外接键盘空间所有权尚未重新设计；
+- 含输入控件的 Bottom Sheet、词条沉浸编辑等 Portal 尚未接入 Android `--fc-kb`；
+- API 26～29 的 Insets 动画由 AndroidX 兼容层提供，仍需低版本设备或模拟器验证；
+- 原生逐帧 JavaScript 发布是否在低端设备掉帧，只能通过真机录屏/帧时间确认；
+- 新原生路径已有 ADB/CDP 逐帧诊断和目标真机实际触控验收；尚未单独归档新版真机录屏。

@@ -213,14 +213,19 @@ export default function MobileAiChat({
                                     ? '正在压缩对话历史…'
                                     : '发消息或按住说话'
 
+    const messageListEmpty = messages.length === 0 && !isStreaming
     useEffect(() => {
-        if (!active || !autoScroll || scrollFrameRef.current !== null) return
+        if (!active || scrollFrameRef.current !== null || (!messageListEmpty && !autoScroll)) return
         scrollFrameRef.current = window.requestAnimationFrame(() => {
             scrollFrameRef.current = null
             const container = messagesEndRef.current?.parentElement
-            if (container) container.scrollTop = container.scrollHeight
+            if (container) container.scrollTop = messageListEmpty ? 0 : container.scrollHeight
+            if (messageListEmpty) {
+                lastScrollTopRef.current = 0
+                setAutoScroll(true)
+            }
         })
-    }, [active, activeConversationId, autoScroll, messages.length, streamingBlocks])
+    }, [active, activeConversationId, autoScroll, messageListEmpty, messages.length, setAutoScroll, streamingBlocks])
 
     useEffect(() => {
         const container = messagesEndRef.current?.parentElement

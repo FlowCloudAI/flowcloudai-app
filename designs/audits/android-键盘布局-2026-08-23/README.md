@@ -2,8 +2,17 @@
 
 > 状态：归档 ｜ 日期：2026-08-23
 
-分析与结论见工作区根 [`docs/devlog/2026-08-23-android-软键盘布局接管.md`](../../../../docs/devlog/2026-08-23-android-软键盘布局接管.md)。
-本目录只放该记录引用的真机录屏。
+> 2026-08-23 后续结论：本目录录制的是已被替换的纯前端方案（历史高度预测、250ms 自演过渡、
+> visual viewport 平移补偿）。现行架构改为 Android 原生 `WindowInsetsCompat` 发布实际 IME 高度，
+> 详见 [`docs/mobile_keyboard_layout.md`](../../../docs/mobile_keyboard_layout.md)。这些视频只证明旧方案的
+> 终点与过渡现象，不能作为新原生路径的验收证据。
+>
+> 2026-08-23 验收补充：项目负责人已在下述目标真机上完成新原生路径的实际触控验收，确认空消息态拖动
+> 不再抖动、输入框不再概率性先上跳后回落。本目录没有新增原生路径录屏；新方案的逐帧诊断数据、验收边界
+> 与 iOS 适用性结论统一记录在权威文档中。
+
+现行分析与结论统一维护在 [`docs/mobile_keyboard_layout.md`](../../../docs/mobile_keyboard_layout.md)。
+本目录只保留旧方案引用的真机录屏。
 
 **采集环境**：Xiaomi 24129RT7CC / Android 16 (SDK 36) / Android System WebView 143.0.7499.192 /
 三键导航 / dpr 3.25 / 默认输入法讯飞 MIUI 版。录屏经 `adb shell screenrecord`，12 Mbps。

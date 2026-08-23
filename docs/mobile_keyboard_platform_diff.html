@@ -1,0 +1,962 @@
+<meta charset="utf-8">
+<title>WebView 键盘对照台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+
+<style>
+/* ── 设计令牌：亮色为基准，暗色只重定义变量 ─────────────────────── */
+:root {
+    --ground: #eef1f4;
+    --surface: #ffffff;
+    --surface-2: #e3e8ed;
+    --ink: #101820;
+    --ink-2: #47555f;
+    --ink-3: #78868f;
+    --rule: #cdd6dd;
+    --rule-strong: #a9b6c0;
+
+    --android: #167a4a;
+    --android-soft: #d5f0e2;
+    --ios: #0a5fc0;
+    --ios-soft: #d6e6fb;
+
+    --kb: #c03d1c;
+    --kb-soft: #f7ddd4;
+    --bad: #b5390f;
+    --good: #16704a;
+
+    --shadow: 0 1px 2px rgba(16, 24, 32, .10), 0 8px 24px rgba(16, 24, 32, .06);
+
+    --sans: "IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    --dur: 620ms;
+    --ease: cubic-bezier(.22, .78, .28, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --ground: #0c1116;
+        --surface: #141c23;
+        --surface-2: #1c262e;
+        --ink: #e7eef4;
+        --ink-2: #a2b2bf;
+        --ink-3: #6d7d8a;
+        --rule: #26333c;
+        --rule-strong: #3a4a55;
+
+        --android: #3ddc84;
+        --android-soft: #123526;
+        --ios: #56a8ff;
+        --ios-soft: #0e2740;
+
+        --kb: #ff6f43;
+        --kb-soft: #3a1d13;
+        --bad: #ff8a5c;
+        --good: #4ade80;
+
+        --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
+    }
+}
+
+:root[data-theme="dark"] {
+    --ground: #0c1116;
+    --surface: #141c23;
+    --surface-2: #1c262e;
+    --ink: #e7eef4;
+    --ink-2: #a2b2bf;
+    --ink-3: #6d7d8a;
+    --rule: #26333c;
+    --rule-strong: #3a4a55;
+
+    --android: #3ddc84;
+    --android-soft: #123526;
+    --ios: #56a8ff;
+    --ios-soft: #0e2740;
+
+    --kb: #ff6f43;
+    --kb-soft: #3a1d13;
+    --bad: #ff8a5c;
+    --good: #4ade80;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 32px 20px 72px;
+}
+
+/* ── 页头 ──────────────────────────────────────────────────── */
+.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 18px; margin-bottom: 26px; }
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 10px;
+}
+
+h1 {
+    font-size: clamp(26px, 4.4vw, 38px);
+    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -.015em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+}
+
+.thesis { margin: 0; max-width: 66ch; color: var(--ink-2); font-size: 15px; }
+.thesis strong { color: var(--ink); font-weight: 600; }
+
+/* ── 控制条 ────────────────────────────────────────────────── */
+.controls {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    margin: 0 0 24px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+}
+
+.ctrl-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-right: 2px;
+}
+
+button {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 7px 15px;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms, color 120ms;
+}
+
+button:hover { border-color: var(--ink-3); }
+button:focus-visible { outline: 2px solid var(--ios); outline-offset: 2px; }
+
+button.primary { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+button.primary:hover { opacity: .88; }
+
+button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--ground);
+    border-color: var(--ink);
+}
+
+.spacer { flex: 1 1 auto; }
+
+.phase {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-2);
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+/* ── 双端并排 ──────────────────────────────────────────────── */
+.decks { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+@media (max-width: 760px) { .decks { grid-template-columns: 1fr; } }
+
+.deck {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+
+.deck[data-os="android"] { --accent: var(--android); --accent-soft: var(--android-soft); }
+.deck[data-os="ios"] { --accent: var(--ios); --accent-soft: var(--ios-soft); }
+
+.deck-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 4px; }
+.deck-head h2 { font-size: 17px; font-weight: 600; margin: 0; color: var(--accent); letter-spacing: -.01em; }
+.deck-head .engine { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+
+.deck-rule {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin: 0 0 14px;
+    padding: 7px 9px;
+    background: var(--accent-soft);
+    border-radius: 3px;
+    line-height: 1.45;
+}
+
+.deck-rule b { color: var(--accent); font-weight: 600; }
+
+/* ── 手机 + 画布带 ─────────────────────────────────────────── */
+.stage { display: flex; gap: 14px; align-items: flex-start; }
+
+.col-cap {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: center;
+    margin: 0 0 6px;
+    white-space: nowrap;
+}
+
+/* 屏幕：固定物理尺寸，永远是 834 单位高 */
+.screen {
+    position: relative;
+    width: 168px;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    background: var(--surface-2);
+    overflow: hidden;
+    flex: 0 0 auto;
+}
+
+/* 布局画布：Android 恒高、iOS 会变矮；整体按 offsetTop 平移 */
+.canvas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    background: var(--surface);
+    border-bottom: 1px dashed var(--rule-strong);
+    transition: height var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.el {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: .04em;
+    transition: top var(--dur) var(--ease), height var(--dur) var(--ease);
+}
+
+.el-topbar { background: var(--ink); color: var(--ground); }
+.el-body { background: var(--surface-2); color: var(--ink-3); border: 1px dashed var(--rule-strong); }
+.el-composer { background: var(--accent); color: var(--surface); font-weight: 600; }
+.el-tab { background: var(--rule-strong); color: var(--surface); }
+
+/* 键盘：系统绘制，永远贴屏幕底，不属于 Web 布局 */
+.kb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--kb-soft);
+    border-top: 2px solid var(--kb);
+    color: var(--kb);
+    font-family: var(--mono);
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: .06em;
+    transition: transform var(--dur) var(--ease);
+    z-index: 5;
+}
+
+/* 键盘顶边基准线，横跨屏幕 */
+.kbline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 1px dashed var(--kb);
+    z-index: 6;
+    opacity: 0;
+    transition: top var(--dur) var(--ease), opacity var(--dur) var(--ease);
+    pointer-events: none;
+}
+
+/* 缝隙高亮：输入框底 → 键盘顶之间的死区 */
+.gap {
+    position: absolute;
+    left: 5px;
+    right: 5px;
+    background: repeating-linear-gradient(-45deg, transparent 0 4px, var(--bad) 4px 5px);
+    opacity: .55;
+    z-index: 4;
+    transition: top var(--dur) var(--ease), height var(--dur) var(--ease), opacity var(--dur) var(--ease);
+    pointer-events: none;
+}
+
+/* 离屏遮罩：画布被平移到屏幕之上的部分 */
+.offscreen-tag {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    background: var(--bad);
+    color: var(--surface);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    text-align: center;
+    padding: 2px 0;
+    letter-spacing: .06em;
+    z-index: 7;
+    opacity: 0;
+    transition: opacity 240ms;
+    pointer-events: none;
+}
+
+/* 画布带：把「相机」和「画布」的关系单独画出来 */
+.strip {
+    position: relative;
+    width: 52px;
+    flex: 0 0 auto;
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    background: repeating-linear-gradient(0deg, transparent 0 9px, var(--rule) 9px 10px);
+}
+
+.strip-canvas {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--rule-strong);
+    transition: height var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.strip-window {
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    border: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    transition: top var(--dur) var(--ease), height var(--dur) var(--ease);
+    z-index: 2;
+}
+
+.strip-window::after {
+    content: "相机";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    color: var(--accent);
+    letter-spacing: .08em;
+}
+
+/* ── 读数表 ────────────────────────────────────────────────── */
+.readout { margin-top: 16px; border-top: 1px solid var(--rule); }
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 12.5px;
+}
+
+.row.key { background: var(--accent-soft); padding-left: 6px; padding-right: 6px; margin: 0 -6px; }
+
+.row .name { color: var(--ink-2); }
+.row .name code { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); display: block; }
+.row .val { font-family: var(--mono); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row .val.bad { color: var(--bad); }
+.row .val.good { color: var(--good); }
+.row .val .unit { font-size: 10px; color: var(--ink-3); font-weight: 400; }
+.row .val .flag { font-size: 10.5px; margin-left: 5px; }
+
+/* ── 结论区 ────────────────────────────────────────────────── */
+.notes { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+@media (max-width: 760px) { .notes { grid-template-columns: 1fr; } }
+
+.note {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--ink-3);
+    border-radius: 3px;
+    padding: 14px 16px;
+}
+
+.note.full { grid-column: 1 / -1; }
+.note h3 { margin: 0 0 8px; font-size: 14.5px; font-weight: 600; }
+.note p { margin: 0 0 9px; font-size: 13.5px; color: var(--ink-2); }
+.note p:last-child { margin-bottom: 0; }
+.note code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 2px; color: var(--ink); }
+.note b { color: var(--ink); font-weight: 600; }
+
+.note.android { border-left-color: var(--android); }
+.note.ios { border-left-color: var(--ios); }
+.note.warn { border-left-color: var(--kb); }
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 18px 0 0;
+    padding: 11px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+}
+
+.swatch { display: inline-flex; align-items: center; gap: 6px; }
+.swatch i { width: 13px; height: 13px; border-radius: 2px; display: inline-block; }
+
+footer {
+    margin-top: 34px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-3);
+    line-height: 1.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 1ms !important; }
+}
+</style>
+
+<div class="wrap">
+
+    <header class="masthead">
+        <p class="eyebrow">app_main · 移动端 · 真机实测建模</p>
+        <h1>同一份页面，两个引擎，键盘升起后完全不同</h1>
+        <p class="thesis">
+            两台手机装着<strong>完全相同的页面</strong>：固定顶栏、内容区、底部输入框、底部 Tab。
+            按下「呼出键盘」，看它们分道扬镳——
+            <strong>Android 的布局纹丝不动，是「相机」滑走了</strong>；
+            <strong>iOS 是「画布」本身变矮了</strong>。
+            这一个差别决定了两端要写完全不同的代码。
+            切到「灵感页（大输入框）」还会露出 iOS 独有的第二条位移——<strong>Web 层根本读不到的那条</strong>。
+        </p>
+    </header>
+
+    <div class="controls">
+        <span class="ctrl-label">操作</span>
+        <button id="btn-kb" class="primary" type="button">呼出键盘</button>
+        <button id="btn-fix" type="button" aria-pressed="false">预让修复：关</button>
+        <button id="btn-big" type="button" aria-pressed="false">页面：AI 聊天（小输入框）</button>
+        <button id="btn-slow" type="button" aria-pressed="false">慢放：关</button>
+        <span class="spacer"></span>
+        <span class="phase" id="phase">键盘收起 · 两端一致</span>
+    </div>
+
+    <div class="decks" id="decks"></div>
+
+    <div class="legend">
+        <span class="swatch"><i style="background:var(--ink)"></i>固定顶栏</span>
+        <span class="swatch"><i style="background:var(--rule-strong)"></i>底部 Tab</span>
+        <span class="swatch"><i style="background:var(--android)"></i>输入框（composer）</span>
+        <span class="swatch"><i style="background:var(--kb-soft);border:2px solid var(--kb)"></i>系统键盘（原生层，不属于 Web 布局）</span>
+        <span class="swatch"><i style="background:repeating-linear-gradient(-45deg,transparent 0 3px,var(--bad) 3px 4px)"></i>死区（输入框够不到键盘）</span>
+    </div>
+
+    <div class="notes">
+
+        <div class="note full">
+            <h3>先看一个陷阱：默认状态下，两端症状一模一样</h3>
+            <p>
+                只按「呼出键盘」不开修复，两列的「输入框与键盘的缝隙」都是
+                <b>108，都被 Tab 占住</b>。光看这一行会以为是同一个 bug，
+                于是想用同一套代码去修——这正是 2026-08 走过的弯路。
+            </p>
+            <p>
+                真正暴露差别的是上面两行：<b>Android 的 <code>offsetTop</code> 是 313、顶栏跑到 −273 离屏；
+                iOS 的 <code>offsetTop</code> 是 0、顶栏稳稳停在 40。</b>
+                同样的表象，一个是相机移了，一个是画布矮了。
+                <b>先分清是谁动了，再决定改什么。</b>
+            </p>
+        </div>
+
+        <div class="note android">
+            <h3>Android：布局不动，相机移动</h3>
+            <p>
+                targetSdk 35+ 强制 edge-to-edge 之后，<b>IME 根本不 resize 窗口</b>。
+                <code>documentElement.clientHeight</code> 恒为 834，每个元素的
+                <code>getBoundingClientRect()</code> 在键盘升起前后<b>完全相同</b>。
+            </p>
+            <p>
+                唯一变的是 <code>visualViewport.offsetTop</code>：Chromium 为了露出焦点元素，
+                把「可见窗口」整体下移。所以顶栏没有被移动，是<b>被移出了取景框</b>。
+            </p>
+            <p>
+                判断一个元素在不在屏幕上，正确公式是
+                <code>rect.top − visualViewport.offsetTop</code>，不是 <code>rect.top</code>。
+            </p>
+        </div>
+
+        <div class="note ios">
+            <h3>iOS：画布变矮，元素被迫上移</h3>
+            <p>
+                WebKit 直接把<b>布局视口缩短</b>了：<code>documentElement.clientHeight</code>
+                从 834 变成 521。所有贴着视口底部定位的东西——Tab、输入框——
+                会跟着新的底边<b>真的往上跑</b>。
+            </p>
+            <p>
+                后果是 Tab 停在键盘正上方，把 108 个像素占死。
+                这就是需求「Tab 不得占用键盘上方空间」在 iOS 上比 Android 难的根本原因：
+                Android 上「屏幕底部」还在 834，iOS 上它已经变成 521 了。
+            </p>
+            <p>
+                注意 <code>visualViewport.offsetTop</code> 在 iOS 上是 <b>0</b>。
+                照搬 Android 的平移抵消，在这里什么也不会发生。
+            </p>
+        </div>
+
+        <div class="note warn full">
+            <h3>换成「灵感页（大输入框）」，iOS 的第二条位移才现形</h3>
+            <p>
+                小输入框那一档会给人一个错觉：iOS 的顶栏一直好好的，好像
+                <b>只要把 Tab 隐藏，iOS 就天然没问题</b>。换成灵感页就会看到不是这样。
+            </p>
+            <p>
+                正文 textarea 占了大半屏，WebKit 为了露出它，<b>直接改 WKWebView 外层
+                <code>UIScrollView.contentOffset</code></b>，把顶栏顶出屏幕。
+                关键在于这次位移<b>和 Android 那次完全不是一个性质</b>：
+            </p>
+            <p>
+                Android 的平移全额写在 <code>visualViewport.offsetTop</code> 里——<b>能读、能算、能抵消</b>，
+                已上线的方案就是这么做的。iOS 这次位移发生在<b>原生 scroll view 上，Web 层读数全是 0</b>：
+                <code>offsetTop</code> 是 0，<code>scrollY</code> 是 0，<code>rect.top</code> 还是 40，
+                根 CSS 早就锁死了不可滚动——<b>你连它发生了都不知道</b>。
+            </p>
+            <p>
+                所以「位移能否被 Web 算出」那一行才是两端难度的真正分水岭。
+                Android 的问题是能自己修的，iOS 的这条<b>只能上原生桥</b>。
+                这也是 <code>a781f94</code> 回退时留下的残留问题——高度已经算对了，顶栏照样离屏。
+            </p>
+        </div>
+
+        <div class="note warn full">
+            <h3>把「预让修复」打开，看 iOS 那一列</h3>
+            <p>
+                预让修复做的事很简单：在 <code>focusin</code> 时把学习到的键盘高度写进
+                <code>--fc-kb</code>，让输入框<b>提前</b>抬到键盘顶部。
+                Android 上它同时解决了两件事——输入框贴住键盘（缝隙 = 0），
+                而且因为焦点元素不再落在可见区之下，Chromium <b>没有理由再平移</b>，
+                顶栏自然留在屏幕上。这是 2026-08-23 已在真机验收的方案。
+            </p>
+            <p>
+                同一份 CSS 放到 iOS 上会<b>坏得更彻底</b>：WebKit 已经把视口缩短了一个键盘高度，
+                页面再让一次，就是<b>双重消费</b>——输入框和键盘之间裂开 313px 的死区。
+                这正是 <code>a781f94</code> 那次回退记录下来的根因。
+                <b>iOS 必须先知道「WebKit 已经让了多少」，才能决定自己还要让多少。</b>
+            </p>
+        </div>
+
+    </div>
+
+    <footer>
+        数值来自真机实测：Xiaomi 24129RT7CC / Android 16 / WebView 143（2026-08-23）——
+        视口 834，键盘 312.92，键盘顶 521.5，Tab 顶 − 键盘顶 = +205。<br>
+        iOS 一侧依据 iPhone16,1 / iOS 26.6 与 iPhone 17 Pro 模拟器 / iOS 26.5 的回退记录建模，
+        见 <code>docs/devlog/2026-08-20-ios-灵感页键盘终态与视口所有权.md</code>。<br>
+        现行方案文档：<code>app_main/docs/mobile_keyboard_layout.md</code>。本页为教学模型，几何按比例还原，不是逐像素快照。<br>
+        <b>两处取值是建模而非实测</b>：iOS 大输入框那次原生 scroll 取 100（真机只有「顶栏与元数据离屏」的截图结论，没有量到具体偏移量）；
+        Android 灵感页在修复关闭时的平移量沿用 AI 聊天页实测的 313，该页本身只在修复开启（<code>offsetTop</code> = 0）的状态下量过。
+    </footer>
+
+</div>
+
+<script>
+"use strict";
+
+/*
+ * 双端键盘行为对照模型。
+ *
+ * 所有几何量都用「布局单位」表达（1 单位 = 真机 1 CSS px），渲染时统一乘 SCALE。
+ * 模型只描述两件事：布局视口高度怎么变、可见窗口（visualViewport）落在画布的哪一段。
+ * 其余全部由这两个量推导，避免在渲染层再塞平台分支。
+ */
+
+const L = 834;          // 无键盘时的布局视口高度（= 屏幕高）
+const KB = 313;         // 键盘高度（实测 312.92）
+const KB_TOP = L - KB;  // 键盘顶边在屏幕坐标的位置 = 521
+const NAV = 108;        // 底部 Tab 高度
+const COMPOSER_H = 86;  // 输入框高度
+const TOPBAR = [40, 100];
+const SCALE = 0.46;
+
+const px = (v) => (v * SCALE).toFixed(2) + "px";
+
+const EDITOR_TOP = 106;      // 大输入框模式下正文顶边（紧贴顶栏）
+const IOS_NATIVE_SCROLL = 100; // iOS 为露出大 textarea 平移的原生 scroll offset
+
+const state = {kbUp: false, fix: false, big: false, slow: false};
+
+/**
+ * 求某一端在当前状态下的完整几何。
+ *
+ * 返回的 rects 是「布局坐标」；屏幕坐标要再减去 offsetTop。
+ * 这个区分是整个演示的核心，不要在调用方把两者混用。
+ */
+function model(os) {
+    const kb = state.kbUp;
+
+    // 1. 布局视口高度：Android 恒定，iOS 被 WebKit 缩短
+    const layoutH = (os === "ios" && kb) ? L - KB : L;
+
+    // 2. 页面自己预留的底部高度。--fc-kb 只在预让修复打开且键盘升起时才非 0
+    const fcKb = (kb && state.fix) ? KB : 0;
+    const reserved = NAV + Math.max(fcKb - NAV, 0);   // = max(NAV, fcKb)
+
+    // 3. 贴底元素按「当前布局视口底边」排布。
+    //    大输入框模式下正文顶边固定在顶栏之下，靠底边变化来伸缩。
+    const tab = [layoutH - NAV, layoutH];
+    const composerBottom = layoutH - reserved;
+    const composer = state.big
+        ? [EDITOR_TOP, composerBottom]
+        : [composerBottom - COMPOSER_H, composerBottom];
+
+    // 4. 视觉视口。Android 的可见高度被键盘压缩但布局没变，于是产生平移；
+    //    iOS 因为布局已经缩过，不需要再平移。
+    const visualH = kb ? L - KB : L;
+    let offsetTop = 0;
+    if (os === "android" && kb) {
+        // Chromium 只在焦点元素落到可见区之下时才平移；预让修复把它提前抬进可见区
+        offsetTop = state.fix ? 0 : KB;
+    }
+
+    // 5. iOS 独有的第二条位移：WebKit 为露出大 textarea 直接改 WKWebView 外层
+    //    UIScrollView.contentOffset。它不反映在 offsetTop / scrollY 里，Web 层读不到，
+    //    也不因为页面高度算对了就消失（devlog 2026-08-20 的残留问题就是它）。
+    const nativeScroll = (os === "ios" && kb && state.big) ? IOS_NATIVE_SCROLL : 0;
+    const shift = offsetTop + nativeScroll;   // 屏幕坐标 = 布局坐标 − shift
+
+    // 6. 判定指标
+    const topbarScreen = TOPBAR[0] - shift;
+    const composerScreenBottom = composer[1] - shift;
+    const gap = KB_TOP - composerScreenBottom;         // >0 死区，=0 贴合，<0 被盖住
+    const tabScreenTop = tab[0] - shift;
+    const tabCovered = kb ? tabScreenTop >= KB_TOP : null;
+
+    // 缝隙里未必是空的：Tab 常常正好卡在输入框和键盘之间。
+    // 把「真空段」单独算出来，避免把 Tab 占位误画成死区。
+    const emptyFrom = composerScreenBottom;
+    const emptyTo = Math.min(tabScreenTop, KB_TOP);
+    const emptyH = Math.max(0, emptyTo - emptyFrom);
+
+    // 画布被推到键盘顶以上时，底下那条什么都没有的白带。
+    // 这是 iOS「键盘上方一条空白」的来源，也要算进死区。
+    const canvasBottomScreen = layoutH - shift;
+    const blankFrom = canvasBottomScreen;
+    const blankH = Math.max(0, KB_TOP - canvasBottomScreen);
+
+    return {
+        os, kb, layoutH, visualH, offsetTop, nativeScroll, shift,
+        rects: {topbar: TOPBAR, composer, tab},
+        topbarScreen, gap, tabScreenTop, tabCovered,
+        emptyFrom, emptyH, blankFrom, blankH,
+        deadTotal: emptyH + blankH,
+    };
+}
+
+/* ── 渲染 ─────────────────────────────────────────────────── */
+
+function deckMarkup(os) {
+    const name = os === "android" ? "Android" : "iOS";
+    const engine = os === "android" ? "Chromium / Android WebView 143" : "WebKit / WKWebView";
+    const rule = os === "android"
+        ? "布局视口<b>恒为全屏高</b>，IME 不 resize 窗口。键盘出现时只有取景框在移动。"
+        : "布局视口<b>被 WebKit 缩短</b>一个键盘高度。贴底元素会跟着新底边真的往上跑。";
+
+    return `
+<div class="deck" data-os="${os}">
+    <div class="deck-head">
+        <h2>${name}</h2>
+        <span class="engine">${engine}</span>
+    </div>
+    <p class="deck-rule">${rule}</p>
+
+    <div class="stage">
+        <div>
+            <p class="col-cap">屏幕所见</p>
+            <div class="screen" data-role="screen">
+                <div class="canvas" data-role="canvas">
+                    <div class="el el-topbar" data-role="topbar">顶栏</div>
+                    <div class="el el-body" data-role="body">内容区</div>
+                    <div class="el el-composer" data-role="composer">输入框</div>
+                    <div class="el el-tab" data-role="tab">Tab</div>
+                </div>
+                <div class="gap" data-role="gap"></div>
+                <div class="gap" data-role="gap2"></div>
+                <div class="kbline" data-role="kbline"></div>
+                <div class="kb" data-role="kb">系统键盘 313</div>
+                <div class="offscreen-tag" data-role="offtag">↑ 顶栏已被移出取景框</div>
+            </div>
+        </div>
+        <div>
+            <p class="col-cap">画布 / 相机</p>
+            <div class="strip" data-role="strip">
+                <div class="strip-canvas" data-role="stripcanvas"></div>
+                <div class="strip-window" data-role="stripwindow"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="readout">
+        <div class="row">
+            <span class="name">布局视口高<code>documentElement.clientHeight</code></span>
+            <span class="val" data-role="r-layout"></span>
+        </div>
+        <div class="row">
+            <span class="name">视觉视口高<code>visualViewport.height</code></span>
+            <span class="val" data-role="r-visual"></span>
+        </div>
+        <div class="row key">
+            <span class="name">视口平移<code>visualViewport.offsetTop</code></span>
+            <span class="val" data-role="r-offset"></span>
+        </div>
+        <div class="row">
+            <span class="name">顶栏布局坐标<code>rect.top</code></span>
+            <span class="val" data-role="r-recttop"></span>
+        </div>
+        <div class="row">
+            <span class="name">原生 scroll 位移<code>WKWebView.contentOffset · Web 层不可见</code></span>
+            <span class="val" data-role="r-native"></span>
+        </div>
+        <div class="row key">
+            <span class="name">顶栏屏幕位置<code>rect.top − 全部位移</code></span>
+            <span class="val" data-role="r-screen"></span>
+        </div>
+        <div class="row key">
+            <span class="name">位移能否被 Web 算出<code>决定「能不能自己修」</code></span>
+            <span class="val" data-role="r-detect"></span>
+        </div>
+        <div class="row key">
+            <span class="name">输入框与键盘的缝隙<code>键盘顶 − 输入框底</code></span>
+            <span class="val" data-role="r-gap"></span>
+        </div>
+        <div class="row">
+            <span class="name">Tab 是否被键盘盖住<code>需求 4</code></span>
+            <span class="val" data-role="r-tab"></span>
+        </div>
+    </div>
+</div>`;
+}
+
+document.getElementById("decks").innerHTML = deckMarkup("android") + deckMarkup("ios");
+
+const decks = {
+    android: document.querySelector('.deck[data-os="android"]'),
+    ios: document.querySelector('.deck[data-os="ios"]'),
+};
+
+function q(deck, role) { return deck.querySelector(`[data-role="${role}"]`); }
+
+function num(v, unit) {
+    return `${v}<span class="unit">${unit || ""}</span>`;
+}
+
+function paint(os) {
+    const d = decks[os];
+    const m = model(os);
+    const screenH = L * SCALE;
+
+    // 屏幕与画布带高度恒定，这样 iOS 的画布缩短才看得出来
+    q(d, "screen").style.height = px(L);
+    q(d, "strip").style.height = px(L);
+
+    // 布局画布：高度随 layoutH，整体按 shift（视口平移 + 原生 scroll）上移
+    const canvas = q(d, "canvas");
+    canvas.style.height = px(m.layoutH);
+    canvas.style.transform = `translateY(${-m.shift * SCALE}px)`;
+
+    // 画布内的元素用布局坐标定位
+    const put = (role, [top, bottom]) => {
+        const el = q(d, role);
+        el.style.top = px(top);
+        el.style.height = px(bottom - top);
+    };
+    put("topbar", m.rects.topbar);
+    put("composer", m.rects.composer);
+    put("tab", m.rects.tab);
+
+    // 大输入框模式下正文自己就是焦点元素，没有独立内容区
+    const body = q(d, "body");
+    body.style.display = state.big ? "none" : "flex";
+    if (!state.big) put("body", [m.rects.topbar[1] + 6, m.rects.composer[0] - 6]);
+    q(d, "composer").textContent = state.big ? "正文 textarea" : "输入框";
+
+    // 键盘：原生层，永远贴屏幕底，只做整体升降
+    q(d, "kb").style.height = px(KB);
+    q(d, "kb").style.transform = m.kb ? "translateY(0)" : `translateY(${KB * SCALE}px)`;
+
+    // 键盘顶边基准线
+    const kbline = q(d, "kbline");
+    kbline.style.top = px(KB_TOP);
+    kbline.style.opacity = m.kb ? "1" : "0";
+
+    // 死区条纹：只画真正空着的段。Tab 占住的部分不算死区。
+    // gap  = 输入框底 → Tab 顶；gap2 = 画布底 → 键盘顶（原生 scroll 露出的白带）
+    const stripe = (role, from, h) => {
+        const el = q(d, role);
+        if (m.kb && h > 1) {
+            el.style.opacity = ".55";
+            el.style.top = px(from);
+            el.style.height = px(h);
+        } else {
+            el.style.opacity = "0";
+            el.style.height = "0px";
+        }
+    };
+    stripe("gap", m.emptyFrom, m.emptyH);
+    stripe("gap2", m.blankFrom, m.blankH);
+
+    // 顶栏离屏警告。两端症状相同、成因不同，标签必须写清是谁动的。
+    const tag = q(d, "offtag");
+    tag.style.opacity = m.topbarScreen < 0 ? "1" : "0";
+    tag.textContent = m.nativeScroll > 0
+        ? "↑ 顶栏被原生 scroll 推走 · Web 读不到"
+        : `↑ 顶栏被移出取景框 · offsetTop ${m.offsetTop}`;
+
+    // 画布带：Android 画布恒高、窗口下移；iOS 画布变矮、窗口不动。
+    // 原生 scroll 表现为画布整体上滑——相机没动，画布自己溜走了。
+    const sc0 = q(d, "stripcanvas");
+    sc0.style.height = px(m.layoutH);
+    sc0.style.transform = `translateY(${-m.nativeScroll * SCALE}px)`;
+    const win = q(d, "stripwindow");
+    win.style.top = px(m.offsetTop);
+    win.style.height = px(m.visualH);
+
+    // ── 读数 ──
+    q(d, "r-layout").innerHTML = num(m.layoutH);
+    q(d, "r-layout").className = "val" + (m.layoutH !== L ? " bad" : "");
+
+    q(d, "r-visual").innerHTML = num(m.visualH);
+
+    const off = q(d, "r-offset");
+    off.innerHTML = num(m.offsetTop) + (m.offsetTop > 0 ? '<span class="flag">相机已下移</span>' : "");
+    off.className = "val" + (m.offsetTop > 0 ? " bad" : "");
+
+    q(d, "r-recttop").innerHTML = num(TOPBAR[0]) + '<span class="flag">恒定</span>';
+
+    const nat = q(d, "r-native");
+    nat.innerHTML = num(m.nativeScroll) + (m.nativeScroll > 0 ? '<span class="flag">读不到 ✕</span>' : "");
+    nat.className = "val" + (m.nativeScroll > 0 ? " bad" : "");
+
+    const det = q(d, "r-detect");
+    if (!m.kb || m.shift === 0) {
+        det.innerHTML = '<span class="unit">无位移</span>';
+        det.className = "val";
+    } else if (m.nativeScroll > 0) {
+        det.innerHTML = '不能<span class="flag">只能上原生桥</span>';
+        det.className = "val bad";
+    } else {
+        det.innerHTML = '能<span class="flag">offsetTop 全额反映</span>';
+        det.className = "val good";
+    }
+
+    const sc = q(d, "r-screen");
+    sc.innerHTML = num(m.topbarScreen) + (m.topbarScreen < 0
+        ? '<span class="flag">离屏 ✕</span>'
+        : '<span class="flag">可见 ✓</span>');
+    sc.className = "val " + (m.topbarScreen < 0 ? "bad" : "good");
+
+    const g = q(d, "r-gap");
+    if (!m.kb) {
+        g.innerHTML = '<span class="unit">—</span>';
+        g.className = "val";
+    } else if (Math.abs(m.gap) < 1) {
+        g.innerHTML = num(0) + '<span class="flag">贴合 ✓</span>';
+        g.className = "val good";
+    } else if (m.gap > 0 && m.deadTotal < 1) {
+        g.innerHTML = num(m.gap) + '<span class="flag">被 Tab 占住 ✕</span>';
+        g.className = "val bad";
+    } else if (m.gap > 0) {
+        g.innerHTML = num(m.gap) + `<span class="flag">其中 ${Math.round(m.deadTotal)} 是死区 ✕</span>`;
+        g.className = "val bad";
+    } else {
+        g.innerHTML = num(m.gap) + '<span class="flag">被键盘盖住 ✕</span>';
+        g.className = "val bad";
+    }
+
+    const t = q(d, "r-tab");
+    if (!m.kb) {
+        t.innerHTML = '<span class="unit">—</span>';
+        t.className = "val";
+    } else if (m.tabCovered) {
+        t.innerHTML = '被盖住<span class="flag">✓</span>';
+        t.className = "val good";
+    } else {
+        t.innerHTML = `占用 ${KB_TOP - m.tabScreenTop}<span class="flag">✕</span>`;
+        t.className = "val bad";
+    }
+}
+
+function phaseText() {
+    if (!state.kbUp) return "键盘收起 · 两端一致";
+    if (state.big && state.fix) return "键盘升起 · 灵感页 + 修复 → Android 全绿，iOS 顶栏仍被原生 scroll 顶飞";
+    if (state.big) return "键盘升起 · 灵感页 → 两端顶栏都离屏，但只有 Android 那次读得到";
+    if (state.fix) return "键盘升起 · 预让修复已开 → Android 正确，iOS 双重消费";
+    return "键盘升起 · 引擎默认行为 → 两端各自出问题";
+}
+
+function render() {
+    document.documentElement.style.setProperty("--dur", state.slow ? "2200ms" : "620ms");
+    paint("android");
+    paint("ios");
+    document.getElementById("phase").textContent = phaseText();
+    document.getElementById("btn-kb").textContent = state.kbUp ? "收起键盘" : "呼出键盘";
+    const f = document.getElementById("btn-fix");
+    f.textContent = "预让修复：" + (state.fix ? "开" : "关");
+    f.setAttribute("aria-pressed", String(state.fix));
+    const b = document.getElementById("btn-big");
+    b.textContent = "页面：" + (state.big ? "灵感页（大输入框）" : "AI 聊天（小输入框）");
+    b.setAttribute("aria-pressed", String(state.big));
+    const s = document.getElementById("btn-slow");
+    s.textContent = "慢放：" + (state.slow ? "开" : "关");
+    s.setAttribute("aria-pressed", String(state.slow));
+}
+
+document.getElementById("btn-kb").addEventListener("click", () => { state.kbUp = !state.kbUp; render(); });
+document.getElementById("btn-fix").addEventListener("click", () => { state.fix = !state.fix; render(); });
+document.getElementById("btn-big").addEventListener("click", () => { state.big = !state.big; render(); });
+document.getElementById("btn-slow").addEventListener("click", () => { state.slow = !state.slow; render(); });
+
+render();
+</script>

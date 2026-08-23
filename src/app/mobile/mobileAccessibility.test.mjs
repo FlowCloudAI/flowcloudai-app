@@ -177,10 +177,15 @@ test('AI 操作图标使用通过审计的 SVG 轮廓与统一描边', () => {
     assert.match(mobileAiChatUiSource, /m5 19 1\.2-4\.7L15\.5 5a1\.6 1\.6 0 0 1 2\.3 0/)
 })
 
-test('AI 空消息态不会被末尾滚动锚点制造伪滚动距离', () => {
+test('AI 空消息态不重复避让键盘且不会把拖动升级成视觉视口平移', () => {
     assert.match(mobileAiMessageListSource, /const showEmptyState = messages\.length === 0 && !isStreaming/)
     assert.match(mobileAiMessageListSource, /mobile-ai-chat__messages--empty/)
-    assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{\s*gap:\s*0;/)
+    const messagesRule = mobileAiChatCss.match(/\.mobile-ai-chat__messages\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    assert.match(messagesRule, /padding:[\s\S]*?var\(--mobile-ai-composer-space\)/)
+    assert.match(messagesRule, /scroll-padding-bottom:\s*var\(--mobile-ai-composer-space\)/)
+    assert.doesNotMatch(messagesRule, /--mobile-keyboard-extra/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{[\s\S]*?gap:\s*0;[\s\S]*?overflow-y:\s*hidden;[\s\S]*?overscroll-behavior:\s*none;[\s\S]*?touch-action:\s*none;/)
+    assert.match(mobileAiChatSource, /container\.scrollTop = messageListEmpty \? 0 : container\.scrollHeight/)
 })
 
 test('系统主题偏好与解析结果分离，iOS system 模式不反向锁死 WebView 外观', () => {
