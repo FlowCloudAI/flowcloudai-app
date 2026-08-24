@@ -1,21 +1,16 @@
 .mobile-page-topbar {
     /*
-     * 顶栏背景渐变调试区：
-     * 1. bg-stop-*：从顶栏顶部到顶栏底部的关键点位置，0% 在最上，100% 在最下。
-     * 2. bg-visible-*：该关键点处页面背景色的可见度，100% 为完全实色，0% 为完全透明。
-     * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
+     * 顶栏遮罩：栏体本身整片实色，渐隐挪到栏体下方的 ::after。
+     *
+     * 旧实现把渐变画在栏体内部（0%→100% 实色，60% 处只剩 50%，100% 处全透明），
+     * 而操作行实际占据栏体的 31%~100%——正好落在最透明的一段。编辑页不滚动所以没暴露，
+     * 属性页/关系页一滚，正文就和返回键、页面标题叠字（2026-08-24 Android 真机核对，
+     * 证据见 app_main/designs/audits/mobile-entry-editor-2026-08-24/）。
+     *
+     * bg-fade-height 控制栏体下方渐隐段的高度，调大过渡更柔和，调小更接近硬边。
      */
     --mobile-page-topbar-x: var(--mobile-page-x);
-    --mobile-page-topbar-bg-stop-1: 0%;
-    --mobile-page-topbar-bg-visible-1: 100%;
-    --mobile-page-topbar-bg-stop-2: 20%;
-    --mobile-page-topbar-bg-visible-2: 90%;
-    --mobile-page-topbar-bg-stop-3: 30%;
-    --mobile-page-topbar-bg-visible-3: 80%;
-    --mobile-page-topbar-bg-stop-4: 60%;
-    --mobile-page-topbar-bg-visible-4: 50%;
-    --mobile-page-topbar-bg-stop-5: 100%;
-    --mobile-page-topbar-bg-visible-5: 0%;
+    --mobile-page-topbar-bg-fade-height: var(--mobile-gap-group);
 
     position: relative;
     z-index: var(--mobile-z-sticky);
@@ -28,14 +23,19 @@
     box-sizing: border-box;
     margin-bottom: var(--mobile-gap-inline);
     padding: var(--mobile-topbar-offset) var(--mobile-page-topbar-x) 0;
-    background: linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-1), transparent) var(--mobile-page-topbar-bg-stop-1),
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-2), transparent) var(--mobile-page-topbar-bg-stop-2),
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-3), transparent) var(--mobile-page-topbar-bg-stop-3),
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-4), transparent) var(--mobile-page-topbar-bg-stop-4),
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-5), transparent) var(--mobile-page-topbar-bg-stop-5)
-    );
+    background: var(--fc-color-bg);
+}
+
+/* 栏体下沿的渐隐段：让滚过去的内容淡出，而不是穿透到操作行上。 */
+.mobile-page-topbar::after {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: var(--mobile-page-topbar-bg-fade-height);
+    content: '';
+    background: linear-gradient(180deg, var(--fc-color-bg) 0%, transparent 100%);
+    pointer-events: none;
 }
 
 .mobile-page-topbar--sticky {
