@@ -85,7 +85,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
-| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界 |
+| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§9 规则 8 规定底部面板不承载滚动或输入内容，并列出两处已知违例 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
@@ -104,6 +104,7 @@
 | --- | --- | --- |
 | [mobile-ai-mode-menu-redesign-2026-08-19](../designs/audits/mobile-ai-mode-menu-redesign-2026-08-19/README.md) | 2026-08-19 | AI 模式菜单轻量化，选定 Marker-Only 方案。含实现 QA 与交付清单，Android 真机核对通过 |
 | [mobile-ai-svg-icons-2026-08-19](../designs/audits/mobile-ai-svg-icons-2026-08-19/README.md) | 2026-08-19 | 五枚 AI 操作图标。审计通过，已接入代码并完成 Android 真机视觉核对 |
+| [mobile-entry-editor-2026-08-24](../designs/audits/mobile-entry-editor-2026-08-24/README.md) | 2026-08-24 | 移动端词条编辑主页、属性页与关系页重构。代码与构建已通过，Android/iOS 原生视觉和触摸验收仍待补证 |
 | [android-键盘布局-2026-08-23](../designs/audits/android-键盘布局-2026-08-23/README.md) | 2026-08-23 | 被替换的纯前端键盘方案录屏与新原生 Insets 路径的目标真机验收说明；现行机制以键盘权威文档为准 |
 | [mobile-keyboard-probe-2026-08-20](../designs/audits/mobile-keyboard-probe-2026-08-20/README.md) | 2026-08-20 | iPhone 15 Pro / iOS 26.6 的 WKWebView 键盘行为探针，固定了 `interactive-widget`、视觉视口平移和安全区事实 |
 | [ios-input-viewport-2026-08-18](../designs/audits/ios-input-viewport-2026-08-18/README.md) | 2026-08-18 | iOS 输入视口回归验证，iPhone 17 Pro / iOS 26.5 模拟器，8 张过程截图。问题→方案摘要见 `docs/devlog/2026-08-18-ios-输入视口-二次缩短.md` |

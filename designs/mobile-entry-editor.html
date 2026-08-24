@@ -5,8 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>移动端词条编辑设计稿</title>
   <style>
+    /*
+     * 模拟应用真实标尺：数值取自 lib_ui 的 --fc-space-* / --fc-radius-*
+     * 与 app_main/src/app/mobile/mobileTokens.css 的 --mobile-* 折算值。
+     * 设计稿不复制生产组件实现，只保证间距、圆角、字号、控件密度一致。
+     */
     :root {
       color-scheme: light;
+
+      --fc-space-xs: 4px;
+      --fc-space-sm: 8px;
+      --fc-space-md: 12px;
+      --fc-space-lg: 16px;
+      --fc-space-xl: 24px;
+
+      --fc-radius-md: 8px;
+      --fc-radius-lg: 12px;
+      --fc-radius-xl: 16px;
+      --fc-radius-full: 9999px;
+
+      /* mobileTokens.css：--mobile-tap-min: 3rem = max(iOS 44pt, Material 48dp) */
+      --tap-min: 48px;
+      --page-x: 16px;
+
+      --text-meta: 13px;
+      --text-body-sm: 15px;
+      --text-body: 17px;
+      --text-title: 22px;
+      --text-display: 28px;
+
+      --safe-top: 59px;
+      --safe-bottom: 34px;
+      --nav-content-height: 60px;
+      --keyboard-height: 336px;
+
       --fc-bg: #f6f5f3;
       --fc-surface: #fffdfa;
       --fc-surface-muted: #f1f0ed;
@@ -16,7 +48,9 @@
       --fc-primary: #1677ff;
       --fc-primary-soft: #eaf3ff;
       --fc-danger: #c63b3b;
+      --fc-warn: #a9761d;
       --fc-shadow: 0 22px 64px rgb(29 28 26 / 16%);
+
       --phone-width: 390px;
       --phone-height: 844px;
     }
@@ -32,13 +66,12 @@
       --fc-primary: #66a8ff;
       --fc-primary-soft: #19324f;
       --fc-danger: #ff8d8d;
+      --fc-warn: #e0b165;
       --fc-shadow: 0 22px 70px rgb(0 0 0 / 42%);
     }
 
     * { box-sizing: border-box; }
-
-    html,
-    body { margin: 0; min-height: 100%; }
+    html, body { margin: 0; min-height: 100%; }
 
     body {
       color: var(--fc-text);
@@ -46,15 +79,14 @@
       font: 14px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    button,
-    input,
-    textarea { font: inherit; color: inherit; }
-
+    button, input, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; }
+
+    /* ---------------- 说明栏 ---------------- */
 
     .workspace {
       display: grid;
-      grid-template-columns: 340px minmax(0, 1fr);
+      grid-template-columns: 360px minmax(0, 1fr);
       min-height: 100vh;
     }
 
@@ -63,29 +95,27 @@
       top: 0;
       height: 100vh;
       overflow: auto;
-      padding: 26px 28px;
+      padding: 26px 28px 40px;
       border-right: 1px solid var(--fc-border);
       background: color-mix(in srgb, var(--fc-surface) 94%, transparent);
     }
 
     .notes h1 { margin: 0 0 4px; font-size: 21px; }
-    .notes h2 { margin: 22px 0 8px; font-size: 13px; }
+    .notes h2 { margin: 22px 0 8px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--fc-text-secondary); }
     .notes p { margin: 0; color: var(--fc-text-secondary); }
+    .notes .lead { color: var(--fc-text); }
+    .notes code { font-size: 12px; }
 
     .switches { display: flex; flex-wrap: wrap; gap: 8px; }
 
-    .switches button,
-    .top-action,
-    .chip,
-    .compact-action,
-    .icon-button {
-      min-height: 44px;
+    .switches button {
+      min-height: 40px;
+      padding: 6px 13px;
       border: 1px solid var(--fc-border);
-      border-radius: 999px;
+      border-radius: var(--fc-radius-full);
       background: var(--fc-surface);
+      text-align: left;
     }
-
-    .switches button { padding: 8px 14px; }
 
     .switches button[aria-pressed="true"] {
       color: var(--fc-primary);
@@ -94,11 +124,21 @@
     }
 
     .decision {
-      padding: 12px 0;
+      padding: 11px 0;
       border-top: 1px solid var(--fc-border);
     }
 
     .decision strong { display: block; margin-bottom: 2px; }
+    .decision.is-change strong::before { content: "改 "; color: var(--fc-primary); }
+    .decision.is-keep strong::before { content: "留 "; color: var(--fc-text-secondary); }
+    .decision.is-open strong::before { content: "问 "; color: var(--fc-warn); }
+
+    .budget { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 12px; }
+    .budget th, .budget td { padding: 4px 0; text-align: left; border-bottom: 1px solid var(--fc-border); }
+    .budget td:last-child, .budget th:last-child { text-align: right; color: var(--fc-text-secondary); }
+    .budget tr.total td { font-weight: 650; color: var(--fc-primary); }
+
+    /* ---------------- 手机画布 ---------------- */
 
     .stage {
       display: grid;
@@ -110,6 +150,10 @@
 
     .phone {
       position: relative;
+      display: grid;
+      /* 显式轨道：implicit auto 轨道会被横向滚动条与最高的那一屏撑出画布。 */
+      grid-template-columns: 100%;
+      grid-template-rows: 100%;
       width: var(--phone-width);
       height: var(--phone-height);
       overflow: hidden;
@@ -119,429 +163,622 @@
       box-shadow: var(--fc-shadow);
     }
 
-    .screen {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+    .phone > .app-screen { grid-area: 1 / 1; min-width: 0; min-height: 0; }
+
+    /* 四屏都是页面栈里的完整页面，同一时刻只显示一屏。 */
+    .app-screen {
+      display: none;
+      flex-direction: column;
       height: 100%;
+      background: var(--fc-surface);
     }
+
+    .app-screen > * { flex: 0 0 auto; }
+
+    .phone[data-view="main"]     .screen,
+    .phone[data-view="props"]    .props-screen,
+    .phone[data-view="relation"] .relation-screen,
+    .phone[data-view="focus"]    .focus-screen { display: flex; }
+
+    .status-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      height: var(--safe-top);
+      padding: 0 22px 6px;
+      color: var(--fc-text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .status-bar span:last-child { color: var(--fc-text-secondary); font-weight: 500; }
 
     .topbar {
       z-index: 4;
       display: grid;
-      grid-template-columns: 72px minmax(0, 1fr) 72px;
+      grid-template-columns: 76px minmax(0, 1fr) 76px;
       align-items: center;
-      min-height: 62px;
-      padding: 8px 14px 6px;
-      border-bottom: 1px solid var(--fc-border);
+      gap: var(--fc-space-sm);
+      padding: var(--fc-space-sm) var(--page-x);
       background: var(--fc-surface);
     }
 
-    .topbar strong { text-align: center; font-size: 16px; }
+    .topbar-title { min-width: 0; text-align: center; }
+    .topbar-title strong { display: block; overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-title small { color: var(--fc-text-secondary); font-size: 12px; }
+    .topbar-title .saving-dot::before { content: "· "; color: #73b629; }
 
+    /* 顶栏动作统一 48px 命中区——当前实现里「保存」在 44px 药丸内，「沉浸编辑」只有 32px。 */
     .top-action {
-      min-height: 42px;
-      padding: 0 12px;
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-md);
+      border: 0;
+      border-radius: var(--fc-radius-full);
       background: transparent;
+      white-space: nowrap;
     }
 
     .top-action:first-child { justify-self: start; }
-    .top-action:last-child { justify-self: end; color: var(--fc-primary); }
+    .top-action.primary { justify-self: end; color: var(--fc-primary); font-weight: 600; }
+    .top-action.danger { justify-self: end; color: var(--fc-danger); }
 
-    .scroll {
-      min-height: 0;
-      overflow: auto;
-      overscroll-behavior: contain;
-      scrollbar-width: none;
-    }
+    /* ---------------- 编辑页：身份区 ---------------- */
 
-    .scroll::-webkit-scrollbar { display: none; }
-
-    .form {
+    .identity {
       display: grid;
-      gap: 18px;
-      padding: 18px 16px 108px;
+      gap: var(--fc-space-xs);
+      padding: 0 var(--page-x) var(--fc-space-sm);
+      background: var(--fc-surface);
     }
 
-    .field { display: grid; gap: 7px; }
+    .title-input {
+      width: 100%;
+      height: 56px;
+      padding: 0;
+      border: 0;
+      border-bottom: 1px solid var(--fc-border);
+      outline: none;
+      background: transparent;
+      font-size: var(--text-title);
+      font-weight: 650;
+    }
+
+    .title-input:focus { border-bottom-color: var(--fc-primary); }
+    .title-input::placeholder { color: var(--fc-text-secondary); font-weight: 500; }
 
     .field-label {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      min-height: 20px;
       color: var(--fc-text-secondary);
-      font-size: 13px;
+      font-size: var(--text-meta);
     }
 
-    .required { color: var(--fc-danger); }
-
-    .input,
+    /* 摘要常驻三行可读（2026-08-24 反馈：单行不可接受）。
+       15px × 1.5 = 22.5/行 × 3 = 68，加上下内边距共 96。 */
     .summary-input {
       width: 100%;
+      height: 96px;
+      padding: var(--fc-space-sm) var(--fc-space-md);
       border: 1px solid var(--fc-border);
-      border-radius: 14px;
+      border-radius: var(--fc-radius-lg);
       outline: none;
+      resize: none;
+      overflow: auto;
       background: transparent;
-    }
-
-    .input {
-      height: 48px;
-      padding: 0 14px;
-      font-size: 18px;
-      font-weight: 650;
-    }
-
-    .input:focus,
-    .summary-input:focus,
-    .body-editor:focus { border-color: var(--fc-primary); }
-
-    .chips {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 2px;
+      font-size: var(--text-body-sm);
+      line-height: 1.5;
       scrollbar-width: none;
     }
 
-    .chip {
-      flex: 0 0 auto;
-      min-height: 40px;
-      padding: 0 14px;
-    }
+    .summary-input:focus { border-color: var(--fc-primary); }
+    .summary-input::-webkit-scrollbar { display: none; }
 
-    .chip.active {
-      color: var(--fc-primary);
-      border-color: var(--fc-primary);
-      background: var(--fc-primary-soft);
-    }
+    /* ---------------- 编辑页：正文区（主角） ---------------- */
 
-    .category-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-    }
-
-    .select-like,
-    .compact-action {
+    /* 正文是主任务，必须比摘要更重：容器 + 抬升底色。稿子早期只画分隔线，
+       实机上空词条表现为一整片死白，而次要的摘要反倒有边框。 */
+    .body-pane {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      min-height: 46px;
-      padding: 0 14px;
-      border: 1px solid var(--fc-border);
-      border-radius: 14px;
-      background: transparent;
-    }
-
-    .compact-action { color: var(--fc-primary); }
-
-    .body-shell {
+      flex-direction: column;
+      min-height: 0;
+      margin-bottom: var(--fc-space-sm);
       overflow: hidden;
       border: 1px solid var(--fc-border);
-      border-radius: 16px;
+      border-radius: var(--fc-radius-xl);
+      background: var(--fc-surface);
     }
 
-    .body-toolbar {
+    .screen > .body-pane,
+    .focus-screen > .body-pane { flex: 1 1 auto; }
+
+    .body-pane > .body-head { flex: 0 0 auto; }
+    .body-pane > .body-editor,
+    .body-pane > .body-preview { flex: 1 1 auto; }
+
+    .body-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      min-height: 46px;
-      padding: 0 12px;
+      gap: var(--fc-space-sm);
+      padding: 0 var(--fc-space-md);
+      min-height: var(--tap-min);
       border-bottom: 1px solid var(--fc-border);
+      background: var(--fc-surface);
+    }
+
+    .body-head .label { font-size: var(--text-body-sm); font-weight: 600; }
+    .body-head .count { color: var(--fc-text-secondary); font-size: 12px; }
+    .body-head .spacer { flex: 1; }
+
+    .segmented {
+      display: flex;
+      gap: 2px;
+      padding: 2px;
+      border-radius: var(--fc-radius-full);
       background: var(--fc-surface-muted);
     }
 
-    .body-toolbar span { color: var(--fc-text-secondary); font-size: 12px; }
-
-    .body-toolbar button {
-      min-height: 36px;
-      padding: 0 10px;
-      color: var(--fc-primary);
+    .segmented button {
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-md);
       border: 0;
+      border-radius: var(--fc-radius-full);
       background: transparent;
+      color: var(--fc-text-secondary);
+      font-size: var(--text-meta);
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--fc-surface);
+      color: var(--fc-text);
+      font-weight: 600;
+    }
+
+    .expand-button {
+      display: grid;
+      place-items: center;
+      width: var(--tap-min);
+      height: var(--tap-min);
+      margin-right: -12px;
+      border: 0;
+      border-radius: var(--fc-radius-full);
+      background: transparent;
+      color: var(--fc-primary);
+      font-size: 17px;
     }
 
     .body-editor {
       width: 100%;
-      min-height: 260px;
-      resize: none;
-      padding: 14px;
+      min-height: 0;
+      padding: var(--fc-space-md) var(--fc-space-md) var(--fc-space-xl);
       border: 0;
       outline: none;
+      resize: none;
+      overflow: auto;
       background: transparent;
-      font-size: 15px;
-      line-height: 1.75;
+      font-size: var(--text-body-sm);
+      line-height: 1.8;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
     }
 
-    .section-details {
-      overflow: hidden;
-      border: 1px solid var(--fc-border);
-      border-radius: 16px;
-      scroll-margin-top: 12px;
+    .body-editor::-webkit-scrollbar { display: none; }
+
+    .body-preview {
+      display: none;
+      min-height: 0;
+      padding: var(--fc-space-sm) var(--page-x) var(--fc-space-xl);
+      overflow: auto;
+      font-size: var(--text-body-sm);
+      line-height: 1.8;
+      scrollbar-width: none;
     }
 
-    .section-details > summary {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
-      align-items: center;
-      gap: 12px;
-      min-height: 64px;
-      padding: 10px 12px;
-      text-align: left;
-      list-style: none;
-      cursor: pointer;
-    }
+    .body-preview h2 { margin: 20px 0 8px; font-size: 18px; }
+    .body-preview p { margin: 0 0 14px; }
+    .wiki { color: var(--fc-primary); border-bottom: 1px solid color-mix(in srgb, var(--fc-primary) 40%, transparent); }
 
-    .section-details > summary::-webkit-details-marker { display: none; }
+    .phone[data-body="preview"] .body-editor { display: none; }
+    .phone[data-body="preview"] .body-preview { display: block; }
 
-    .section-details[open] > summary { border-bottom: 1px solid var(--fc-border); }
+    /* ---------------- 编辑页：属性入口行 ---------------- */
 
-    .section-details .count {
-      color: var(--fc-text-secondary);
-      font-size: 12px;
-    }
-
-    .section-details .chevron {
-      color: var(--fc-primary);
-    }
-
-    .section-details .chevron::after { content: "展开"; }
-    .section-details[open] .chevron::after { content: "收起"; }
-
-    .section-body {
-      display: grid;
-      gap: 10px;
-      padding: 12px;
-    }
-
-    .save-state {
+    .props-entry {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
-      color: var(--fc-text-secondary);
-      font-size: 12px;
-    }
-
-    .save-state::before {
-      width: 7px;
-      height: 7px;
-      content: "";
-      border-radius: 50%;
-      background: #73b629;
-    }
-
-    .bottom-nav {
-      z-index: 4;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      min-height: 70px;
-      padding-bottom: env(safe-area-inset-bottom);
+      gap: var(--fc-space-sm);
+      width: 100%;
+      min-height: var(--tap-min);
+      padding: 0 var(--page-x);
+      border: 0;
       border-top: 1px solid var(--fc-border);
       background: var(--fc-surface);
+      text-align: left;
     }
 
-    .bottom-nav button {
-      min-height: 56px;
-      padding: 8px 2px;
-      color: var(--fc-text-secondary);
-      border: 0;
-      background: transparent;
-      font-size: 12px;
-    }
-
-    .bottom-nav button.active { color: var(--fc-primary); }
-
-    .summary-input {
-      min-height: 92px;
-      resize: vertical;
-      padding: 12px;
-      line-height: 1.6;
-    }
-
-    .cover-row {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .cover-thumb {
-      display: grid;
-      place-items: end start;
-      width: 96px;
-      height: 68px;
-      padding: 8px;
-      color: var(--fc-text-secondary);
-      border-radius: 12px;
-      background: linear-gradient(145deg, #d2dae2, #eef1f4 62%, #c2ccd7);
-      font-size: 11px;
-    }
-
-    [data-theme="dark"] .cover-thumb {
-      background: linear-gradient(145deg, #36404b, #272e35 62%, #45515d);
-    }
-
-    .cover-copy { min-width: 0; }
-    .cover-copy strong,
-    .cover-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cover-copy span { color: var(--fc-text-secondary); font-size: 12px; }
-
-    .icon-button {
-      min-width: 44px;
-      padding: 0 12px;
-      color: var(--fc-primary);
-      background: transparent;
-    }
-
-    .tag-list {
-      overflow: hidden;
-      border: 1px solid var(--fc-border);
-      border-radius: 14px;
-    }
-
-    .tag-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 10px;
-      min-height: 58px;
-      padding: 9px 10px 9px 12px;
-      border-bottom: 1px solid var(--fc-border);
-    }
-
-    .tag-row:last-child { border-bottom: 0; }
-    .tag-main { min-width: 0; }
-    .tag-main strong { display: block; }
-    .tag-main span { color: var(--fc-text-secondary); font-size: 12px; }
-    .tag-value { color: var(--fc-primary); }
-
-    .clear-button {
-      min-height: 40px;
-      padding: 0 10px;
-      color: var(--fc-danger);
-      border: 0;
-      background: transparent;
-    }
-
-    .add-row,
-    .relation-row {
+    .props-entry .chips-inline {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      min-height: 52px;
-      padding: 0 12px;
-      border: 1px dashed var(--fc-border);
-      border-radius: 14px;
-      background: transparent;
-    }
-
-    .add-row { color: var(--fc-primary); }
-    .relation-row { border-style: solid; }
-    .relation-row span { color: var(--fc-text-secondary); }
-
-    .relation-list {
+      gap: 6px;
+      min-width: 0;
       overflow: hidden;
-      border: 1px solid var(--fc-border);
-      border-radius: 14px;
+      flex: 1;
     }
 
-    .relation-item {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-      min-height: 52px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--fc-border);
+    .props-entry .pill {
+      flex: 0 0 auto;
+      padding: 4px 10px;
+      border-radius: var(--fc-radius-full);
+      background: var(--fc-surface-muted);
+      color: var(--fc-text-secondary);
+      font-size: 12px;
+      white-space: nowrap;
     }
 
-    .relation-item:last-child { border-bottom: 0; }
-    .relation-item strong,
-    .relation-item span { display: block; }
-    .relation-item span { color: var(--fc-text-secondary); font-size: 12px; }
-    .relation-kind { align-self: center; color: var(--fc-primary); }
+    .props-entry .pill.accent { color: var(--fc-primary); background: var(--fc-primary-soft); }
+    .props-entry .pill.warn { color: var(--fc-warn); background: color-mix(in srgb, var(--fc-warn) 14%, transparent); }
+    .props-entry .more { color: var(--fc-primary); font-size: var(--text-meta); white-space: nowrap; }
 
-    .focus-screen {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      height: 100%;
-    }
-
-    .focus-editor {
-      min-height: 0;
-      overflow: auto;
-      padding: 20px 18px 120px;
-      outline: none;
-      font-size: 16px;
-      line-height: 1.9;
-    }
-
-    .focus-editor h2 { margin: 28px 0 10px; font-size: 20px; }
-    .focus-editor p { margin: 0 0 18px; }
+    /* ---------------- 底部工具栏与键盘 ---------------- */
 
     .macrobar {
       z-index: 6;
-      display: flex;
+      display: none;
       gap: 6px;
       overflow-x: auto;
-      min-height: 58px;
-      padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
+      min-height: 56px;
+      align-items: center;
+      padding: 4px var(--fc-space-sm);
       border-top: 1px solid var(--fc-border);
       background: var(--fc-surface);
       scrollbar-width: none;
     }
 
+    .macrobar::-webkit-scrollbar { display: none; }
+
     .macrobar button {
       flex: 0 0 auto;
-      min-width: 44px;
-      min-height: 44px;
-      padding: 0 12px;
+      min-width: var(--tap-min);
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-md);
       border: 1px solid var(--fc-border);
-      border-radius: 12px;
+      border-radius: var(--fc-radius-lg);
       background: transparent;
+      font-size: var(--text-meta);
     }
 
-    .macrobar button.primary {
-      color: var(--fc-primary);
-      border-color: var(--fc-primary);
-      background: var(--fc-primary-soft);
-    }
+    .macrobar button.primary { color: var(--fc-primary); border-color: var(--fc-primary); background: var(--fc-primary-soft); }
 
+    /* 键盘只是占位块，用来验证高度预算；按真实 iOS 中文键盘的候选条 + 四行结构填满，
+       避免画布上出现看起来像布局漏洞的空白。 */
     .keyboard {
       display: none;
-      height: 260px;
-      padding: 10px;
+      flex-direction: column;
+      gap: 8px;
+      height: var(--keyboard-height);
+      padding: 8px 6px calc(8px + var(--safe-bottom));
       border-top: 1px solid var(--fc-border);
       background: var(--fc-surface-muted);
     }
 
+    .kb-suggest {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: space-around;
+      height: 38px;
+      color: var(--fc-text-secondary);
+      font-size: 13px;
+    }
+
     .keyboard-grid {
       display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 5px;
+      flex: 1 1 auto;
+      grid-template-columns: repeat(20, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 6px;
     }
 
     .key {
       display: grid;
       place-items: center;
       min-width: 0;
-      min-height: 38px;
+      grid-column: span 2;
       border: 1px solid var(--fc-border);
       border-radius: 7px;
       background: var(--fc-surface);
+      font-size: 12px;
+    }
+
+    .key.half { grid-column: span 1; }
+    .key.wide { grid-column: span 3; }
+    .key.space { grid-column: span 10; }
+    .key.blank { border: 0; background: transparent; }
+
+    .phone[data-keyboard="open"] .app-screen .keyboard { display: flex; }
+
+    .bottom-nav {
+      z-index: 4;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-height: calc(var(--nav-content-height) + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      border-top: 1px solid var(--fc-border);
+      background: var(--fc-surface);
+    }
+
+    .bottom-nav button {
+      min-height: var(--tap-min);
+      padding: 6px 2px;
+      color: var(--fc-text-secondary);
+      border: 0;
+      background: transparent;
       font-size: 11px;
     }
 
-    .key.space { grid-column: span 6; }
-    .key.wide { grid-column: span 2; }
+    .bottom-nav button.active { color: var(--fc-primary); }
 
-    .phone[data-view="main"] .focus-screen,
-    .phone[data-view="focus"] .screen { display: none; }
+    /* 输入聚焦时 Tab 让位给键盘；正文聚焦还额外收起身份区与属性入口。 */
+    .phone[data-focus="body"] .screen .identity,
+    .phone[data-focus="body"] .screen .props-entry,
+    .phone[data-focus="body"] .screen .bottom-nav,
+    .phone[data-focus="identity"] .screen .props-entry,
+    .phone[data-focus="identity"] .screen .bottom-nav,
+    .phone[data-focus="search"] .relation-screen .bottom-nav { display: none; }
 
-    .phone[data-view="focus"][data-keyboard="open"] .keyboard { display: block; }
-    .phone[data-view="focus"][data-keyboard="open"] .focus-screen { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+    .phone[data-focus="body"] .screen .macrobar { display: flex; }
+    .phone[data-view="focus"] .focus-screen .macrobar { display: flex; }
 
-    @media (max-width: 840px) {
+    /* 只切换编辑页顶栏的标题；其余屏各有自己的一份，不受编辑页焦点态影响。 */
+    .phone[data-focus="none"] .screen .topbar-title .entry-title,
+    .phone[data-focus="identity"] .screen .topbar-title .entry-title { display: none; }
+    .phone[data-focus="body"] .screen .topbar-title .stage-title { display: none; }
+
+    /* ---------------- 属性页 / 关系页：完整页面骨架 ---------------- */
+
+    .page-scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--fc-space-md) var(--page-x) var(--fc-space-xl);
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+    }
+
+    .page-scroll::-webkit-scrollbar { display: none; }
+
+    .prop-group { margin-bottom: var(--fc-space-lg); }
+
+    .prop-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 28px;
+      color: var(--fc-text-secondary);
+      font-size: var(--text-meta);
+    }
+
+    .prop-label button {
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-sm);
+      margin-right: -8px;
+      border: 0;
+      background: transparent;
+      color: var(--fc-primary);
+      font-size: var(--text-meta);
+    }
+
+    .chips { display: flex; gap: var(--fc-space-sm); overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+
+    .chip {
+      flex: 0 0 auto;
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-lg);
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-full);
+      background: transparent;
+    }
+
+    .chip.active { color: var(--fc-primary); border-color: var(--fc-primary); background: var(--fc-primary-soft); font-weight: 600; }
+
+    .select-like {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-lg);
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-lg);
+      background: transparent;
+    }
+
+    .select-like span:last-child { color: var(--fc-text-secondary); font-size: var(--text-meta); }
+
+    .thumb-row { display: flex; gap: var(--fc-space-sm); overflow-x: auto; scrollbar-width: none; }
+    .thumb-row::-webkit-scrollbar { display: none; }
+
+    .thumb {
+      position: relative;
+      display: grid;
+      place-items: end start;
+      flex: 0 0 auto;
+      width: 96px;
+      height: 72px;
+      padding: 6px;
+      border: 0;
+      border-radius: var(--fc-radius-lg);
+      background: linear-gradient(145deg, #d2dae2, #eef1f4 62%, #c2ccd7);
+      color: #48525c;
+      font-size: 11px;
+    }
+
+    [data-theme="dark"] .thumb { background: linear-gradient(145deg, #36404b, #272e35 62%, #45515d); color: #cfd6dd; }
+
+    .thumb.add {
+      place-items: center;
+      border: 1px solid var(--fc-border);
+      background: transparent;
+      color: var(--fc-primary);
+      font-size: 20px;
+    }
+
+    .row-list { overflow: hidden; border: 1px solid var(--fc-border); border-radius: var(--fc-radius-lg); }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--fc-space-md);
+      width: 100%;
+      min-height: 56px;
+      padding: var(--fc-space-sm) var(--fc-space-md);
+      border: 0;
+      border-bottom: 1px solid var(--fc-border);
+      background: transparent;
+      text-align: left;
+    }
+
+    .row:last-child { border-bottom: 0; }
+    .row-main { min-width: 0; }
+    .row-main strong { display: block; font-weight: 600; }
+    .row-main span { display: block; color: var(--fc-text-secondary); font-size: 12px; }
+    .row-value { color: var(--fc-primary); font-size: var(--text-body-sm); }
+    .row-chevron { color: var(--fc-text-secondary); }
+
+    .row-input {
+      width: 108px;
+      min-height: 40px;
+      padding: 0 var(--fc-space-sm);
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-md);
+      outline: none;
+      background: transparent;
+      color: var(--fc-primary);
+      font-size: var(--text-body-sm);
+      text-align: right;
+    }
+
+    .add-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: var(--tap-min);
+      margin-top: var(--fc-space-sm);
+      padding: 0 var(--fc-space-md);
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-lg);
+      background: transparent;
+      color: var(--fc-primary);
+    }
+
+    .add-row span { color: var(--fc-text-secondary); font-size: 12px; }
+
+    .search-input {
+      width: 100%;
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-lg);
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-lg);
+      outline: none;
+      background: transparent;
+      font-size: var(--text-body-sm);
+    }
+
+    .search-input:focus { border-color: var(--fc-primary); }
+
+    .segmented-wide {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      padding: 2px;
+      border-radius: var(--fc-radius-lg);
+      background: var(--fc-surface-muted);
+    }
+
+    .segmented-wide button {
+      min-height: 44px;
+      border: 0;
+      border-radius: calc(var(--fc-radius-lg) - 2px);
+      background: transparent;
+      color: var(--fc-text-secondary);
+      font-size: var(--text-body-sm);
+    }
+
+    .segmented-wide button[aria-pressed="true"] {
+      background: var(--fc-surface);
+      color: var(--fc-text);
+      font-weight: 600;
+    }
+
+    .danger-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: var(--tap-min);
+      margin-top: var(--fc-space-xl);
+      border: 1px solid color-mix(in srgb, var(--fc-danger) 40%, transparent);
+      border-radius: var(--fc-radius-lg);
+      background: transparent;
+      color: var(--fc-danger);
+    }
+
+    /* ---------------- 全屏专注 ---------------- */
+
+    .focus-editor {
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: var(--fc-space-lg) 18px var(--fc-space-xl);
+      outline: none;
+      font-size: 16px;
+      line-height: 1.9;
+      scrollbar-width: none;
+    }
+
+    .focus-editor::-webkit-scrollbar { display: none; }
+    .focus-editor h2 { margin: 26px 0 10px; font-size: 20px; }
+    .focus-editor p { margin: 0 0 16px; }
+
+    .wiki-panel {
+      position: absolute;
+      right: var(--page-x);
+      bottom: calc(var(--keyboard-height) + 60px);
+      left: var(--page-x);
+      z-index: 7;
+      display: none;
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: var(--fc-radius-lg);
+      background: var(--fc-surface);
+      box-shadow: 0 8px 32px rgb(20 19 18 / 22%);
+    }
+
+    .phone[data-wiki="open"] .wiki-panel { display: block; }
+
+    .wiki-panel .wiki-title { padding: 6px var(--fc-space-md); border-bottom: 1px solid var(--fc-border); color: var(--fc-text-secondary); font-size: 12px; }
+
+    .wiki-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: var(--tap-min);
+      padding: 0 var(--fc-space-md);
+      border: 0;
+      border-bottom: 1px solid var(--fc-border);
+      background: transparent;
+      text-align: left;
+    }
+
+    .wiki-option:last-child { border-bottom: 0; }
+    .wiki-option.active { background: var(--fc-primary-soft); }
+    .wiki-option span:last-child { color: var(--fc-text-secondary); font-size: 12px; }
+
+    @media (max-width: 900px) {
       .workspace { grid-template-columns: 1fr; }
       .notes { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--fc-border); }
       .stage { padding: 24px 12px; }
@@ -552,26 +789,33 @@
   <main class="workspace">
     <aside class="notes">
       <h1>移动端词条编辑态</h1>
-      <p>所属板块：项目 Tab → 词条详情 → 编辑。这里只设计编辑流程，不包含 AI 对话与差异审阅。</p>
+      <p class="lead">
+        入口：项目 Tab → 词条列表/项目主页 → 词条详情 → 编辑；新建词条直接落到本页。
+        底部 Tab 栏在这些页面始终存在（<code>MobileApp.tsx</code> 无条件渲染 <code>MobileNav</code>），画布中已如实画出。
+      </p>
+      <p class="lead" style="margin-top:8px">
+        本稿覆盖<strong>编辑态及其下级页面</strong>（属性页、关系编辑页、全屏专注）。查看态在
+        <code>mobile-entry-detail.html</code>，AI 讨论与差异审阅在 <code>mobile-ai-entry-review.html</code>，不在此拼合。
+      </p>
 
-      <h2>查看状态</h2>
+      <h2>本轮改了什么</h2>
+      <p>
+        上一版把正文降级成一个按钮（现网实现 <code>MobileEntryDetailEditView.tsx</code> 的「正文」一节只有标题行 +
+        32px 的「沉浸编辑」）。本轮把正文放回页面主体，元数据移到<strong>独立的属性页</strong>，
+        关系编辑再下一级为移动端专用页面。
+      </p>
+
+      <h2>状态</h2>
       <div class="switches" aria-label="设计状态">
-        <button type="button" data-view="main" aria-pressed="true">主编辑</button>
-        <button type="button" data-view="focus" aria-pressed="false">沉浸正文</button>
-      </div>
-
-      <h2>查看板块</h2>
-      <div class="switches" aria-label="编辑板块">
-        <button type="button" data-section="summary" aria-pressed="true">摘要</button>
-        <button type="button" data-section="media" aria-pressed="false">图片</button>
-        <button type="button" data-section="properties" aria-pressed="false">属性与标签</button>
-        <button type="button" data-section="relations" aria-pressed="false">词条关系</button>
-      </div>
-
-      <h2>输入状态</h2>
-      <div class="switches" aria-label="键盘状态">
-        <button type="button" data-keyboard="closed" aria-pressed="true">键盘收起</button>
-        <button type="button" data-keyboard="open" aria-pressed="false">键盘弹出</button>
+        <button type="button" data-state="edit" aria-pressed="true">编辑（键盘收起）</button>
+        <button type="button" data-state="body" aria-pressed="false">正文聚焦 · 键盘</button>
+        <button type="button" data-state="identity" aria-pressed="false">摘要聚焦 · 键盘</button>
+        <button type="button" data-state="preview" aria-pressed="false">正文预览</button>
+        <button type="button" data-state="props" aria-pressed="false">词条属性页</button>
+        <button type="button" data-state="relation" aria-pressed="false">关系编辑页</button>
+        <button type="button" data-state="relationSearch" aria-pressed="false">关系编辑页 · 搜索键盘</button>
+        <button type="button" data-state="focus" aria-pressed="false">全屏专注 · 键盘</button>
+        <button type="button" data-state="wiki" aria-pressed="false">双链候选</button>
       </div>
 
       <h2>预览条件</h2>
@@ -584,131 +828,296 @@
         <button type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
       </div>
 
+      <h2>编辑页高度预算（390 × 844）</h2>
+      <table class="budget">
+        <tr><th>区块</th><th>高度</th></tr>
+        <tr><td>安全区 / 状态栏</td><td>59</td></tr>
+        <tr><td>顶栏</td><td>64</td></tr>
+        <tr><td>身份区（标题 56 + 摘要三行 96 + 标签行）</td><td>189</td></tr>
+        <tr><td>属性入口行</td><td>48</td></tr>
+        <tr><td>Tab 栏 + 安全区</td><td>94</td></tr>
+        <tr class="total"><td>正文可视高度</td><td>388</td></tr>
+      </table>
+      <p style="margin-top:6px">
+        数值取自本稿在 390 × 844 画布下的实际布局测量，非真机实测。
+        正文聚焦时身份区、属性入口、Tab 让位，键盘（336）与工具栏（56）接管底部，正文仍有约 <strong>326px</strong>。
+        当前实现的对应数字是 <strong>0</strong>——编辑页一屏内不出现任何正文。
+        属性页与关系页的可滚动内容区各为 <strong>625px</strong>（键盘弹出时 383px）。
+      </p>
+
       <h2>设计取舍</h2>
-      <div class="decision">
-        <strong>摘要属于核心内容</strong>
-        <p>摘要紧邻标题，进入编辑页即可查看和修改，不藏进二级入口。</p>
+
+      <div class="decision is-change">
+        <strong>正文占主体，不再是一个按钮</strong>
+        <p>编辑页第一屏就能读到并直接修改正文。「全屏专注」降级为可选入口（正文区右上 ⤢），不再是唯一通路。</p>
       </div>
-      <div class="decision">
-        <strong>业务板块保持独立</strong>
-        <p>图片、属性与标签、词条关系分别折叠；只减少默认高度，不改变业务层级。</p>
+
+      <div class="decision is-change">
+        <strong>整页不滚动，只有正文区自己滚</strong>
+        <p>
+          这是 2026-08-03 撤掉内联正文（<code>c8973ec</code>）的直接原因所在：表单整页滚动 + 内嵌可增高编辑器，
+          键盘一弹就失控。改成固定骨架后，键盘只需压缩正文区高度，与 AI composer 走同一条
+          <code>--fc-kb</code> 路径，符合 AGENTS.md §5.1「键盘只有一个 owner」。
+        </p>
       </div>
-      <div class="decision">
-        <strong>正文工具栏跟键盘走</strong>
-        <p>沉浸编辑时宏栏固定在键盘上方；横向滚动保留 44px 触控尺寸。</p>
+
+      <div class="decision is-change">
+        <strong>元数据进独立的属性页，不用底部面板</strong>
+        <p>
+          属性内容既会超高滚动（类型 + 分类 + 图片 + 标签 + 关系），又全都需要输入，
+          两条都撞上「底部面板不承载滚动或输入内容」的规范。它是页面栈里的真页面（不是 Overlay），
+          因此有真正的边缘返回手势、转场和返回键处理。规范条文见
+          <code>designs/mobile-ui-baseline.md §9.8</code>。
+        </p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>关系编辑是移动端专用的第三级页面</strong>
+        <p>
+          不再把桌面端 <code>EntryRelationCreator</code> 用 CSS 掰成竖排。关系页一页装下
+          目标词条搜索、方向分段和关系说明——正因为它是完整页面，滚动和输入都不再是问题。
+        </p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>草稿走 store，不靠 props 穿三层</strong>
+        <p>
+          编辑页 → 属性页 → 关系页共享同一份词条草稿。按 AGENTS.md §5.1，跨页共享状态走
+          <code>useSyncExternalStore</code> 式 store，不新增 <code>CustomEvent</code>。
+          store 生命周期 = 一次编辑会话，退出编辑态即清空。
+        </p>
+      </div>
+
+      <div class="decision is-keep">
+        <strong>摘要常驻三行</strong>
+        <p>沿用 2026-08-03「摘要属于核心内容」的结论。2026-08-24 反馈明确：单行不可接受，至少三行。</p>
+      </div>
+
+      <div class="decision is-keep">
+        <strong>全屏专注不带预览</strong>
+        <p>专注模式的定位就是只写不看；要看渲染就收起回内联正文区切「预览」。避免同一个开关出现在两层。</p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>正文区内建 编辑 / 预览 切换</strong>
+        <p>
+          现状是要看渲染效果必须「保存 → 退沉浸 → 退编辑态 → 回查看态」。
+          <code>MarkdownEditor</code> 已有 <code>mode: 'edit' | 'preview'</code>，这里只是把它接出来。
+        </p>
+      </div>
+
+      <div class="decision is-keep">
+        <strong>保留查看 / 编辑两态与手动保存</strong>
+        <p>
+          合并成单页直接编辑（自动保存）收益更大，但要重写 694 行的 <code>MobileEntryDetail.tsx</code>，
+          并触碰刚在 2026-08-23/24 稳定下来的键盘链路。本轮不动。
+        </p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>正文有容器，空状态不是一片死白</strong>
+        <p>
+          2026-08-24 Android 真机核对：正文原本只有上下分隔线、无容器，空词条时是一大片留白，
+          而次要的摘要反而带边框，主次颠倒。正文改为带边框与抬升底色的容器。
+        </p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>所有主入口回到 48px</strong>
+        <p>
+          <code>--mobile-tap-min: 3rem</code> 是项目自己的标尺。现状「沉浸编辑」32px、「新建类型」约 20px，
+          本稿内所有可点区域按 48px 画。
+        </p>
+      </div>
+
+      <div class="decision is-change">
+        <strong>新建词条对齐桌面端的占位清理</strong>
+        <p>
+          桌面端 <code>ProjectEditor.tsx</code> 同样预先落库，但用 <code>placeholderEntryIds</code> 标记，
+          保存成功即清标记，关闭标签页时标记还在就删。其注释明确写了
+          <strong>不要按字段内容猜测空词条</strong>（只设了类型或关系的词条是有效的）。
+          移动端只抄了预创建、漏了清理。本稿按桌面端机制补齐：退出词条页时占位仍在就删。
+        </p>
+      </div>
+
+      <div class="decision is-open">
+        <strong>待确认：分类回显要改另一份稿</strong>
+        <p>
+          查看态从未渲染分类（<code>MobileEntryDetailView</code> 无 category）。修法在
+          <code>mobile-entry-detail.html</code>，不在本稿范围内。
+        </p>
+      </div>
+
+      <div class="decision is-open">
+        <strong>待确认：属性页是否需要「完成」按钮</strong>
+        <p>
+          本稿的属性页改动即时写回草稿，靠返回退出，没有「完成」。若要与编辑页的手动保存心智一致，
+          可以加一个只做返回的「完成」——但那是个假动作按钮，我倾向不加。
+        </p>
       </div>
     </aside>
 
     <section class="stage">
-      <div class="phone" id="phone" data-view="main" data-keyboard="closed">
-        <section class="screen" aria-label="词条主编辑">
+      <div class="phone" id="phone" data-view="main" data-focus="none" data-keyboard="closed" data-body="edit" data-wiki="closed">
+
+        <!-- ============ 编辑页 ============ -->
+        <section class="app-screen screen" aria-label="词条编辑">
+          <div class="status-bar"><span>9:41</span><span>5G ▮</span></div>
+
           <header class="topbar">
             <button class="top-action" type="button">取消</button>
-            <strong>编辑词条</strong>
-            <button class="top-action" type="button">保存</button>
+            <div class="topbar-title">
+              <strong class="stage-title">编辑词条</strong>
+              <strong class="entry-title">孙悟空</strong>
+              <small class="saving-dot">已同步</small>
+            </div>
+            <button class="top-action primary" type="button">保存</button>
           </header>
 
-          <div class="scroll">
-            <form class="form">
-              <label class="field">
-                <span class="field-label"><span>标题 <b class="required">*</b></span></span>
-                <input class="input" value="孙悟空" aria-label="标题" />
-              </label>
+          <div class="identity">
+            <input class="title-input" value="孙悟空" placeholder="未命名词条" aria-label="标题" />
+            <div class="field-label"><span>摘要</span><span>84 字</span></div>
+            <textarea class="summary-input" aria-label="摘要" placeholder="用一两句话概括词条">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</textarea>
+          </div>
 
-              <label class="field" id="summary-section">
-                <span class="field-label"><span>摘要</span><span>84 / 200</span></span>
-                <textarea class="summary-input" aria-label="摘要">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</textarea>
-              </label>
-
-              <div class="field">
-                <div class="field-label"><span>词条类型</span><span>影响标签重点显示</span></div>
-                <div class="chips" data-mobile-horizontal-scroll>
-                  <button class="chip active" type="button">人物</button>
-                  <button class="chip" type="button">组织</button>
-                  <button class="chip" type="button">地点</button>
-                  <button class="chip" type="button">物品</button>
-                  <button class="chip" type="button">事件</button>
-                </div>
+          <section class="body-pane" aria-label="正文">
+            <div class="body-head">
+              <span class="label">正文</span>
+              <span class="count">1,240 字</span>
+              <span class="spacer"></span>
+              <div class="segmented" role="group" aria-label="正文显示方式">
+                <button type="button" data-body-mode="edit" aria-pressed="true">编辑</button>
+                <button type="button" data-body-mode="preview" aria-pressed="false">预览</button>
               </div>
+              <button class="expand-button" type="button" data-goto="focus" aria-label="全屏专注编辑" title="全屏专注编辑">⤢</button>
+            </div>
 
-              <div class="field">
-                <span class="field-label">所属分类</span>
-                <div class="category-row">
-                  <button class="select-like" type="button"><span>主要人物</span><span>展开</span></button>
-                  <button class="compact-action" type="button">新建</button>
-                </div>
-              </div>
-
-              <div class="field">
-                <div class="field-label"><span>正文</span><span>1,240 字</span></div>
-                <div class="body-shell">
-                  <div class="body-toolbar">
-                    <span>Markdown · 自动保存草稿</span>
-                    <button type="button" data-jump="focus">沉浸编辑</button>
-                  </div>
-                  <textarea class="body-editor" aria-label="正文">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。
+            <textarea class="body-editor" aria-label="正文编辑区">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。
 
 ## 早年经历
 
-由花果山灵石孕育，学得七十二般变化与筋斗云，后因大闹天宫被压五行山下。
+由花果山灵石孕育，拜师学得七十二般变化与筋斗云。取得金箍棒后大闹天宫，最终被压在五行山下。
 
 ## 取经途中
 
-护送唐僧西行，善于识破妖魔变化，是队伍最重要的战力。</textarea>
-                </div>
+受观音点化后护送[[唐僧]]西行。善于识破妖魔变化，是队伍最重要的战力，也常因处事直接与师父产生冲突。
+
+## 人物关系
+
+尊[[唐僧]]为师，与[[猪八戒]]、沙悟净并肩同行。对[[花果山]]群猴始终保有强烈的责任感。</textarea>
+
+            <div class="body-preview" aria-label="正文预览">
+              <p>花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</p>
+              <h2>早年经历</h2>
+              <p>由花果山灵石孕育，拜师学得七十二般变化与筋斗云。取得金箍棒后大闹天宫，最终被压在五行山下。</p>
+              <h2>取经途中</h2>
+              <p>受观音点化后护送<span class="wiki">唐僧</span>西行。善于识破妖魔变化，是队伍最重要的战力，也常因处事直接与师父产生冲突。</p>
+              <h2>人物关系</h2>
+              <p>尊<span class="wiki">唐僧</span>为师，与<span class="wiki">猪八戒</span>、沙悟净并肩同行。对<span class="wiki">花果山</span>群猴始终保有强烈的责任感。</p>
+            </div>
+          </section>
+
+          <button class="props-entry" type="button" data-goto="props" aria-label="打开词条属性页">
+            <span class="chips-inline">
+              <span class="pill accent">人物</span>
+              <span class="pill">主要人物</span>
+              <span class="pill">4 标签</span>
+              <span class="pill">1 图</span>
+              <span class="pill">3 关系</span>
+            </span>
+            <span class="more">属性 ›</span>
+          </button>
+
+          <div class="macrobar" data-mobile-horizontal-scroll aria-label="正文快捷操作栏">
+            <button class="primary" type="button">正文</button>
+            <button type="button">H2</button>
+            <button type="button">加粗</button>
+            <button type="button">斜体</button>
+            <button type="button">引用</button>
+            <button type="button">列表</button>
+            <button type="button">链接</button>
+            <button type="button">双链</button>
+            <button type="button">图片</button>
+            <button type="button">收起</button>
+          </div>
+
+          <nav class="bottom-nav" aria-label="主导航">
+            <button class="active" type="button">首页</button>
+            <button type="button">AI</button>
+            <button type="button">灵感</button>
+            <button type="button">设置</button>
+          </nav>
+
+          <div class="keyboard" aria-hidden="true">
+            <div class="kb-suggest"><span>唐僧</span><span>唐王</span><span>糖</span></div>
+            <div class="keyboard-grid">
+              <span class="key">Q</span><span class="key">W</span><span class="key">E</span><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span><span class="key">I</span><span class="key">O</span><span class="key">P</span>
+              <span class="key half blank"></span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key">L</span><span class="key half blank"></span>
+              <span class="key wide">⇧</span><span class="key">Z</span><span class="key">X</span><span class="key">C</span><span class="key">V</span><span class="key">B</span><span class="key">N</span><span class="key">M</span><span class="key wide">⌫</span>
+              <span class="key wide">123</span><span class="key">☺</span><span class="key space">空格</span><span class="key wide">换行</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 词条属性页 ============ -->
+        <section class="app-screen props-screen" aria-label="词条属性">
+          <div class="status-bar"><span>9:41</span><span>5G ▮</span></div>
+
+          <header class="topbar">
+            <button class="top-action" type="button" data-goto="main">‹ 编辑</button>
+            <div class="topbar-title">
+              <strong>词条属性</strong>
+              <small>孙悟空</small>
+            </div>
+            <span></span>
+          </header>
+
+          <div class="page-scroll">
+            <div class="prop-group">
+              <div class="prop-label"><span>词条类型</span><button type="button">新建类型</button></div>
+              <div class="chips" data-mobile-horizontal-scroll>
+                <button class="chip" type="button">不设置</button>
+                <button class="chip active" type="button" aria-pressed="true">人物</button>
+                <button class="chip" type="button">组织</button>
+                <button class="chip" type="button">地点</button>
+                <button class="chip" type="button">物品</button>
+                <button class="chip" type="button">事件</button>
               </div>
+            </div>
 
-              <details class="section-details" id="media-section">
-                <summary>
-                  <strong>图片</strong>
-                  <span class="count">1 张 · 已设主图</span>
-                  <span class="chevron"></span>
-                </summary>
-                <div class="section-body">
-                  <div class="cover-row">
-                    <div class="cover-thumb">主图</div>
-                    <div class="cover-copy"><strong>孙悟空设定图</strong><span>作为词条主图显示</span></div>
-                    <button class="icon-button" type="button">更换</button>
-                  </div>
-                  <button class="add-row" type="button"><span>添加图片</span><span>最多 9 张</span></button>
-                </div>
-              </details>
+            <div class="prop-group">
+              <div class="prop-label"><span>所属分类</span></div>
+              <button class="select-like" type="button"><span>主要人物</span><span>更改</span></button>
+            </div>
 
-              <details class="section-details" id="properties-section">
-                <summary>
-                  <strong>属性与标签</strong>
-                  <span class="count">4 项</span>
-                  <span class="chevron"></span>
-                </summary>
-                <div class="section-body">
-                  <div class="tag-list">
-                    <div class="tag-row"><div class="tag-main"><strong>别名</strong><span>文本 · <b class="tag-value">美猴王</b></span></div><button class="clear-button" type="button">清空</button></div>
-                    <div class="tag-row"><div class="tag-main"><strong>年龄</strong><span>数值 · <b class="tag-value">1200</b></span></div><button class="clear-button" type="button">清空</button></div>
-                    <div class="tag-row"><div class="tag-main"><strong>所属势力</strong><span>词条 · <b class="tag-value">取经队伍</b></span></div><button class="clear-button" type="button">清空</button></div>
-                    <div class="tag-row"><div class="tag-main"><strong>身份</strong><span>文本 · <b class="tag-value">齐天大圣</b></span></div><button class="clear-button" type="button">清空</button></div>
-                  </div>
-                  <button class="add-row" type="button"><span>添加已有标签</span><span>新建标签</span></button>
-                </div>
-              </details>
+            <div class="prop-group">
+              <div class="prop-label"><span>图片</span><span>1 张 · 已设主图</span></div>
+              <div class="thumb-row" data-mobile-horizontal-scroll>
+                <button class="thumb" type="button">主图</button>
+                <button class="thumb add" type="button" aria-label="添加图片">＋</button>
+              </div>
+            </div>
 
-              <details class="section-details" id="relations-section">
-                <summary>
-                  <strong>词条关系</strong>
-                  <span class="count">3 条</span>
-                  <span class="chevron"></span>
-                </summary>
-                <div class="section-body">
-                  <div class="relation-list">
-                    <div class="relation-item"><div><strong>唐僧</strong><span>主要人物</span></div><span class="relation-kind">师徒</span></div>
-                    <div class="relation-item"><div><strong>猪八戒</strong><span>主要人物</span></div><span class="relation-kind">同伴</span></div>
-                    <div class="relation-item"><div><strong>花果山</strong><span>地点</span></div><span class="relation-kind">归属</span></div>
-                  </div>
-                  <button class="relation-row" type="button"><strong>管理词条关系</strong><span>进入完整关系编辑</span></button>
-                </div>
-              </details>
+            <div class="prop-group">
+              <div class="prop-label"><span>标签</span><button type="button">新建标签</button></div>
+              <div class="row-list">
+                <div class="row"><div class="row-main"><strong>别名</strong><span>文本</span></div><input class="row-input" value="美猴王" aria-label="别名"/></div>
+                <div class="row"><div class="row-main"><strong>年龄</strong><span>数值 · 0–3000</span></div><input class="row-input" value="1200" aria-label="年龄"/></div>
+                <div class="row"><div class="row-main"><strong>身份</strong><span>文本</span></div><input class="row-input" value="齐天大圣" aria-label="身份"/></div>
+                <div class="row"><div class="row-main"><strong>是否在世</strong><span>布尔</span></div><span class="row-value">是</span></div>
+              </div>
+              <button class="add-row" type="button"><strong>添加已有标签</strong><span>项目内共 9 个定义</span></button>
+            </div>
 
-              <div class="save-state">所有更改已保存</div>
-            </form>
+            <div class="prop-group">
+              <div class="prop-label"><span>词条关系</span><span>3 条</span></div>
+              <div class="row-list">
+                <button class="row" type="button" data-goto="relation"><div class="row-main"><strong>唐僧</strong><span>指向对方 · 师徒</span></div><span class="row-chevron">›</span></button>
+                <button class="row" type="button" data-goto="relation"><div class="row-main"><strong>猪八戒</strong><span>双向 · 同伴</span></div><span class="row-chevron">›</span></button>
+                <button class="row" type="button" data-goto="relation"><div class="row-main"><strong>花果山</strong><span>指向对方 · 归属</span></div><span class="row-chevron">›</span></button>
+              </div>
+              <button class="add-row" type="button" data-goto="relation"><strong>添加关系</strong><span>选择目标词条与方向</span></button>
+            </div>
           </div>
 
           <nav class="bottom-nav" aria-label="主导航">
@@ -719,49 +1128,147 @@
           </nav>
         </section>
 
-        <section class="focus-screen" aria-label="沉浸正文编辑">
+        <!-- ============ 关系编辑页 ============ -->
+        <section class="app-screen relation-screen" aria-label="编辑关系">
+          <div class="status-bar"><span>9:41</span><span>5G ▮</span></div>
+
           <header class="topbar">
-            <button class="top-action" type="button" data-jump="main">返回</button>
-            <strong>正文编辑</strong>
-            <button class="top-action" type="button">保存</button>
+            <button class="top-action" type="button" data-goto="props">‹ 属性</button>
+            <div class="topbar-title">
+              <strong>编辑关系</strong>
+              <small>孙悟空 → 唐僧</small>
+            </div>
+            <span></span>
           </header>
+
+          <div class="page-scroll">
+            <div class="prop-group">
+              <div class="prop-label"><span>目标词条</span><span>项目内 128 条</span></div>
+              <input class="search-input" value="唐" placeholder="搜索词条标题" aria-label="搜索目标词条" />
+              <div class="row-list" style="margin-top: 8px">
+                <button class="row" type="button"><div class="row-main"><strong>唐僧</strong><span>主要人物 · 已选择</span></div><span class="row-value">✓</span></button>
+                <button class="row" type="button"><div class="row-main"><strong>唐王</strong><span>次要人物</span></div><span class="row-chevron">选择</span></button>
+                <button class="row" type="button"><div class="row-main"><strong>唐三藏经卷</strong><span>物品</span></div><span class="row-chevron">选择</span></button>
+              </div>
+            </div>
+
+            <div class="prop-group">
+              <div class="prop-label"><span>关系方向</span></div>
+              <div class="segmented-wide" role="group" aria-label="关系方向">
+                <button type="button" aria-pressed="true">指向对方</button>
+                <button type="button" aria-pressed="false">来自对方</button>
+                <button type="button" aria-pressed="false">双向</button>
+              </div>
+            </div>
+
+            <div class="prop-group">
+              <div class="prop-label"><span>关系说明</span><span>选填</span></div>
+              <input class="search-input" value="师徒" placeholder="例如：师徒、同伴、敌对" aria-label="关系说明" />
+            </div>
+
+            <button class="danger-row" type="button">删除这条关系</button>
+          </div>
+
+          <nav class="bottom-nav" aria-label="主导航">
+            <button class="active" type="button">首页</button>
+            <button type="button">AI</button>
+            <button type="button">灵感</button>
+            <button type="button">设置</button>
+          </nav>
+
+          <div class="keyboard" aria-hidden="true">
+            <div class="kb-suggest"><span>唐僧</span><span>唐王</span><span>糖</span></div>
+            <div class="keyboard-grid">
+              <span class="key">Q</span><span class="key">W</span><span class="key">E</span><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span><span class="key">I</span><span class="key">O</span><span class="key">P</span>
+              <span class="key half blank"></span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key">L</span><span class="key half blank"></span>
+              <span class="key wide">⇧</span><span class="key">Z</span><span class="key">X</span><span class="key">C</span><span class="key">V</span><span class="key">B</span><span class="key">N</span><span class="key">M</span><span class="key wide">⌫</span>
+              <span class="key wide">123</span><span class="key">☺</span><span class="key space">空格</span><span class="key wide">换行</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 全屏专注 ============ -->
+        <section class="app-screen focus-screen" aria-label="全屏专注编辑">
+          <div class="status-bar"><span>9:41</span><span>5G ▮</span></div>
+
+          <header class="topbar">
+            <button class="top-action" type="button" data-goto="main">收起</button>
+            <div class="topbar-title">
+              <strong>孙悟空</strong>
+              <small class="saving-dot">有未保存修改</small>
+            </div>
+            <button class="top-action primary" type="button">保存</button>
+          </header>
+
+          <div class="body-head">
+            <span class="label">正文</span>
+            <span class="count">1,240 字</span>
+            <span class="spacer"></span>
+            <span class="count">专注模式不带预览，收起后可切</span>
+          </div>
 
           <article class="focus-editor" contenteditable="true" aria-label="正文编辑区">
             <p>花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</p>
             <h2>早年经历</h2>
             <p>由花果山灵石孕育，拜师学得七十二般变化与筋斗云。取得金箍棒后大闹天宫，最终被压在五行山下。</p>
             <h2>取经途中</h2>
-            <p>受观音点化后护送唐僧西行。善于识破妖魔变化，是队伍最重要的战力，也常因处事直接与师父产生冲突。</p>
+            <p>受观音点化后护送<span class="wiki">唐僧</span>西行。善于识破妖魔变化，是队伍最重要的战力，也常因处事直接与师父产生冲突。</p>
             <h2>人物关系</h2>
-            <p>尊唐僧为师，与猪八戒、沙悟净并肩同行。对花果山群猴始终保有强烈的责任感。</p>
+            <p>尊<span class="wiki">唐僧</span>为师，与<span class="wiki">猪八戒</span>、沙悟净并肩同行。对<span class="wiki">花果山</span>群猴始终保有强烈的责任感。</p>
           </article>
 
           <div class="macrobar" data-mobile-horizontal-scroll aria-label="正文快捷操作栏">
             <button class="primary" type="button">正文</button>
             <button type="button">H2</button>
             <button type="button">加粗</button>
+            <button type="button">斜体</button>
+            <button type="button">引用</button>
             <button type="button">列表</button>
             <button type="button">链接</button>
             <button type="button">双链</button>
             <button type="button">图片</button>
-            <button type="button">撤销</button>
+            <button type="button">收起</button>
           </div>
 
           <div class="keyboard" aria-hidden="true">
+            <div class="kb-suggest"><span>唐僧</span><span>唐王</span><span>糖</span></div>
             <div class="keyboard-grid">
               <span class="key">Q</span><span class="key">W</span><span class="key">E</span><span class="key">R</span><span class="key">T</span><span class="key">Y</span><span class="key">U</span><span class="key">I</span><span class="key">O</span><span class="key">P</span>
-              <span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key wide">删除</span>
-              <span class="key wide">符号</span><span class="key space">空格</span><span class="key wide">换行</span>
+              <span class="key half blank"></span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key">L</span><span class="key half blank"></span>
+              <span class="key wide">⇧</span><span class="key">Z</span><span class="key">X</span><span class="key">C</span><span class="key">V</span><span class="key">B</span><span class="key">N</span><span class="key">M</span><span class="key wide">⌫</span>
+              <span class="key wide">123</span><span class="key">☺</span><span class="key space">空格</span><span class="key wide">换行</span>
             </div>
           </div>
         </section>
+
+        <div class="wiki-panel" role="listbox" aria-label="词条链接候选">
+          <div class="wiki-title">插入词条链接 · 输入「唐」</div>
+          <button class="wiki-option active" type="button" role="option" aria-selected="true"><span>唐僧</span><span>主要人物</span></button>
+          <button class="wiki-option" type="button" role="option" aria-selected="false"><span>唐王</span><span>次要人物</span></button>
+          <button class="wiki-option" type="button" role="option" aria-selected="false"><span>创建「唐」</span><span>新词条</span></button>
+        </div>
       </div>
     </section>
   </main>
 
   <script>
     const phone = document.querySelector('#phone');
-    const controls = [...document.querySelectorAll('.switches button')];
+
+    // 每个状态就是一组 data-* 组合；侧栏按钮、画布内跳转和 URL 查询参数共用同一入口。
+    const STATES = {
+      edit:           {view: 'main',     focus: 'none',     keyboard: 'closed', body: 'edit',    wiki: 'closed'},
+      body:           {view: 'main',     focus: 'body',     keyboard: 'open',   body: 'edit',    wiki: 'closed'},
+      identity:       {view: 'main',     focus: 'identity', keyboard: 'open',   body: 'edit',    wiki: 'closed'},
+      preview:        {view: 'main',     focus: 'none',     keyboard: 'closed', body: 'preview', wiki: 'closed'},
+      props:          {view: 'props',    focus: 'none',     keyboard: 'closed', body: 'edit',    wiki: 'closed'},
+      relation:       {view: 'relation', focus: 'none',     keyboard: 'closed', body: 'edit',    wiki: 'closed'},
+      relationSearch: {view: 'relation', focus: 'search',   keyboard: 'open',   body: 'edit',    wiki: 'closed'},
+      focus:          {view: 'focus',    focus: 'body',     keyboard: 'open',   body: 'edit',    wiki: 'closed'},
+      wiki:           {view: 'focus',    focus: 'body',     keyboard: 'open',   body: 'edit',    wiki: 'open'},
+    };
+
+    // 画布内的跳转按钮只给目标屏，落到对应状态。
+    const VIEW_TO_STATE = {main: 'edit', props: 'props', relation: 'relation', focus: 'focus'};
 
     function select(groupSelector, selected) {
       document.querySelectorAll(groupSelector).forEach((button) => {
@@ -769,54 +1276,50 @@
       });
     }
 
-    function setView(view) {
-      phone.dataset.view = view;
-      const button = document.querySelector(`[data-view="${view}"]`);
-      if (button) select('[data-view]', button);
+    function setState(name) {
+      const state = STATES[name];
+      if (!state) return;
+      Object.assign(phone.dataset, state);
+      const button = document.querySelector(`.switches [data-state="${name}"]`);
+      if (button) select('.switches [data-state]', button);
     }
 
-    function setKeyboard(value) {
-      phone.dataset.keyboard = value;
-      const button = document.querySelector(`[data-keyboard="${value}"]`);
-      if (button) select('[data-keyboard]', button);
+    function setBodyMode(mode) {
+      phone.dataset.body = mode;
+      const button = document.querySelector(`[data-body-mode="${mode}"]`);
+      if (button) select('[data-body-mode]', button);
     }
 
-    function showSection(section) {
-      setView('main');
-      const target = document.querySelector(`#${section}-section`);
-      document.querySelectorAll('.section-details').forEach((details) => {
-        details.open = details === target;
-      });
-      const button = document.querySelector(`[data-section="${section}"]`);
-      if (button) select('[data-section]', button);
-      requestAnimationFrame(() => target?.scrollIntoView({ block: 'start' }));
-    }
+    document.querySelectorAll('.switches [data-state]').forEach((button) => {
+      button.addEventListener('click', () => setState(button.dataset.state));
+    });
 
-    controls.forEach((button) => {
+    document.querySelectorAll('[data-body-mode]').forEach((button) => {
+      button.addEventListener('click', () => setBodyMode(button.dataset.bodyMode));
+    });
+
+    document.querySelectorAll('[data-goto]').forEach((button) => {
+      button.addEventListener('click', () => setState(VIEW_TO_STATE[button.dataset.goto] ?? 'edit'));
+    });
+
+    document.querySelectorAll('[data-size]').forEach((button) => {
       button.addEventListener('click', () => {
-        if (button.dataset.view) setView(button.dataset.view);
-        if (button.dataset.section) showSection(button.dataset.section);
-        if (button.dataset.keyboard) setKeyboard(button.dataset.keyboard);
-        if (button.dataset.size) {
-          document.documentElement.style.setProperty('--phone-width', `${button.dataset.size}px`);
-          document.documentElement.style.setProperty('--phone-height', button.dataset.size === '360' ? '740px' : '844px');
-          select('[data-size]', button);
-        }
-        if (button.dataset.themeChoice) {
-          document.documentElement.dataset.theme = button.dataset.themeChoice;
-          select('[data-theme-choice]', button);
-        }
+        const width = button.dataset.size;
+        document.documentElement.style.setProperty('--phone-width', `${width}px`);
+        document.documentElement.style.setProperty('--phone-height', width === '360' ? '740px' : '844px');
+        select('[data-size]', button);
       });
     });
 
-    document.querySelectorAll('[data-jump]').forEach((button) => {
-      button.addEventListener('click', () => setView(button.dataset.jump));
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.documentElement.dataset.theme = button.dataset.themeChoice;
+        select('[data-theme-choice]', button);
+      });
     });
 
     const query = new URLSearchParams(location.search);
-    if (['main', 'focus'].includes(query.get('view'))) setView(query.get('view'));
-    if (['open', 'closed'].includes(query.get('keyboard'))) setKeyboard(query.get('keyboard'));
-    if (['summary', 'media', 'properties', 'relations'].includes(query.get('section'))) showSection(query.get('section'));
+    if (STATES[query.get('state')]) setState(query.get('state'));
   </script>
 </body>
 </html>
