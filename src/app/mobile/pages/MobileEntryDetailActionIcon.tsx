@@ -1,4 +1,4 @@
-export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' | 'save' }) {
+export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' | 'save' | 'expand' }) {
     if (type === 'ai') {
         return (
             <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
@@ -27,6 +27,16 @@ export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'mor
                 <path d="M6 4.5h10.2L18 6.3V18a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 18V4.5Z"/>
                 <path d="M8.5 4.5v5h7"/>
                 <path d="M8.5 19.5v-6h7v6"/>
+            </svg>
+        )
+    }
+    if (type === 'expand') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M9 5H5v4"/>
+                <path d="m5 5 5 5"/>
+                <path d="M15 19h4v-4"/>
+                <path d="m19 19-5-5"/>
             </svg>
         )
     }

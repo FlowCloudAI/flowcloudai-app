@@ -1,6 +1,5 @@
 import {logger} from '../../../shared/logger'
 import {listen} from '../../../api/events'
-import {openFileDialog} from '../../../api/dialog'
 import {openUrl} from '../../../api/opener'
 import {
     type CSSProperties,
@@ -17,7 +16,6 @@ import {Button, useAlert, useTheme} from 'flowcloudai-ui'
 import type {MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import {
     type Category,
-    type CustomEntryType,
     db_get_entry,
     db_delete_entry,
     db_list_all_entry_types,
@@ -28,7 +26,6 @@ import {
     db_list_relations_for_entry,
     db_list_tag_schemas,
     db_save_entry_bundle,
-    import_entry_images,
     type Entry,
     type EntryBrief,
     ENTRY_DELETED,
@@ -57,9 +54,7 @@ import {
     buildEntryImageMarkdownRef,
     type EntryImage,
     normalizeEntryImages,
-    toEntryImageSrc,
 } from '../../../features/entries/lib/entryImage'
-import {removeEntryImages} from '../../../features/entries/lib/entryImageCollection'
 import {
     areRelationDraftsEqual,
     buildRelationDraft,
@@ -67,9 +62,7 @@ import {
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
-import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelations/EntryRelationCreator'
 import {
-    appendImages,
     areImagesEqual,
     buildTagDraft,
     escapeMarkdownImageAlt,
@@ -80,11 +73,36 @@ import {MobileEntryDetailView} from './MobileEntryDetailView'
 import MobileEntryDetailEditView from './MobileEntryDetailEditView'
 import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import useMobileEntryWikiEditor from './useMobileEntryWikiEditor'
+import useMobileEntryImages from './useMobileEntryImages'
+import {
+    clearMobileEntryEditDraft,
+    ensureMobileEntryEditDraft,
+    replaceMobileEntryEditDraft,
+    updateMobileEntryEditDraft,
+    useMobileEntryEditDraft,
+    type MobileEntryEditDraft,
+} from '../stores/mobileEntryEditDraftStore'
+import {discardMobileEntryPlaceholder} from '../mobileEntryPlaceholder'
 import './MobileEntryDetail.css'
 type Mode = 'view' | 'edit'
 
 /** 双链候选/关系选择器的查表上限。仅在真正需要时才拉（见 ensureProjectEntries）。 */
 const PROJECT_ENTRY_LOOKUP_LIMIT = 1000
+
+function buildEditDraft(projectId: string, entry: Entry, relations: EntryRelation[]): MobileEntryEditDraft {
+    return {
+        projectId,
+        entryId: entry.id,
+        title: entry.title,
+        content: entry.content ?? '',
+        summary: entry.summary ?? '',
+        entryType: entry.type ?? null,
+        categoryId: entry.category_id ?? null,
+        tagDraft: buildTagDraft(entry),
+        images: normalizeEntryImages(entry.images),
+        relationDrafts: relations.map(relation => buildRelationDraft(entry.id, relation)),
+    }
+}
 
 export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, params}: Props) {
     const projectId = params.projectId
@@ -94,6 +112,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const {theme} = useTheme()
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
+    const inlineContentEditorRef = useRef<MarkdownEditorRef>(null)
     const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const projectEntriesRequestRef = useRef<Promise<EntryBrief[]> | null>(null)
     const recordedHomeEntryRef = useRef<string | null>(null)
@@ -102,31 +121,43 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [mode, setMode] = useState<Mode>(params.mode === 'edit' ? 'edit' : 'view')
+    const draft = useMobileEntryEditDraft(projectId, entryId)
 
     // 编辑表单字段
-    const [title, setTitle] = useState('')
-    const [content, setContent] = useState('')
-    const [summary, setSummary] = useState('')
-    const [entryType, setEntryType] = useState<string | null>(null)
-    const [categoryId, setCategoryId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [menuOpen, setMenuOpen] = useState(false)
-    const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
-    const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
-    const [tagDraft, setTagDraft] = useState<TagValueMap>({})
-    const [images, setImages] = useState<EntryImage[]>([])
-    const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
-    const [lightboxOpen, setLightboxOpen] = useState(false)
-    const [lightboxIndex, setLightboxIndex] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [projectEntriesLoaded, setProjectEntriesLoaded] = useState(false)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
-    const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
     const [immersiveEditorOpen, setImmersiveEditorOpen] = useState(false)
+
+    const title = draft?.title ?? ''
+    const content = draft?.content ?? ''
+    const summary = draft?.summary ?? ''
+    const entryType = draft?.entryType ?? null
+    const categoryId = draft?.categoryId ?? null
+    const tagDraft = useMemo(() => draft?.tagDraft ?? (entry ? buildTagDraft(entry) : {}), [draft?.tagDraft, entry])
+    const images = useMemo(() => draft?.images ?? [], [draft?.images])
+    const relationDrafts = useMemo(() => draft?.relationDrafts ?? [], [draft?.relationDrafts])
+    const updateDraft = useCallback((patch: Partial<MobileEntryEditDraft> | ((current: MobileEntryEditDraft) => MobileEntryEditDraft)) => {
+        updateMobileEntryEditDraft(projectId, entryId, patch)
+    }, [entryId, projectId])
+    const setTitle = useCallback((value: string) => updateDraft({title: value}), [updateDraft])
+    const setContent = useCallback((next: string | ((current: string) => string)) => {
+        updateDraft(current => ({...current, content: typeof next === 'function' ? next(current.content) : next}))
+    }, [updateDraft])
+    const setSummary = useCallback((value: string) => updateDraft({summary: value}), [updateDraft])
+    const setTagDraft = useCallback((next: TagValueMap | ((current: TagValueMap) => TagValueMap)) => {
+        updateDraft(current => ({...current, tagDraft: typeof next === 'function' ? next(current.tagDraft) : next}))
+    }, [updateDraft])
+    const setImages = useCallback((next: EntryImage[] | ((current: EntryImage[]) => EntryImage[])) => {
+        updateDraft(current => ({...current, images: typeof next === 'function' ? next(current.images) : next}))
+    }, [updateDraft])
+    const imageActions = useMobileEntryImages({projectId, images, setImages})
 
     const {
         wikiDraft,
@@ -151,13 +182,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         projectEntries,
         setProjectEntries,
         immersiveEditorOpen,
+        inlineContentEditorRef,
         immersiveContentEditorRef,
-        setImageAddModalOpen,
+        setImageAddModalOpen: imageActions.setImageAddModalOpen,
     })
 
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
         setTagDraft(nextTags)
-    }, [])
+    }, [setTagDraft])
     const entryTags = useEntryTags({
         tagSchemas,
         draftTags: tagDraft,
@@ -177,15 +209,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             ? 'light'
             : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
-    const syncForm = useCallback((e: Entry) => {
-        setTitle(e.title)
-        setContent(e.content ?? '')
-        setSummary(e.summary ?? '')
-        setEntryType(e.type ?? null)
-        setCategoryId(e.category_id ?? null)
-        setTagDraft(buildTagDraft(e))
-        setImages(normalizeEntryImages(e.images))
-    }, [])
+    const syncForm = useCallback((e: Entry, relations: EntryRelation[], force = false) => {
+        const nextDraft = buildEditDraft(projectId, e, relations)
+        if (force) replaceMobileEntryEditDraft(nextDraft)
+        else ensureMobileEntryEditDraft(nextDraft)
+    }, [projectId])
 
     /**
      * 全量词条列表只有三处要用：正文 `[[` 双链候选、编辑态的关系选择器、
@@ -228,8 +256,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setOutgoingLinks(outgoing)
         setIncomingLinks(incoming)
         setEntryRelations(relations)
-        setRelationDrafts(relations.map(relation => buildRelationDraft(entryId, relation)))
-        syncForm(e)
+        syncForm(e, relations)
         const homeEntryKey = `${projectId}:${e.id}`
         if (recordedHomeEntryRef.current !== homeEntryKey) {
             recordedHomeEntryRef.current = homeEntryKey
@@ -247,7 +274,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         return e
     }, [entryId, projectId, syncForm])
 
-    const isDirty = mode === 'edit' && !!entry && (
+    const isDirty = mode === 'edit' && !!entry && !!draft && (
         title !== entry.title
         || content !== (entry.content ?? '')
         || summary !== (entry.summary ?? '')
@@ -270,15 +297,26 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }, [ensureProjectEntries, hasConnectionData, mode])
 
     const enterEdit = useCallback(() => {
-        if (entry) syncForm(entry)
+        if (entry) syncForm(entry, entryRelations, true)
         setMode('edit')
-    }, [entry, syncForm])
+    }, [entry, entryRelations, syncForm])
 
     const confirmDiscard = useCallback(async () => {
         if (!isDirty) return true
         const result = await showAlert('未保存的更改将丢失，是否继续？', 'warning', 'confirm')
         return result === 'yes'
     }, [isDirty, showAlert])
+
+    const discardPlaceholder = useCallback(async (): Promise<boolean> => {
+        if (!params.isPlaceholder) return true
+        try {
+            await discardMobileEntryPlaceholder(projectId, entryId)
+            return true
+        } catch (error) {
+            await showAlert(`清理未保存的新词条失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            return false
+        }
+    }, [entryId, params.isPlaceholder, projectId, showAlert])
 
     useEffect(() => {
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -288,6 +326,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 void showAlert('词条已在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
                 return
             }
+            if (mode === 'edit') clearMobileEntryEditDraft(projectId, entryId)
             void reloadEntryState()
                 .then((updatedEntry) => {
                     setLoadError(null)
@@ -299,6 +338,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             entryId,
                             displayName: updatedEntry.title,
                             mode,
+                            isPlaceholder: undefined,
                         },
                     })
                     void showAlert('词条已在后台更新，页面已刷新。', 'success', 'nonInvasive', 1500)
@@ -321,16 +361,21 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     // 输入/编辑期间第一次返回只退出编辑模式；不会顺带离开词条或切换 Tab。
     const exitEditMode = useCallback(async (): Promise<boolean> => {
         if (!await confirmDiscard()) return false
+        if (params.isPlaceholder) {
+            if (!await discardPlaceholder()) return false
+            setImmersiveEditorOpen(false)
+            pop()
+            return true
+        }
         if (entry) {
-            syncForm(entry)
-            setRelationDrafts(initialRelationDrafts)
+            clearMobileEntryEditDraft(projectId, entryId)
             setImmersiveEditorOpen(false)
             setMode('view')
         } else {
             pop()
         }
         return true
-    }, [confirmDiscard, entry, initialRelationDrafts, pop, syncForm])
+    }, [confirmDiscard, discardPlaceholder, entry, entryId, params.isPlaceholder, pop, projectId])
 
     // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
     const handleCancel = useCallback(async () => {
@@ -353,10 +398,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 await exitEditMode()
                 return false
             }
-            return confirmDiscard()
+            const canLeave = await confirmDiscard()
+            if (!canLeave) return false
+            if (params.isPlaceholder) return await discardPlaceholder()
+            clearMobileEntryEditDraft(projectId, entryId)
+            return true
         })
         return () => setBeforeLeave(null)
-    }, [confirmDiscard, exitEditMode, immersiveEditorOpen, mode, setBeforeLeave])
+    }, [confirmDiscard, discardPlaceholder, entryId, exitEditMode, immersiveEditorOpen, mode, params.isPlaceholder, projectId, setBeforeLeave])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})
@@ -452,14 +501,13 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 sourceId: saveSourceIdRef.current,
             })
             setEntry(savedBundle.entry)
-            syncForm(savedBundle.entry)
+            syncForm(savedBundle.entry, savedBundle.relations, true)
             setOutgoingLinks(savedBundle.outgoingLinks)
             setIncomingLinks(savedBundle.incomingLinks)
             setEntryRelations(savedBundle.relations)
-            setRelationDrafts(savedBundle.relations.map(relation => buildRelationDraft(entryId, relation)))
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName），保存后继续停留在编辑态。
-            replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'edit'}})
+            replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'edit', isPlaceholder: undefined}})
         } catch (e) {
             setSaveError(`保存失败：${formatApiError(toApiError(e))}`)
         } finally {
@@ -472,31 +520,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         if (result !== 'yes') return
         try {
             await db_delete_entry(entryId, projectId)
+            clearMobileEntryEditDraft(projectId, entryId)
             pop()
         } catch (e) {
             await showAlert(`删除失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [entry, entryId, pop, projectId, showAlert])
-
-    const handleTypeCreated = useCallback(async (created: CustomEntryType) => {
-        try {
-            setEntryTypes(await db_list_all_entry_types(projectId))
-        } catch (e) {
-            logger.error('刷新词条类型失败', e)
-        }
-        setEntryType(created.id)
-    }, [projectId])
-
-    const handleTagSchemaSaved = useCallback((schema: TagSchema) => {
-        const nextSchemas = entryTags.handleTagSchemaSaved(schema)
-        setTagSchemas(nextSchemas)
-        setTagCreatorOpen(false)
-    }, [entryTags])
-
-    const lightboxImages = useMemo(() => images.map((image) => ({
-        ...image,
-        src: toEntryImageSrc(image),
-    })), [images])
 
     const entryBriefById = useMemo(
         () => new Map(projectEntries.map(item => [item.id, item])),
@@ -506,52 +535,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         () => new Map(categories.map(item => [item.id, item.name])),
         [categories],
     )
-
-    const handleUploadImages = useCallback(async (): Promise<EntryImage[]> => {
-        try {
-            const selected = await openFileDialog({
-                multiple: true,
-                filters: [{
-                    name: 'Images',
-                    extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
-                }],
-            })
-            const paths = Array.isArray(selected) ? selected : selected ? [selected] : []
-            if (!paths.length) return []
-            const imported = await import_entry_images(projectId, paths)
-            const nextImportedImages: EntryImage[] = imported.map((image, index) => ({
-                ...image,
-                alt: image.alt || (image.path?.split(/[\\/]/).pop() ?? `图片 ${index + 1}`),
-                is_cover: false,
-            }))
-            setImages(current => appendImages(current, nextImportedImages))
-            return nextImportedImages
-        } catch (error) {
-            await showAlert(`导入图片失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
-            return []
-        }
-    }, [projectId, showAlert])
-
-    const handleAddAiImages = useCallback((aiImages: EntryImage[]) => {
-        setImages(current => appendImages(current, aiImages))
-    }, [])
-
-    const handleSetCover = useCallback((targetIndex: number) => {
-        setImages(current => current.map((image, index) => ({
-            ...image,
-            is_cover: index === targetIndex,
-        })))
-    }, [])
-
-    const handleRemoveImage = useCallback((targetIndex: number) => {
-        setImages(current => removeEntryImages(current, [targetIndex]))
-        setLightboxIndex(current => Math.min(current, Math.max(0, images.length - 2)))
-    }, [images.length])
-
-    const handleRemoveImages = useCallback((indices: number[]) => {
-        setImages(current => removeEntryImages(current, indices))
-        setLightboxIndex(0)
-    }, [])
 
     const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
         const image = images[targetIndex]
@@ -572,17 +555,17 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const nextContent = `${prefix}${before}${markdown}${after}${suffix}`
         const nextCursor = prefix.length + before.length + markdown.length
         setContent(nextContent)
-        setLightboxOpen(false)
         window.requestAnimationFrame(() => {
             const nextTextarea = getContentTextarea()
             nextTextarea?.focus()
             nextTextarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, entry?.title, getContentTextarea, images, projectId, showAlert, title])
+    }, [content, entry?.title, getContentTextarea, images, projectId, setContent, showAlert, title])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry && loadError) return <div className="mobile-page__error" role="alert"><span>词条加载失败：{loadError}</span><Button type="button" size="sm" variant="outline" onClick={() => void loadEntry()}>重试</Button></div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
+    if (mode === 'edit' && !draft) return <div className="mobile-page__loading">准备编辑会话…</div>
 
     // ---------- 编辑态 ----------
     if (mode === 'edit') {
@@ -593,23 +576,22 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             onSelect: (event: ReactSyntheticEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
             onFocus: handleContentFocus, onBlur: handleContentBlur,
         }
+        const activeType = entryType ? entryTypes.find(type => entryTypeKey(type) === entryType) : null
+        const activeCategory = categoryId ? categories.find(category => category.id === categoryId) : null
         return <MobileEntryDetailEditView
             saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
-            entryType={entryType} onEntryType={setEntryType} categoryId={categoryId} onCategory={setCategoryId}
-            categories={categories} entryTypes={entryTypes} onOpenTypeCreator={() => setTypeCreatorOpen(true)}
+            content={content} previewContent={buildMarkdownPreviewSource(content, images)} onContentChange={handleContentChange}
+            editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
+            entryTypeLabel={activeType?.name ?? '无类型'} categoryLabel={activeCategory?.name ?? '无分类'}
+            tagCount={entryTags.visibleTagSchemas.length} imageCount={images.length} relationCount={relationDrafts.length}
+            onOpenProperties={() => push({type: 'entryProperties', params: {projectId, entryId, displayName: title || entry.title, isPlaceholder: params.isPlaceholder}})}
             immersiveOpen={immersiveEditorOpen} onOpenImmersive={() => setImmersiveEditorOpen(true)}
             wikiDraft={wikiDraft} wikiOptions={wikiLinkOptions} activeWikiIndex={activeWikiOptionIndex}
             categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
             onWikiIndex={setActiveWikiOptionIndex} onWikiCommit={handleWikiOptionCommit}
-            imagesProps={{images, onAddImage: () => setImageAddModalOpen(true), onOpenImage: index => { setLightboxIndex(index); setLightboxOpen(true) }}}
-            tagsProps={{hasTagDefinitions: entryTags.localTagSchemas.length > 0, availableTagSchemaOptions: entryTags.availableTagSchemaOptions, tagSchemaPickerValue: entryTags.tagSchemaPickerValue, editTagSchemas: entryTags.visibleTagSchemas, implantedTagSchemaIdSet: entryTags.implantedTagSchemaIdSet, tagDraft, onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema, onTagDraftChange: setTagDraft, onOpenTagCreator: () => setTagCreatorOpen(true)}}
-            relationsProps={{relationDrafts, entries: projectEntries, categories, currentEntryId: entryId, disabled: saving, onChange: setRelationDrafts, onOpenEntry: target => void (async () => { if (await confirmDiscard()) handleOpenLinkedEntry(target.id) })()}}
             immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
-            typeCreatorProps={{open: typeCreatorOpen, projectId, existingNames: entryTypes.map(type => type.name), onClose: () => setTypeCreatorOpen(false), onSaved: created => void handleTypeCreated(created)}}
-            tagCreatorProps={{open: tagCreatorOpen, projectId, entryTypes, existingNames: entryTags.localTagSchemas.map(schema => schema.name), existingCount: entryTags.localTagSchemas.length, onClose: () => setTagCreatorOpen(false), onSaved: handleTagSchemaSaved}}
-            lightboxProps={{open: lightboxOpen, images: lightboxImages, currentIndex: lightboxIndex, infoTitle: title || entry.title || '未命名词条', onClose: () => setLightboxOpen(false), onIndexChange: setLightboxIndex, onSetCover: handleSetCover, onRemove: handleRemoveImage, onRemoveMany: handleRemoveImages, onAddImage: () => { setLightboxOpen(false); setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
-            imageAddProps={{open: imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => setImageAddModalOpen(false), onUploadLocal: handleUploadImages, onAddAiImages: handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }, onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}}
+            imageAddProps={{open: imageActions.imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => imageActions.setImageAddModalOpen(false), onUploadLocal: imageActions.handleUploadImages, onCapturePhoto: imageActions.handleCaptureImage, onAddAiImages: imageActions.handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }, onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}}
         />
     }
 

@@ -38,6 +38,7 @@ interface UseMobileEntryWikiEditorOptions {
     projectEntries: EntryBrief[]
     setProjectEntries: Dispatch<SetStateAction<EntryBrief[]>>
     immersiveEditorOpen: boolean
+    inlineContentEditorRef: RefObject<MarkdownEditorRef | null>
     immersiveContentEditorRef: RefObject<MarkdownEditorRef | null>
     setImageAddModalOpen: Dispatch<SetStateAction<boolean>>
 }
@@ -51,6 +52,7 @@ export default function useMobileEntryWikiEditor({
     projectEntries,
     setProjectEntries,
     immersiveEditorOpen,
+    inlineContentEditorRef,
     immersiveContentEditorRef,
     setImageAddModalOpen,
 }: UseMobileEntryWikiEditorOptions) {
@@ -111,8 +113,8 @@ export default function useMobileEntryWikiEditor({
     }, [])
 
     const getContentTextarea = useCallback(
-        () => immersiveContentEditorRef.current?.getTextareaElement() ?? null,
-        [immersiveContentEditorRef],
+        () => (immersiveEditorOpen ? immersiveContentEditorRef : inlineContentEditorRef).current?.getTextareaElement() ?? null,
+        [immersiveContentEditorRef, immersiveEditorOpen, inlineContentEditorRef],
     )
 
     const syncWikiDraftFromTextarea = useCallback((textarea: HTMLTextAreaElement | null, nextContent: string = content) => {

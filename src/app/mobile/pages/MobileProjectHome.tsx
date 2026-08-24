@@ -155,7 +155,7 @@ export default function MobileProjectHome({
             })
             void invalidateProjectContext(projectId)
             setAiFocus({projectId, entryId: created.id})
-            push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
+            push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit', isPlaceholder: true}})
         } catch (e) {
             logger.error('新建词条失败', e)
             setActionError(`新建词条失败：${formatApiError(toApiError(e))}`)

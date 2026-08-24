@@ -213,7 +213,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
         try {
             const created = await db_create_entry({projectId, categoryId, title: '未命名词条'})
             setAiFocus({projectId, entryId: created.id})
-            push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
+            push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit', isPlaceholder: true}})
         } catch (e) {
             logger.error('新建词条失败', e)
             setActionError(formatApiError(toApiError(e)))

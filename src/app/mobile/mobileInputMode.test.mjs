@@ -125,10 +125,17 @@ test('只观察 visualViewport，不把键盘高度二次回写到应用根节�
     assert.match(mobileAppCss, /height:\s*100dvh/)
 })
 
-test('沉浸正文编辑使用全屏 Portal 隔离下层页面且不二次裁短视口', () => {
+test('沉浸正文编辑使用全屏 Portal 隔离下层页面且只消费原生键盘遮挡量', () => {
     assert.match(immersiveEditorSource, /<Overlay[\s\S]*variant="fullscreen"/)
-    assert.match(immersiveEditorSource, /--mobile-entry-visible-height/)
-    assert.match(immersiveEditorSource, /--mobile-entry-visible-offset-top/)
+    // 2026-08-24：沉浸层曾用 visualViewport 自写高度并平移整层，与编辑页的 --fc-kb
+    // 路径并存造成两套键盘动画。现在只允许消费 --fc-kb，不得再回写视口几何。
+    assert.doesNotMatch(immersiveEditorSource, /window\.visualViewport/)
+    assert.doesNotMatch(immersiveEditorSource, /style\.setProperty/)
+    assert.doesNotMatch(entryDetailCss, /--mobile-entry-visible-(?:height|offset-top)/)
+    assert.match(
+        entryDetailCss,
+        /\.mobile-entry-detail__immersive\s*\{[^}]*padding-bottom:\s*max\(var\(--fc-kb, 0px\), var\(--mobile-safe-bottom\)\);/s,
+    )
     assert.doesNotMatch(entryDetailCss, /--mobile-entry-viewport-(?:height|offset-top)/)
     assert.match(entryEditViewSource, /data-immersive-open=\{p\.immersiveOpen \|\| undefined}/)
     assert.match(entryEditViewSource, /inert=\{p\.immersiveOpen}/)

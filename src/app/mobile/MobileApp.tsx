@@ -36,6 +36,8 @@ import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
 import MobileEntryTypeManager from './pages/MobileEntryTypeManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
+import MobileEntryProperties from './pages/MobileEntryProperties'
+import MobileEntryRelationEditor from './pages/MobileEntryRelationEditor'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
@@ -567,6 +569,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     />
                 )}
                 {page?.type === 'entryDetail' && <MobileEntryDetail {...layerProps} params={page.params}/>}
+                {page?.type === 'entryProperties' && <MobileEntryProperties {...layerProps} params={page.params}/>}
+                {page?.type === 'entryRelation' && <MobileEntryRelationEditor {...layerProps} params={page.params}/>}
                 {page?.type === 'typeManager' && <MobileEntryTypeManager {...layerProps} params={page.params}/>}
                 {page?.type === 'tagManager' && <MobileTagManager {...layerProps} params={page.params}/>}
                 {page?.type === 'categoryManager' && <MobileCategoryManager {...layerProps} params={page.params}/>}

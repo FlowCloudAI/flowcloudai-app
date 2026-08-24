@@ -1,17 +1,38 @@
+/* 词条页基类：查看态与编辑态共用的外观。编辑态的骨架覆盖紧跟其后。 */
 .mobile-entry-detail {
-    padding: var(--mobile-gap-item) var(--mobile-gap-group);
-}
-
-.mobile-entry-detail--edit {
+    position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    gap: var(--mobile-gap-item);
+    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
+    background: var(--fc-color-bg);
 }
 
-.mobile-entry-detail__title-input,
-.mobile-entry-detail__summary-input,
-.mobile-entry-detail__meta-row {
-    margin-bottom: var(--mobile-gap-item);
+/*
+ * 编辑主页骨架（2026-08-24 设计稿）：整页不滚动，只有正文区自己滚。
+ * 底部预留交给外壳的 `.mobile-nav-safe-fixed` + `--mobile-nav-reserved-height`——
+ * 页面自算 padding 会与 `.mobile-page:not(.mobile-nav-safe-fixed)` 抢特异度，
+ * 且在 Android 上拿不到键盘遮挡量（属性页 2026-08-24 真机实测被键盘切断）。
+ */
+.mobile-entry-detail--edit {
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
+
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0;
+    padding-inline: var(--mobile-page-x);
+    padding-top: 0;
+    /*
+     * 必须显式写 padding-bottom：同文件更靠前的 `.mobile-entry-detail` 用 padding 简写，
+     * 会把外壳 `.mobile-nav-safe-fixed` 给的底部预留压回 12px，属性入口行随即被 Tab 栏盖住。
+     * 值仍取共享的 --mobile-nav-reserved-height，键盘分量由上面两行按外壳同一套公式算。
+     */
+    padding-bottom: var(--mobile-nav-reserved-height);
+    overflow: hidden;
+    transition: padding-bottom var(--fc-kb-transition, 0s);
 }
 
 .mobile-entry-detail__title-input {
@@ -19,54 +40,12 @@
     font-weight: var(--mobile-weight-strong);
 }
 
-.mobile-entry-detail__meta-row {
-    display: flex;
-    gap: var(--mobile-gap-inline);
-}
-
 .mobile-entry-detail__meta-select {
     flex: 1;
 }
 
-.mobile-entry-detail__add-type {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--mobile-gap-text);
-    align-self: flex-start;
-    margin-bottom: var(--mobile-gap-item);
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--fc-color-primary);
-    font-size: var(--mobile-text-body-sm);
-    cursor: pointer;
-}
-
 .mobile-entry-detail__tags {
     margin-bottom: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__tags-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--mobile-gap-inline);
-    flex-wrap: wrap;
-    margin-bottom: var(--mobile-gap-text);
-}
-
-.mobile-entry-detail__tags-label {
-    font-size: var(--mobile-text-body-sm);
-    color: var(--fc-color-text-secondary);
-}
-
-.mobile-entry-detail__tags-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--mobile-gap-text);
-    flex: 1 1 14rem;
-    flex-wrap: wrap;
 }
 
 .mobile-entry-detail__tag-select {
@@ -86,19 +65,6 @@
 
 .mobile-entry-detail__images {
     margin-bottom: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__images-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--mobile-gap-inline);
-    margin-bottom: var(--mobile-gap-text);
-}
-
-.mobile-entry-detail__images-label {
-    font-size: var(--mobile-text-body-sm);
-    color: var(--fc-color-text-secondary);
 }
 
 .mobile-entry-detail__image-grid {
@@ -149,10 +115,6 @@
     color: var(--fc-color-text-on-primary);
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-strong);
-}
-
-.mobile-entry-detail__images-empty {
-    min-height: 4rem;
 }
 
 .mobile-entry-detail__images--view {
@@ -222,48 +184,6 @@
     font-size: var(--mobile-text-meta);
     color: var(--fc-color-text-secondary);
     line-height: var(--mobile-leading-snug);
-}
-
-.mobile-entry-detail__relations {
-    margin-bottom: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__relations-label {
-    font-size: var(--mobile-text-body-sm);
-    color: var(--fc-color-text-secondary);
-}
-
-.mobile-entry-detail__relations .entry-relation-editor {
-    padding: 0;
-    border-bottom: none;
-    gap: var(--mobile-gap-inline);
-}
-
-.mobile-entry-detail__relations .entry-relation-editor__header {
-    display: flex;
-    justify-content: flex-start;
-}
-
-.mobile-entry-detail__relations .entry-relation-editor__item {
-    border-radius: var(--mobile-radius-field);
-    background: var(--fc-color-bg-elevated);
-}
-
-.mobile-entry-detail__relations .entry-relation-editor__row {
-    flex-direction: column;
-    gap: var(--mobile-gap-inline);
-}
-
-.mobile-entry-detail__relations .entry-relation-editor__field--direction {
-    width: 100%;
-    flex-basis: auto;
-}
-
-.mobile-entry-detail__relations .entry-relation-editor__actions {
-    width: 100%;
-    margin-left: 0;
-    padding-top: 0;
-    justify-content: flex-end;
 }
 
 .mobile-entry-detail__wiki-panel {
@@ -351,10 +271,6 @@
     margin: 0 0 var(--mobile-gap-inline);
 }
 
-.mobile-entry-detail__type {
-    margin-bottom: var(--mobile-gap-item);
-}
-
 .mobile-entry-detail__type-badge {
     --mobile-entry-type-bg: var(--fc-color-bg-tertiary);
     --mobile-entry-type-color: var(--fc-color-text);
@@ -405,21 +321,6 @@
     margin-top: var(--mobile-gap-section);
 }
 
-/* Native iOS direction overrides */
-.mobile-entry-detail {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-item);
-    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
-    background: var(--fc-color-bg);
-}
-
-.mobile-entry-detail--edit {
-    gap: var(--mobile-gap-item);
-    padding-bottom: calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
-}
-
 .mobile-entry-detail__action-svg {
     display: block;
     width: 1.45rem;
@@ -453,8 +354,12 @@
     white-space: nowrap;
 }
 
+/*
+ * 页面标题一律用正文色。基线曾是 --fc-color-primary，只有编辑页单独覆盖回深色，
+ * 导致属性页/关系页的标题是蓝色，读起来像可点链接（2026-08-24 真机核对）。
+ */
 .mobile-entry-detail__edit-heading span {
-    color: var(--fc-color-primary);
+    color: var(--fc-color-text);
     font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-strong);
     line-height: var(--mobile-leading-tight) ;
@@ -464,68 +369,6 @@
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-meta);
     line-height: var(--mobile-leading-tight) ;
-}
-
-.mobile-entry-detail__images-header .fc-btn,
-.mobile-entry-detail__tags-actions .fc-btn {
-    border-radius: var(--fc-radius-full);
-}
-
-.mobile-entry-detail__title-input,
-.mobile-entry-detail__summary-input,
-.mobile-entry-detail__meta-row,
-.mobile-entry-detail__form-section,
-.mobile-entry-detail__tags,
-.mobile-entry-detail__images,
-.mobile-entry-detail__relations,
-.mobile-entry-detail__connections {
-    margin-bottom: 0;
-}
-
-.mobile-entry-detail__form-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-item);
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.mobile-entry-detail__form-section--identity {
-    gap: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 1.2rem;
-}
-
-.mobile-entry-detail__section-header span {
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-strong);
-    line-height: var(--mobile-leading-tight) ;
-}
-
-.mobile-entry-detail__section-action {
-    display: inline-flex;
-    min-height: 2rem;
-    align-items: center;
-    justify-content: center;
-    padding: 0 var(--mobile-gap-item);
-    border: var(--mobile-border);
-    border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-muted-soft);
-    color: var(--fc-color-primary);
-    font: inherit;
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-strong);
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-entry-detail__title-input .fc-input__wrapper,
@@ -551,23 +394,6 @@
     font-size: var(--mobile-text-title);
     font-weight: var(--mobile-weight-strong);
     letter-spacing: 0;
-}
-
-.mobile-entry-detail__title-field,
-.mobile-entry-detail__summary-field,
-.mobile-entry-detail__type-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-text);
-}
-
-.mobile-entry-detail__title-field > span,
-.mobile-entry-detail__summary-field > span,
-.mobile-entry-detail__type-field > .mobile-entry-detail__field-heading {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    font-weight: var(--mobile-weight-medium);
-    line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-entry-detail__field-heading {
@@ -608,38 +434,6 @@
     color: var(--fc-color-text-secondary);
 }
 
-.mobile-entry-detail__meta-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__field {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: var(--mobile-gap-text);
-}
-
-.mobile-entry-detail__field > span {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    font-weight: var(--mobile-weight-medium);
-    line-height: var(--mobile-leading-tight) ;
-}
-
-.mobile-entry-detail__add-type {
-    display: inline-flex;
-    min-height: var(--mobile-tap-min);
-    align-items: center;
-    gap: var(--mobile-gap-text);
-    margin: 0;
-    padding: 0 var(--mobile-gap-text);
-    color: var(--fc-color-primary);
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-strong);
-}
-
 .mobile-entry-detail__type-options {
     display: flex;
     gap: var(--mobile-gap-inline);
@@ -672,134 +466,6 @@
     color: var(--fc-color-primary);
 }
 
-.mobile-entry-detail__edit-disclosures {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__edit-disclosure {
-    overflow: hidden;
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-card);
-    background: var(--mobile-surface-raised);
-    box-shadow: none;
-}
-
-.mobile-entry-detail__edit-disclosure-summary {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    min-height: 3.6rem;
-    align-items: center;
-    gap: var(--mobile-gap-item);
-    padding: 0 var(--mobile-gap-group);
-    list-style: none;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.mobile-entry-detail__edit-disclosure-summary::-webkit-details-marker {
-    display: none;
-}
-
-.mobile-entry-detail__edit-disclosure-summary strong {
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-strong);
-}
-
-.mobile-entry-detail__edit-disclosure-summary span,
-.mobile-entry-detail__edit-disclosure-summary small {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    white-space: nowrap;
-}
-
-.mobile-entry-detail__edit-disclosure-summary small::after {
-    content: '展开';
-    color: var(--fc-color-primary);
-}
-
-.mobile-entry-detail__edit-disclosure[open] .mobile-entry-detail__edit-disclosure-summary small::after {
-    content: '收起';
-}
-
-.mobile-entry-detail__edit-disclosure-body {
-    padding: var(--mobile-gap-group);
-    border-top: var(--mobile-border);
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__form-section {
-    gap: var(--mobile-gap-item);
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__images-header,
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__tags-header {
-    justify-content: flex-end;
-    margin-bottom: var(--mobile-gap-item);
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__images-label,
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__tags-label {
-    display: none;
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__image-grid {
-    display: flex;
-    gap: var(--mobile-gap-inline);
-    padding-bottom: var(--mobile-gap-text);
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__image-grid::-webkit-scrollbar {
-    display: none;
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__image-thumb {
-    width: 5.5rem;
-    aspect-ratio: 4 / 3;
-    flex: 0 0 5.5rem;
-}
-
-.mobile-entry-detail__edit-disclosure-body .mobile-entry-detail__tags-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow: hidden;
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-field);
-}
-
-.mobile-entry-detail__edit-disclosure-body .highlight-tag-item {
-    min-width: 0;
-    padding: var(--mobile-gap-item);
-    border-width: 0 0 1px;
-    border-radius: 0;
-    background: transparent;
-}
-
-.mobile-entry-detail__edit-disclosure-body .highlight-tag-item:last-child {
-    border-bottom: 0;
-}
-
-.mobile-entry-detail__edit-disclosure-body .highlight-tag-item__hint[aria-hidden='true'] {
-    display: none;
-}
-
-.mobile-entry-detail__edit-disclosure-body .highlight-tag-item__editor {
-    flex-direction: row;
-}
-
-.mobile-entry-detail__edit-disclosure-body .highlight-tag-item__clear {
-    min-height: var(--mobile-tap-min);
-}
-
 .mobile-entry-detail__image-grid {
     gap: var(--mobile-gap-inline);
 }
@@ -828,10 +494,15 @@
     overflow: hidden;
 }
 
+/*
+ * 全屏专注编辑：外层 Overlay 始终铺满整个 WebView，内层只用 padding-bottom 让出
+ * 原生发布的键盘遮挡量。不写 visualViewport 高度、不平移整层——那会让本页成为
+ * 键盘布局的第二个 owner（AGENTS.md §5.1），与编辑页的 `--fc-kb` 路径两套动画。
+ */
 .mobile-entry-detail__immersive {
     display: flex;
     width: 100%;
-    height: var(--mobile-entry-visible-height, 100%);
+    height: 100%;
     min-height: 0;
     flex-direction: column;
     overflow: hidden;
@@ -839,7 +510,8 @@
     color: var(--fc-color-text);
     box-sizing: border-box;
     padding-top: var(--mobile-safe-top);
-    transform: translateY(var(--mobile-entry-visible-offset-top, 0px));
+    padding-bottom: max(var(--fc-kb, 0px), var(--mobile-safe-bottom));
+    transition: padding-bottom var(--fc-kb-transition, 0s);
 }
 
 .mobile-entry-detail__immersive-topbar {
@@ -933,10 +605,6 @@
     display: none;
 }
 
-.mobile-entry-detail__immersive[data-keyboard-visible] .mobile-entry-detail__markdown-toolbar {
-    padding-bottom: var(--mobile-gap-inline);
-}
-
 .mobile-entry-detail__markdown-tool {
     display: inline-grid;
     width: var(--mobile-entry-markdown-tool-width);
@@ -944,9 +612,10 @@
     flex: 0 0 var(--mobile-entry-markdown-tool-width);
     padding: 0;
     place-items: center;
-    border: var(--mobile-border);
-    border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
+    /* 无描边：整排 48px 圆形描边键在真机上视觉重量过大，像一组单选钮而不是工具栏。 */
+    border: 0;
+    border-radius: var(--mobile-radius-field);
+    background: transparent;
     color: var(--fc-color-primary);
     font: inherit;
     box-shadow: none;
@@ -991,10 +660,6 @@
     font-weight: var(--mobile-weight-strong);
     letter-spacing: 0;
     line-height: var(--mobile-leading-tight) ;
-}
-
-.mobile-entry-detail__type {
-    margin-bottom: 0;
 }
 
 .mobile-entry-detail__meta-chips {
@@ -1052,4 +717,572 @@
 
 .mobile-entry-detail__markdown-preview {
     line-height: var(--mobile-leading-normal);
+}
+
+.mobile-entry-detail__edit-topbar {
+    flex: 0 0 auto;
+}
+
+.mobile-entry-detail__edit-topbar .mobile-entry-detail__edit-heading {
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    text-align: center;
+}
+
+.mobile-entry-detail__edit-topbar .mobile-entry-detail__edit-heading span {
+    font-size: var(--mobile-text-body-sm);
+}
+
+.mobile-entry-detail__identity .mobile-entry-detail__title-input .fc-input__wrapper {
+    min-height: 3.5rem;
+}
+
+.mobile-entry-detail__identity .mobile-entry-detail__summary-input {
+    height: 5.5rem;
+    min-height: 5.5rem;
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    resize: none;
+    overflow-y: auto;
+    background: transparent;
+    /* 17px 是 IOS-003 的已验收结论：可编辑控件低于 16px 会触发 iOS 聚焦自动缩放。 */
+    font-size: var(--mobile-text-body);
+    line-height: var(--mobile-leading-snug);
+    scrollbar-width: none;
+}
+
+.mobile-entry-detail__identity .mobile-entry-detail__summary-input::-webkit-scrollbar {
+    display: none;
+}
+
+/*
+ * 正文是本页主任务，必须比摘要更有视觉重量。此前正文只有上下两条分隔线、
+ * 中间无容器，空词条时表现为一大片死白，而次要的摘要反而带边框（2026-08-24 真机核对）。
+ */
+.mobile-entry-detail__body-pane {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin-bottom: var(--mobile-gap-inline);
+    overflow: hidden;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+}
+
+.mobile-entry-detail__body-head {
+    display: flex;
+    min-height: var(--mobile-tap-min);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
+    padding-inline: var(--mobile-gap-item);
+    border-bottom: var(--mobile-divider);
+}
+
+.mobile-entry-detail__body-label {
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-detail__body-count {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-detail__body-spacer {
+    flex: 1 1 auto;
+}
+
+.mobile-entry-detail__body-mode {
+    display: inline-flex;
+    gap: calc(var(--mobile-gap-text) / 2);
+    padding: calc(var(--mobile-gap-text) / 2);
+    border-radius: var(--fc-radius-full);
+    background: var(--mobile-surface-muted-soft);
+}
+
+.mobile-entry-detail__body-mode button {
+    min-height: var(--mobile-tap-min);
+    padding: 0 var(--mobile-gap-item);
+    border: 0;
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-detail__body-mode button[aria-pressed='true'] {
+    background: var(--mobile-surface-raised);
+    color: var(--fc-color-text);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-detail__expand-button {
+    display: inline-grid;
+    width: var(--mobile-tap-min);
+    height: var(--mobile-tap-min);
+    flex: 0 0 var(--mobile-tap-min);
+    margin-right: 0;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+    color: var(--fc-color-primary);
+}
+
+.mobile-entry-detail__expand-button .mobile-entry-detail__action-svg {
+    width: 1.2rem;
+    height: 1.2rem;
+}
+
+.mobile-entry-detail__inline-editor-wrap {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+.mobile-entry-detail__inline-editor {
+    min-height: 0;
+    flex: 1 1 auto;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor,
+.mobile-entry-detail__inline-editor .w-md-editor-content,
+.mobile-entry-detail__inline-editor .w-md-editor-area,
+.mobile-entry-detail__inline-editor .w-md-editor-text,
+.mobile-entry-detail__inline-editor .w-md-editor-text-pre,
+.mobile-entry-detail__inline-editor .w-md-editor-text-input,
+.mobile-entry-detail__inline-editor .w-md-editor-preview {
+    height: 100% !important;
+    min-height: 0 !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-toolbar {
+    display: none;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-text,
+.mobile-entry-detail__inline-editor .w-md-editor-preview {
+    padding: var(--mobile-gap-item) var(--mobile-gap-item) var(--mobile-gap-section) !important;
+    overflow-y: auto !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-text,
+.mobile-entry-detail__inline-editor .w-md-editor-text-input,
+.mobile-entry-detail__inline-editor .w-md-editor-text-pre,
+.mobile-entry-detail__inline-editor .w-md-editor-text-pre code {
+    color: var(--fc-color-text) !important;
+    font-family: var(--fc-font-family) !important;
+    /* 必须与沉浸编辑器同字号：切换全屏时字号变化会让整段正文重排。 */
+    font-size: var(--mobile-text-body) !important;
+    line-height: var(--mobile-leading-normal) !important;
+    letter-spacing: 0 !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word;
+}
+
+.mobile-entry-detail__inline-editor .wmde-markdown {
+    color: var(--fc-color-text) !important;
+    font-family: var(--fc-font-family) !important;
+    font-size: var(--mobile-text-body) !important;
+    line-height: var(--mobile-leading-normal) !important;
+}
+
+.mobile-entry-detail__inline-editor-wrap > .mobile-entry-detail__wiki-panel {
+    position: absolute;
+    right: 0;
+    bottom: var(--mobile-gap-inline);
+    left: 0;
+    z-index: var(--mobile-z-overlay);
+}
+
+.mobile-entry-detail__properties-entry {
+    display: flex;
+    width: 100%;
+    min-height: var(--mobile-tap-min);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
+    padding: 0;
+    border: 0;
+    border-top: var(--mobile-divider);
+    background: transparent;
+    text-align: left;
+}
+
+.mobile-entry-detail__properties-chips {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: calc(var(--mobile-gap-inline) / 2);
+    overflow: hidden;
+}
+
+.mobile-entry-detail__property-pill {
+    flex: 0 0 auto;
+    padding: var(--mobile-gap-text) var(--mobile-gap-item);
+    border-radius: var(--fc-radius-full);
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight);
+    white-space: nowrap;
+}
+
+.mobile-entry-detail__property-pill--accent {
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+    color: var(--fc-color-primary);
+}
+
+.mobile-entry-detail__properties-more {
+    flex: 0 0 auto;
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-meta);
+    white-space: nowrap;
+}
+
+.mobile-entry-detail__markdown-toolbar--inline {
+    display: none;
+    margin-inline: 0;
+    padding: var(--mobile-gap-text) 0;
+    /* 右侧渐隐：此前工具栏被硬切在屏幕边缘，看不出还能横滑。 */
+    mask-image: linear-gradient(
+        90deg,
+        var(--fc-color-text) 0,
+        var(--fc-color-text) calc(100% - var(--mobile-gap-section)),
+        transparent 100%
+    );
+}
+
+.mobile-entry-detail__identity {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-rows: 1fr;
+    padding-bottom: var(--mobile-gap-inline);
+    transition:
+        grid-template-rows var(--mobile-duration-base) var(--mobile-ease-standard),
+        padding-bottom var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-entry-detail__identity > .mobile-entry-detail__identity-inner {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: var(--mobile-gap-text);
+    overflow: hidden;
+}
+
+.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__identity {
+    grid-template-rows: 0fr;
+    padding-bottom: 0;
+}
+
+.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__properties-entry,
+.mobile-entry-detail--edit[data-identity-focused='true'] .mobile-entry-detail__properties-entry {
+    display: none;
+}
+
+.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__markdown-toolbar--inline {
+    display: flex;
+}
+
+/*
+ * 属性页与关系页只让自己的滚动区消费原生键盘遮挡，不移动 WebView 或应用外壳。
+ *
+ * 只声明 `--mobile-nav-reserved-height`，底部 padding 交给 MobileApp.css 的
+ * `.mobile-page:not(.mobile-nav-safe-fixed)`。页面自己写 padding 简写会被那条更高
+ * 特异度的规则整条盖掉——2026-08-24 Android 真机实测，属性页最底部的标签输入框
+ * 被软键盘切断且无可滚空间，证据见 designs/audits/mobile-entry-editor-2026-08-24/。
+ */
+.mobile-entry-properties,
+.mobile-entry-relation-editor {
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
+
+    padding-inline: var(--mobile-page-x);
+    padding-top: 0;
+    background: var(--fc-color-bg);
+}
+
+.mobile-entry-properties__content,
+.mobile-entry-relation-editor__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-group);
+}
+
+.mobile-entry-properties__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-entry-properties__label {
+    display: flex;
+    min-height: 1.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mobile-gap-inline);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-properties__label button {
+    display: inline-flex;
+    min-height: var(--mobile-tap-min);
+    align-items: center;
+    gap: var(--mobile-gap-text);
+    margin-right: 0;
+    padding: 0 var(--mobile-gap-inline);
+    border: 0;
+    background: transparent;
+    color: var(--fc-color-primary);
+    font: inherit;
+}
+
+.mobile-entry-properties__label small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+}
+
+/* 属性页的标签列表压成行式：桌面 HighLightTagItem 的卡片形态在 375dp 下单条就占近 1/4 屏。 */
+.mobile-entry-properties .mobile-entry-detail__tags {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-entry-properties .highlight-tag-item {
+    min-width: 0;
+    padding: var(--mobile-gap-item);
+    border-width: 0 0 1px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.mobile-entry-properties .highlight-tag-item:last-child {
+    border-bottom: 0;
+}
+
+/* 空的取值范围提示不占行；`清空` 收成行内小按钮，不再是整宽主按钮。 */
+.mobile-entry-properties .highlight-tag-item__hint[aria-hidden='true'] {
+    display: none;
+}
+
+.mobile-entry-properties .highlight-tag-item__editor {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-entry-properties .highlight-tag-item__input {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.mobile-entry-properties .highlight-tag-item__clear {
+    min-height: var(--mobile-tap-min);
+    flex: 0 0 auto;
+    width: auto;
+    padding-inline: var(--mobile-gap-item);
+}
+
+.mobile-entry-properties .mobile-entry-detail__tag-select {
+    width: 100%;
+}
+
+.mobile-entry-properties .mobile-entry-detail__tag-select .fc-select__trigger {
+    min-height: var(--mobile-tap-min);
+}
+
+.mobile-entry-properties .mobile-entry-detail__image-grid {
+    display: flex;
+    gap: var(--mobile-gap-inline);
+    overflow-x: auto;
+}
+
+/* 「添加」常驻为缩略图行末尾的一块瓦片：空状态与有图状态是同一种布局。 */
+.mobile-entry-detail__image-thumb--add {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--mobile-gap-text);
+    border: var(--mobile-border);
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-detail__image-thumb--add svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.mobile-entry-properties .mobile-entry-detail__image-thumb {
+    width: 6rem;
+    flex: 0 0 6rem;
+    aspect-ratio: 4 / 3;
+}
+
+.mobile-entry-properties .mobile-entry-detail__tags-list,
+.mobile-entry-properties__relation-list,
+.mobile-entry-relation-editor__results {
+    overflow: hidden;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-field);
+    background: transparent;
+}
+
+.mobile-entry-properties__relation-row,
+.mobile-entry-relation-editor__result {
+    display: grid;
+    width: 100%;
+    min-height: 3.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--mobile-gap-item);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    border: 0;
+    border-bottom: var(--mobile-divider);
+    background: transparent;
+    color: var(--fc-color-text);
+    text-align: left;
+}
+
+.mobile-entry-properties__relation-row:last-child,
+.mobile-entry-relation-editor__result:last-child {
+    border-bottom: 0;
+}
+
+.mobile-entry-properties__relation-row > span:first-child,
+.mobile-entry-relation-editor__result > span:first-child {
+    min-width: 0;
+}
+
+.mobile-entry-properties__relation-row strong,
+.mobile-entry-properties__relation-row small,
+.mobile-entry-relation-editor__result strong,
+.mobile-entry-relation-editor__result small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-entry-properties__relation-row strong,
+.mobile-entry-relation-editor__result strong {
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-properties__relation-row small,
+.mobile-entry-relation-editor__result small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-properties__add-row,
+.mobile-entry-relation-editor__delete {
+    display: inline-flex;
+    width: 100%;
+    min-height: var(--mobile-tap-min);
+    align-items: center;
+    justify-content: center;
+    gap: var(--mobile-gap-text);
+    padding: 0 var(--mobile-gap-item);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-field);
+    background: transparent;
+    color: var(--fc-color-primary);
+    font: inherit;
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-relation-editor__search .fc-input__wrapper {
+    min-height: var(--mobile-tap-min);
+    border-radius: var(--mobile-radius-field);
+    background: transparent;
+}
+
+.mobile-entry-relation-editor__result > span:last-child {
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-relation-editor__result.is-selected {
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
+}
+
+.mobile-entry-relation-editor__result-more {
+    padding: var(--mobile-gap-item);
+    border-top: var(--mobile-divider);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    text-align: center;
+}
+
+/* 未选目标的新关系，退出等于放弃，不用危险色。 */
+.mobile-entry-relation-editor__discard {
+    display: inline-flex;
+    min-height: var(--mobile-tap-min);
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--mobile-gap-group);
+    border: var(--mobile-border);
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--mobile-text-body-sm);
+}
+
+.mobile-entry-relation-editor__directions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: calc(var(--mobile-gap-text) / 2);
+    padding: calc(var(--mobile-gap-text) / 2);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-muted-soft);
+}
+
+.mobile-entry-relation-editor__directions button {
+    min-height: var(--mobile-tap-min);
+    padding: 0 var(--mobile-gap-text);
+    border: 0;
+    border-radius: var(--mobile-radius-field);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--mobile-text-body-sm);
+}
+
+.mobile-entry-relation-editor__directions button[aria-pressed='true'] {
+    background: var(--mobile-surface-raised);
+    color: var(--fc-color-text);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-relation-editor__delete {
+    margin-top: var(--mobile-gap-inline);
+    border-color: color-mix(in srgb, var(--fc-color-danger) 42%, var(--fc-color-border));
+    color: var(--fc-color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-entry-detail--edit {
+        transition: none;
+    }
 }

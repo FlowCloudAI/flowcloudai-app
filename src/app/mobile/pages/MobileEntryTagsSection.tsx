@@ -1,12 +1,16 @@
+/**
+ * 移动端词条属性页的标签区：标签值列表 + 一条「添加已有标签」控件。
+ * 分组标题与「新建标签」入口由属性页的分组标题行提供，本组件不自带 header，
+ * 保证属性页五个分组用同一种标题语言（2026-08-24 真机核对）。
+ */
 import {type ComponentProps, type Dispatch, type SetStateAction} from 'react'
-import {Button, Select} from 'flowcloudai-ui'
+import {Select} from 'flowcloudai-ui'
 import {type TagSchema} from '../../../api'
 import HighLightTagItem from '../../../features/entries/components/HighLightTagItem'
 import {
     getComparableTagValue,
     normalizeComparableTagValue,
 } from '../../../features/entries/lib/entryTag'
-import {MobileAddIcon} from '../components/MobileTopControls'
 import {type TagValueMap} from './MobileEntryDetailUtils'
 
 type SelectOptions = NonNullable<ComponentProps<typeof Select>['options']>
@@ -20,7 +24,6 @@ interface MobileEntryTagsSectionProps {
     tagDraft: TagValueMap
     onAddVisibleTagSchema: (schemaId: string) => void
     onTagDraftChange: Dispatch<SetStateAction<TagValueMap>>
-    onOpenTagCreator: () => void
 }
 
 export function MobileEntryTagsSection({
@@ -32,31 +35,9 @@ export function MobileEntryTagsSection({
     tagDraft,
     onAddVisibleTagSchema,
     onTagDraftChange,
-    onOpenTagCreator,
 }: MobileEntryTagsSectionProps) {
     return (
-        <section className="mobile-entry-detail__tags mobile-entry-detail__form-section">
-            <div className="mobile-entry-detail__tags-header">
-                <div className="mobile-entry-detail__tags-label">标签</div>
-                <div className="mobile-entry-detail__tags-actions">
-                    {availableTagSchemaOptions.length > 0 && (
-                        <Select
-                            value={tagSchemaPickerValue}
-                            onValueChange={(value) => {
-                                if (typeof value !== 'string') return
-                                onAddVisibleTagSchema(value)
-                            }}
-                            options={availableTagSchemaOptions}
-                            placeholder="添加已有标签"
-                            searchable
-                            className="mobile-entry-detail__tag-select"
-                        />
-                    )}
-                    <Button type="button" variant="ghost" size="sm" onClick={onOpenTagCreator}>
-                        <MobileAddIcon className="mobile-top-control-svg--inline"/>新建标签
-                    </Button>
-                </div>
-            </div>
+        <div className="mobile-entry-detail__tags">
             {!hasTagDefinitions ? (
                 <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前项目还没有标签定义</div>
             ) : editTagSchemas.length > 0 ? (
@@ -85,6 +66,20 @@ export function MobileEntryTagsSection({
             ) : (
                 <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前词条还没有已添加标签</div>
             )}
-        </section>
+
+            {availableTagSchemaOptions.length > 0 && (
+                <Select
+                    value={tagSchemaPickerValue}
+                    onValueChange={(value) => {
+                        if (typeof value !== 'string') return
+                        onAddVisibleTagSchema(value)
+                    }}
+                    options={availableTagSchemaOptions}
+                    placeholder="添加已有标签"
+                    searchable
+                    className="mobile-entry-detail__tag-select"
+                />
+            )}
+        </div>
     )
 }

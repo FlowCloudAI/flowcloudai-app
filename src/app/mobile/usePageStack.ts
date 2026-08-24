@@ -13,6 +13,16 @@ export interface MobileEntryListPageParams extends MobileProjectPageParams {
 export interface MobileEntryDetailPageParams extends MobileProjectPageParams {
     entryId?: string
     mode?: 'view' | 'edit'
+    isPlaceholder?: boolean
+}
+
+export interface MobileEntryEditChildPageParams extends MobileProjectPageParams {
+    entryId: string
+    isPlaceholder?: boolean
+}
+
+export interface MobileEntryRelationPageParams extends MobileEntryEditChildPageParams {
+    relationIndex?: number
 }
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
@@ -26,6 +36,8 @@ export interface MobilePageParamsMap {
     projectHome: MobileProjectPageParams
     entryList: MobileEntryListPageParams
     entryDetail: MobileEntryDetailPageParams
+    entryProperties: MobileEntryEditChildPageParams
+    entryRelation: MobileEntryRelationPageParams
     typeManager: MobileProjectScopedPageParams
     tagManager: MobileProjectScopedPageParams
     categoryManager: MobileProjectScopedPageParams

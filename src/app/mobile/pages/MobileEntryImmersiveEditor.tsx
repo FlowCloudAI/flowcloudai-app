@@ -1,7 +1,13 @@
-/* 移动端沉浸正文编辑器：通过全屏 Portal 隔离下层页面，并承载常用 Markdown 工具。 */
+/*
+ * 移动端沉浸正文编辑器：通过全屏 Portal 隔离下层页面，并承载常用 Markdown 工具。
+ *
+ * 键盘布局只消费原生发布的 `--fc-kb`（见 AGENTS.md §5.1「键盘只能有一个 owner」）。
+ * 2026-08-24 之前这里另用 visualViewport 写高度并平移整层，与编辑页/属性页的
+ * `--fc-kb` 路径并存，造成同一次键盘弹出两套动画；该实现已移除，不要重新引入。
+ */
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import Overlay from '../../../shared/ui/overlay/Overlay'
-import {type ComponentProps, type ReactNode, type RefObject, useEffect, useRef} from 'react'
+import {type ComponentProps, type ReactNode, type RefObject} from 'react'
 import {
     MobileBackIcon,
     MobilePageTopBar,
@@ -38,30 +44,6 @@ export function MobileEntryImmersiveEditor({
     onSave,
     onMarkdownTool,
 }: MobileEntryImmersiveEditorProps) {
-    const viewportRootRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        const viewport = window.visualViewport
-        if (!viewport) return undefined
-
-        const syncKeyboardVisibility = () => {
-            const root = viewportRootRef.current
-            if (!root) return
-            root.style.setProperty('--mobile-entry-visible-height', `${viewport.height}px`)
-            root.style.setProperty('--mobile-entry-visible-offset-top', `${viewport.offsetTop}px`)
-            root.toggleAttribute('data-keyboard-visible', viewport.height < window.innerHeight - 80)
-        }
-
-        // 外层 Overlay 始终覆盖完整布局视口；这里只调整内层工作区，让工具栏停在覆盖式键盘上方。
-        syncKeyboardVisibility()
-        viewport.addEventListener('resize', syncKeyboardVisibility)
-        viewport.addEventListener('scroll', syncKeyboardVisibility)
-        return () => {
-            viewport.removeEventListener('resize', syncKeyboardVisibility)
-            viewport.removeEventListener('scroll', syncKeyboardVisibility)
-        }
-    }, [])
-
     return (
         <Overlay
             open
@@ -71,7 +53,7 @@ export function MobileEntryImmersiveEditor({
             className="mobile-entry-detail__immersive-host"
             ariaLabel="沉浸正文编辑"
         >
-            <div ref={viewportRootRef} className="mobile-entry-detail__immersive">
+            <div className="mobile-entry-detail__immersive">
                 <MobilePageTopBar
                     className="mobile-entry-detail__immersive-topbar"
                     ariaLabel="沉浸正文编辑操作"
