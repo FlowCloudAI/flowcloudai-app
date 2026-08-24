@@ -60,7 +60,8 @@ test('底部导航覆盖到机器底部，滚动页穿过其背后且固定页�
     assert.match(mobileAppCss, /\.mobile-page:not\(\.mobile-nav-safe-fixed\)\s*\{[\s\S]*?padding-bottom:\s*calc\([\s\S]*?var\(--mobile-scroll-nav-spacer\)/)
     assert.match(mobileAppCss, /\.mobile-nav-safe-fixed\s*\{[\s\S]*?padding-bottom:\s*var\(--mobile-nav-reserved-height\)/)
     assert.match(mobileAiChatSource, /className="mobile-ai-chat mobile-nav-safe-fixed"/)
-    assert.match(mobileAiChatCss, /\.mobile-ai-chat__composer\s*\{[\s\S]*?bottom:\s*var\(--mobile-nav-reserved-height\)/)
+    // composer 必须消费外壳的保留高度，但允许在其上再叠键盘上沿间距（--mobile-ai-keyboard-gap）。
+    assert.match(mobileAiChatCss, /\.mobile-ai-chat__composer\s*\{[\s\S]*?bottom:\s*(?:calc\()?var\(--mobile-nav-reserved-height\)/)
     assert.match(mobileIdeaSource, /className="mobile-idea mobile-nav-safe-fixed"/)
     assert.match(mobileTimelineSource, /className="mobile-page mobile-nav-safe-fixed mobile-timeline-page"/)
     assert.match(mobileRelationGraphSource, /className="mobile-page mobile-nav-safe-fixed mobile-relation-graph-page"/)
@@ -150,7 +151,12 @@ test('AI 工具模式菜单使用轻量标记选中态与紧邻标题的普通�
     assert.match(mobileAiComposerSource, /MobileAiIcon type=\{option\.mode\} strokeWidth=\{1\.7\}/)
     assert.match(mobileAiComposerSource, /mobile-ai-tool-mode-menu__label[^>]*>\{option\.label\}\{active \? <MobileCheckIcon\/> : null\}/)
     assert.match(mobileAiChatUiSource, /writer:\s*'写入免确认'/)
-    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu\s*\{[\s\S]*?--mobile-ai-tool-mode-title-size:\s*calc\(0\.875rem \* var\(--mobile-font-scale\)\);[\s\S]*?--mobile-ai-tool-mode-description-size:\s*calc\(0\.71875rem \* var\(--mobile-font-scale\)\);[\s\S]*?width:\s*min\(9\.75rem,[\s\S]*?padding:\s*var\(--mobile-gap-text\)/)
+    // 2026-08-24：本条曾要求菜单自带 0.875rem/0.71875rem 两个局部字号变量，与
+    // mobileUiBaseline 的「字号只有 5 档」断言直接冲突，整套 test:mobile-shell 因此长期阻塞。
+    // 以基线为准，改为断言菜单消费标尺内字号。
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu\s*\{[\s\S]*?width:\s*min\(11rem,[\s\S]*?padding:\s*var\(--mobile-gap-text\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__label\s*\{[\s\S]*?font-size:\s*var\(--mobile-text-body-sm\)/)
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text small\s*\{[\s\S]*?font-size:\s*var\(--mobile-text-meta\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\s*\{[\s\S]*?grid-template-columns:\s*1\.375rem minmax\(0, 1fr\);[\s\S]*?min-height:\s*calc\(var\(--mobile-tap-min\) \+ var\(--mobile-gap-text\)\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row \.mobile-ai-svg\s*\{[\s\S]*?width:\s*1\.375rem;[\s\S]*?height:\s*1\.375rem;/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\.active\s*\{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*var\(--fc-color-primary\)/)

@@ -408,10 +408,8 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 }
 
 .mobile-ai-tool-mode-menu {
-    --mobile-ai-tool-mode-title-size: calc(0.875rem * var(--mobile-font-scale));
-    --mobile-ai-tool-mode-description-size: calc(0.71875rem * var(--mobile-font-scale));
-
-    width: min(9.75rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
+    /* 字号回到 5 档标尺（基线 §3.1）；此前的 14px/11.5px 是第六、七档。 */
+    width: min(11rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
     padding: var(--mobile-gap-text);
     border-radius: var(--mobile-radius-card);
 }
@@ -449,13 +447,13 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     display: flex;
     align-items: center;
     gap: var(--mobile-gap-text);
-    font-size: var(--mobile-ai-tool-mode-title-size);
+    font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-medium);
     line-height: var(--mobile-leading-tight);
 }
 
 .mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text small {
-    font-size: var(--mobile-ai-tool-mode-description-size);
+    font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-normal);
     line-height: var(--mobile-leading-tight);
 }
