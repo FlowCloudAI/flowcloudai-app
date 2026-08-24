@@ -42,6 +42,7 @@ futures = "0.3"
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-flow-camera = { path = "plugins/tauri-plugin-flow-camera" }
 
 # ── 序列化 ──
 serde = { version = "1.0", features = ["derive"] }

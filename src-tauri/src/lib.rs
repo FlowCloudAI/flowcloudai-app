@@ -198,7 +198,8 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .register_uri_scheme_protocol("fcimg", |ctx, request| handle_fcimg_request(ctx, request))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init());
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_flow_camera::init());
 
     // 单实例插件可能早于应用 setup 收到第二进程参数，桌面文件队列必须先注册。
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

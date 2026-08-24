@@ -36,6 +36,7 @@ interface EntryImageAddModalProps {
     existingImages?: EntryImage[]
     onClose: () => void
     onUploadLocal: () => void | EntryImage[] | Promise<void | EntryImage[]>
+    onCapturePhoto?: () => void | EntryImage[] | Promise<void | EntryImage[]>
     onAddAiImages: (images: EntryImage[]) => void
     onInsertImage?: (image: EntryImage) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
@@ -55,6 +56,7 @@ export default function EntryImageAddModal({
                                                existingImages = [],
                                                onClose,
                                                onUploadLocal,
+                                               onCapturePhoto,
                                                onAddAiImages,
                                                onInsertImage,
                                                onOpenPluginManagement,
@@ -77,6 +79,7 @@ export default function EntryImageAddModal({
     const [errorMessage, setErrorMessage] = useState('')
     const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
     const [submitting, setSubmitting] = useState(false)
+    const [submitSource, setSubmitSource] = useState<'local' | 'camera' | null>(null)
     const submittingRef = useRef(false)
     const {showAlert} = useAlert()
 
@@ -91,6 +94,7 @@ export default function EntryImageAddModal({
             setErrorMessage('')
             setMissingApiKeyPluginId('')
             setSubmitting(false)
+            setSubmitSource(null)
             submittingRef.current = false
             setPlugins([])
             setPluginLoadError('')
@@ -261,6 +265,7 @@ export default function EntryImageAddModal({
     const handleLocalUpload = async () => {
         if (submittingRef.current) return
         submittingRef.current = true
+        setSubmitSource('local')
         setSubmitting(true)
         try {
             const uploadedImages = await onUploadLocal()
@@ -275,6 +280,30 @@ export default function EntryImageAddModal({
         } finally {
             submittingRef.current = false
             setSubmitting(false)
+            setSubmitSource(null)
+        }
+    }
+
+    const handleCapturePhoto = async () => {
+        if (!onCapturePhoto || submittingRef.current) return
+        submittingRef.current = true
+        setSubmitSource('camera')
+        setSubmitting(true)
+        try {
+            const capturedImages = await onCapturePhoto()
+            if (!Array.isArray(capturedImages) || !capturedImages[0]) return
+            if (insertMode) {
+                onInsertImage?.(capturedImages[0])
+            }
+            onClose()
+        } catch (e) {
+            const msg = formatApiError(toApiError(e))
+            setErrorMessage(`拍照失败: ${msg}`)
+            void showAlert(msg, 'error', 'nonInvasive', 3000)
+        } finally {
+            submittingRef.current = false
+            setSubmitting(false)
+            setSubmitSource(null)
         }
     }
 
@@ -376,11 +405,20 @@ export default function EntryImageAddModal({
                     ) : activeTab === 'local' ? (
                         <div className="entry-image-add-local">
                             <p className="entry-image-add-local-desc">
-                                从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。
+                                {onCapturePhoto
+                                    ? '选择本地图片，或调用系统相机拍摄一张照片。支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。'
+                                    : '从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。'}
                             </p>
-                            <Button type="button" size="sm" radius="full" disabled={submitting} onClick={handleLocalUpload}>
-                                {submitting ? '导入中…' : '选择本地图片'}
-                            </Button>
+                            <div className="entry-image-add-local-actions">
+                                <Button type="button" size="sm" radius="full" disabled={submitting} onClick={handleLocalUpload}>
+                                    {submitting && submitSource === 'local' ? '导入中…' : '选择本地图片'}
+                                </Button>
+                                {onCapturePhoto && (
+                                    <Button type="button" size="sm" radius="full" variant="outline" disabled={submitting} onClick={handleCapturePhoto}>
+                                        {submitting && submitSource === 'camera' ? '处理中…' : '拍照'}
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     ) : (
                         <div className="entry-image-add-ai">

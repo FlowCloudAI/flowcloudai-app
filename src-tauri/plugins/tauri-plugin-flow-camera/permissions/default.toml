@@ -1,0 +1,5 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "允许主 WebView 调用系统相机拍摄临时图片，并在消费后清理插件缓存副本。"
+permissions = ["allow-capture", "allow-discard"]

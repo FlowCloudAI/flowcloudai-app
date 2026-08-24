@@ -167,6 +167,13 @@
     line-height: var(--fc-line-height-normal);
 }
 
+.entry-image-add-local-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--fc-space-sm);
+}
+
 /* ── AI 标签 ────────────────────────────────────────────────────────────────── */
 
 .entry-image-add-ai {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 相机插件只共享 flow-camera 缓存子目录，不申请 CAMERA 权限。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <provider
+      android:name="cn.flowcloudai.camera.FlowCameraFileProvider"
+      android:authorities="${applicationId}.flowcamera.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/flow_camera_file_paths" />
+    </provider>
+  </application>
+</manifest>
