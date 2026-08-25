@@ -80,7 +80,7 @@
 
 ## 7. 设计基线与设计稿（`../designs/`）
 
-`AGENTS.md` 规定：界面改动需先出可审计的单文件 HTML 设计稿，统一存 `designs/<主题名>.html`。当前有 7 份 HTML 设计稿。
+`AGENTS.md` 规定：界面改动需先出可审计的单文件 HTML 设计稿，统一存 `designs/<主题名>.html`。当前有 6 份 HTML 设计稿。
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
@@ -88,8 +88,7 @@
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§9 规则 8 规定底部面板不承载滚动或输入内容，并列出两处已知违例 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
-| [../designs/mobile-entry-detail.html](../designs/mobile-entry-detail.html) | 现行 | 2026-08-25 | 移动端词条**查看态**排版稿。图片升为主视觉、类型与分类上移到标题下、属性改定义列表、未填写属性折叠、空正文给主操作。5 个状态，含 390/360 与深浅色 |
-| [../designs/mobile-entry-editor.html](../designs/mobile-entry-editor.html) | 现行 | 2026-08-25 | 移动端词条**编辑态 + 属性页 + 关系页**排版稿。元数据整体移到正文之上、类型与分类在身份区直接可改、正文头压到 40px、保存改文字按钮、属性页改 iOS 分组列表。7 个状态 |
+| [../designs/mobile-entry-detail.html](../designs/mobile-entry-detail.html) | 现行 | 2026-08-25 | 移动端词条详情排版稿，**展示态与编辑态合并在一份**（同属 `MobileEntryDetail.tsx`）。展示态：图片升为主视觉、类型与分类上移到标题下、属性改定义列表、未填写折叠、空正文给主操作。编辑态：元数据整体移到正文之上、类型与分类在身份区可改、正文头压到 40px、保存改文字按钮、属性页改 iOS 分组列表。12 个状态，含 390/360 与深浅色。原 `mobile-entry-editor.html` 已并入本文件 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
 | [../designs/mobile-entry-editor-ai-review-design-qa.md](../designs/mobile-entry-editor-ai-review-design-qa.md) | 结论记录 | 2026-08-02 | 移动端词条编辑与 AI 差异审阅 QA |
 | [../designs/mobile-world-check-design-qa.md](../designs/mobile-world-check-design-qa.md) | 结论记录 | 2026-08-06 | 移动端设定检测设计 QA。视觉证据已丢失 |
