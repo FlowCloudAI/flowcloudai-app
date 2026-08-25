@@ -114,7 +114,7 @@ export interface MobileTopAction {
     icon: ReactNode
     onClick: () => void
     disabled?: boolean
-    kind?: 'add' | 'more' | 'primary'
+    kind?: 'add' | 'more' | 'primary' | 'text'
     ariaHasPopup?: ButtonHTMLAttributes<HTMLButtonElement>['aria-haspopup']
     ariaExpanded?: boolean
 }

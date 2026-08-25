@@ -8,6 +8,7 @@ const read = relativePath => readFileSync(new URL(relativePath, import.meta.url)
 const appSource = read('./MobileApp.tsx')
 const stackSource = read('./usePageStack.ts')
 const editViewSource = read('./pages/MobileEntryDetailEditView.tsx')
+const detailCssSource = read('./pages/MobileEntryDetail.css')
 const viewSource = read('./pages/MobileEntryDetailView.tsx')
 const imageViewerSource = read('./components/MobileImageViewer.tsx')
 const propertiesSource = read('./pages/MobileEntryProperties.tsx')
@@ -40,6 +41,19 @@ test('编辑主页保留三行摘要、内联正文与横向工具栏手势标�
     assert.match(editViewSource, /className="mobile-entry-detail__body-pane"/)
     assert.match(editViewSource, /mode=\{bodyMode\}/)
     assert.match(editViewSource, /data-mobile-horizontal-scroll="true"/)
+})
+
+test('编辑主页先呈现身份与附件，正文聚焦时整体折叠且顶栏使用文字操作', () => {
+    assert.ok(editViewSource.indexOf('mobile-entry-detail__edit-meta') < editViewSource.indexOf('mobile-entry-detail__body-pane'))
+    assert.match(editViewSource, /entryTypeOptions/)
+    // 分类只读属于依赖剪贴板替代入口的步骤 D，本轮继续保留可编辑 Select。
+    assert.match(editViewSource, /categoryOptions/)
+    assert.match(editViewSource, /addFirst compact/)
+    assert.match(editViewSource, /mobile-top-action-pill__text">取消/)
+    assert.match(editViewSource, /保存中…/)
+    assert.doesNotMatch(editViewSource, /type=\{p\.saving \? 'more' : 'save'\}/)
+    assert.match(detailCssSource, /data-body-focused='true'[^}]*mobile-entry-detail__edit-meta[\s\S]*?grid-template-rows: 0fr/)
+    assert.match(detailCssSource, /mobile-entry-detail__body-mode button::after/)
 })
 
 test('三层编辑页复用公共移动端顶栏，不另造编辑页壳层', () => {

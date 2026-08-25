@@ -755,6 +755,63 @@
     display: none;
 }
 
+.mobile-entry-detail__edit-meta {
+    display: grid;
+    min-height: 0;
+    flex: 0 0 auto;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-entry-detail__edit-meta-inner {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+    padding-bottom: var(--mobile-gap-inline);
+    overflow: hidden;
+}
+
+.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__edit-meta {
+    grid-template-rows: 0fr;
+}
+
+.mobile-entry-detail__identity-selects {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-entry-detail__identity-select {
+    min-width: 0;
+}
+
+.mobile-entry-detail__attachments {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--mobile-gap-text);
+    padding-top: var(--mobile-gap-inline);
+    border-top: var(--mobile-divider);
+}
+
+.mobile-entry-detail__image-grid[data-mobile-image-compact='true'] {
+    display: flex;
+    gap: var(--mobile-gap-inline);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.mobile-entry-detail__image-grid[data-mobile-image-compact='true']::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-entry-detail__image-grid[data-mobile-image-compact='true'] .mobile-entry-detail__image-thumb {
+    width: calc(var(--mobile-tap-min) + var(--mobile-gap-item));
+    height: calc(var(--mobile-tap-min) + var(--mobile-gap-item));
+    flex: 0 0 calc(var(--mobile-tap-min) + var(--mobile-gap-item));
+}
+
 /*
  * 正文是本页主任务，必须比摘要更有视觉重量。此前正文只有上下两条分隔线、
  * 中间无容器，空词条时表现为一大片死白，而次要的摘要反而带边框（2026-08-24 真机核对）。
@@ -773,7 +830,7 @@
 
 .mobile-entry-detail__body-head {
     display: flex;
-    min-height: var(--mobile-tap-min);
+    min-height: calc(var(--mobile-tap-min) - var(--mobile-gap-inline));
     flex: 0 0 auto;
     align-items: center;
     gap: var(--mobile-gap-inline);
@@ -804,7 +861,8 @@
 }
 
 .mobile-entry-detail__body-mode button {
-    min-height: var(--mobile-tap-min);
+    position: relative;
+    min-height: calc(var(--mobile-tap-min) - var(--mobile-gap-group) - var(--mobile-gap-text));
     padding: 0 var(--mobile-gap-item);
     border: 0;
     border-radius: var(--fc-radius-full);
@@ -814,6 +872,13 @@
     font-size: var(--mobile-text-meta);
 }
 
+.mobile-entry-detail__body-mode button::after {
+    position: absolute;
+    inset-block: calc((var(--mobile-gap-group) + var(--mobile-gap-text)) / -2);
+    inset-inline: calc(var(--mobile-gap-text) / -2);
+    content: "";
+}
+
 .mobile-entry-detail__body-mode button[aria-pressed='true'] {
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
@@ -821,10 +886,11 @@
 }
 
 .mobile-entry-detail__expand-button {
+    position: relative;
     display: inline-grid;
-    width: var(--mobile-tap-min);
-    height: var(--mobile-tap-min);
-    flex: 0 0 var(--mobile-tap-min);
+    width: calc(var(--mobile-tap-min) - var(--mobile-gap-inline));
+    height: calc(var(--mobile-tap-min) - var(--mobile-gap-inline));
+    flex: 0 0 calc(var(--mobile-tap-min) - var(--mobile-gap-inline));
     margin-right: 0;
     padding: 0;
     place-items: center;
@@ -832,6 +898,12 @@
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-primary);
+}
+
+.mobile-entry-detail__expand-button::after {
+    position: absolute;
+    inset: calc(var(--mobile-gap-inline) / -2);
+    content: "";
 }
 
 .mobile-entry-detail__expand-button .mobile-entry-detail__action-svg {
@@ -965,13 +1037,9 @@
 }
 
 .mobile-entry-detail__identity {
-    display: grid;
+    display: block;
     flex: 0 0 auto;
-    grid-template-rows: 1fr;
-    padding-bottom: var(--mobile-gap-inline);
-    transition:
-        grid-template-rows var(--mobile-duration-base) var(--mobile-ease-standard),
-        padding-bottom var(--mobile-duration-base) var(--mobile-ease-standard);
+    padding-bottom: 0;
 }
 
 .mobile-entry-detail__identity > .mobile-entry-detail__identity-inner {
@@ -979,17 +1047,7 @@
     min-height: 0;
     flex-direction: column;
     gap: var(--mobile-gap-text);
-    overflow: hidden;
-}
-
-.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__identity {
-    grid-template-rows: 0fr;
-    padding-bottom: 0;
-}
-
-.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__properties-entry,
-.mobile-entry-detail--edit[data-identity-focused='true'] .mobile-entry-detail__properties-entry {
-    display: none;
+    overflow: visible;
 }
 
 .mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__markdown-toolbar--inline {

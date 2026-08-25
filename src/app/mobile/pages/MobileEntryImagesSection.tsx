@@ -11,15 +11,32 @@ interface MobileEntryImagesSectionProps {
     images: EntryImage[]
     onAddImage: () => void
     onOpenImage: (index: number) => void
+    addFirst?: boolean
+    compact?: boolean
 }
 
 export function MobileEntryImagesSection({
     images,
     onAddImage,
     onOpenImage,
+    addFirst = false,
+    compact = false,
 }: MobileEntryImagesSectionProps) {
+    const addButton = (
+        <button
+            type="button"
+            className="mobile-entry-detail__image-thumb mobile-entry-detail__image-thumb--add"
+            onClick={onAddImage}
+            aria-label="添加图片"
+        >
+            <MobileAddIcon/>
+            <span>添加</span>
+        </button>
+    )
+
     return (
-        <div className="mobile-entry-detail__image-grid" data-mobile-horizontal-scroll="true">
+        <div className="mobile-entry-detail__image-grid" data-mobile-image-compact={compact || undefined} data-mobile-horizontal-scroll="true">
+            {addFirst && addButton}
             {images.map((image, index) => {
                 const src = toEntryImageSrc(image)
                 return (
@@ -38,15 +55,7 @@ export function MobileEntryImagesSection({
                     </button>
                 )
             })}
-            <button
-                type="button"
-                className="mobile-entry-detail__image-thumb mobile-entry-detail__image-thumb--add"
-                onClick={onAddImage}
-                aria-label="添加图片"
-            >
-                <MobileAddIcon/>
-                <span>添加</span>
-            </button>
+            {!addFirst && addButton}
         </div>
     )
 }

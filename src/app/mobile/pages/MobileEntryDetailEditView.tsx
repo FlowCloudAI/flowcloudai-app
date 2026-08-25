@@ -1,15 +1,17 @@
-/** 移动端词条编辑主页：固定身份区与属性入口，正文占据剩余空间并独立滚动。 */
-import {type ComponentProps, type FocusEvent, type MouseEvent as ReactMouseEvent, type RefObject, useState} from 'react'
-import {Input} from 'flowcloudai-ui'
+/** 移动端词条编辑主页：身份与附件位于正文之前，正文聚焦时两者平滑折叠。 */
+import {type ComponentProps, type MouseEvent as ReactMouseEvent, type RefObject, useState} from 'react'
+import {Input, Select} from 'flowcloudai-ui'
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
+import {type EntryImage} from '../../../features/entries/lib/entryImage'
 import {
-    MobileBackIcon,
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
+import MobileImageViewer from '../components/MobileImageViewer'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
+import {MobileEntryImagesSection} from './MobileEntryImagesSection'
 import {MOBILE_MARKDOWN_TOOLS, type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
 import {MobileMarkdownToolIcon} from './MobileEntryMarkdownTools'
 
@@ -28,6 +30,12 @@ interface Props {
     onTitle: (value: string) => void
     summary: string
     onSummary: (value: string) => void
+    entryTypeValue: string
+    entryTypeOptions: Array<{value: string; label: string}>
+    onEntryType: (value: string) => void
+    categoryValue: string
+    categoryOptions: Array<{value: string; label: string}>
+    onCategory: (value: string) => void
     content: string
     previewContent: string
     onContentChange: (value: string) => void
@@ -36,11 +44,12 @@ interface Props {
     onMarkdownTool: (tool: MobileMarkdownTool) => void
     /** 内联预览里的链接点击。缺了它 WebView 会直接导航到 fc:// 并把应用换成错误页。 */
     onPreviewMarkdownClick: (event: ReactMouseEvent<HTMLDivElement>) => void
-    entryTypeLabel: string
-    categoryLabel: string
     tagCount: number
     imageCount: number
     relationCount: number
+    images: EntryImage[]
+    onAddImage: () => void
+    onOpenImage: (index: number) => void
     onOpenProperties: () => void
     immersiveOpen: boolean
     onOpenImmersive: () => void
@@ -52,13 +61,13 @@ interface Props {
     onWikiIndex: (index: number) => void
     onWikiCommit: (option: MobileWikiOption) => void
     immersiveProps: Omit<ComponentProps<typeof MobileEntryImmersiveEditor>, 'wikiPanel'>
+    imageViewerProps: ComponentProps<typeof MobileImageViewer>
     imageAddProps: ComponentProps<typeof EntryImageAddModal>
 }
 
-export default function MobileEntryDetailEditView({editorRef, immersiveProps, imageAddProps, ...p}: Props) {
+export default function MobileEntryDetailEditView({editorRef, immersiveProps, imageViewerProps, imageAddProps, ...p}: Props) {
     const [bodyMode, setBodyMode] = useState<'edit' | 'preview'>('edit')
     const [bodyFocused, setBodyFocused] = useState(false)
-    const [identityFocused, setIdentityFocused] = useState(false)
     const wikiPanel = p.wikiDraft ? (
         <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
             <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
@@ -104,19 +113,12 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
             p.textareaProps.onBlur?.(event)
         },
     }
-    const handleIdentityFocus = () => setIdentityFocused(true)
-    const handleIdentityBlur = (event: FocusEvent<HTMLElement>) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
-        setIdentityFocused(false)
-    }
-
     return (
         <div
             className="mobile-page mobile-nav-safe-fixed mobile-entry-detail mobile-entry-detail--edit"
             data-mobile-editing="true"
             data-immersive-open={p.immersiveOpen || undefined}
             data-body-focused={bodyFocused || undefined}
-            data-identity-focused={identityFocused || undefined}
             inert={p.immersiveOpen}
         >
             <MobilePageTopBar
@@ -128,7 +130,8 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                     actions={[{
                         key: 'cancel',
                         label: '取消编辑',
-                        icon: <MobileBackIcon/>,
+                        icon: <span className="mobile-top-action-pill__text">取消</span>,
+                        kind: 'text',
                         disabled: p.saving,
                         onClick: p.onCancel,
                     }]}
@@ -141,8 +144,8 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                     actions={[{
                         key: 'save',
                         label: p.saving ? '保存中' : '保存词条',
-                        icon: <MobileEntryDetailActionIcon type={p.saving ? 'more' : 'save'}/>,
-                        kind: 'add',
+                        icon: <span className="mobile-top-action-pill__text">{p.saving ? '保存中…' : '保存'}</span>,
+                        kind: 'text',
                         disabled: p.saving,
                         onClick: p.onSave,
                     }]}
@@ -151,14 +154,33 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
 
             {p.error && <div className="mobile-page__error-banner" role="alert"><span>{p.error}</span></div>}
 
-            <section className="mobile-entry-detail__identity" onFocus={handleIdentityFocus} onBlur={handleIdentityBlur}>
-                {/* 内层容器承载实际内容，外层只负责 grid 0fr/1fr 的可过渡折叠。 */}
-                <div className="mobile-entry-detail__identity-inner">
-                    <Input placeholder="未命名词条" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
-                    <div className="mobile-entry-detail__field-heading"><span>摘要</span><small>{p.summary.length} 字</small></div>
-                    <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+            <div className="mobile-entry-detail__edit-meta">
+                <div className="mobile-entry-detail__edit-meta-inner">
+                    <section className="mobile-entry-detail__identity" aria-label="词条身份">
+                        <div className="mobile-entry-detail__identity-inner">
+                            <Input placeholder="未命名词条" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
+                            <div className="mobile-entry-detail__identity-selects">
+                                <Select value={p.entryTypeValue} onValueChange={value => p.onEntryType(String(value ?? ''))} options={p.entryTypeOptions} placeholder="词条类型" className="mobile-entry-detail__identity-select"/>
+                                <Select value={p.categoryValue} onValueChange={value => p.onCategory(String(value ?? ''))} options={p.categoryOptions} placeholder="所属分类" className="mobile-entry-detail__identity-select"/>
+                            </div>
+                            <div className="mobile-entry-detail__field-heading"><span>摘要</span><small>{p.summary.length} 字</small></div>
+                            <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+                        </div>
+                    </section>
+
+                    <section className="mobile-entry-detail__attachments" aria-label="词条附件与属性">
+                        <MobileEntryImagesSection images={p.images} onAddImage={p.onAddImage} onOpenImage={p.onOpenImage} addFirst compact/>
+                        <button type="button" className="mobile-entry-detail__properties-entry" onClick={p.onOpenProperties} aria-label="打开词条属性页">
+                            <span className="mobile-entry-detail__properties-chips">
+                                <span className="mobile-entry-detail__property-pill">{p.tagCount} 标签</span>
+                                <span className="mobile-entry-detail__property-pill">{p.relationCount} 关系</span>
+                                <span className="mobile-entry-detail__property-pill">{p.imageCount} 图片</span>
+                            </span>
+                            <span className="mobile-entry-detail__properties-more">属性 ›</span>
+                        </button>
+                    </section>
                 </div>
-            </section>
+            </div>
 
             <section className="mobile-entry-detail__body-pane" aria-label="正文">
                 <div className="mobile-entry-detail__body-head">
@@ -201,17 +223,6 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                 </div>
             </section>
 
-            <button type="button" className="mobile-entry-detail__properties-entry" onClick={p.onOpenProperties} aria-label="打开词条属性页">
-                <span className="mobile-entry-detail__properties-chips">
-                    <span className="mobile-entry-detail__property-pill mobile-entry-detail__property-pill--accent">{p.entryTypeLabel}</span>
-                    <span className="mobile-entry-detail__property-pill">{p.categoryLabel}</span>
-                    <span className="mobile-entry-detail__property-pill">{p.tagCount} 标签</span>
-                    <span className="mobile-entry-detail__property-pill">{p.imageCount} 图</span>
-                    <span className="mobile-entry-detail__property-pill">{p.relationCount} 关系</span>
-                </span>
-                <span className="mobile-entry-detail__properties-more">属性 ›</span>
-            </button>
-
             <div className="mobile-entry-detail__markdown-toolbar mobile-entry-detail__markdown-toolbar--inline" role="toolbar" aria-label="Markdown 常用工具" data-mobile-horizontal-scroll="true">
                 {MOBILE_MARKDOWN_TOOLS.map(item => (
                     <button key={item.tool} type="button" className="mobile-entry-detail__markdown-tool" aria-label={item.label} title={item.label} onMouseDown={event => event.preventDefault()} onClick={() => p.onMarkdownTool(item.tool)}>
@@ -221,6 +232,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
             </div>
 
             {p.immersiveOpen && <MobileEntryImmersiveEditor {...immersiveProps} wikiPanel={wikiPanel}/>}
+            <MobileImageViewer {...imageViewerProps}/>
             <EntryImageAddModal {...imageAddProps}/>
         </div>
     )

@@ -608,22 +608,31 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             onSelect: (event: ReactSyntheticEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
             onFocus: handleContentFocus, onBlur: handleContentBlur,
         }
-        const activeType = entryType ? entryTypes.find(type => entryTypeKey(type) === entryType) : null
-        const activeCategory = categoryId ? categories.find(category => category.id === categoryId) : null
+        const entryTypeOptions = [
+            {value: '', label: '无类型'},
+            ...entryTypes.map(type => ({value: entryTypeKey(type), label: type.name})),
+        ]
+        const categoryOptions = [
+            {value: '', label: '无分类'},
+            ...categories.map(category => ({value: category.id, label: category.name})),
+        ]
         return <MobileEntryDetailEditView
             saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
+            entryTypeValue={entryType ?? ''} entryTypeOptions={entryTypeOptions} onEntryType={value => updateDraft({entryType: value || null})}
+            categoryValue={categoryId ?? ''} categoryOptions={categoryOptions} onCategory={value => updateDraft({categoryId: value || null})}
             content={content} previewContent={buildMarkdownPreviewSource(content, images)} onContentChange={handleContentChange}
             editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
             onPreviewMarkdownClick={handleEditPreviewMarkdownClick}
-            entryTypeLabel={activeType?.name ?? '无类型'} categoryLabel={activeCategory?.name ?? '无分类'}
             tagCount={entryTags.visibleTagSchemas.length} imageCount={images.length} relationCount={relationDrafts.length}
+            images={images} onAddImage={() => imageActions.setImageAddModalOpen(true)} onOpenImage={imageActions.openImage}
             onOpenProperties={() => push({type: 'entryProperties', params: {projectId, entryId, displayName: title || entry.title, isPlaceholder: params.isPlaceholder}})}
             immersiveOpen={immersiveEditorOpen} onOpenImmersive={() => setImmersiveEditorOpen(true)}
             wikiDraft={wikiDraft} wikiOptions={wikiLinkOptions} activeWikiIndex={activeWikiOptionIndex}
             categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
             onWikiIndex={setActiveWikiOptionIndex} onWikiCommit={handleWikiOptionCommit}
             immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
+            imageViewerProps={{open: imageActions.lightboxOpen, images, currentIndex: imageActions.lightboxIndex, title: title || entry.title || '未命名词条', mode: 'manage', onClose: () => imageActions.setLightboxOpen(false), onIndexChange: imageActions.setLightboxIndex, onSetCover: imageActions.handleSetCover, onRemove: imageActions.handleRemoveImage, onRemoveMany: imageActions.handleRemoveImages, onAddImage: () => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
             imageAddProps={{open: imageActions.imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => imageActions.setImageAddModalOpen(false), onUploadLocal: imageActions.handleUploadImages, onCapturePhoto: imageActions.handleCaptureImage, onAddAiImages: imageActions.handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }, onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}}
         />
     }

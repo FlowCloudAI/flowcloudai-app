@@ -191,6 +191,25 @@
     color: var(--fc-color-text-on-primary);
 }
 
+.mobile-top-action-pill:has(.mobile-top-action-pill__button--text:only-child) {
+    width: auto;
+    padding-inline: var(--mobile-gap-inline);
+}
+
+.mobile-top-action-pill__button--text {
+    width: auto;
+    min-width: var(--mobile-top-action-size);
+    flex-basis: auto;
+    padding-inline: var(--mobile-gap-inline);
+}
+
+.mobile-top-action-pill__text {
+    color: currentColor;
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-strong);
+    white-space: nowrap;
+}
+
 .mobile-top-action-pill__button:active {
     transform: scale(0.98);
 }
