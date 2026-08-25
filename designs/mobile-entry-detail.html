@@ -445,13 +445,25 @@
         }
 
         /* --- 区块标题 --- */
+        /* 区块标题是页面骨架，不是内容。
+           它此前和正文自己的 h3 同为 22px strong，「正文」和紧随其后的「出身」
+           读起来是同一层，分不清哪个是章节名。改成弱化标签 + 右侧细线，
+           把 title 这一档整个让给正文里真正的标题。 */
         .section-head {
             display: flex; margin-bottom: var(--mobile-gap-item);
-            gap: var(--mobile-gap-inline); align-items: baseline;
+            gap: var(--mobile-gap-inline); align-items: center;
         }
-        .section-head h2 { margin: 0; font-size: var(--mobile-text-title); font-weight: var(--mobile-weight-strong); }
-        .section-head .note { color: var(--fc-color-text-tertiary); font-size: var(--mobile-text-meta); }
+        .section-head h2 {
+            margin: 0; color: var(--fc-color-text-tertiary);
+            font-size: var(--mobile-text-meta); font-weight: var(--mobile-weight-medium);
+            letter-spacing: .04em; white-space: nowrap;
+        }
+        .section-head .note { color: var(--fc-color-text-tertiary); font-size: var(--mobile-text-meta); white-space: nowrap; }
         .section-head .spacer { flex: 1 1 auto; }
+        .section-head::after {
+            content: ''; flex: 1 1 auto; height: 1px; min-width: var(--mobile-gap-group);
+            background: color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+        }
 
         .section + .section { margin-top: var(--mobile-gap-section); }
 
