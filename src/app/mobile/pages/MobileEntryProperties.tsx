@@ -18,7 +18,6 @@ import {
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import TagCreator from '../../../features/entries/components/TagCreator'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
-import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import type {EntryImage} from '../../../features/entries/lib/entryImage'
 import {logger} from '../../../shared/logger'
@@ -28,6 +27,7 @@ import {
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
+import MobileImageViewer from '../components/MobileImageViewer'
 import type {MobileBeforeLeave} from '../mobileBackNavigation'
 import {
     updateMobileEntryEditDraft,
@@ -205,7 +205,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
 
             <EntryTypeCreator open={typeCreatorOpen} projectId={projectId} existingNames={entryTypes.map(type => type.name)} onClose={() => setTypeCreatorOpen(false)} onSaved={created => void handleTypeCreated(created)}/>
             <TagCreator open={tagCreatorOpen} projectId={projectId} entryTypes={entryTypes} existingNames={entryTags.localTagSchemas.map(schema => schema.name)} existingCount={entryTags.localTagSchemas.length} onClose={() => setTagCreatorOpen(false)} onSaved={handleTagSchemaSaved}/>
-            <EntryImageLightbox open={imageActions.lightboxOpen} images={imageActions.lightboxImages} currentIndex={imageActions.lightboxIndex} infoTitle={draft.title || '未命名词条'} onClose={() => imageActions.setLightboxOpen(false)} onIndexChange={imageActions.setLightboxIndex} onSetCover={imageActions.handleSetCover} onRemove={imageActions.handleRemoveImage} onRemoveMany={imageActions.handleRemoveImages} onAddImage={() => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }}/>
+            <MobileImageViewer open={imageActions.lightboxOpen} images={draft.images} currentIndex={imageActions.lightboxIndex} title={draft.title || '未命名词条'} mode="manage" onClose={() => imageActions.setLightboxOpen(false)} onIndexChange={imageActions.setLightboxIndex} onSetCover={imageActions.handleSetCover} onRemove={imageActions.handleRemoveImage} onRemoveMany={imageActions.handleRemoveImages} onAddImage={() => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }}/>
             <EntryImageAddModal open={imageActions.imageAddModalOpen} projectId={projectId} entryTitle={draft.title || null} entrySummary={draft.summary || null} entryType={draft.entryType} existingImages={draft.images} onClose={() => imageActions.setImageAddModalOpen(false)} onUploadLocal={imageActions.handleUploadImages} onCapturePhoto={imageActions.handleCaptureImage} onAddAiImages={imageActions.handleAddAiImages} onOpenAiSettings={pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}/>
         </div>
     )

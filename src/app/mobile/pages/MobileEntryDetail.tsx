@@ -62,7 +62,7 @@ import {
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
-import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
+import MobileImageViewer from '../components/MobileImageViewer'
 import {
     areImagesEqual,
     buildTagDraft,
@@ -686,11 +686,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 onOpenLinkedEntry={handleOpenLinkedEntry}
                 onMarkdownClick={handleMarkdownClick}
             />
-            <EntryImageLightbox
+            <MobileImageViewer
                 open={imageActions.lightboxOpen}
-                images={imageActions.lightboxImages}
+                images={viewImages}
                 currentIndex={imageActions.lightboxIndex}
-                infoTitle={entry.title}
+                title={entry.title}
                 onClose={() => imageActions.setLightboxOpen(false)}
                 onIndexChange={imageActions.setLightboxIndex}
             />

@@ -1,5 +1,5 @@
 /** 移动端词条图片操作：统一文件导入、系统拍照、封面与删除，草稿归属由调用方决定。 */
-import {type Dispatch, type SetStateAction, useCallback, useMemo, useState} from 'react'
+import {type Dispatch, type SetStateAction, useCallback, useState} from 'react'
 import {useAlert} from 'flowcloudai-ui'
 import {
     captureSystemPhoto,
@@ -10,7 +10,7 @@ import {
     toApiError,
 } from '../../../api'
 import {openFileDialog} from '../../../api/dialog'
-import {type EntryImage, toEntryImageSrc} from '../../../features/entries/lib/entryImage'
+import {type EntryImage} from '../../../features/entries/lib/entryImage'
 import {removeEntryImages} from '../../../features/entries/lib/entryImageCollection'
 import {logger} from '../../../shared/logger'
 import {appendImages} from './MobileEntryDetailUtils'
@@ -26,11 +26,6 @@ export default function useMobileEntryImages({projectId, images, setImages}: Opt
     const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
-
-    const lightboxImages = useMemo(() => images.map(image => ({
-        ...image,
-        src: toEntryImageSrc(image),
-    })), [images])
 
     const handleUploadImages = useCallback(async (): Promise<EntryImage[]> => {
         try {
@@ -118,7 +113,6 @@ export default function useMobileEntryImages({projectId, images, setImages}: Opt
         setLightboxOpen,
         lightboxIndex,
         setLightboxIndex,
-        lightboxImages,
         handleUploadImages,
         handleCaptureImage,
         handleAddAiImages,
