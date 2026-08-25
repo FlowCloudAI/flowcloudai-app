@@ -483,7 +483,14 @@
         }
         .attr-chip--implanted { border-left-color: var(--fc-color-primary); }
         .attr-chip__name { flex: 0 0 auto; color: var(--fc-color-text-secondary); font-size: var(--mobile-text-meta); }
-        .attr-chip__value { min-width: 0; font-size: var(--mobile-text-body-sm); font-weight: var(--mobile-weight-medium); overflow-wrap: anywhere; }
+        /* 值不截断：长值让 chip 占满整行并自然换行。属性值可能是一整句设定，
+           截断等于让人必须进编辑态才能读完。 */
+        .attr-chip__value {
+            min-width: 0; font-size: var(--mobile-text-body-sm);
+            font-weight: var(--mobile-weight-medium);
+            line-height: var(--mobile-leading-snug); overflow-wrap: anywhere;
+        }
+        .attr-chip--long { width: 100%; }
 
         /* --- 正文 --- */
         .markdown { font-size: var(--mobile-text-body); line-height: var(--mobile-leading-normal); }
@@ -750,20 +757,23 @@
             <li><b>「清空」只在有值时出现。</b>旧版对空输入框也常驻一个「清空」按钮。</li>
         </ul>
 
-        <h2>需要你确认</h2>
+        <h2>已确认的决定（2026-08-25）</h2>
         <ul>
-            <li><b>元数据上移的代价在正文高度上。</b>本稿实测（设计稿画布，非真机）：<br>
-                390×844 → 身份 209px、附件 62px、<b>正文可视 323px</b>（约 7 行）；<br>
-                360×740 → 身份 209px、附件 62px、<b>正文可视 219px</b>（约 4 行）。<br>
-                点进正文后身份与附件折叠，正文分别回到约 660px / 560px。
-                <b>小屏 219px 是这套排版最薄弱的一处</b>，要不要接受，或者在 &lt;740px 高度时默认折叠附件条。</li>
-            <li>展示态没有主图时<b>完全不占位</b>（见「无图片」状态），还是留一个可点的添加位。</li>
-            <li>「更新于」用<b>绝对日期</b>还是相对时间。本稿用绝对日期，列表页用的是相对时间，两处会不一致。</li>
-            <li>展示态的关联区<b>故意不给「添加关系」入口</b>——保持只读，加关系走编辑态，避免旧版「查看页其实是个表单」的滑坡。</li>
-            <li>图片浏览器<b>沿用桌面端 <code>EntryImageLightbox</code> 组件</b>还是移动端另写一个？桌面版带缩放控件与画廊多选，移动端更适合捏合缩放 + 滑动翻页。本稿画的是移动端形态。</li>
-            <li>属性 chip 在<b>值很长时</b>（例如一整句设定）会撑成整行。要不要给单条 chip 设上限并截断。</li>
-            <li>编辑态预览里的<b>双链目前只提示不跳转</b>（2026-08-25 修复顶层导航时的取舍）。要不要改成「保存并跳转」。</li>
-            <li>属性页的<b>关系仍在最下方</b>——它是唯一真正属于「附件」的东西，且条目可能很多。</li>
+            <li><b>元数据上移的代价可接受。</b>默认态正文可视高度 390×844 为 323px、360×740 为 219px（本稿画布实测）；点进正文后身份区与附件条折叠，分别回到约 660px / 560px。不为小屏另做折叠规则。</li>
+            <li><b>无图时不占位。</b>不存在的信息不占用空间，展示态没有主图就直接不渲染主图区（见「无图片、无属性」状态）。</li>
+            <li><b>时间用绝对日期</b>，与桌面端一致。移动端词条列表 <code>MobileEntryList.formatDate</code> 本来就是绝对时间（<code>08/24 19:41</code>），两处一致；首页「继续创作」卡片的相对时间（<code>MobileHomeUi</code>）属于另一种场景，不在此统一。</li>
+            <li><b>展示态不提供任何编辑能力。</b>关联区不给「添加关系」入口，图片区不给增删，属性不可就地编辑。要改就进编辑态。</li>
+            <li><b>图片浏览器移动端自写</b>，参考桌面端 <code>EntryImageLightbox</code> 的能力集，但不复用它的实现：桌面那套是「预览/画廊切换 + 百分比缩放按钮 + 键盘方向键」，移动端应当是捏合缩放 + 滑动翻页 + 底部缩略图条。落地时 <code>MobileEntryProperties.tsx</code> 里现有的桌面 <code>EntryImageLightbox</code> 也要一并换掉。</li>
+            <li><b>属性值不截断。</b>长值让 chip 占满整行并自然换行，允许多行（见「出身」那条）。属性值可能是一整句设定，截断等于逼人进编辑态才能读完。</li>
+            <li><b>编辑态预览的双链不跳转</b>，维持 2026-08-25 修复顶层导航时的处理：只提示「保存后可在查看态打开」。不做「保存并跳转」。</li>
+            <li><b>关系放在属性页最下方</b>，桌面端也是这个位置，算统一设计。</li>
+        </ul>
+
+        <h2>落地时的注意事项</h2>
+        <ul>
+            <li>分类只读依赖 <code>plans/ENTRY-CLIPBOARD.md</code> 的剪切/复制/多选先有替代入口，否则用户会没有任何办法改归属。<b>两者要一起排期</b>，不能只做前者。</li>
+            <li>展示态属性只列有值项，需要一个新的筛选集合——现有 <code>browseVisibleTagSchemas</code> 会把未填写的植入标签也算进来，不能直接用。</li>
+            <li>正反链收起态需要计数，而计数依赖 <code>ensureProjectEntries</code> 解析出的标题；收起时可以只取长度，不必等标题解析完成。</li>
         </ul>
     </aside>
 
@@ -805,6 +815,7 @@
                         <span class="attr-chip attr-chip--implanted"><span class="attr-chip__name">战力</span><span class="attr-chip__value">98</span></span>
                         <span class="attr-chip"><span class="attr-chip__name">阵营</span><span class="attr-chip__value">取经队伍</span></span>
                         <span class="attr-chip"><span class="attr-chip__name">兵器</span><span class="attr-chip__value">如意金箍棒</span></span>
+                        <span class="attr-chip attr-chip--long"><span class="attr-chip__name">出身</span><span class="attr-chip__value">东胜神洲傲来国花果山顶一块仙石，受天真地秀、日精月华，迸裂产一石卵，见风化作石猴</span></span>
                     </div>
 
                     <section class="section">
