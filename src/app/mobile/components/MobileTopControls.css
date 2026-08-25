@@ -185,6 +185,12 @@
     font-weight: var(--mobile-weight-strong);
 }
 
+/* 详情页的主编辑动作要从同组的辅助动作里显式突出。 */
+.mobile-top-action-pill__button--primary {
+    background: var(--fc-color-primary);
+    color: var(--fc-color-text-on-primary);
+}
+
 .mobile-top-action-pill__button:active {
     transform: scale(0.98);
 }

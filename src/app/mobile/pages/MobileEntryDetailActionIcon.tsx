@@ -1,4 +1,5 @@
-export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' | 'save' | 'expand' }) {
+/** 词条详情专用线性图标；方向箭头与关系语义保持一一对应。 */
+export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' | 'save' | 'expand' | 'relation-outgoing' | 'relation-incoming' | 'relation-two-way' | 'link-outgoing' | 'link-incoming' | 'chevron' }) {
     if (type === 'ai') {
         return (
             <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
@@ -49,6 +50,34 @@ export function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'mor
                 <path d="M12 10v8"/>
                 <path d="M16 10v8"/>
                 <path d="M7 7.5 8 20h8l1-12.5"/>
+            </svg>
+        )
+    }
+    if (type === 'relation-outgoing' || type === 'link-outgoing') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d={type === 'link-outgoing' ? 'M6 18 18 6M10 6h8v8' : 'M5 12h14M14 7l5 5-5 5'}/>
+            </svg>
+        )
+    }
+    if (type === 'relation-incoming' || type === 'link-incoming') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d={type === 'link-incoming' ? 'M18 6 6 18M14 18H6v-8' : 'M19 12H5m5-5-5 5 5 5'}/>
+            </svg>
+        )
+    }
+    if (type === 'relation-two-way') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5 9h14m-4-4 4 4-4 4M19 15H5m4 4-4-4 4-4"/>
+            </svg>
+        )
+    }
+    if (type === 'chevron') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="m8 10 4 4 4-4"/>
             </svg>
         )
     }

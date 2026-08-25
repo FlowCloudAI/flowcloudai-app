@@ -20,6 +20,7 @@ import EntryCoverImage from '../../../features/entries/components/EntryCoverImag
 import {getMeaningfulCoverMark} from '../../../shared/lib/defaultCover'
 import {MobileAddIcon, MobileBackIcon, MobileMenuIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
+import {formatMobileEntryListDate} from './MobileEntryDate'
 import './MobileEntryList.css'
 
 interface Props {
@@ -30,16 +31,6 @@ interface Props {
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
     params: MobileEntryListPageParams
-}
-
-function formatDate(s?: string | null): string {
-    if (!s) return '未知'
-    const normalized = s.includes('T') ? s : s.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const t = new Date(withTimezone).getTime()
-    return Number.isNaN(t) ? '未知' : new Intl.DateTimeFormat('zh-CN', {
-        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    }).format(t)
 }
 
 /** 首屏与每次「加载更多」的页大小。 */
@@ -393,7 +384,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                                     )}
                                     title={entry.title}
                                     description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
-                                    extraInfo={<div className="mobile-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
+                                    extraInfo={<div className="mobile-entry-date">更新于 {formatMobileEntryListDate(entry.updated_at)}</div>}
                                     tag={et ? (
                                         <span className="mobile-entry-card__tag">
                                             <EntryTypeIcon entryType={et} className="mobile-entry-card__tag-icon"/> {et.name}

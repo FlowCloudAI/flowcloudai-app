@@ -48,7 +48,7 @@ import {
     resolveInternalEntryProjectId,
     resolveMarkdownAnchor,
 } from '../../../features/entries/lib/entryMarkdown'
-import {areTagMapsEqual} from '../../../features/entries/lib/entryTag'
+import {areTagMapsEqual, getComparableTagValue} from '../../../features/entries/lib/entryTag'
 import {recordHomeActivity} from '../../../features/home/homeActivity'
 import {
     buildEntryImageMarkdownRef,
@@ -62,6 +62,7 @@ import {
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
+import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import {
     areImagesEqual,
     buildTagDraft,
@@ -74,6 +75,7 @@ import MobileEntryDetailEditView from './MobileEntryDetailEditView'
 import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import useMobileEntryWikiEditor from './useMobileEntryWikiEditor'
 import useMobileEntryImages from './useMobileEntryImages'
+import {formatMobileEntryUpdatedDate} from './MobileEntryDate'
 import {
     clearMobileEntryEditDraft,
     ensureMobileEntryEditDraft,
@@ -636,7 +638,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         : undefined
 
     const viewTagMap = tagDraft
-    const viewTagSchemas = entryTags.browseVisibleTagSchemas
+    // 查看态只呈现真正有值的属性；植入标签即使需要在编辑态常驻，空值也不应占阅读空间。
+    const viewTagSchemas = entryTags.visibleTagSchemas.filter((schema) => {
+        const value = getComparableTagValue(viewTagMap, schema)
+        return value !== null && value !== ''
+    })
     const viewImages = normalizeEntryImages(entry.images)
     const viewMarkdownSource = buildMarkdownPreviewSource(entry.content ?? '', viewImages)
     const viewRelationDrafts = entryRelations
@@ -644,33 +650,50 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         .filter(relation => relation.otherEntryId)
     const hasConnections = viewRelationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
 
+    const viewCategory = entry.category_id
+        ? categories.find(category => category.id === entry.category_id) ?? null
+        : null
+
     return (
-        <MobileEntryDetailView
-            pageRef={pageRef}
-            topActionsRef={topActionsRef}
-            entry={entry} error={loadError}
-            entryType={et}
-            typeBadgeStyle={typeBadgeStyle}
-            viewTagSchemas={viewTagSchemas}
-            implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
-            viewTagMap={viewTagMap}
-            viewImages={viewImages}
-            viewMarkdownSource={viewMarkdownSource}
-            viewRelationDrafts={viewRelationDrafts}
-            hasConnections={hasConnections}
-            outgoingLinks={outgoingLinks}
-            incomingLinks={incomingLinks}
-            entryBriefById={entryBriefById}
-            connectionsResolving={hasConnectionData && !projectEntriesLoaded}
-            colorMode={colorMode}
-            menuOpen={menuOpen}
-            setMenuOpen={setMenuOpen}
-            onBack={pop}
-            onAiDiscuss={handleAiDiscuss}
-            onEdit={enterEdit}
-            onDelete={handleDelete}
-            onOpenLinkedEntry={handleOpenLinkedEntry}
-            onMarkdownClick={handleMarkdownClick}
-        />
+        <>
+            <MobileEntryDetailView
+                pageRef={pageRef}
+                topActionsRef={topActionsRef}
+                entry={entry} error={loadError}
+                entryType={et}
+                categoryName={viewCategory?.name ?? null}
+                updatedDate={formatMobileEntryUpdatedDate(entry.updated_at)}
+                typeBadgeStyle={typeBadgeStyle}
+                viewTagSchemas={viewTagSchemas}
+                implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
+                viewTagMap={viewTagMap}
+                viewImages={viewImages}
+                viewMarkdownSource={viewMarkdownSource}
+                viewRelationDrafts={viewRelationDrafts}
+                hasConnections={hasConnections}
+                outgoingLinks={outgoingLinks}
+                incomingLinks={incomingLinks}
+                entryBriefById={entryBriefById}
+                connectionsResolving={hasConnectionData && !projectEntriesLoaded}
+                colorMode={colorMode}
+                menuOpen={menuOpen}
+                setMenuOpen={setMenuOpen}
+                onBack={pop}
+                onAiDiscuss={handleAiDiscuss}
+                onEdit={enterEdit}
+                onDelete={handleDelete}
+                onOpenImage={imageActions.openImage}
+                onOpenLinkedEntry={handleOpenLinkedEntry}
+                onMarkdownClick={handleMarkdownClick}
+            />
+            <EntryImageLightbox
+                open={imageActions.lightboxOpen}
+                images={imageActions.lightboxImages}
+                currentIndex={imageActions.lightboxIndex}
+                infoTitle={entry.title}
+                onClose={() => imageActions.setLightboxOpen(false)}
+                onIndexChange={imageActions.setLightboxIndex}
+            />
+        </>
     )
 }
