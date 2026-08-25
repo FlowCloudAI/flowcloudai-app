@@ -55,6 +55,7 @@ export function MobileEntryTagsSection({
                             value={tagDraft[schema.id] ?? tagDraft[schema.name] ?? null}
                             implanted={implantedTagSchemaIdSet.has(schema.id)}
                             mode="edit"
+                            layout="row"
                             onChange={(value) => onTagDraftChange(prev => {
                                 const nextValue = normalizeComparableTagValue(value)
                                 if (getComparableTagValue(prev, schema) === nextValue) return prev

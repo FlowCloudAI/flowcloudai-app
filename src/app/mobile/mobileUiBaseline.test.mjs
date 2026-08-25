@@ -103,7 +103,7 @@ test('所有动效都有减少动态效果降级', () => {
 
 test('横向滚动区声明手势豁免属性', () => {
     const scrollClasses = [
-        'mobile-entry-detail__type-options',
+        // 词条类型 chips 在属性页改为换行布局，不再是横向滚动区。
         'mobile-entry-detail__image-grid',
         'mobile-entry-detail__markdown-toolbar',
         'mobile-entry-list__filters',

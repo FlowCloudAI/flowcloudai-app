@@ -19,6 +19,7 @@ const projectHomeSource = read('./pages/MobileProjectHome.tsx')
 const entryListSource = read('./pages/MobileEntryList.tsx')
 const navGuardSource = read('../../shared/hooks/useTopLevelNavigationGuard.ts')
 const appShellSource = read('../index/AppShell.tsx')
+const tagItemSource = read('../../features/entries/components/HighLightTagItem.tsx')
 
 test('词条属性与关系编辑使用完整页面栈，不回退到底部面板', () => {
     assert.match(stackSource, /entryProperties:\s*MobileEntryEditChildPageParams/)
@@ -110,4 +111,17 @@ test('移动图片浏览器使用公共全屏 Overlay，并支持捏合、横滑
     assert.match(detailSource, /<MobileImageViewer/)
     assert.match(propertiesSource, /<MobileImageViewer/)
     assert.doesNotMatch(`${detailSource}\n${propertiesSource}`, /EntryImageLightbox/)
+})
+
+test('属性与关系页使用分组列表，类型换行且标签值保持紧凑行式编辑', () => {
+    assert.doesNotMatch(propertiesSource, /mobile-entry-detail__type-options" data-mobile-horizontal-scroll/)
+    assert.match(detailCssSource, /mobile-entry-properties \.mobile-entry-detail__type-options[\s\S]*?flex-wrap: wrap/)
+    assert.match(propertiesSource, /mobile-entry-properties__group--tags/)
+    assert.ok(propertiesSource.indexOf('mobile-entry-properties__group--tags') < propertiesSource.indexOf('mobile-entry-properties__group--relations'))
+    assert.match(relationSource, /mobile-entry-relation-editor__group/)
+    assert.match(tagItemSource, /layout === 'row'/)
+    assert.match(tagItemSource, /schema\.range_min === 0 && schema\.range_max == null/)
+    assert.match(tagItemSource, /value != null && value !== ''/)
+    assert.match(tagItemSource, /type="text"/)
+    assert.match(tagItemSource, /inputMode=\{schema\.type === 'number' \? 'decimal' : 'text'\}/)
 })

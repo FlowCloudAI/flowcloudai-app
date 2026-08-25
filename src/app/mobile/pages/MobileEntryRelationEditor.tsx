@@ -144,7 +144,7 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
             />
 
             <div className="mobile-entry-relation-editor__content">
-                <section className="mobile-entry-properties__group">
+                <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
                     <div className="mobile-entry-properties__label"><span>目标词条</span><small>项目内 {Math.max(0, entries.length - 1)} 条</small></div>
                     <Input value={search} onValueChange={setSearch} placeholder="搜索词条标题" className="mobile-entry-relation-editor__search"/>
                     <div className="mobile-entry-relation-editor__results">
@@ -164,7 +164,7 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
                     </div>
                 </section>
 
-                <section className="mobile-entry-properties__group">
+                <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
                     <div className="mobile-entry-properties__label"><span>关系方向</span></div>
                     <div className="mobile-entry-relation-editor__directions" role="group" aria-label="关系方向">
                         {DIRECTIONS.map(direction => (
@@ -173,7 +173,7 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
                     </div>
                 </section>
 
-                <section className="mobile-entry-properties__group">
+                <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
                     <div className="mobile-entry-properties__label"><span>关系说明</span><small>选填</small></div>
                     <Input value={currentRelation.content} onValueChange={value => updateRelation({content: value})} placeholder="例如：师徒、同伴、敌对"/>
                 </section>

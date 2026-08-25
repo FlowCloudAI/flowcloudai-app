@@ -20,6 +20,7 @@ interface HighLightTagItemProps {
     value?: HighLightTagValue
     implanted?: boolean
     mode?: 'show' | 'edit'
+    layout?: 'card' | 'row'
     onChange?: (value: HighLightTagValue) => void
     onRemove?: () => void
 }
@@ -39,6 +40,8 @@ function getTypeLabel(type: HighLightTagType): string {
 function getRangeText(schema: HighLightTagSchema): string | null {
     if (schema.type !== 'number') return null
     if (schema.range_min == null && schema.range_max == null) return null
+    // 新建数值标签的默认下界是 0；只有这一项时不构成有用的范围提示。
+    if (schema.range_min === 0 && schema.range_max == null) return null
     const min = schema.range_min ?? '不限'
     const max = schema.range_max ?? '不限'
     return `建议范围 ${min} - ${max}`
@@ -49,6 +52,7 @@ export default function HighLightTagItem({
                                               value = null,
                                               implanted = false,
                                               mode = 'show',
+                                              layout = 'card',
                                               onChange,
                                               onRemove,
                                           }: HighLightTagItemProps) {
@@ -66,7 +70,7 @@ export default function HighLightTagItem({
 
     return (
         <div
-            className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}${implanted ? ' is-implanted' : ''}${canRemove ? ' has-remove' : ''}`}
+            className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}${layout === 'row' ? ' is-row' : ''}${implanted ? ' is-implanted' : ''}${canRemove ? ' has-remove' : ''}`}
         >
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
@@ -127,7 +131,7 @@ export default function HighLightTagItem({
                         <Input
                             ref={numberInputRef}
                             className="highlight-tag-item__input"
-                            type={schema.type === 'number' ? 'number' : 'text'}
+                            type="text"
                             inputMode={schema.type === 'number' ? 'decimal' : 'text'}
                             size="lg"
                             radius="lg"
@@ -154,17 +158,18 @@ export default function HighLightTagItem({
                             }}
                             placeholder={schema.type === 'number' ? '输入数值' : '输入标签内容'}
                         />
-                        <button
-                            type="button"
-                            className="highlight-tag-item__clear"
-                            onClick={() => {
-                                if (numberInputRef.current) numberInputRef.current.value = ''
-                                onChange?.(null)
-                            }}
-                            disabled={value == null || value === ''}
-                        >
-                            清空
-                        </button>
+                        {value != null && value !== '' && (
+                            <button
+                                type="button"
+                                className="highlight-tag-item__clear"
+                                onClick={() => {
+                                    if (numberInputRef.current) numberInputRef.current.value = ''
+                                    onChange?.(null)
+                                }}
+                            >
+                                清空
+                            </button>
+                        )}
                     </div>
                 )
             ) : (

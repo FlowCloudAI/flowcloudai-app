@@ -153,9 +153,9 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
             {loading && <div className="mobile-page__loading">加载属性…</div>}
             {!loading && (
                 <div className="mobile-entry-properties__content">
-                    <section className="mobile-entry-properties__group">
+                    <section className="mobile-entry-properties__group mobile-entry-properties__group--types">
                         <div className="mobile-entry-properties__label"><span>词条类型</span><button type="button" onClick={() => setTypeCreatorOpen(true)}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button></div>
-                        <div className="mobile-entry-detail__type-options" data-mobile-horizontal-scroll="true">
+                        <div className="mobile-entry-detail__type-options">
                             <button type="button" aria-pressed={draft.entryType === null} className={`mobile-entry-detail__type-option${draft.entryType === null ? ' is-active' : ''}`} onClick={() => updateDraft({entryType: null})}>不设置</button>
                             {entryTypes.map(type => {
                                 const key = entryTypeKey(type)
@@ -164,17 +164,17 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                         </div>
                     </section>
 
-                    <section className="mobile-entry-properties__group">
+                    <section className="mobile-entry-properties__group mobile-entry-properties__group--category">
                         <div className="mobile-entry-properties__label"><span>所属分类</span></div>
                         <Select value={draft.categoryId ?? ''} onValueChange={value => updateDraft({categoryId: value ? String(value) : null})} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/>
                     </section>
 
-                    <section className="mobile-entry-properties__group">
+                    <section className="mobile-entry-properties__group mobile-entry-properties__group--images">
                         <div className="mobile-entry-properties__label"><span>图片</span><small>{draft.images.length} 张</small></div>
                         <MobileEntryImagesSection images={draft.images} onAddImage={() => imageActions.setImageAddModalOpen(true)} onOpenImage={imageActions.openImage}/>
                     </section>
 
-                    <section className="mobile-entry-properties__group">
+                    <section className="mobile-entry-properties__group mobile-entry-properties__group--tags">
                         <div className="mobile-entry-properties__label"><span>标签</span><button type="button" onClick={() => setTagCreatorOpen(true)}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建标签</button></div>
                         <MobileEntryTagsSection
                             hasTagDefinitions={entryTags.localTagSchemas.length > 0}
@@ -188,7 +188,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                         />
                     </section>
 
-                    <section className="mobile-entry-properties__group">
+                    <section className="mobile-entry-properties__group mobile-entry-properties__group--relations">
                         <div className="mobile-entry-properties__label"><span>词条关系</span><small>{draft.relationDrafts.length} 条</small></div>
                         <div className="mobile-entry-properties__relation-list">
                             {draft.relationDrafts.map((relation, index) => (
