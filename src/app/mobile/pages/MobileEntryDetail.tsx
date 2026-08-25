@@ -612,15 +612,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             {value: '', label: '无类型'},
             ...entryTypes.map(type => ({value: entryTypeKey(type), label: type.name})),
         ]
-        const categoryOptions = [
-            {value: '', label: '无分类'},
-            ...categories.map(category => ({value: category.id, label: category.name})),
-        ]
         return <MobileEntryDetailEditView
             saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
             entryTypeValue={entryType ?? ''} entryTypeOptions={entryTypeOptions} onEntryType={value => updateDraft({entryType: value || null})}
-            categoryValue={categoryId ?? ''} categoryOptions={categoryOptions} onCategory={value => updateDraft({categoryId: value || null})}
+            categoryLabel={categoryId ? (categoryNameById.get(categoryId) ?? '') : ''}
             content={content} previewContent={buildMarkdownPreviewSource(content, images)} onContentChange={handleContentChange}
             editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
             onPreviewMarkdownClick={handleEditPreviewMarkdownClick}

@@ -33,9 +33,8 @@ interface Props {
     entryTypeValue: string
     entryTypeOptions: Array<{value: string; label: string}>
     onEntryType: (value: string) => void
-    categoryValue: string
-    categoryOptions: Array<{value: string; label: string}>
-    onCategory: (value: string) => void
+    /** 只读展示用；分类归属不在词条编辑内部变更。 */
+    categoryLabel: string
     content: string
     previewContent: string
     onContentChange: (value: string) => void
@@ -159,22 +158,40 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                     <section className="mobile-entry-detail__identity" aria-label="词条身份">
                         <div className="mobile-entry-detail__identity-inner">
                             <Input placeholder="未命名词条" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
+                            {/*
+                              * 两个下拉必须带常驻标签：类型和分类可以取同名（真机上就出现过
+                              * 「人物 / 人物」两个一模一样的框），placeholder 在有值时不显示，
+                              * 光看控件分不出哪个是哪个。
+                              */}
                             <div className="mobile-entry-detail__identity-selects">
-                                <Select value={p.entryTypeValue} onValueChange={value => p.onEntryType(String(value ?? ''))} options={p.entryTypeOptions} placeholder="词条类型" className="mobile-entry-detail__identity-select"/>
-                                <Select value={p.categoryValue} onValueChange={value => p.onCategory(String(value ?? ''))} options={p.categoryOptions} placeholder="所属分类" className="mobile-entry-detail__identity-select"/>
+                                <div className="mobile-entry-detail__identity-field">
+                                    <span className="mobile-entry-detail__identity-field-label">类型</span>
+                                    <Select value={p.entryTypeValue} onValueChange={value => p.onEntryType(String(value ?? ''))} options={p.entryTypeOptions} placeholder="未设置" aria-label="词条类型" className="mobile-entry-detail__identity-select"/>
+                                </div>
+                                {/*
+                                  * 分类只读。归属是词条与分类树的关系，不是词条自己的字段，
+                                  * 改归属走列表上的剪切/复制/多选，见 plans/ENTRY-CLIPBOARD.md。
+                                  */}
+                                <div className="mobile-entry-detail__identity-field mobile-entry-detail__identity-field--readonly">
+                                    <span className="mobile-entry-detail__identity-field-label">分类</span>
+                                    <span className="mobile-entry-detail__identity-readonly">{p.categoryLabel || '无分类'}</span>
+                                </div>
                             </div>
-                            <div className="mobile-entry-detail__field-heading"><span>摘要</span><small>{p.summary.length} 字</small></div>
+                            {/* 摘要不另起标签行：placeholder 已经说明用途，这一行在 834px 视口里换不来信息量。 */}
                             <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
                         </div>
                     </section>
 
+                    {/*
+                      * 缩略图与计数并排成一行。拆成两行时元数据要吃掉 356px（390×844 真机实测），
+                      * 正文只剩 184px；合并后正文回到 ~300px。图片数不再重复——缩略图条就在旁边。
+                      */}
                     <section className="mobile-entry-detail__attachments" aria-label="词条附件与属性">
                         <MobileEntryImagesSection images={p.images} onAddImage={p.onAddImage} onOpenImage={p.onOpenImage} addFirst compact/>
                         <button type="button" className="mobile-entry-detail__properties-entry" onClick={p.onOpenProperties} aria-label="打开词条属性页">
                             <span className="mobile-entry-detail__properties-chips">
                                 <span className="mobile-entry-detail__property-pill">{p.tagCount} 标签</span>
                                 <span className="mobile-entry-detail__property-pill">{p.relationCount} 关系</span>
-                                <span className="mobile-entry-detail__property-pill">{p.imageCount} 图片</span>
                             </span>
                             <span className="mobile-entry-detail__properties-more">属性 ›</span>
                         </button>

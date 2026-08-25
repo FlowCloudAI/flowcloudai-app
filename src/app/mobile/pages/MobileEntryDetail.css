@@ -446,10 +446,24 @@
     display: none;
 }
 
+/* 同上：chips 视觉高度压到 36，热区靠 ::after 补到 48。 */
+:root[data-fc-density="touch"] .mobile-entry-detail__type-option {
+    min-block-size: auto;
+    min-inline-size: auto;
+    block-size: calc(var(--mobile-tap-min) - var(--mobile-gap-item));
+}
+
+.mobile-entry-detail__type-option::after {
+    position: absolute;
+    inset-block: calc(var(--mobile-gap-item) / -2);
+    inset-inline: 0;
+    content: "";
+}
+
 .mobile-entry-detail__type-option {
-    min-height: var(--mobile-tap-min);
+    position: relative;
     flex: 0 0 auto;
-    padding: 0 var(--mobile-gap-group);
+    padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: var(--mobile-surface-raised);
@@ -719,6 +733,32 @@
     line-height: var(--mobile-leading-normal);
 }
 
+/*
+ * MarkdownPreview 自带 GitHub 那套排版：h2 实测 24px（第 6 档字号，违反基线 §3.1），
+ * 且 h1/h2 带一条下边框，和区块标题的细线撞在一起。这里把正文标题收进 5 档字号，
+ * 深层级靠字重与间距区分，不新造字号。
+ */
+.mobile-entry-detail__markdown-preview :is(h1, h2, h3, h4, h5, h6) {
+    border-bottom: 0;
+    line-height: var(--mobile-leading-tight);
+}
+
+.mobile-entry-detail__markdown-preview :is(h1, h2) {
+    margin-block: var(--mobile-gap-group) var(--mobile-gap-inline);
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-detail__markdown-preview :is(h3, h4, h5, h6) {
+    margin-block: var(--mobile-gap-item) var(--mobile-gap-text);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-detail__markdown-preview :is(h1, h2, h3, h4, h5, h6):first-child {
+    margin-block-start: 0;
+}
+
 .mobile-entry-detail__edit-topbar {
     flex: 0 0 auto;
 }
@@ -782,17 +822,56 @@
     gap: var(--mobile-gap-inline);
 }
 
-.mobile-entry-detail__identity-select {
+/* 标签常驻在下拉左侧：类型与分类可以同名，只看值分不出是哪一个。 */
+.mobile-entry-detail__identity-field {
+    display: flex;
     min-width: 0;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
 }
 
+.mobile-entry-detail__identity-field-label {
+    flex: 0 0 auto;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-entry-detail__identity-select {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* 只读分类：不做成控件的样子，避免看起来可点。 */
+.mobile-entry-detail__identity-readonly {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-body-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 触发器压到刚好等于命中区下限：原来的高度是这一屏最大的一块浪费。 */
+.mobile-entry-detail__identity-select .fc-select__trigger {
+    min-height: var(--mobile-tap-min);
+    height: var(--mobile-tap-min);
+}
+
+/* 缩略图条与计数入口并排一行，不再各占一行。 */
 .mobile-entry-detail__attachments {
     display: flex;
     min-width: 0;
-    flex-direction: column;
-    gap: var(--mobile-gap-text);
+    align-items: center;
+    gap: var(--mobile-gap-item);
     padding-top: var(--mobile-gap-inline);
     border-top: var(--mobile-divider);
+}
+
+.mobile-entry-detail__attachments > .mobile-entry-detail__images {
+    min-width: 0;
+    flex: 1 1 auto;
+    margin: 0;
 }
 
 .mobile-entry-detail__image-grid[data-mobile-image-compact='true'] {
@@ -877,6 +956,28 @@
     inset-block: calc((var(--mobile-gap-group) + var(--mobile-gap-text)) / -2);
     inset-inline: calc(var(--mobile-gap-text) / -2);
     content: "";
+}
+
+/*
+ * 视觉压扁、命中区不变（基线 §6.1 规则 2）。
+ * mobileAccessibility.css 的公共兜底选择器是
+ * `:root[data-fc-density="touch"] body :where(button)`，特异性 (0,1,2)，
+ * 只写 .class button (0,1,1) 压不住它——必须带上同一个 :root 前缀，
+ * 否则这里的高度会被静默还原成 48px（真机实测过一次）。
+ * 热区由上面的 ::after 补齐。
+ */
+:root[data-fc-density="touch"] .mobile-entry-detail__body-mode button {
+    min-block-size: auto;
+    min-inline-size: auto;
+    block-size: calc(var(--mobile-tap-min) - var(--mobile-gap-group) - var(--mobile-gap-text));
+}
+
+:root[data-fc-density="touch"] .mobile-entry-detail__expand-button {
+    min-block-size: auto;
+    min-inline-size: auto;
+    block-size: calc(var(--mobile-tap-min) - var(--mobile-gap-item));
+    inline-size: calc(var(--mobile-tap-min) - var(--mobile-gap-item));
+    flex: 0 0 calc(var(--mobile-tap-min) - var(--mobile-gap-item));
 }
 
 .mobile-entry-detail__body-mode button[aria-pressed='true'] {
@@ -980,24 +1081,23 @@
 
 .mobile-entry-detail__properties-entry {
     display: flex;
-    width: 100%;
+    width: auto;
     min-height: var(--mobile-tap-min);
     flex: 0 0 auto;
     align-items: center;
     gap: var(--mobile-gap-inline);
-    padding: 0;
+    padding: 0 0 0 var(--mobile-gap-item);
     border: 0;
-    border-top: var(--mobile-divider);
+    border-left: var(--mobile-divider);
     background: transparent;
     text-align: left;
 }
 
 .mobile-entry-detail__properties-chips {
     display: flex;
-    min-width: 0;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     gap: calc(var(--mobile-gap-inline) / 2);
-    overflow: hidden;
+    white-space: nowrap;
 }
 
 .mobile-entry-detail__property-pill {
@@ -1103,6 +1203,7 @@
 
 .mobile-entry-properties .mobile-entry-detail__type-options {
     flex-wrap: wrap;
+    row-gap: var(--mobile-gap-inline);
     row-gap: var(--mobile-gap-group);
     padding-bottom: 0;
     overflow: visible;
@@ -1152,6 +1253,15 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
+}
+
+/*
+ * 「植入」是内部术语（表示该标签由词条类型带入），对创作者不可理解。
+ * 移动端不显示这个徽章——植入标签本来就没有删除按钮，那才是可感知的区别。
+ * 只在移动端隐藏，桌面端不动。
+ */
+.mobile-entry-properties .highlight-tag-item__badge {
+    display: none;
 }
 
 .mobile-entry-properties .highlight-tag-item.is-row {
@@ -1441,17 +1551,21 @@
     object-fit: cover;
 }
 
+/*
+ * 计数浮在任意照片之上，底色不能跟随主题——浅色主题下的半透明白底遇到亮图
+ * 会连同主文本色一起消失。这里固定用遮罩层 token 压暗，文字取其反色。
+ */
 .mobile-entry-detail__hero-count {
     position: absolute;
     right: var(--mobile-gap-item);
     bottom: var(--mobile-gap-item);
     padding: var(--mobile-gap-text) var(--mobile-gap-inline);
-    border: var(--mobile-glass-border);
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-translucent-strong);
-    color: var(--fc-color-text);
+    background: color-mix(in srgb, var(--fc-color-bg-overlay) 62%, transparent);
+    color: var(--fc-color-bg-elevated);
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-strong);
+    backdrop-filter: var(--mobile-glass-filter-soft);
 }
 
 .mobile-entry-detail__identity-line {
@@ -1480,41 +1594,57 @@
     color: var(--fc-color-text-tertiary);
 }
 
+/* 摘要保留一个安静的容器：剥成裸文本后它和正文同为灰底黑字，读起来是正文的第一段。 */
 .mobile-entry-detail:not(.mobile-entry-detail--edit) > .mobile-entry-detail__summary {
-    padding: 0;
+    padding: var(--mobile-gap-item) var(--mobile-gap-group);
     border: 0;
-    border-radius: 0;
-    background: transparent;
+    border-left: var(--mobile-gap-text) solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
+    border-radius: 0 var(--mobile-radius-field) var(--mobile-radius-field) 0;
+    background: var(--mobile-surface-muted-soft);
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-body-sm);
     line-height: var(--mobile-leading-normal);
 }
 
+/*
+ * 属性用流式排布，不是等宽两列：「98」和「如意金箍棒」不该占一样宽。
+ * 短值挤在一行，长值自然换到独占一行并内部折行——不设截断，也不靠字数阈值
+ * 猜哪条该占满（属性值可能是一整句设定）。
+ */
 .mobile-entry-detail:not(.mobile-entry-detail--edit) > .mobile-entry-detail__meta-chips {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--mobile-gap-inline);
 }
 
 .mobile-entry-detail__tag-chip {
     min-width: 0;
+    max-width: 100%;
 }
 
-.mobile-entry-detail__tag-chip.is-wide {
-    grid-column: 1 / -1;
-}
-
+/* 展示态的属性是「名称 值」一行，不是名称在上、值在下——后者一条就占两行。 */
 .mobile-entry-detail__tag-chip > .highlight-tag-item.is-show {
-    height: 100%;
+    display: flex;
     min-width: 0;
     box-sizing: border-box;
-    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-text) var(--mobile-gap-item);
     border-radius: var(--mobile-radius-field);
     background: var(--mobile-surface-muted-soft);
 }
 
+.mobile-entry-detail__tag-chip > .highlight-tag-item.is-show .highlight-tag-item__header {
+    flex: 0 0 auto;
+}
+
 .mobile-entry-detail__tag-chip > .highlight-tag-item.is-show .highlight-tag-item__value {
+    min-width: 0;
+    flex: 1 1 auto;
     font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-snug);
     white-space: normal;
     overflow-wrap: anywhere;
 }
@@ -1527,25 +1657,39 @@
     margin: 0;
 }
 
+/*
+ * 区块标题是页面骨架，不是内容。它一旦和正文自己的 h3 同为 title 档，
+ * 「正文」和紧随其后的「出身」就读成同一层，分不清哪个是章节名。
+ * 这里把 title 档整个让给正文里真正的标题，骨架退到 meta 档 + 右侧细线。
+ * 另：这一行不可点，不该占 --mobile-tap-min 的高度。
+ */
 .mobile-entry-detail__section-heading {
     display: flex;
-    min-height: var(--mobile-tap-min);
     align-items: center;
-    justify-content: space-between;
     gap: var(--mobile-gap-inline);
-    border-bottom: var(--mobile-divider);
 }
 
 .mobile-entry-detail__section-heading h2 {
     margin: 0;
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-title);
-    font-weight: var(--mobile-weight-strong);
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
 }
 
 .mobile-entry-detail__section-heading span {
-    color: var(--fc-color-text-secondary);
+    color: var(--fc-color-text-tertiary);
     font-size: var(--mobile-text-meta);
+    white-space: nowrap;
+}
+
+.mobile-entry-detail__section-heading::after {
+    min-width: var(--mobile-gap-group);
+    height: 1px;
+    flex: 1 1 auto;
+    background: var(--mobile-border-color);
+    content: "";
 }
 
 .mobile-entry-detail__reading-section .mobile-entry-detail__markdown {

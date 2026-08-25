@@ -10,6 +10,7 @@ import {
     type RefObject,
     type SetStateAction,
     type UIEvent,
+    useEffect,
     useRef,
     useState,
 } from 'react'
@@ -123,12 +124,23 @@ export function MobileEntryDetailView({
         onSelect: onDelete,
     }]
 
+    // 滚动事件在 Android WebView 上会连发，直接量 rect 会让长文滚动掉帧；
+    // 每帧最多测一次，测完再清标记。
+    const scrollFrameRef = useRef(0)
     const handleScroll = (event: UIEvent<HTMLDivElement>) => {
-        const titleElement = titleRef.current
-        if (!titleElement) return
-        const pageTop = event.currentTarget.getBoundingClientRect().top
-        setShowStickyTitle(titleElement.getBoundingClientRect().bottom <= pageTop)
+        if (scrollFrameRef.current) return
+        const page = event.currentTarget
+        scrollFrameRef.current = window.requestAnimationFrame(() => {
+            scrollFrameRef.current = 0
+            const titleElement = titleRef.current
+            if (!titleElement) return
+            setShowStickyTitle(titleElement.getBoundingClientRect().bottom <= page.getBoundingClientRect().top)
+        })
     }
+
+    useEffect(() => () => {
+        if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current)
+    }, [])
 
     return (
         <div ref={pageRef} className="mobile-page mobile-entry-detail" onScroll={handleScroll}>
@@ -195,7 +207,10 @@ export function MobileEntryDetailView({
                         <EntryTypeIcon entryType={entryType} className=""/> {entryType.name}
                     </span>
                 )}
-                {categoryName && <span className="mobile-entry-detail__category-name">{categoryName}</span>}
+                {/* 分类与类型同名时只显示徽章：两个一模一样的词并排不提供任何信息。 */}
+                {categoryName && categoryName !== entryType?.name && (
+                    <span className="mobile-entry-detail__category-name">{categoryName}</span>
+                )}
                 <span className="mobile-entry-detail__updated-date">更新于 {updatedDate}</span>
             </div>
 
@@ -205,9 +220,8 @@ export function MobileEntryDetailView({
                 <div className="mobile-entry-detail__meta-chips" aria-label="词条属性">
                     {viewTagSchemas.map(schema => {
                         const value = getComparableTagValue(viewTagMap, schema)
-                        const isWide = typeof value === 'string' && value.length > 18
                         return (
-                            <div key={schema.id} className={`mobile-entry-detail__tag-chip${isWide ? ' is-wide' : ''}`}>
+                            <div key={schema.id} className="mobile-entry-detail__tag-chip">
                                 <HighLightTagItem
                                     schema={{
                                         id: schema.id,
@@ -219,6 +233,7 @@ export function MobileEntryDetailView({
                                     value={value}
                                     implanted={implantedTagSchemaIdSet.has(schema.id)}
                                     mode="show"
+                                    layout="row"
                                 />
                             </div>
                         )
@@ -242,9 +257,9 @@ export function MobileEntryDetailView({
                     </div>
                 ) : (
                     <div className="mobile-entry-detail__empty">
-                        <p>这里还没有正文内容。</p>
+                        <p>这条词条还只有一个名字。<br/>写点什么，或者让 AI 先起个草稿。</p>
                         <div className="mobile-entry-detail__empty-actions">
-                            <Button type="button" variant="primary" onClick={onEdit}>开始编辑</Button>
+                            <Button type="button" variant="primary" onClick={onEdit}>开始写正文</Button>
                             <Button type="button" variant="ghost" onClick={onAiDiscuss}>让 AI 起草</Button>
                         </div>
                     </div>

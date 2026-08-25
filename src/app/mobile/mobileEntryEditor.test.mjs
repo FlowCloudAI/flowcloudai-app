@@ -48,7 +48,11 @@ test('编辑主页先呈现身份与附件，正文聚焦时整体折叠且顶�
     assert.ok(editViewSource.indexOf('mobile-entry-detail__edit-meta') < editViewSource.indexOf('mobile-entry-detail__body-pane'))
     assert.match(editViewSource, /entryTypeOptions/)
     // 分类只读属于依赖剪贴板替代入口的步骤 D，本轮继续保留可编辑 Select。
-    assert.match(editViewSource, /categoryOptions/)
+    // 分类归属不在词条编辑内部变更（改归属见 plans/ENTRY-CLIPBOARD.md），
+    // 编辑页与属性页都不得再出现可写的分类控件。
+    assert.match(editViewSource, /categoryLabel/)
+    assert.doesNotMatch(editViewSource, /onCategory/)
+    assert.doesNotMatch(propertiesSource, /categoryId:/)
     assert.match(editViewSource, /addFirst compact/)
     assert.match(editViewSource, /mobile-top-action-pill__text">取消/)
     assert.match(editViewSource, /保存中…/)
@@ -94,8 +98,8 @@ test('查看态按阅读层级展示有值属性、主图、空正文操作与�
     assert.match(viewSource, /className="mobile-entry-detail__hero"/)
     assert.match(viewSource, /categoryName/)
     assert.match(viewSource, /更新于 \{updatedDate\}/)
-    assert.match(viewSource, /这里还没有正文内容。/)
-    assert.match(viewSource, /开始编辑/)
+    assert.match(viewSource, /这条词条还只有一个名字。/)
+    assert.match(viewSource, /开始写正文/)   // 主操作直指要做的事，不是泛泛的「编辑」
     assert.match(viewSource, /让 AI 起草/)
     assert.match(viewSource, /aria-expanded=\{linksExpanded\}/)
     assert.match(viewSource, /type=\{getRelationIcon\(relation\.direction\)\}/)

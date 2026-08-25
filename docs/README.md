@@ -105,6 +105,7 @@
 
 | 审计包 | 日期 | 结论 |
 | --- | --- | --- |
+| [mobile-entry-detail-rebuild-2026-08-26](../designs/audits/mobile-entry-detail-rebuild-2026-08-26/README.md) | 2026-08-26 | 词条详情改造首轮实现与设计稿的 16 项偏差修正，含修复前后真机对比。记录了 `mobileAccessibility.css` 公共触控兜底 (0,1,2) 压过业务 `.class button` (0,1,1) 的特异性坑 |
 | [mobile-entry-link-navigation-2026-08-25](../designs/audits/mobile-entry-link-navigation-2026-08-25/README.md) | 2026-08-25 | 编辑态预览的双链把应用导航成 Chrome 错误页的真机前后对比，附首张词条查看态真机截图。问题→方案见 `docs/devlog/2026-08-25-移动端预览链接把应用打没.md`（工作区根仓库） |
 | [mobile-ai-mode-menu-redesign-2026-08-19](../designs/audits/mobile-ai-mode-menu-redesign-2026-08-19/README.md) | 2026-08-19 | AI 模式菜单轻量化，选定 Marker-Only 方案。含实现 QA 与交付清单，Android 真机核对通过 |
 | [mobile-ai-svg-icons-2026-08-19](../designs/audits/mobile-ai-svg-icons-2026-08-19/README.md) | 2026-08-19 | 五枚 AI 操作图标。审计通过，已接入代码并完成 Android 真机视觉核对 |

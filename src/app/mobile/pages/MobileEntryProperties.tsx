@@ -3,10 +3,9 @@
  * 这些内容会滚动且包含输入，因此必须是页面栈里的完整页面，不能放进底部面板。
  */
 import {type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState} from 'react'
-import {Button, Select} from 'flowcloudai-ui'
+import {Button} from 'flowcloudai-ui'
 import {
     db_list_all_entry_types,
-    db_list_categories,
     db_list_entries,
     db_list_tag_schemas,
     type CustomEntryType,
@@ -60,7 +59,6 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
     const {projectId, entryId, isPlaceholder} = params
     const draft = useMobileEntryEditDraft(projectId, entryId)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
-    const [categories, setCategories] = useState<Awaited<ReturnType<typeof db_list_categories>>>([])
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(true)
@@ -74,13 +72,11 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         setLoading(true)
         Promise.all([
             db_list_all_entry_types(projectId),
-            db_list_categories(projectId),
             db_list_tag_schemas(projectId),
             db_list_entries({projectId, limit: ENTRY_LOOKUP_LIMIT, offset: 0}),
-        ]).then(([nextTypes, nextCategories, nextSchemas, nextEntries]) => {
+        ]).then(([nextTypes, nextSchemas, nextEntries]) => {
             if (disposed) return
             setEntryTypes(nextTypes)
-            setCategories(nextCategories)
             setTagSchemas(nextSchemas)
             setEntries(nextEntries)
         }).catch(error => {
@@ -114,10 +110,6 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         onTagsChange: handleTagDraftChange,
     })
 
-    const categoryOptions = useMemo(() => [
-        {value: '', label: '无分类'},
-        ...categories.map(category => ({value: category.id, label: category.name})),
-    ], [categories])
     const entryTitleById = useMemo(() => new Map(entries.map(entry => [entry.id, entry.title])), [entries])
 
     const handleTypeCreated = useCallback(async (created: CustomEntryType) => {
@@ -162,11 +154,6 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                                 return <button type="button" key={key} aria-pressed={draft.entryType === key} className={`mobile-entry-detail__type-option${draft.entryType === key ? ' is-active' : ''}`} onClick={() => updateDraft({entryType: key})}>{type.name}</button>
                             })}
                         </div>
-                    </section>
-
-                    <section className="mobile-entry-properties__group mobile-entry-properties__group--category">
-                        <div className="mobile-entry-properties__label"><span>所属分类</span></div>
-                        <Select value={draft.categoryId ?? ''} onValueChange={value => updateDraft({categoryId: value ? String(value) : null})} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/>
                     </section>
 
                     <section className="mobile-entry-properties__group mobile-entry-properties__group--images">

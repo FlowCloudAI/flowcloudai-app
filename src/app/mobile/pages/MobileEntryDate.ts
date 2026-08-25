@@ -22,11 +22,16 @@ export function formatMobileEntryListDate(value?: string | null): string {
     }).format(date)
 }
 
+/**
+ * 详情页的更新时间。当年的词条不带年份——「2026年8月25日」里的年份在绝大多数
+ * 情况下是噪声，跨年的词条才需要它来定位。
+ */
 export function formatMobileEntryUpdatedDate(value?: string | null): string {
     const date = parseEntryDate(value)
     if (!date) return '日期未知'
+    const sameYear = date.getFullYear() === new Date().getFullYear()
     return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric',
+        year: sameYear ? undefined : 'numeric',
         month: 'long',
         day: 'numeric',
     }).format(date)
