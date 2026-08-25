@@ -473,6 +473,36 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         }
     }, [ensureProjectEntries, handleOpenLinkedEntry, projectId, showAlert])
 
+    /**
+     * 编辑态内联预览里的链接：一律不做顶层导航。
+     *
+     * 这里曾经完全没有处理器，点一下双链就会让 WebView 载入 `fc://…` 并报
+     * `net::ERR_UNKNOWN_URL_SCHEME`，整个应用被换成错误页、未保存正文全部丢失
+     * （2026-08-25 真机复现）。词条跳转不在这里做——编辑态正文可能有未保存修改，
+     * 跳走会和离开守卫、页面栈深度打架，跳转留给保存后的查看态。
+     */
+    const handleEditPreviewMarkdownClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+        const anchor = resolveMarkdownAnchor(event.target)
+        if (!anchor) return
+        event.preventDefault()
+
+        const href = anchor.getAttribute('href') ?? ''
+        if (parseInternalEntryHref(href, anchor.textContent ?? '')) {
+            void showAlert('预览态不跳转词条，保存后可在查看态打开。', 'info', 'nonInvasive', 1800)
+            return
+        }
+        if (isSafeExternalHref(href)) {
+            void openUrl(href).catch((error) => {
+                logger.error('打开链接失败', error)
+                void showAlert('打开链接失败', 'error', 'nonInvasive', 1800)
+            })
+            return
+        }
+        if (href) {
+            void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
+        }
+    }, [showAlert])
+
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
             await showAlert('请输入词条标题', 'warning', 'nonInvasive', 2000)
@@ -583,6 +613,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
             content={content} previewContent={buildMarkdownPreviewSource(content, images)} onContentChange={handleContentChange}
             editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
+            onPreviewMarkdownClick={handleEditPreviewMarkdownClick}
             entryTypeLabel={activeType?.name ?? '无类型'} categoryLabel={activeCategory?.name ?? '无分类'}
             tagCount={entryTags.visibleTagSchemas.length} imageCount={images.length} relationCount={relationDrafts.length}
             onOpenProperties={() => push({type: 'entryProperties', params: {projectId, entryId, displayName: title || entry.title, isPlaceholder: params.isPlaceholder}})}

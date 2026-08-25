@@ -1,5 +1,5 @@
 /** 移动端词条编辑主页：固定身份区与属性入口，正文占据剩余空间并独立滚动。 */
-import {type ComponentProps, type FocusEvent, type RefObject, useState} from 'react'
+import {type ComponentProps, type FocusEvent, type MouseEvent as ReactMouseEvent, type RefObject, useState} from 'react'
 import {Input} from 'flowcloudai-ui'
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
@@ -34,6 +34,8 @@ interface Props {
     editorRef: RefObject<MarkdownEditorRef | null>
     textareaProps: MarkdownTextareaProps
     onMarkdownTool: (tool: MobileMarkdownTool) => void
+    /** 内联预览里的链接点击。缺了它 WebView 会直接导航到 fc:// 并把应用换成错误页。 */
+    onPreviewMarkdownClick: (event: ReactMouseEvent<HTMLDivElement>) => void
     entryTypeLabel: string
     categoryLabel: string
     tagCount: number
@@ -169,7 +171,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                     </div>
                     <button type="button" className="mobile-entry-detail__expand-button" aria-label="全屏专注编辑" title="全屏专注编辑" onClick={p.onOpenImmersive}><MobileEntryDetailActionIcon type="expand"/></button>
                 </div>
-                <div className="mobile-entry-detail__inline-editor-wrap">
+                <div className="mobile-entry-detail__inline-editor-wrap" onClick={p.onPreviewMarkdownClick}>
                     <MarkdownEditor
                         ref={editorRef}
                         value={p.content}

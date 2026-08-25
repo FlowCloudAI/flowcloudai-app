@@ -14,6 +14,8 @@ const storeSource = read('./stores/mobileEntryEditDraftStore.ts')
 const detailSource = read('./pages/MobileEntryDetail.tsx')
 const projectHomeSource = read('./pages/MobileProjectHome.tsx')
 const entryListSource = read('./pages/MobileEntryList.tsx')
+const navGuardSource = read('../../shared/hooks/useTopLevelNavigationGuard.ts')
+const appShellSource = read('../index/AppShell.tsx')
 
 test('词条属性与关系编辑使用完整页面栈，不回退到底部面板', () => {
     assert.match(stackSource, /entryProperties:\s*MobileEntryEditChildPageParams/)
@@ -53,4 +55,18 @@ test('新建词条用显式占位标记，保存后解除标记', () => {
     assert.match(detailSource, /isPlaceholder:\s*undefined/)
     assert.match(detailSource, /discardMobileEntryPlaceholder/)
     assert.doesNotMatch(detailSource, /title\s*===\s*['"]未命名词条['"]/)
+})
+
+test('编辑态内联预览拦截链接，且顶层导航有全局兜底', () => {
+    // 2026-08-25 真机复现：内联预览的 `fc://` 双链无人接管，点一下 WebView 就载入
+    // net::ERR_UNKNOWN_URL_SCHEME 错误页，整个应用被替换、未保存正文全部丢失。
+    assert.match(editViewSource, /onClick=\{p\.onPreviewMarkdownClick\}/)
+    assert.match(detailSource, /handleEditPreviewMarkdownClick/)
+    assert.match(detailSource, /onPreviewMarkdownClick=\{handleEditPreviewMarkdownClick\}/)
+
+    // 兜底防线必须挂在 AppShell 且用捕获阶段，否则业务处理器跑不到就被吞掉。
+    assert.match(appShellSource, /useTopLevelNavigationGuard\(\)/)
+    assert.match(navGuardSource, /addEventListener\('click', handleClick, true\)/)
+    assert.match(navGuardSource, /event\.preventDefault\(\)/)
+    assert.doesNotMatch(navGuardSource, /stopPropagation\(/)
 })

@@ -209,6 +209,14 @@ app_main/
 - 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
 - macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
 - iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
+- **任何渲染 Markdown 的表面都必须自己接管锚点点击。** WebView 主文档一旦导航离开应用地址，
+  整个应用就被替换掉：`fc://` / `entry-title://` 会得到 `net::ERR_UNKNOWN_URL_SCHEME` 错误页，
+  http(s) 外链则把站点加载进应用窗口——两种都会连同未保存内容一起丢失，且没有应用内返回路径。
+  新增预览面板时必须在容器上接 `onClick`，用 `resolveMarkdownAnchor` 取锚点后**无条件 `preventDefault`**，
+  再决定跳词条、走 `api/opener`，还是提示拒绝。`AppShell` 的 `useTopLevelNavigationGuard` 是最后一道
+  兜底（捕获阶段只 `preventDefault`、不 `stopPropagation`），**它是防漏网的，不是「可以不接」的许可**。
+  2026-08-25 已因此丢过一次未保存正文，记录见 `docs/devlog/2026-08-25-移动端预览链接把应用打没.md`。
+
 - **2026-08-20 的双端原生键盘架构仍保持回退**：`a781f94` 撤销了 iOS/Android 共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 通用键盘布局；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。2026-08-23 重新引入的是范围更窄的 **Android-only** 路径，只服务 AI composer 与灵感正文，不恢复共享 store、不改变 Tab 位置、不写 iOS 布局。iOS 仍按未解决问题独立设计与真机验收。
 
 - **Android 键盘布局的唯一高度来源是原生 `WindowInsetsCompat.Type.ime()`**：
@@ -221,4 +229,4 @@ app_main/
   **不要再为键盘问题去改这个 viewport meta**。完整现行方案、兼容边界与验收项见
   `docs/mobile_keyboard_layout.md`。
 
-文档同步时间：2026-08-23 +08:00
+文档同步时间：2026-08-25 +08:00
