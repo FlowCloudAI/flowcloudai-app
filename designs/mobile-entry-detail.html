@@ -143,7 +143,9 @@
         .screen { display: none; flex-direction: column; height: 100%; background: var(--fc-color-bg); color: var(--fc-color-text); font-size: var(--mobile-text-body); }
         .phone[data-state="full"]      .screen--full,
         .phone[data-state="scrolled"]  .screen--scrolled,
-        .phone[data-state="tags"]      .screen--tags,
+        .phone[data-state="links"]     .screen--links,
+        .phone[data-state="viewer"]    .screen--viewer,
+        .phone[data-state="gallery"]   .screen--gallery,
         .phone[data-state="lean"]      .screen--lean,
         .phone[data-state="vempty"]    .screen--vempty,
         .phone[data-state="edit"]      .screen--edit,
@@ -211,6 +213,9 @@
             font-size: var(--mobile-text-body-sm);
         }
         .select-chip__label { color: var(--fc-color-text-tertiary); }
+        /* 分类只读：归属变更走剪切/复制/多选，不在词条编辑内部改。 */
+        .select-chip--readonly { border-style: dashed; background: transparent; color: var(--fc-color-text-secondary); }
+        .select-chip--readonly::after { content: none; }
         .select-chip__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .select-chip svg { flex: 0 0 auto; width: 13px; height: 13px; fill: none; stroke: var(--fc-color-text-tertiary); stroke-width: 2.2; }
         /* 视觉 36px，命中区补到 48px（基线 §6.1 规则 2：图标可小，命中区不可小） */
@@ -441,75 +446,32 @@
 
         /* --- 区块标题 --- */
         .section-head {
-            display: flex;
-            margin-bottom: var(--mobile-gap-item);
-            gap: var(--mobile-gap-inline);
-            align-items: baseline;
+            display: flex; margin-bottom: var(--mobile-gap-item);
+            gap: var(--mobile-gap-inline); align-items: baseline;
         }
-        .section-head h2 {
-            margin: 0;
-            font-size: var(--mobile-text-title);
-            font-weight: var(--mobile-weight-strong);
-        }
+        .section-head h2 { margin: 0; font-size: var(--mobile-text-title); font-weight: var(--mobile-weight-strong); }
         .section-head .note { color: var(--fc-color-text-tertiary); font-size: var(--mobile-text-meta); }
         .section-head .spacer { flex: 1 1 auto; }
-        .section-head .link { border: 0; background: transparent; color: var(--fc-color-primary); font-size: var(--mobile-text-body-sm); padding: 0; }
 
         .section + .section { margin-top: var(--mobile-gap-section); }
 
-        /* --- 属性：定义列表，不是卡片 ---
-           植入标签与自定义标签用分组区分，取消「植入」徽章（内部术语）。 */
-        .attr-group + .attr-group { margin-top: var(--mobile-gap-group); }
-        .attr-group__label {
-            margin-bottom: var(--mobile-gap-inline);
-            color: var(--fc-color-text-tertiary);
-            font-size: var(--mobile-text-meta);
-            font-weight: var(--mobile-weight-medium);
-        }
-        .attr-list {
-            border: var(--mobile-border);
-            border-radius: var(--mobile-radius-card);
+        /* --- 属性：流式 chip ---
+           旧稿用两组卡片列表，4 条属性要占约 250px。改成流式后压到约 70px。
+           植入标签保留主色左条（HighLightTagItem 的 .is-show.is-implanted，真机上确实生效）；
+           之前读不出差别是因为那一屏三条全是植入，没有非植入项可对比。
+           未填写的属性不再显示——展示态没有「提示你去填」的职责。 */
+        .attr-flow { display: flex; flex-wrap: wrap; gap: var(--mobile-gap-inline); }
+        .attr-chip {
+            display: inline-flex; max-width: 100%;
+            padding: 5px var(--mobile-gap-item) 5px var(--mobile-gap-inline);
+            gap: var(--mobile-gap-inline); align-items: baseline;
+            border: var(--mobile-border); border-left: 3px solid transparent;
+            border-radius: var(--fc-radius-lg);
             background: var(--mobile-surface-raised);
-            overflow: hidden;
         }
-        .attr-row {
-            display: flex;
-            min-height: 46px;
-            padding: var(--mobile-gap-item) var(--mobile-gap-group);
-            gap: var(--mobile-gap-item);
-            align-items: baseline;
-        }
-        .attr-row + .attr-row { border-top: var(--mobile-divider); }
-        .attr-row__name {
-            flex: 0 0 auto;
-            max-width: 42%;
-            color: var(--fc-color-text-secondary);
-            font-size: var(--mobile-text-body-sm);
-        }
-        .attr-row__value {
-            flex: 1 1 auto;
-            min-width: 0;
-            text-align: right;
-            font-size: var(--mobile-text-body);
-            font-weight: var(--mobile-weight-medium);
-            overflow-wrap: anywhere;
-        }
-        .attr-row--blank .attr-row__value { color: var(--fc-color-text-tertiary); font-weight: var(--mobile-weight-normal); }
-
-        .attr-more {
-            display: flex;
-            width: 100%;
-            min-height: var(--mobile-tap-min);
-            padding: 0 var(--mobile-gap-group);
-            gap: 6px;
-            align-items: center;
-            justify-content: center;
-            border: 0;
-            border-top: var(--mobile-divider);
-            background: transparent;
-            color: var(--fc-color-primary);
-            font-size: var(--mobile-text-body-sm);
-        }
+        .attr-chip--implanted { border-left-color: var(--fc-color-primary); }
+        .attr-chip__name { flex: 0 0 auto; color: var(--fc-color-text-secondary); font-size: var(--mobile-text-meta); }
+        .attr-chip__value { min-width: 0; font-size: var(--mobile-text-body-sm); font-weight: var(--mobile-weight-medium); overflow-wrap: anywhere; }
 
         /* --- 正文 --- */
         .markdown { font-size: var(--mobile-text-body); line-height: var(--mobile-leading-normal); }
@@ -521,52 +483,100 @@
         /* 空正文：必须给主操作本身，不是描述主操作在哪（基线 §9 规则 5）。
            旧实现是一行「暂无正文内容」浮在 362px 高的空白里。 */
         .empty-body {
-            display: flex;
-            padding: var(--mobile-gap-section) var(--mobile-gap-group);
-            gap: var(--mobile-gap-item);
-            flex-direction: column;
-            align-items: center;
-            border: var(--mobile-border);
-            border-radius: var(--mobile-radius-card);
-            background: var(--mobile-surface-muted-soft);
-            text-align: center;
+            display: flex; padding: var(--mobile-gap-section) var(--mobile-gap-group);
+            gap: var(--mobile-gap-item); flex-direction: column; align-items: center;
+            border: var(--mobile-border); border-radius: var(--mobile-radius-card);
+            background: var(--mobile-surface-muted-soft); text-align: center;
         }
         .empty-body p { margin: 0; color: var(--fc-color-text-secondary); font-size: var(--mobile-text-body-sm); line-height: var(--mobile-leading-snug); }
         .btn-primary {
-            display: inline-flex;
-            min-height: var(--mobile-tap-min);
-            padding: 0 var(--mobile-gap-section);
-            gap: var(--mobile-gap-inline);
-            align-items: center;
-            border: 0;
-            border-radius: var(--fc-radius-full);
-            background: var(--fc-color-primary);
-            color: #fff;
-            font-size: var(--mobile-text-body);
-            font-weight: var(--mobile-weight-medium);
+            display: inline-flex; min-height: var(--mobile-tap-min); padding: 0 var(--mobile-gap-section);
+            gap: var(--mobile-gap-inline); align-items: center; border: 0;
+            border-radius: var(--fc-radius-full); background: var(--fc-color-primary); color: #fff;
+            font-size: var(--mobile-text-body); font-weight: var(--mobile-weight-medium);
         }
         .btn-primary svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-
-        /* --- 关联 --- */
-        .conn-group + .conn-group { margin-top: var(--mobile-gap-group); }
-        .conn-group__label { margin-bottom: var(--mobile-gap-inline); color: var(--fc-color-text-tertiary); font-size: var(--mobile-text-meta); font-weight: var(--mobile-weight-medium); }
-        .conn-card {
-            display: flex;
-            width: 100%;
-            min-height: var(--mobile-tap-min);
-            padding: var(--mobile-gap-item) var(--mobile-gap-group);
-            gap: var(--mobile-gap-text);
-            flex-direction: column;
-            align-items: flex-start;
-            border: var(--mobile-border);
-            border-radius: var(--fc-radius-lg);
-            background: var(--mobile-surface-raised);
-            color: inherit;
-            text-align: left;
+        .btn-ghost {
+            min-height: var(--mobile-tap-min); padding: 0 var(--mobile-gap-group); border: 0;
+            background: transparent; color: var(--fc-color-primary); font-size: var(--mobile-text-body-sm);
         }
-        .conn-card + .conn-card { margin-top: var(--mobile-gap-inline); }
-        .conn-card strong { font-size: var(--mobile-text-body); font-weight: var(--mobile-weight-medium); }
-        .conn-card small { color: var(--fc-color-text-secondary); font-size: var(--mobile-text-meta); }
+
+        /* --- 关联 ---
+           方向用箭头而不是「指向对方 / 来自对方 / 双向」三个词。
+           正反链（正文提到 / 被提到）默认收起：它们在正文里本来就能点，
+           展开一整列卡片是重复占位。 */
+        .rel-row {
+            display: flex; width: 100%; min-height: var(--mobile-tap-min);
+            padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+            gap: var(--mobile-gap-item); align-items: center;
+            border: 0; background: transparent; color: inherit; text-align: left;
+        }
+        .rel-row + .rel-row { border-top: var(--mobile-divider); }
+        .rel-arrow {
+            display: grid; flex: 0 0 auto; width: 28px; height: 28px; place-items: center;
+            border-radius: var(--fc-radius-full);
+            background: var(--fc-color-primary-subtle); color: var(--fc-color-primary);
+            font-size: var(--mobile-text-body); font-weight: var(--mobile-weight-strong);
+        }
+        .rel-row__name { flex: 0 1 auto; min-width: 0; font-size: var(--mobile-text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rel-row__note { flex: 1 1 auto; min-width: 0; color: var(--fc-color-text-secondary); font-size: var(--mobile-text-meta); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .links-toggle {
+            display: flex; width: 100%; min-height: var(--mobile-tap-min);
+            padding: 0 var(--mobile-gap-item); gap: var(--mobile-gap-inline); align-items: center;
+            border: 0; border-top: var(--mobile-divider); background: transparent;
+            color: var(--fc-color-text-secondary); font-size: var(--mobile-text-body-sm); text-align: left;
+        }
+        .links-toggle .spacer { flex: 1 1 auto; }
+        .links-toggle svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+        /* --- 图片浏览器（对齐桌面端 EntryImageLightbox）--- */
+        .viewer { display: flex; flex-direction: column; height: 100%; background: #0d0d0f; color: #f2f2f2; }
+        .viewer .status-bar { color: #f2f2f2; }
+        .viewer__bar { display: flex; padding: var(--mobile-gap-inline) var(--mobile-page-x); gap: var(--mobile-gap-inline); align-items: center; }
+        .viewer__bar button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: var(--fc-radius-full); background: rgba(255,255,255,.1); color: #f2f2f2; }
+        .viewer__bar svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .viewer__count { flex: 1 1 auto; text-align: center; font-size: var(--mobile-text-body-sm); }
+        .viewer__count b { font-weight: var(--mobile-weight-strong); }
+        .viewer__stage {
+            display: grid; flex: 1 1 auto; min-height: 0; place-items: center; padding: var(--mobile-gap-group);
+        }
+        .viewer__image {
+            width: 100%; max-height: 100%; aspect-ratio: 4 / 5;
+            border-radius: var(--fc-radius-lg);
+            background: linear-gradient(140deg, var(--mobile-cover-a), var(--mobile-cover-b));
+        }
+        .viewer__strip { display: flex; flex: 0 0 auto; padding: var(--mobile-gap-item) var(--mobile-page-x); gap: var(--mobile-gap-inline); overflow-x: auto; scrollbar-width: none; }
+        .viewer__strip::-webkit-scrollbar { height: 0; }
+        .viewer__strip button {
+            flex: 0 0 auto; width: 46px; height: 46px; padding: 0;
+            border: 2px solid transparent; border-radius: var(--fc-radius-lg);
+            background: linear-gradient(140deg, var(--mobile-cover-a), var(--mobile-cover-b));
+        }
+        .viewer__strip button.on { border-color: #fff; }
+        .viewer__actions {
+            display: flex; flex: 0 0 auto; padding: 0 var(--mobile-page-x) var(--mobile-gap-group);
+            gap: var(--mobile-gap-inline);
+        }
+        .viewer__actions button {
+            flex: 1 1 0; min-height: var(--mobile-tap-min); border: 0; border-radius: var(--fc-radius-full);
+            background: rgba(255,255,255,.12); color: #f2f2f2; font-size: var(--mobile-text-body-sm);
+        }
+        .viewer__actions button.danger { color: #ff8b82; }
+        .viewer__actions button:disabled { opacity: .38; }
+
+        .gallery-grid { display: grid; flex: 1 1 auto; min-height: 0; padding: 0 var(--mobile-page-x); gap: var(--mobile-gap-inline); grid-template-columns: repeat(3, 1fr); align-content: start; overflow-y: auto; }
+        .gallery-cell {
+            position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: var(--fc-radius-lg);
+            background: linear-gradient(140deg, var(--mobile-cover-a), var(--mobile-cover-b));
+        }
+        .gallery-cell__check {
+            position: absolute; right: 6px; top: 6px; display: grid; width: 22px; height: 22px;
+            place-items: center; border: 2px solid rgba(255,255,255,.85); border-radius: var(--fc-radius-full);
+            color: transparent; font-size: 13px; font-weight: 700;
+        }
+        .gallery-cell.on .gallery-cell__check { border-color: var(--fc-color-primary); background: var(--fc-color-primary); color: #fff; }
+        .gallery-cell.on { outline: 3px solid var(--fc-color-primary); outline-offset: -3px; }
 
         /* --- Tab 栏 --- */
         .tabbar { display: flex; padding: var(--mobile-gap-inline) 0 var(--mobile-gap-group); border-top: var(--mobile-divider); }
@@ -675,7 +685,9 @@
             <div class="group">展示态</div>
             <button data-go="full" aria-pressed="true">完整词条（主图 / 属性 / 关联）</button>
             <button data-go="scrolled" aria-pressed="false">滚动后（顶栏显示词条名）</button>
-            <button data-go="tags" aria-pressed="false">展开未填写属性</button>
+            <button data-go="links" aria-pressed="false">展开正反链</button>
+            <button data-go="viewer" aria-pressed="false">图片浏览器 · 单图</button>
+            <button data-go="gallery" aria-pressed="false">图片浏览器 · 画廊多选</button>
             <button data-go="lean" aria-pressed="false">无图片、无属性</button>
             <button data-go="vempty" aria-pressed="false">空词条（无正文）</button>
             <div class="group">编辑态主页</div>
@@ -700,9 +712,12 @@
         <ul>
             <li><b>图片升为主视觉。</b>原本是标题下方一条 88px 缩略图，且<b>点不开</b>（<code>--static</code> 无 onClick，查看态根本没挂灯箱）。改为 16:10 主图，右下角标张数，点击进设定集。对齐桌面端 <code>entry-editor-cover-panel</code>。</li>
             <li><b>类型与分类上移到标题正下方。</b>原本类型徽章排在摘要之后，<b>分类从来没显示过</b>。现在「类型 · 分类 · 更新时间」一行，摘要在其后。</li>
-            <li><b>属性从卡片改成定义列表。</b>原本每个标签是带徽章、提示与值的卡片，一屏放两个。现在单行「名称 → 值」，行高 46px。</li>
-            <li><b>用分组代替「植入」徽章。</b>现状唯一区别是 4px 左蓝边（<code>HighLightTagItem.css</code> 的 <code>.is-show.is-implanted</code>），和未填写卡片长得一样，且「植入」是内部术语。改为「「人物」的类型属性」与「其他标签」两个分组。桌面端同样没解决这个问题，不值得照抄。</li>
-            <li><b>未填写属性默认折叠。</b><code>browseVisibleTagSchemas</code> 会把未填写的植入标签也算进来，真机上三张「未填写」大卡吃掉整个元信息区。</li>
+            <li><b>属性改成流式 chip。</b>原本每个标签是带徽章、提示与值的卡片，一屏放两个。现在四条属性共占 74px（本稿实测）。</li>
+            <li><b>植入标签沿用主色左条。</b><code>HighLightTagItem.css</code> 的 <code>.is-show.is-implanted</code> 在真机上确实生效（见审计包 <code>android-查看态.png</code>）；之前读不出差别，是因为那一屏三条全是植入标签，没有非植入项可对比。本稿保留这条规则，chip 左侧 3px 主色边。</li>
+            <li><b>未填写的属性完全不显示。</b><code>browseVisibleTagSchemas</code> 会把未填写的植入标签也算进来，真机上三张「未填写」大卡吃掉整个元信息区。展示态没有「提示你去填」的职责，那是编辑态的事。</li>
+            <li><b>关联的方向用箭头。</b>「指向对方 / 来自对方 / 双向」三个词改成 → / ← / ↔，正反链用弱化的 ↗ / ↙。</li>
+            <li><b>正反链默认收起。</b>「正文提到」和「被这些词条提到」在正文里本来就能点，展开成整列卡片是重复占位。收成一行「正文提到 3 · 被提到 1」，需要时展开。</li>
+            <li><b>新增图片浏览器</b>（单图 + 画廊多选），对齐桌面端 <code>EntryImageLightbox</code>。展示态此前根本打不开图片。</li>
             <li><b>空正文给出主操作。</b>基线 §9 规则 5 明令「空状态必须包含主操作本身」；现状只有一行「暂无正文内容」浮在 362px 高的空白里（真机实测，834px 视口占 43%）。</li>
             <li><b>顶栏滚动后显示词条名。</b>长文滚动后原本只剩三个图标。</li>
             <li><b>编辑按钮改为实心填充。</b>现状靠 <code>kind:\'add\'</code> 的 font-size 区分，但子元素是固定尺寸 SVG，真机实测三个按钮完全一致（48×48 按钮 / 23×23 图标 / 同色）。</li>
@@ -712,7 +727,7 @@
         <ul>
             <li><b>元数据整体移到正文之上。</b>旧版把「类型/分类/标签/图片/关系」压成一行截断的 chips 放在正文<b>下方</b>。新顺序：身份（标题·类型·分类·摘要）→ 附件（图片·标签·关系）→ 正文，与桌面端
                 <code>EntryEditorMetaPanel</code> 在正文之上一致。</li>
-            <li><b>类型与分类直接在身份区可改。</b>它们回答「这条词条是什么」，不该和图片、关系一起藏进二级页。</li>
+            <li><b>类型在身份区直接可改；分类改为只读。</b>分类归属不是词条的字段，是词条与分类树的关系，应当由词条的剪切 / 复制 / 多选来改，计划见 <code>plans/ENTRY-CLIPBOARD.md</code>。属性页的「所属分类」下拉一并去掉。</li>
             <li><b>图片在编辑主页可直接增删。</b>旧版必须进属性页才能加图。添加位固定在缩略图条最前，避免被横滚滚出可视范围。</li>
             <li><b>正文头部从 48px 压到 40px。</b>分段控件视觉 28px、<b>命中区用 <code>::after</code> 补到 48px</b>——基线 §6.1 规则 2 要求的是扩热区，不是放大视觉；旧版直接把
                 <code>min-height</code> 设成 48px 撑满整行（那是上一轮为满足触控尺寸做的错误处理）。同样做法用在类型 chips 与身份区的类型/分类选择器上。</li>
@@ -733,6 +748,8 @@
             <li>展示态没有主图时<b>完全不占位</b>（见「无图片」状态），还是留一个可点的添加位。</li>
             <li>「更新于」用<b>绝对日期</b>还是相对时间。本稿用绝对日期，列表页用的是相对时间，两处会不一致。</li>
             <li>展示态的关联区<b>故意不给「添加关系」入口</b>——保持只读，加关系走编辑态，避免旧版「查看页其实是个表单」的滑坡。</li>
+            <li>图片浏览器<b>沿用桌面端 <code>EntryImageLightbox</code> 组件</b>还是移动端另写一个？桌面版带缩放控件与画廊多选，移动端更适合捏合缩放 + 滑动翻页。本稿画的是移动端形态。</li>
+            <li>属性 chip 在<b>值很长时</b>（例如一整句设定）会撑成整行。要不要给单条 chip 设上限并截断。</li>
             <li>编辑态预览里的<b>双链目前只提示不跳转</b>（2026-08-25 修复顶层导航时的取舍）。要不要改成「保存并跳转」。</li>
             <li>属性页的<b>关系仍在最下方</b>——它是唯一真正属于「附件」的东西，且条目可能很多。</li>
         </ul>
@@ -755,7 +772,7 @@
                 </header>
 
                 <div class="page">
-                    <button class="hero" aria-label="查看孙悟空的图片设定集，共 5 张">
+                    <button class="hero" aria-label="查看孙悟空的图片设定集，共 5 张" data-go="viewer">
                         <span class="hero__glyph">孙</span>
                         <span class="hero__count"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 16l4.5-4.5L12 16"/><circle cx="15.5" cy="9.5" r="1.5"/></svg>5 张</span>
                     </button>
@@ -768,28 +785,15 @@
                         <span>更新于 8 月 24 日</span>
                     </div>
 
-                    <p class="summary">花果山水帘洞美猴王，师从菩提祖师，习得七十二变与筋斗云。大闹天宫后被压五行山下五百年。</p>
+                    <p class="summary" style="margin-bottom:var(--mobile-gap-item)">花果山水帘洞美猴王，师从菩提祖师，习得七十二变与筋斗云。大闹天宫后被压五行山下五百年。</p>
 
-                    <section class="section">
-                        <div class="section-head"><h2>属性</h2></div>
-
-                        <div class="attr-group">
-                            <div class="attr-group__label">「人物」的类型属性</div>
-                            <div class="attr-list">
-                                <div class="attr-row"><span class="attr-row__name">年龄</span><span class="attr-row__value">1000+</span></div>
-                                <div class="attr-row"><span class="attr-row__name">战力</span><span class="attr-row__value">98</span></div>
-                                <button class="attr-more" type="button" data-go="tags">还有 1 个未填写 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
-                            </div>
-                        </div>
-
-                        <div class="attr-group">
-                            <div class="attr-group__label">其他标签</div>
-                            <div class="attr-list">
-                                <div class="attr-row"><span class="attr-row__name">阵营</span><span class="attr-row__value">取经队伍</span></div>
-                                <div class="attr-row"><span class="attr-row__name">兵器</span><span class="attr-row__value">如意金箍棒</span></div>
-                            </div>
-                        </div>
-                    </section>
+                    <!-- 只列有值的属性；左侧主色条 = 该类型植入的属性。 -->
+                    <div class="attr-flow">
+                        <span class="attr-chip attr-chip--implanted"><span class="attr-chip__name">年龄</span><span class="attr-chip__value">1000+</span></span>
+                        <span class="attr-chip attr-chip--implanted"><span class="attr-chip__name">战力</span><span class="attr-chip__value">98</span></span>
+                        <span class="attr-chip"><span class="attr-chip__name">阵营</span><span class="attr-chip__value">取经队伍</span></span>
+                        <span class="attr-chip"><span class="attr-chip__name">兵器</span><span class="attr-chip__value">如意金箍棒</span></span>
+                    </div>
 
                     <section class="section">
                         <div class="section-head"><h2>正文</h2><span class="note">1,284 字</span></div>
@@ -804,19 +808,18 @@
                     </section>
 
                     <section class="section">
-                        <div class="section-head"><h2>关联</h2><span class="note">6</span></div>
-                        <div class="conn-group">
-                            <div class="conn-group__label">结构化关系</div>
-                            <button class="conn-card"><strong>唐僧</strong><small>指向对方 · 师徒</small></button>
-                            <button class="conn-card"><strong>猪八戒</strong><small>双向 · 同门</small></button>
-                        </div>
-                        <div class="conn-group">
-                            <div class="conn-group__label">正文提到</div>
-                            <button class="conn-card"><strong>菩提祖师</strong><small>灵台方寸山斜月三星洞的隐世高人</small></button>
-                        </div>
-                        <div class="conn-group">
-                            <div class="conn-group__label">被这些词条提到</div>
-                            <button class="conn-card"><strong>如意金箍棒</strong><small>定海神针铁，重一万三千五百斤</small></button>
+                        <div class="section-head"><h2>关联</h2></div>
+                        <!-- 方向用箭头：→ 指向对方 / ← 来自对方 / ↔ 双向。 -->
+                        <div class="attr-list" style="border:var(--mobile-border);border-radius:var(--mobile-radius-card);background:var(--mobile-surface-raised);overflow:hidden">
+                            <button class="rel-row"><span class="rel-arrow">→</span><span class="rel-row__name">唐僧</span><span class="rel-row__note">师徒</span></button>
+                            <button class="rel-row"><span class="rel-arrow">↔</span><span class="rel-row__name">猪八戒</span><span class="rel-row__note">同门</span></button>
+                            <button class="rel-row"><span class="rel-arrow">←</span><span class="rel-row__name">如意金箍棒</span><span class="rel-row__note">持有</span></button>
+                            <!-- 正反链默认收起：正文里本来就能点，展开一整列卡片是重复占位。 -->
+                            <button class="links-toggle" data-go="links">
+                                <span>正文提到 <b>3</b> · 被提到 <b>1</b></span>
+                                <span class="spacer"></span>
+                                <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
                         </div>
                     </section>
                 </div>
@@ -855,56 +858,12 @@
                         </div>
                     </section>
                     <section class="section">
-                        <div class="section-head"><h2>关联</h2><span class="note">6</span></div>
-                        <div class="conn-group">
-                            <div class="conn-group__label">结构化关系</div>
-                            <button class="conn-card"><strong>唐僧</strong><small>指向对方 · 师徒</small></button>
+                        <div class="section-head"><h2>关联</h2></div>
+                        <div class="attr-list" style="border:var(--mobile-border);border-radius:var(--mobile-radius-card);background:var(--mobile-surface-raised);overflow:hidden">
+                            <button class="rel-row"><span class="rel-arrow">→</span><span class="rel-row__name">唐僧</span><span class="rel-row__note">师徒</span></button>
+                            <button class="rel-row"><span class="rel-arrow">↔</span><span class="rel-row__name">猪八戒</span><span class="rel-row__note">同门</span></button>
+                            <button class="links-toggle" data-go="links"><span>正文提到 <b>3</b> · 被提到 <b>1</b></span><span class="spacer"></span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
                         </div>
-                    </section>
-                </div>
-                <nav class="tabbar">
-                    <div class="on"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>首页</div>
-                    <div><svg viewBox="0 0 24 24"><path d="M12 3l2.1 5.3L19.5 10l-5.4 1.7L12 17l-2.1-5.3L4.5 10l5.4-1.7z"/></svg>AI</div>
-                    <div><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>灵感</div>
-                    <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21"/></svg>设置</div>
-                </nav>
-            </section>
-
-            <!-- ============ 展开未填写属性 ============ -->
-            <section class="screen screen--tags">
-                <div class="status-bar"><span>19:41</span><span>5G ▮▮▮</span></div>
-                <header class="topbar topbar--scrolled">
-                    <div class="pill"><button aria-label="返回"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button></div>
-                    <div class="topbar__center">孙悟空</div>
-                    <div class="pill">
-                        <button aria-label="AI 讨论"><svg viewBox="0 0 24 24"><path d="M12 3l2.1 5.3L19.5 10l-5.4 1.7L12 17l-2.1-5.3L4.5 10l5.4-1.7z"/></svg></button>
-                        <button class="is-primary" aria-label="编辑词条"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg></button>
-                        <button aria-label="更多操作"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
-                    </div>
-                </header>
-                <div class="page">
-                    <section class="section" style="margin-top:0">
-                        <div class="section-head"><h2>属性</h2></div>
-                        <div class="attr-group">
-                            <div class="attr-group__label">「人物」的类型属性</div>
-                            <div class="attr-list">
-                                <div class="attr-row"><span class="attr-row__name">年龄</span><span class="attr-row__value">1000+</span></div>
-                                <div class="attr-row"><span class="attr-row__name">战力</span><span class="attr-row__value">98</span></div>
-                                <div class="attr-row attr-row--blank"><span class="attr-row__name">绑定人物</span><span class="attr-row__value">未填写</span></div>
-                                <button class="attr-more" type="button" data-go="full">收起未填写 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg></button>
-                            </div>
-                        </div>
-                        <div class="attr-group">
-                            <div class="attr-group__label">其他标签</div>
-                            <div class="attr-list">
-                                <div class="attr-row"><span class="attr-row__name">阵营</span><span class="attr-row__value">取经队伍</span></div>
-                                <div class="attr-row"><span class="attr-row__name">兵器</span><span class="attr-row__value">如意金箍棒</span></div>
-                            </div>
-                        </div>
-                    </section>
-                    <section class="section">
-                        <div class="section-head"><h2>正文</h2><span class="note">1,284 字</span></div>
-                        <div class="markdown"><h3>出身</h3><p>东胜神洲傲来国花果山顶一块仙石，受天真地秀、日精月华，迸裂产一石卵，化作石猴。</p></div>
                     </section>
                 </div>
                 <nav class="tabbar">
@@ -977,7 +936,7 @@
                         <div class="empty-body">
                             <p>这条词条还只有一个名字。<br>写点什么，或者让 AI 先起个草稿。</p>
                             <button class="btn-primary"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>开始写正文</button>
-                            <button class="attr-more" style="border-top:0;color:var(--fc-color-primary)">让 AI 起草</button>
+                            <button class="btn-ghost">让 AI 起草</button>
                         </div>
                     </section>
                 </div>
@@ -987,6 +946,84 @@
                     <div><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>灵感</div>
                     <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21"/></svg>设置</div>
                 </nav>
+            </section>
+
+            <!-- ============ 展开正反链 ============ -->
+            <section class="screen screen--links">
+                <div class="status-bar"><span>19:41</span><span>5G ▮▮▮</span></div>
+                <header class="topbar topbar--scrolled">
+                    <div class="pill"><button aria-label="返回"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button></div>
+                    <div class="topbar__center">孙悟空</div>
+                    <div class="pill">
+                        <button aria-label="AI 讨论"><svg viewBox="0 0 24 24"><path d="M12 3l2.1 5.3L19.5 10l-5.4 1.7L12 17l-2.1-5.3L4.5 10l5.4-1.7z"/></svg></button>
+                        <button class="is-primary" aria-label="编辑词条"><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg></button>
+                        <button aria-label="更多操作"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg></button>
+                    </div>
+                </header>
+                <div class="page">
+                    <section class="section" style="margin-top:0">
+                        <div class="section-head"><h2>关联</h2></div>
+                        <div class="attr-list" style="border:var(--mobile-border);border-radius:var(--mobile-radius-card);background:var(--mobile-surface-raised);overflow:hidden">
+                            <button class="rel-row"><span class="rel-arrow">→</span><span class="rel-row__name">唐僧</span><span class="rel-row__note">师徒</span></button>
+                            <button class="rel-row"><span class="rel-arrow">↔</span><span class="rel-row__name">猪八戒</span><span class="rel-row__note">同门</span></button>
+                            <button class="rel-row"><span class="rel-arrow">←</span><span class="rel-row__name">如意金箍棒</span><span class="rel-row__note">持有</span></button>
+                            <button class="links-toggle" data-go="full"><span>正文提到 <b>3</b> · 被提到 <b>1</b></span><span class="spacer"></span><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
+                            <button class="rel-row"><span class="rel-arrow" style="background:var(--mobile-surface-muted);color:var(--fc-color-text-secondary)">↗</span><span class="rel-row__name">菩提祖师</span><span class="rel-row__note">正文提到</span></button>
+                            <button class="rel-row"><span class="rel-arrow" style="background:var(--mobile-surface-muted);color:var(--fc-color-text-secondary)">↗</span><span class="rel-row__name">二郎神</span><span class="rel-row__note">正文提到</span></button>
+                            <button class="rel-row"><span class="rel-arrow" style="background:var(--mobile-surface-muted);color:var(--fc-color-text-secondary)">↗</span><span class="rel-row__name">五行山</span><span class="rel-row__note">正文提到</span></button>
+                            <button class="rel-row"><span class="rel-arrow" style="background:var(--mobile-surface-muted);color:var(--fc-color-text-secondary)">↙</span><span class="rel-row__name">如意金箍棒</span><span class="rel-row__note">被提到</span></button>
+                        </div>
+                    </section>
+                </div>
+                <nav class="tabbar">
+                    <div class="on"><svg viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>首页</div>
+                    <div><svg viewBox="0 0 24 24"><path d="M12 3l2.1 5.3L19.5 10l-5.4 1.7L12 17l-2.1-5.3L4.5 10l5.4-1.7z"/></svg>AI</div>
+                    <div><svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>灵感</div>
+                    <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21"/></svg>设置</div>
+                </nav>
+            </section>
+
+            <!-- ============ 图片浏览器 · 单图 ============ -->
+            <section class="screen screen--viewer">
+                <div class="viewer">
+                    <div class="status-bar"><span>19:41</span><span>5G ▮▮▮</span></div>
+                    <div class="viewer__bar">
+                        <button aria-label="关闭图片浏览" data-go="full"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+                        <div class="viewer__count"><b>2</b> / 5 · 孙悟空</div>
+                        <button aria-label="画廊模式" data-go="gallery"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></button>
+                    </div>
+                    <div class="viewer__stage"><div class="viewer__image"></div></div>
+                    <div class="viewer__strip" data-mobile-horizontal-scroll="true">
+                        <button></button><button class="on"></button><button></button><button></button><button></button>
+                    </div>
+                    <div class="viewer__actions">
+                        <button>设为主图</button>
+                        <button class="danger">删除</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ 图片浏览器 · 画廊多选 ============ -->
+            <section class="screen screen--gallery">
+                <div class="viewer">
+                    <div class="status-bar"><span>19:41</span><span>5G ▮▮▮</span></div>
+                    <div class="viewer__bar">
+                        <button aria-label="退出画廊" data-go="viewer"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+                        <div class="viewer__count">已选 <b>2</b> 张 · 共 5 张</div>
+                        <button aria-label="全选"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg></button>
+                    </div>
+                    <div class="gallery-grid">
+                        <button class="gallery-cell"><span class="gallery-cell__check">✓</span></button>
+                        <button class="gallery-cell on"><span class="gallery-cell__check">✓</span></button>
+                        <button class="gallery-cell"><span class="gallery-cell__check">✓</span></button>
+                        <button class="gallery-cell on"><span class="gallery-cell__check">✓</span></button>
+                        <button class="gallery-cell"><span class="gallery-cell__check">✓</span></button>
+                    </div>
+                    <div class="viewer__actions" style="margin-top:var(--mobile-gap-item)">
+                        <button disabled title="只有选中单张时可设为主图">设为主图</button>
+                        <button class="danger">删除 2 张</button>
+                    </div>
+                </div>
             </section>
 
             <!-- ============ 编辑主页 · 默认 ============ -->
@@ -1002,9 +1039,11 @@
                     <div class="identity">
                         <div class="identity__inner">
                             <input class="title-input" value="孙悟空" placeholder="未命名词条">
+                            <!-- 只有类型可改。分类归属由词条的剪切/复制/多选来管，不在词条编辑内部改，
+                                 见 plans/ENTRY-CLIPBOARD.md。 -->
                             <div class="identity-selects">
                                 <button class="select-chip"><span class="select-chip__label">类型</span><span class="select-chip__value">人物</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-                                <button class="select-chip"><span class="select-chip__label">分类</span><span class="select-chip__value">主要角色</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+                                <span class="select-chip select-chip--readonly"><span class="select-chip__label">分类</span><span class="select-chip__value">主要角色</span></span>
                             </div>
                             <textarea class="summary-input" rows="3" placeholder="用一两句话概括词条">花果山水帘洞美猴王，师从菩提祖师，习得七十二变与筋斗云。大闹天宫后被压五行山下五百年。</textarea>
                         </div>
@@ -1094,9 +1133,11 @@
                     <div class="identity">
                         <div class="identity__inner">
                             <input class="title-input" value="孙悟空">
+                            <!-- 只有类型可改。分类归属由词条的剪切/复制/多选来管，不在词条编辑内部改，
+                                 见 plans/ENTRY-CLIPBOARD.md。 -->
                             <div class="identity-selects">
                                 <button class="select-chip"><span class="select-chip__label">类型</span><span class="select-chip__value">人物</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
-                                <button class="select-chip"><span class="select-chip__label">分类</span><span class="select-chip__value">主要角色</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+                                <span class="select-chip select-chip--readonly"><span class="select-chip__label">分类</span><span class="select-chip__value">主要角色</span></span>
                             </div>
                             <textarea class="summary-input" rows="3" placeholder="用一两句话概括词条">花果山水帘洞美猴王，师从菩提祖师，习得七十二变与筋斗云。大闹天宫后被压五行山下五百年。</textarea>
                         </div>
@@ -1185,7 +1226,6 @@
                                 <button class="type-chip">概念</button>
                                 <button class="type-chip">文化</button>
                             </div>
-                            <button class="row" style="border-top:var(--mobile-divider)"><span class="row__name">所属分类</span><span class="row__value">主要角色</span><span class="row__chev"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span></button>
                         </div>
                     </div>
 

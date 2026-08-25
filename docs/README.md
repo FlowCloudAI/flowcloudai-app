@@ -75,6 +75,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [../plans/ANDROID-01.md](../plans/ANDROID-01.md) | 现行 | 2026-08-02 | **Android 端唯一权威计划**，自述取代原 `MOBILE-01.md`。核心闭环 + 安装升级构建链路 |
+| [../plans/ENTRY-CLIPBOARD.md](../plans/ENTRY-CLIPBOARD.md) | 现行 | 2026-08-25 | **词条剪切 / 复制 / 多选**（待开工）。把分类归属变更从词条编辑页内部移出，改由列表与分类树上的剪贴操作完成；复制语义、多选触发方式、剪贴板存续范围等 6 项待定 |
 | [../plans/UI-01.md](../plans/UI-01.md) | 现行 | 2026-05-11 | 桌面端工作台交互问题核对：位置感、编辑对象、保存态、AI 引用对象 |
 | [../plans/ENTRY-RELATION-WORKBENCH.md](../plans/ENTRY-RELATION-WORKBENCH.md) | 现行 | 2026-07-31 | 词条关系工作台布局。**自述「暂缓实现，日后重新评审」**，两栏方案前提已被宽度验证否决 |
 
@@ -88,7 +89,7 @@
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§9 规则 8 规定底部面板不承载滚动或输入内容，并列出两处已知违例 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
-| [../designs/mobile-entry-detail.html](../designs/mobile-entry-detail.html) | 现行 | 2026-08-25 | 移动端词条详情排版稿，**展示态与编辑态合并在一份**（同属 `MobileEntryDetail.tsx`）。展示态：图片升为主视觉、类型与分类上移到标题下、属性改定义列表、未填写折叠、空正文给主操作。编辑态：元数据整体移到正文之上、类型与分类在身份区可改、正文头压到 40px、保存改文字按钮、属性页改 iOS 分组列表。12 个状态，含 390/360 与深浅色。原 `mobile-entry-editor.html` 已并入本文件 |
+| [../designs/mobile-entry-detail.html](../designs/mobile-entry-detail.html) | 现行 | 2026-08-25 | 移动端词条详情排版稿，**展示态与编辑态合并在一份**（同属 `MobileEntryDetail.tsx`）。展示态：图片升为主视觉、类型与分类上移到标题下、属性改定义列表、未填写折叠、空正文给主操作。编辑态：元数据整体移到正文之上、类型与分类在身份区可改、正文头压到 40px、保存改文字按钮、属性页改 iOS 分组列表。14 个状态，含 390/360 与深浅色。展示态属性改流式 chip 且不显示未填写、关联用箭头表方向、正反链默认收起、新增图片浏览器（单图 / 画廊多选）；编辑页不再能改所属分类（见 `plans/ENTRY-CLIPBOARD.md`）。原 `mobile-entry-editor.html` 已并入本文件 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
 | [../designs/mobile-entry-editor-ai-review-design-qa.md](../designs/mobile-entry-editor-ai-review-design-qa.md) | 结论记录 | 2026-08-02 | 移动端词条编辑与 AI 差异审阅 QA |
 | [../designs/mobile-world-check-design-qa.md](../designs/mobile-world-check-design-qa.md) | 结论记录 | 2026-08-06 | 移动端设定检测设计 QA。视觉证据已丢失 |
