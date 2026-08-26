@@ -1,3 +1,4 @@
+/** 移动端共享顶栏、操作胶囊与锚点菜单；页面只提供动作与业务回调。 */
 import {
     type ButtonHTMLAttributes,
     type CSSProperties,
@@ -335,10 +336,14 @@ export interface MobileAnchoredActionMenuProps extends Omit<MobileAnchoredMenuPr
 export function MobileAnchoredActionMenu({
     items,
     onClose,
+    className,
     ...menuProps
 }: MobileAnchoredActionMenuProps) {
+    const menuClassName = [className, items.length === 1 ? 'mobile-anchored-menu--compact' : '']
+        .filter(Boolean)
+        .join(' ')
     return (
-        <MobileAnchoredMenu {...menuProps} onClose={onClose}>
+        <MobileAnchoredMenu {...menuProps} className={menuClassName || undefined} onClose={onClose}>
             <div className="mobile-anchored-menu__group">
                 {items.map(item => (
                     <button

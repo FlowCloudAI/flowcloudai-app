@@ -337,6 +337,22 @@
     margin-bottom: var(--mobile-gap-text);
 }
 
+/*
+ * 三个查看动作按 40px 视觉轨道排列，按钮本身仍由公共规则保持 48px 命中盒。
+ * 相邻命中盒只在胶囊内部轻微交叠，既收紧图标节奏，也不缩小单个触控目标。
+ */
+.mobile-entry-detail__view-actions {
+    display: inline-grid;
+    grid-template-columns: repeat(3, var(--mobile-top-surface-size));
+    /* 防止隐式 auto 行被 48px 命中盒撑高后从 40px 胶囊顶部开始排布。 */
+    grid-template-rows: 100%;
+    align-items: center;
+}
+
+.mobile-entry-detail__view-actions .mobile-top-action-pill__button {
+    justify-self: center;
+}
+
 .mobile-entry-detail__edit-heading {
     display: flex;
     min-width: 0;
@@ -523,7 +539,6 @@
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     box-sizing: border-box;
-    padding-top: var(--mobile-safe-top);
     padding-bottom: max(var(--fc-kb, 0px), var(--mobile-safe-bottom));
     transition: padding-bottom var(--fc-kb-transition, 0s);
 }
@@ -562,16 +577,20 @@
 }
 
 .mobile-entry-detail__immersive-editor .w-md-editor-content,
-.mobile-entry-detail__immersive-editor .w-md-editor-area,
-.mobile-entry-detail__immersive-editor .w-md-editor-text,
-.mobile-entry-detail__immersive-editor .w-md-editor-text-pre,
-.mobile-entry-detail__immersive-editor .w-md-editor-text-input {
+.mobile-entry-detail__immersive-editor .w-md-editor-area {
     height: 100% !important;
     min-height: 0 !important;
 }
 
+.mobile-entry-detail__immersive-editor .w-md-editor-area {
+    overflow-y: auto !important;
+}
+
 .mobile-entry-detail__immersive-editor .w-md-editor-text {
+    height: auto !important;
+    min-height: 100% !important;
     padding: var(--mobile-gap-text) 0 var(--mobile-gap-group) !important;
+    overflow: visible !important;
     color: var(--fc-color-text) !important;
     font-family: var(--fc-font-family) !important;
     font-size: var(--mobile-text-body) !important;
@@ -594,6 +613,21 @@
     word-break: inherit;
 }
 
+/*
+ * UIW 编辑器由高亮 pre 撑开正文，再让外层 area 统一滚动。把三层都钉死为 100%
+ * 会让 textarea 在内部独自滚动，而 pre 留在原位，长正文随即出现光标与文字错位。
+ */
+.mobile-entry-detail__immersive-editor .w-md-editor-text-pre {
+    height: auto !important;
+    min-height: 100% !important;
+}
+
+.mobile-entry-detail__immersive-editor .w-md-editor-text-input {
+    height: 100% !important;
+    min-height: 100% !important;
+    overflow: hidden !important;
+}
+
 .mobile-entry-detail__immersive-editor .w-md-editor-text-pre code {
     font: inherit !important;
     letter-spacing: inherit !important;
@@ -608,7 +642,8 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--mobile-entry-markdown-tool-gap);
-    padding: var(--mobile-gap-inline) var(--mobile-page-x) calc(var(--mobile-gap-inline) + var(--mobile-safe-bottom));
+    /* 安全区和键盘遮挡已经由 immersive 外层消费，这里只保留工具栏自身内边距。 */
+    padding: var(--mobile-gap-inline) var(--mobile-page-x);
     overflow-x: auto;
     border-top: var(--mobile-border);
     background: var(--mobile-surface-translucent-strong);
@@ -795,6 +830,42 @@
     display: none;
 }
 
+/* 摘要字段保持三行正文高度，字段名放在同一横向容器里，不额外挤占正文空间。 */
+.mobile-entry-detail__summary-field {
+    display: grid;
+    min-height: 5.5rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    box-sizing: border-box;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+}
+
+.mobile-entry-detail__summary-field:focus-within {
+    border-color: var(--fc-color-primary);
+}
+
+.mobile-entry-detail__summary-label {
+    padding-top: calc(var(--mobile-gap-text) / 2);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-snug);
+}
+
+.mobile-entry-detail__identity .mobile-entry-detail__summary-field .mobile-entry-detail__summary-input {
+    height: 4.5rem;
+    min-height: 4.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    background: transparent;
+}
+
 .mobile-entry-detail__edit-meta {
     display: grid;
     min-height: 0;
@@ -812,7 +883,7 @@
     overflow: hidden;
 }
 
-.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__edit-meta {
+.mobile-entry-detail--edit[data-body-keyboard-visible='true'] .mobile-entry-detail__edit-meta {
     grid-template-rows: 0fr;
 }
 
@@ -891,6 +962,18 @@
     background: var(--mobile-surface-raised);
 }
 
+/*
+ * 键盘收起后编辑主页恢复信息全貌，正文不再独占整屏，但仍应消费元数据之后的全部
+ * 剩余高度；需要专注写作时再进入键盘态。页面自身允许滚动，以兼容小屏与大字号。
+ */
+.mobile-entry-detail--edit:not([data-body-keyboard-visible='true']) {
+    overflow-y: auto;
+}
+
+.mobile-entry-detail--edit:not([data-body-keyboard-visible='true']) .mobile-entry-detail__body-pane {
+    flex: 1 0 min(32dvh, calc(var(--mobile-tap-min) * 5));
+}
+
 .mobile-entry-detail__body-head {
     display: flex;
     min-height: calc(var(--mobile-tap-min) - var(--mobile-gap-inline));
@@ -933,6 +1016,7 @@
     color: var(--fc-color-text-secondary);
     font: inherit;
     font-size: var(--mobile-text-meta);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-entry-detail__body-mode button::after {
@@ -968,6 +1052,13 @@
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font-weight: var(--mobile-weight-strong);
+}
+
+/* 切到预览后，“编辑”只保留普通文字态；按压/焦点不得遗留主色圆底。 */
+.mobile-entry-detail__body-mode button[aria-pressed='false'] {
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    box-shadow: none;
 }
 
 .mobile-entry-detail__expand-button {
@@ -1016,9 +1107,6 @@
 .mobile-entry-detail__inline-editor .w-md-editor,
 .mobile-entry-detail__inline-editor .w-md-editor-content,
 .mobile-entry-detail__inline-editor .w-md-editor-area,
-.mobile-entry-detail__inline-editor .w-md-editor-text,
-.mobile-entry-detail__inline-editor .w-md-editor-text-pre,
-.mobile-entry-detail__inline-editor .w-md-editor-text-input,
 .mobile-entry-detail__inline-editor .w-md-editor-preview {
     height: 100% !important;
     min-height: 0 !important;
@@ -1031,7 +1119,28 @@
 .mobile-entry-detail__inline-editor .w-md-editor-text,
 .mobile-entry-detail__inline-editor .w-md-editor-preview {
     padding: var(--mobile-gap-item) var(--mobile-gap-item) var(--mobile-gap-section) !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-area,
+.mobile-entry-detail__inline-editor .w-md-editor-preview {
     overflow-y: auto !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-text {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-text-pre {
+    height: auto !important;
+    min-height: 100% !important;
+}
+
+.mobile-entry-detail__inline-editor .w-md-editor-text-input {
+    height: 100% !important;
+    min-height: 100% !important;
+    overflow: hidden !important;
 }
 
 .mobile-entry-detail__inline-editor .w-md-editor-text,
@@ -1134,7 +1243,7 @@
     overflow: visible;
 }
 
-.mobile-entry-detail--edit[data-body-focused='true'] .mobile-entry-detail__markdown-toolbar--inline {
+.mobile-entry-detail--edit[data-body-keyboard-visible='true'] .mobile-entry-detail__markdown-toolbar--inline {
     display: flex;
 }
 
@@ -1175,6 +1284,17 @@
     background: var(--mobile-surface-raised);
 }
 
+/* 类型与图片是轻量选择区；标签和关系继续用容器承载可编辑的复杂内容。 */
+.mobile-entry-properties__group--types,
+.mobile-entry-properties__group--images {
+    padding: 0 0 var(--mobile-gap-group);
+    overflow: visible;
+    border: 0;
+    border-bottom: var(--mobile-divider);
+    border-radius: 0;
+    background: transparent;
+}
+
 .mobile-entry-properties__label {
     display: flex;
     min-height: calc(var(--mobile-tap-min) - var(--mobile-gap-group));
@@ -1187,7 +1307,6 @@
 
 .mobile-entry-properties .mobile-entry-detail__type-options {
     flex-wrap: wrap;
-    row-gap: var(--mobile-gap-inline);
     row-gap: var(--mobile-gap-group);
     padding-bottom: 0;
     overflow: visible;
@@ -1306,6 +1425,10 @@
     flex: 1 1 auto;
 }
 
+.mobile-entry-properties .highlight-tag-item__input .fc-input__field {
+    font-size: var(--mobile-text-body);
+}
+
 .mobile-entry-properties .highlight-tag-item__clear {
     min-height: var(--mobile-tap-min);
     flex: 0 0 auto;
@@ -1314,6 +1437,8 @@
 }
 
 .mobile-entry-properties .mobile-entry-detail__tag-select {
+    min-width: 0;
+    flex: 0 0 auto;
     width: 100%;
 }
 
@@ -1453,6 +1578,30 @@
     text-align: center;
 }
 
+.mobile-entry-relation-editor__state {
+    display: flex;
+    min-height: var(--mobile-tap-min);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-item);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
+}
+
+.mobile-entry-relation-editor__state strong {
+    color: var(--fc-color-text);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+}
+
+.mobile-entry-relation-editor__state-action {
+    align-self: flex-start;
+    margin-top: var(--mobile-gap-inline);
+}
+
 /* 未选目标的新关系，退出等于放弃，不用危险色。 */
 .mobile-entry-relation-editor__discard {
     display: inline-flex;
@@ -1519,6 +1668,7 @@
     position: relative;
     display: block;
     width: 100%;
+    flex: 0 0 auto;
     aspect-ratio: 16 / 10;
     padding: 0;
     overflow: hidden;

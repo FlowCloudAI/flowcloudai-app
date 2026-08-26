@@ -158,6 +158,7 @@ export function MobileEntryDetailView({
                 center={showStickyTitle ? <div className="mobile-entry-detail__sticky-title">{entry.title}</div> : undefined}
                 right={<MobileTopActionPill
                     ref={topActionsRef}
+                    className="mobile-entry-detail__view-actions"
                     actions={[
                         {
                             key: 'ai',
@@ -169,7 +170,6 @@ export function MobileEntryDetailView({
                             key: 'edit',
                             label: '编辑词条',
                             icon: <MobileEntryDetailActionIcon type="edit"/>,
-                            kind: 'primary',
                             onClick: onEdit,
                         },
                         {

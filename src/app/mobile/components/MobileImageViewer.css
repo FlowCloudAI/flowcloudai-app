@@ -3,37 +3,14 @@
     display: flex;
     min-height: 0;
     flex-direction: column;
-    padding-top: var(--mobile-safe-top);
     padding-bottom: var(--mobile-safe-bottom);
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
 }
 
+/* 顶栏结构、命中区与安全区统一交给移动端公共顶栏。图片区只取消页面正文默认留白。 */
 .mobile-image-viewer__topbar {
-    display: grid;
-    min-height: var(--mobile-top-surface-size);
-    flex: 0 0 auto;
-    grid-template-columns: var(--mobile-top-surface-size) minmax(0, 1fr) var(--mobile-top-surface-size);
-    align-items: center;
-    gap: var(--mobile-gap-inline);
-    padding: 0 var(--mobile-page-x);
-    border-bottom: var(--mobile-divider);
-    background: var(--mobile-surface-translucent-strong);
-}
-
-.mobile-image-viewer__top-action,
-.mobile-image-viewer__mode-action {
-    display: inline-grid;
-    min-width: var(--mobile-top-surface-size);
-    min-height: var(--mobile-top-surface-size);
-    padding: 0;
-    place-items: center;
-    border: 0;
-    background: transparent;
-    color: var(--fc-color-primary);
-    font: inherit;
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-strong);
+    margin-bottom: 0;
 }
 
 .mobile-image-viewer__heading {

@@ -50,12 +50,13 @@ test('业务 CSS 不出现颜色字面量、原始色板或裸安全区', () => 
     assertNoMatch(/env\(safe-area-inset-/g, '裸安全区')
 })
 
-test('废止 token、裸大 z-index 与第三档阴影保持为零', () => {
+test('废止 token、裸大 z-index 与未经登记的第三档阴影保持为零', () => {
     assertNoMatch(/--mobile-(?:font-weight-(?:label|strong|heading|display)|border-(?:soft|medium|strong|emphasis|bold)|shadow-[a-z-]+)/g, '废止 token')
     assertNoMatch(/z-index\s*:\s*(?:-\d+|[3-9]|\d{2,})\s*;/g, '裸 z-index')
     assertDeclarations('box-shadow', '非标准阴影', value => (
         /^none(?:\s*!important)?$/.test(value)
         || /^var\(--mobile-elevation-(?:raised|floating)\)$/.test(value)
+        || /^var\(--mobile-topbar-(?:bg|pill)-box-shadow\)$/.test(value)
     ))
     assertNoMatch(/--mobile-inset-highlight|var\(--fc-shadow-/g, '旧阴影来源')
     assertNoMatch(/border-radius\s*:\s*(?!0(?:\s+0){0,3}\s*;)[^;{}]*(?:[1-9]|%)/g, '裸圆角')

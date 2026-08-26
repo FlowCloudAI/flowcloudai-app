@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>公共顶栏材质对照</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #e9e9e7;
+            color: #171717;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        main { min-height: 100vh; display: grid; padding: 36px; place-items: center; }
+        .board {
+            padding: 24px;
+            border: 1px solid #d6d6d2;
+            border-radius: 24px;
+            background: #fff;
+            box-shadow: 0 22px 60px rgb(0 0 0 / 12%);
+        }
+        h1 { margin: 0 0 8px; font-size: 22px; }
+        .note { margin: 0 0 20px; color: #666; font-size: 13px; }
+        .grid { display: grid; grid-template-columns: repeat(2, 390px); gap: 22px; }
+        figure { margin: 0; }
+        .frame {
+            width: 390px;
+            height: 220px;
+            overflow: hidden;
+            border: 1px solid #cacac7;
+            border-radius: 18px;
+            background: #faf9f6;
+        }
+        .frame img { display: block; width: 390px; height: auto; }
+        figcaption { margin-top: 10px; font-size: 13px; font-weight: 700; }
+        .meta { display: block; margin-top: 3px; color: #777; font-size: 11px; font-weight: 400; }
+    </style>
+</head>
+<body>
+<main>
+    <section class="board">
+        <h1>公共顶栏材质：真实截图 / 实验室当前实现</h1>
+        <p class="note">均归一化为 390px 宽并裁取顶栏区域；比较按钮轮廓、渐变覆盖、内容穿透和视觉密度。</p>
+        <div class="grid">
+            <figure>
+                <div class="frame">
+                    <img src="../mobile-entry-detail-rebuild-2026-08-26/android-恢复公共顶栏五段渐变-滚动态.png" alt="真实 Android 截图顶栏">
+                </div>
+                <figcaption>真实 Android 截图<span class="meta">1220px 宽原图归一化至 390px</span></figcaption>
+            </figure>
+            <figure>
+                <div class="frame">
+                    <img src="implementation-light-phone.png" alt="实验室亮色当前实现顶栏">
+                </div>
+                <figcaption>实验室 · 亮色当前实现<span class="meta">390 × 844px 模拟设备，裁取顶部 220px</span></figcaption>
+            </figure>
+        </div>
+    </section>
+</main>
+</body>
+</html>

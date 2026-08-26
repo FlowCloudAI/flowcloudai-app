@@ -1,4 +1,5 @@
-import {useEffect, useRef} from 'react'
+/** 词条标签值的展示与编辑单元；桌面元数据面板和移动端属性页共享同一套取值语义。 */
+import {useEffect, useId, useRef} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import {resolveEditableNumberTagValue} from '../lib/entryTagInput'
 import './HighLightTagItem.css'
@@ -60,6 +61,8 @@ export default function HighLightTagItem({
     const canRemove = isEditMode && !implanted && Boolean(onRemove)
     const rangeText = getRangeText(schema)
     const numberInputRef = useRef<HTMLInputElement>(null)
+    const titleId = useId()
+    const hintId = useId()
 
     useEffect(() => {
         const input = numberInputRef.current
@@ -74,7 +77,7 @@ export default function HighLightTagItem({
         >
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
-                    <span className="highlight-tag-item__title">{schema.name}</span>
+                    <span id={titleId} className="highlight-tag-item__title">{schema.name}</span>
                     {isEditMode && implanted && (
                         <span className="highlight-tag-item__badge">植入</span>
                     )}
@@ -89,6 +92,7 @@ export default function HighLightTagItem({
                         size="sm"
                         className="highlight-tag-item__remove"
                         title="从当前词条移除标签"
+                        aria-label={`从当前词条移除标签「${schema.name}」`}
                         onClick={onRemove}
                     >
                         删除
@@ -96,17 +100,18 @@ export default function HighLightTagItem({
                 )}
             </div>
             {isEditMode && (
-                <div className="highlight-tag-item__hint" aria-hidden={!rangeText}>
+                <div id={hintId} className="highlight-tag-item__hint" aria-hidden={!rangeText}>
                     {rangeText ?? '\u00a0'}
                 </div>
             )}
 
             {isEditMode ? (
                 schema.type === 'boolean' ? (
-                    <div className="highlight-tag-item__bool-group highlight-tag-item__bool-group--edit">
+                    <div className="highlight-tag-item__bool-group highlight-tag-item__bool-group--edit" role="group" aria-labelledby={titleId}>
                         <button
                             type="button"
                             className={`highlight-tag-item__bool-chip${value == null ? ' active' : ''}`}
+                            aria-pressed={value == null}
                             onClick={() => onChange?.(null)}
                         >
                             未填写
@@ -114,6 +119,7 @@ export default function HighLightTagItem({
                         <button
                             type="button"
                             className={`highlight-tag-item__bool-chip${value === true ? ' active' : ''}`}
+                            aria-pressed={value === true}
                             onClick={() => onChange?.(true)}
                         >
                             是
@@ -121,6 +127,7 @@ export default function HighLightTagItem({
                         <button
                             type="button"
                             className={`highlight-tag-item__bool-chip${value === false ? ' active' : ''}`}
+                            aria-pressed={value === false}
                             onClick={() => onChange?.(false)}
                         >
                             否
@@ -137,6 +144,8 @@ export default function HighLightTagItem({
                             radius="lg"
                             value={schema.type === 'number' ? undefined : value == null ? '' : String(value)}
                             defaultValue={schema.type === 'number' && value != null ? String(value) : undefined}
+                            aria-labelledby={titleId}
+                            aria-describedby={rangeText ? hintId : undefined}
                             onBlur={(event) => {
                                 if (schema.type !== 'number') return
                                 const nextValue = resolveEditableNumberTagValue(event.currentTarget.value)
@@ -162,6 +171,7 @@ export default function HighLightTagItem({
                             <button
                                 type="button"
                                 className="highlight-tag-item__clear"
+                                aria-label={`清空标签「${schema.name}」`}
                                 onClick={() => {
                                     if (numberInputRef.current) numberInputRef.current.value = ''
                                     onChange?.(null)

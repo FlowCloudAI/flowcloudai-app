@@ -13,7 +13,6 @@ import {
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {MOBILE_MARKDOWN_TOOLS, type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
 import {MobileMarkdownToolIcon} from './MobileEntryMarkdownTools'
 
@@ -73,8 +72,8 @@ export function MobileEntryImmersiveEditor({
                         actions={[{
                             key: 'save',
                             label: saving ? '保存中' : '保存词条',
-                            icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="save"/>,
-                            kind: 'add',
+                            icon: <span className="mobile-top-action-pill__text">{saving ? '保存中…' : '保存'}</span>,
+                            kind: 'text',
                             disabled: saving,
                             onClick: onSave,
                         }]}
@@ -93,7 +92,10 @@ export function MobileEntryImmersiveEditor({
                         hideFullscreen
                         toolbarCommands={[]}
                         extraCommands={[]}
-                        textareaProps={textareaProps}
+                        textareaProps={{
+                            ...textareaProps,
+                            'aria-label': textareaProps['aria-label'] ?? '词条正文',
+                        }}
                         tokens={{
                             background: 'transparent',
                             toolbarBackground: 'transparent',

@@ -1,40 +1,69 @@
 .mobile-page-topbar {
+    --mobile-topbar-safe-offset: 0px;
+    --mobile-topbar-top-offset: calc(
+        var(--mobile-topbar-safe-offset)
+        + var(--mobile-topbar-edge-gap)
+    );
     /*
-     * 顶栏遮罩：栏体本身整片实色，渐隐挪到栏体下方的 ::after。
-     *
-     * 旧实现把渐变画在栏体内部（0%→100% 实色，60% 处只剩 50%，100% 处全透明），
-     * 而操作行实际占据栏体的 31%~100%——正好落在最透明的一段。编辑页不滚动所以没暴露，
-     * 属性页/关系页一滚，正文就和返回键、页面标题叠字（2026-08-24 Android 真机核对，
-     * 证据见 app_main/designs/audits/mobile-entry-editor-2026-08-24/）。
-     *
-     * bg-fade-height 控制栏体下方渐隐段的高度，调大过渡更柔和，调小更接近硬边。
+     * 顶栏背景渐变调试区：
+     * 1. bg-stop-*：从顶栏顶部到顶栏底部的关键点位置，0% 在最上，100% 在最下。
+     * 2. bg-visible-*：该关键点处页面背景色的可见度，100% 为完全实色，0% 为完全透明。
+     * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
      */
-    --mobile-page-topbar-x: var(--mobile-page-x);
-    --mobile-page-topbar-bg-fade-height: var(--mobile-gap-group);
+    --mobile-page-topbar-x: max(
+        1.25rem,
+        var(--mobile-safe-left),
+        var(--mobile-safe-right)
+    );
+    --mobile-page-topbar-bg-stop-1: 0%;
+    --mobile-page-topbar-bg-visible-1: 100%;
+    --mobile-page-topbar-bg-stop-2: 20%;
+    --mobile-page-topbar-bg-visible-2: 90%;
+    --mobile-page-topbar-bg-stop-3: 30%;
+    --mobile-page-topbar-bg-visible-3: 80%;
+    --mobile-page-topbar-bg-stop-4: 60%;
+    --mobile-page-topbar-bg-visible-4: 50%;
+    --mobile-page-topbar-bg-stop-5: 100%;
+    --mobile-page-topbar-bg-visible-5: 0%;
 
     position: relative;
     z-index: var(--mobile-z-sticky);
+    isolation: isolate;
     display: grid;
     flex: 0 0 auto;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: var(--mobile-gap-inline);
-    min-height: calc(var(--mobile-top-surface-size) + var(--mobile-topbar-offset));
+    min-height: calc(var(--mobile-top-surface-size) + var(--mobile-topbar-top-offset));
     box-sizing: border-box;
     margin-bottom: var(--mobile-gap-inline);
-    padding: var(--mobile-topbar-offset) var(--mobile-page-topbar-x) 0;
-    background: var(--fc-color-bg);
+    padding: var(--mobile-topbar-top-offset) var(--mobile-page-topbar-x) 0;
+    background: transparent;
 }
 
-/* 栏体下沿的渐隐段：让滚过去的内容淡出，而不是穿透到操作行上。 */
-.mobile-page-topbar::after {
+/*
+ * 普通页面外壳已经从安全区下沿开始；全屏 Portal 从物理屏幕顶端开始，
+ * 因此由公共顶栏在同一个 top-offset 参数里补入安全区，页面不得各写一份。
+ */
+.fc-overlay__panel--fullscreen .mobile-page-topbar {
+    --mobile-topbar-safe-offset: var(--mobile-safe-top);
+}
+
+/* 独立背景层让顶栏 blur 不会与内部胶囊的 blur 合并。 */
+.mobile-page-topbar::before {
     position: absolute;
-    top: 100%;
-    right: 0;
-    left: 0;
-    height: var(--mobile-page-topbar-bg-fade-height);
+    z-index: 0;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-1), transparent) var(--mobile-page-topbar-bg-stop-1),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-2), transparent) var(--mobile-page-topbar-bg-stop-2),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-3), transparent) var(--mobile-page-topbar-bg-stop-3),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-4), transparent) var(--mobile-page-topbar-bg-stop-4),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-5), transparent) var(--mobile-page-topbar-bg-stop-5)
+    );
+    box-shadow: var(--mobile-topbar-bg-box-shadow);
     content: '';
-    background: linear-gradient(180deg, var(--fc-color-bg) 0%, transparent 100%);
     pointer-events: none;
 }
 
@@ -50,6 +79,8 @@
 
 .mobile-page-topbar__side,
 .mobile-page-topbar__center {
+    position: relative;
+    z-index: 1;
     display: flex;
     min-width: 0;
     align-items: center;
@@ -135,10 +166,12 @@
     gap: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
-    padding: 0;
-    border: var(--mobile-border);
+    padding: 0 var(--mobile-topbar-pill-padding-x);
+    border: var(--mobile-topbar-pill-border);
     border-radius: var(--fc-radius-full);
-    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
+    background: transparent;
+    box-shadow: var(--mobile-topbar-pill-box-shadow);
+    /* 独立伪元素上的底色与毛玻璃见 src/glassEffect.css。 */
     /*
      * 开关都走淡入淡出，不要做成「展开瞬间隐藏」。
      * 菜单的玻璃盒是从这颗胶囊的矩形上原地长出来的，两者在起手那一帧几乎完全重合；
@@ -146,6 +179,15 @@
      * 观感上就是断一下。叠加期那点密度差远比断点轻。
      */
     transition: opacity var(--mobile-duration-fast) var(--mobile-ease-standard);
+}
+
+.mobile-top-action-pill::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    content: '';
+    pointer-events: none;
 }
 
 .mobile-top-action-pill:has(.mobile-top-action-pill__button:only-child) {
@@ -166,6 +208,7 @@
     flex: 0 0 var(--mobile-top-action-size);
     width: var(--mobile-top-action-size);
     height: var(--mobile-top-action-size);
+    box-sizing: border-box;
     padding: 0;
     place-items: center;
     border-radius: var(--fc-radius-full);
@@ -187,8 +230,26 @@
 
 /* 详情页的主编辑动作要从同组的辅助动作里显式突出。 */
 .mobile-top-action-pill__button--primary {
-    background: var(--fc-color-primary);
+    background: transparent;
     color: var(--fc-color-text-on-primary);
+}
+
+/* 按钮命中区不缩小；实心视觉圆单独按确认稿使用 38px。 */
+.mobile-top-action-pill__button--primary::before {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--mobile-topbar-primary-visual-size);
+    height: var(--mobile-topbar-primary-visual-size);
+    transform: translate(-50%, -50%);
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-primary);
+    content: '';
+}
+
+.mobile-top-action-pill__button--primary .mobile-top-action-pill__icon {
+    position: relative;
+    z-index: 1;
 }
 
 .mobile-top-action-pill:has(.mobile-top-action-pill__button--text:only-child) {
@@ -285,6 +346,10 @@
     background: transparent;
     isolation: isolate;
     contain: paint;
+}
+
+.mobile-anchored-menu--compact {
+    width: min(13.25rem, calc(100% - 2rem));
 }
 
 /*
@@ -439,6 +504,15 @@
     text-align: left;
     cursor: pointer;
     touch-action: manipulation;
+}
+
+.mobile-anchored-menu--compact .mobile-anchored-menu__row {
+    grid-template-columns: 1.9rem minmax(0, 1fr);
+    padding-inline: var(--mobile-gap-group);
+}
+
+.mobile-anchored-menu--compact .mobile-anchored-menu__check {
+    display: none;
 }
 
 .mobile-anchored-menu__row:active {

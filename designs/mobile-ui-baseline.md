@@ -5,6 +5,7 @@
 > 建立日期：2026-08-18
 > 键盘平台契约更新：2026-08-24
 > 容器结构更新：2026-08-24（§9 规则 8：底部面板不承载滚动或输入内容）
+> 顶栏材质边界更新：2026-08-26（公共顶栏的固定光学阴影配方见 `designs/mobile-topbar-material-spec.md`）
 > 配套文档：`designs/apple-ios-ui-ux-design-guidelines.md`（Apple 平台细则）、`designs/ios-mobile-hig-gap-audit.md`（历史差距审计）
 
 ---
@@ -199,6 +200,8 @@ L1 token 一律挂在 `:root[data-fc-density="touch"]` 上，**不挂在 `.mobil
 | `--mobile-elevation-floating` | 脱离文档流的浮层：抽屉、BottomSheet、锚点菜单、对话框 |
 
 **废止其余 14 个 `--mobile-shadow-*`。** 理由：16 档阴影的实际效果是「所有元素都在浮起」，等价于没有层次。原生平台的层次感主要来自「材质 + 位置」，阴影只区分「贴在页面上」和「浮在页面上方」两种状态。
+
+公共顶栏玻璃胶囊允许使用 `--mobile-topbar-bg-box-shadow` 与 `--mobile-topbar-pill-box-shadow`。它们是 `designs/mobile-topbar-material-spec.md` 固定的材质光学配方，不是可供业务页面选择的第三、第四档 elevation；其他组件不得复用或仿造。
 
 ### 5.4 z-index：语义层（L1）
 

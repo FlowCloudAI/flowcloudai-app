@@ -1,0 +1,1469 @@
+<!doctype html>
+<!--
+状态：现行
+日期：2026-08-26
+用途：移动端公共顶栏材质实验室。左侧调节明暗主题的独立参数，右侧在真实词条层级中实时观察渐变、毛玻璃、细边框与柔和阴影。
+边界：这是单文件设计工具，不参与应用运行时；确认方案后再把导出的 token 映射回 MobileTopControls.css / mobileTokens.css / glassEffect.css。
+-->
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCloudAI · 公共顶栏材质实验室</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --shell-bg: #efeeea;
+            --panel-bg: #fffdfa;
+            --panel-bg-raised: #ffffff;
+            --panel-text: #1a1a1a;
+            --panel-text-secondary: #646464;
+            --panel-text-tertiary: #8a8a8a;
+            --panel-border: #d9d7d2;
+            --panel-primary: #378add;
+            --panel-primary-subtle: #ebf4fd;
+            --panel-danger: #c7433a;
+            --panel-shadow: 0 18px 48px rgb(32 28 20 / 12%);
+            --space-1: 4px;
+            --space-2: 8px;
+            --space-3: 12px;
+            --space-4: 16px;
+            --space-5: 24px;
+            --space-6: 32px;
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-full: 999px;
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --shell-bg: #0b0b0b;
+            --panel-bg: #101010;
+            --panel-bg-raised: #1b1b1b;
+            --panel-text: #ededeb;
+            --panel-text-secondary: #aaa9a4;
+            --panel-text-tertiary: #77756f;
+            --panel-border: #343431;
+            --panel-primary: #5da4e8;
+            --panel-primary-subtle: rgb(55 138 221 / 16%);
+            --panel-danger: #e0655b;
+            --panel-shadow: 0 18px 54px rgb(0 0 0 / 42%);
+        }
+
+        * { box-sizing: border-box; }
+        html { min-width: 320px; background: var(--shell-bg); }
+        body { margin: 0; min-width: 320px; background: var(--shell-bg); color: var(--panel-text); }
+        button, input, textarea { color: inherit; font: inherit; }
+        button { cursor: pointer; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible {
+            outline: 3px solid color-mix(in srgb, var(--panel-primary) 38%, transparent);
+            outline-offset: 2px;
+        }
+
+        .lab-shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(390px, 450px) minmax(560px, 1fr);
+        }
+
+        .inspector {
+            position: sticky;
+            z-index: 5;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid var(--panel-border);
+            background: color-mix(in srgb, var(--panel-bg) 96%, transparent);
+            box-shadow: 8px 0 32px rgb(0 0 0 / 5%);
+            scrollbar-width: thin;
+        }
+
+        .inspector__inner { padding: var(--space-5); }
+        .eyebrow {
+            margin: 0 0 var(--space-2);
+            color: var(--panel-primary);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+        h1 { margin: 0; font-size: 25px; line-height: 1.2; }
+        .intro {
+            margin: var(--space-3) 0 var(--space-5);
+            color: var(--panel-text-secondary);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .theme-switch,
+        .context-switch,
+        .preset-grid,
+        .action-grid {
+            display: grid;
+            gap: var(--space-2);
+        }
+        .theme-switch { grid-template-columns: 1fr 1fr; }
+        .context-switch { grid-template-columns: repeat(3, 1fr); }
+        .preset-grid { grid-template-columns: 1fr 1fr; }
+        .action-grid { grid-template-columns: 1fr 1fr; }
+
+        .segmented-button,
+        .preset-button,
+        .action-button {
+            min-height: 40px;
+            padding: 0 var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            background: var(--panel-bg-raised);
+            color: var(--panel-text-secondary);
+            font-size: 13px;
+            transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+        }
+        .segmented-button:hover,
+        .preset-button:hover,
+        .action-button:hover { border-color: color-mix(in srgb, var(--panel-primary) 52%, var(--panel-border)); }
+        .segmented-button:active,
+        .preset-button:active,
+        .action-button:active { transform: scale(.985); }
+        .segmented-button[aria-pressed="true"],
+        .preset-button[aria-pressed="true"] {
+            border-color: var(--panel-primary);
+            background: var(--panel-primary-subtle);
+            color: var(--panel-primary);
+            font-weight: 700;
+        }
+        .action-button--primary {
+            border-color: var(--panel-primary);
+            background: var(--panel-primary);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .profile-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-2);
+            margin-top: var(--space-3);
+            padding: var(--space-3);
+            border: 1px solid color-mix(in srgb, var(--panel-primary) 22%, var(--panel-border));
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--panel-primary-subtle) 72%, transparent);
+            color: var(--panel-text-secondary);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .profile-hint strong { color: var(--panel-text); }
+        .profile-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 auto;
+            margin-top: 5px;
+            border-radius: var(--radius-full);
+            background: var(--panel-primary);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--panel-primary) 14%, transparent);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin: var(--space-5) 0 var(--space-2);
+            color: var(--panel-text-tertiary);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+        .section-title::after {
+            height: 1px;
+            flex: 1 1 auto;
+            background: var(--panel-border);
+            content: '';
+        }
+
+        .control-group {
+            margin-top: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-md);
+            background: var(--panel-bg-raised);
+            overflow: hidden;
+        }
+        .control-group summary {
+            display: flex;
+            min-height: 46px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--space-4);
+            color: var(--panel-text);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            list-style: none;
+        }
+        .control-group summary::-webkit-details-marker { display: none; }
+        .control-group summary::after {
+            color: var(--panel-text-tertiary);
+            content: '展开';
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .control-group[open] summary::after { content: '收起'; }
+        .control-group__body {
+            display: grid;
+            gap: var(--space-4);
+            padding: var(--space-4);
+            border-top: 1px solid var(--panel-border);
+        }
+
+        .control-row { display: grid; gap: var(--space-2); }
+        .control-row__head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: var(--space-3);
+        }
+        .control-row label { font-size: 12px; font-weight: 650; }
+        .control-row__hint {
+            color: var(--panel-text-tertiary);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .range-line {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 74px;
+            align-items: center;
+            gap: var(--space-3);
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: var(--radius-full);
+            appearance: none;
+            background: linear-gradient(90deg, var(--panel-primary) var(--range-fill, 50%), var(--panel-border) var(--range-fill, 50%));
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--panel-bg-raised);
+            border-radius: var(--radius-full);
+            appearance: none;
+            background: var(--panel-primary);
+            box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--panel-bg-raised);
+            border-radius: var(--radius-full);
+            background: var(--panel-primary);
+            box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+        }
+        .number-input,
+        .color-text {
+            width: 100%;
+            min-height: 34px;
+            padding: 0 var(--space-2);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: var(--panel-bg);
+            color: var(--panel-text);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+        .color-line { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-2); }
+        .color-input {
+            width: 44px;
+            height: 34px;
+            padding: 3px;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: var(--panel-bg);
+        }
+
+        .stop-list { display: grid; gap: var(--space-3); }
+        .stop-row {
+            display: grid;
+            grid-template-columns: 30px minmax(0, 1fr);
+            gap: var(--space-2);
+            padding: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--panel-bg) 72%, transparent);
+        }
+        .stop-index {
+            display: grid;
+            width: 28px;
+            height: 28px;
+            place-items: center;
+            border-radius: var(--radius-full);
+            background: var(--panel-primary-subtle);
+            color: var(--panel-primary);
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .stop-controls { display: grid; gap: var(--space-2); }
+        .stop-control { display: grid; grid-template-columns: 42px minmax(0, 1fr) 52px; align-items: center; gap: var(--space-2); }
+        .stop-control label { color: var(--panel-text-secondary); font-size: 11px; }
+        .stop-control output { color: var(--panel-text-tertiary); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+        .stop-warning {
+            display: none;
+            margin: 0;
+            color: var(--panel-danger);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        .stop-warning.show { display: block; }
+
+        .code-output {
+            width: 100%;
+            min-height: 210px;
+            resize: vertical;
+            padding: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--panel-bg) 84%, #000 4%);
+            color: var(--panel-text-secondary);
+            font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            tab-size: 4;
+        }
+        .json-input {
+            width: 100%;
+            min-height: 150px;
+            resize: vertical;
+            padding: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            background: var(--panel-bg);
+            color: var(--panel-text);
+            font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            tab-size: 2;
+        }
+        .json-input:focus {
+            border-color: var(--panel-primary);
+            outline: 3px solid color-mix(in srgb, var(--panel-primary) 15%, transparent);
+        }
+        .import-status {
+            min-height: 18px;
+            margin: 0;
+            color: var(--panel-text-tertiary);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        .import-status.is-error { color: var(--panel-danger); }
+        .save-status {
+            min-height: 18px;
+            margin: var(--space-2) 0 0;
+            color: var(--panel-text-tertiary);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .stage {
+            display: grid;
+            min-height: 100vh;
+            align-content: start;
+            justify-items: center;
+            gap: var(--space-4);
+            padding: var(--space-5);
+            background:
+                radial-gradient(circle at 72% 12%, color-mix(in srgb, var(--panel-primary) 13%, transparent), transparent 34%),
+                var(--shell-bg);
+        }
+        .stage-toolbar {
+            display: flex;
+            width: min(100%, 720px);
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-3);
+            padding: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-lg);
+            background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+            box-shadow: var(--panel-shadow);
+        }
+        .stage-toolbar__copy { min-width: 0; }
+        .stage-toolbar__copy strong { display: block; font-size: 13px; }
+        .stage-toolbar__copy span { display: block; margin-top: 3px; overflow: hidden; color: var(--panel-text-tertiary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+        .stage-toolbar .context-switch { flex: 0 0 252px; }
+
+        .phone-frame {
+            position: relative;
+            width: 390px;
+            height: 844px;
+            border: 10px solid #1d1d1f;
+            border-radius: 44px;
+            background: var(--preview-page-bg);
+            overflow: hidden;
+            box-shadow: 0 28px 76px rgb(0 0 0 / 24%);
+            isolation: isolate;
+        }
+        .phone-frame::after {
+            position: absolute;
+            z-index: 100;
+            inset: 0;
+            border: 1px solid rgb(255 255 255 / 12%);
+            border-radius: 34px;
+            content: '';
+            pointer-events: none;
+        }
+
+        .scene-scroll {
+            position: absolute;
+            z-index: 0;
+            inset: 0;
+            overflow-y: auto;
+            background: var(--preview-page-bg);
+            color: var(--preview-text);
+            scrollbar-width: none;
+        }
+        .scene-scroll::-webkit-scrollbar { display: none; }
+        .scene-content { min-height: 1500px; padding: 58px 20px 148px; }
+        .hero-card {
+            height: 245px;
+            margin-bottom: 24px;
+            border-radius: 22px;
+            overflow: hidden;
+            background: var(--preview-page-secondary);
+            box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+        }
+        .hero-card img { display: block; width: 100%; height: 100%; object-fit: cover; }
+        .entry-kicker { margin: 0 0 6px; color: var(--preview-text-secondary); font-size: 13px; font-weight: 650; }
+        .entry-title { margin: 0; font-size: 34px; line-height: 1.16; letter-spacing: -.03em; }
+        .identity-line { display: flex; align-items: center; gap: 10px; margin-top: 18px; color: var(--preview-text-secondary); font-size: 14px; }
+        .type-badge {
+            display: inline-flex;
+            min-height: 32px;
+            align-items: center;
+            padding: 0 12px;
+            border: 1px solid color-mix(in srgb, var(--preview-primary) 35%, transparent);
+            border-radius: var(--radius-full);
+            background: color-mix(in srgb, var(--preview-primary) 10%, transparent);
+            color: var(--preview-primary);
+            font-weight: 700;
+        }
+        .summary-card {
+            margin-top: 20px;
+            padding: 16px 18px;
+            border-left: 4px solid color-mix(in srgb, var(--preview-primary) 50%, transparent);
+            border-radius: 0 18px 18px 0;
+            background: color-mix(in srgb, var(--preview-page-secondary) 64%, var(--preview-page-elevated));
+            color: var(--preview-text-secondary);
+            font-size: 15px;
+            line-height: 1.55;
+        }
+        .meta-chips { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+        .meta-chip {
+            display: inline-flex;
+            min-height: 34px;
+            align-items: center;
+            gap: 8px;
+            padding: 0 13px;
+            border: 1px solid color-mix(in srgb, var(--preview-text) 16%, transparent);
+            border-radius: var(--radius-full);
+            background: color-mix(in srgb, var(--preview-page-elevated) 72%, transparent);
+            font-size: 14px;
+        }
+        .meta-chip span { color: var(--preview-text-secondary); }
+        .reading-head { display: flex; align-items: baseline; gap: 10px; margin-top: 30px; }
+        .reading-head strong { font-size: 13px; }
+        .reading-head span { color: var(--preview-text-secondary); font-size: 12px; }
+        .reading-head::after { height: 1px; flex: 1 1 auto; background: color-mix(in srgb, var(--preview-text) 16%, transparent); content: ''; }
+        .entry-copy { font-size: 17px; line-height: 1.75; }
+        .entry-copy h2 { margin: 22px 0 10px; font-size: 22px; line-height: 1.35; }
+        .entry-copy p { margin: 0 0 18px; }
+        .relation-card {
+            margin-top: 26px;
+            padding: 18px;
+            border: 1px solid color-mix(in srgb, var(--preview-text) 14%, transparent);
+            border-radius: 20px;
+            background: var(--preview-page-elevated);
+        }
+        .relation-card strong { display: block; margin-bottom: 8px; }
+        .relation-card p { margin: 0; color: var(--preview-text-secondary); font-size: 14px; line-height: 1.6; }
+
+        .sim-header {
+            position: absolute;
+            z-index: 20;
+            top: 0;
+            right: 0;
+            left: 0;
+            height: var(--preview-bar-height);
+            pointer-events: none;
+        }
+        .sim-header::before {
+            position: absolute;
+            z-index: 0;
+            inset: 0;
+            background: var(--preview-bar-gradient);
+            -webkit-backdrop-filter: blur(var(--preview-bar-blur)) saturate(var(--preview-bar-saturation));
+            backdrop-filter: blur(var(--preview-bar-blur)) saturate(var(--preview-bar-saturation));
+            box-shadow: var(--preview-bar-shadow);
+            content: '';
+        }
+        .status-row,
+        .topbar-row {
+            position: relative;
+            z-index: 1;
+        }
+        .status-row {
+            display: flex;
+            height: 42px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--preview-bar-padding-x);
+            color: var(--preview-text);
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .topbar-row {
+            display: grid;
+            height: calc(var(--preview-bar-height) - 42px);
+            grid-template-columns: 1fr auto 1fr;
+            align-items: start;
+            gap: 8px;
+            padding: 7px var(--preview-bar-padding-x) 0;
+        }
+        .sticky-title {
+            max-width: 138px;
+            padding-top: 11px;
+            overflow: hidden;
+            color: var(--preview-text);
+            font-size: 14px;
+            font-weight: 700;
+            opacity: 0;
+            text-align: center;
+            text-overflow: ellipsis;
+            transition: opacity 150ms ease;
+            white-space: nowrap;
+        }
+        .phone-frame.has-sticky-title .sticky-title { opacity: 1; }
+        .topbar-side { display: flex; min-width: 0; }
+        .topbar-side--right { justify-content: flex-end; }
+        .glass-pill {
+            position: relative;
+            display: inline-flex;
+            height: var(--preview-pill-height);
+            align-items: center;
+            gap: var(--preview-pill-gap);
+            padding: 0 var(--preview-pill-padding-x);
+            border: var(--preview-pill-border-width) solid var(--preview-pill-border-color);
+            border-radius: var(--preview-pill-radius);
+            background: transparent;
+            box-shadow: var(--preview-pill-shadow), inset 0 1px 0 var(--preview-pill-highlight);
+            overflow: hidden;
+            pointer-events: auto;
+            isolation: isolate;
+        }
+        .glass-pill::before {
+            position: absolute;
+            z-index: 0;
+            inset: 0;
+            border-radius: inherit;
+            background: var(--preview-pill-gradient);
+            -webkit-backdrop-filter: blur(var(--preview-pill-blur)) saturate(var(--preview-pill-saturation));
+            backdrop-filter: blur(var(--preview-pill-blur)) saturate(var(--preview-pill-saturation));
+            content: '';
+            pointer-events: none;
+        }
+        .glass-pill__button {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            width: var(--preview-button-size);
+            height: var(--preview-button-size);
+            padding: 0;
+            place-items: center;
+            border: 0;
+            border-radius: var(--radius-full);
+            background: transparent;
+            color: var(--preview-primary);
+        }
+        .glass-pill__button--primary { color: #fff; }
+        .glass-pill__button--primary::before {
+            position: absolute;
+            width: calc(var(--preview-button-size) - 4px);
+            height: calc(var(--preview-button-size) - 4px);
+            border-radius: var(--radius-full);
+            background: var(--preview-primary);
+            content: '';
+        }
+        .glass-pill__button svg { position: relative; z-index: 1; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+        .glass-pill__button--more svg { fill: currentColor; stroke: none; }
+
+        .bottom-nav {
+            position: absolute;
+            z-index: 15;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: grid;
+            height: 92px;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 10px 12px 18px;
+            border-top: 1px solid color-mix(in srgb, var(--preview-text) 10%, transparent);
+            background: color-mix(in srgb, var(--preview-page-bg) 76%, transparent);
+            -webkit-backdrop-filter: blur(22px) saturate(1.25);
+            backdrop-filter: blur(22px) saturate(1.25);
+        }
+        .bottom-nav__item {
+            display: grid;
+            place-items: center;
+            align-content: center;
+            gap: 3px;
+            color: var(--preview-text-secondary);
+            font-size: 11px;
+        }
+        .bottom-nav__item--active { color: var(--preview-primary); }
+        .bottom-nav__item svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .material-readout {
+            display: grid;
+            width: min(100%, 720px);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: var(--space-2);
+        }
+        .readout-card {
+            min-width: 0;
+            padding: var(--space-3);
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-md);
+            background: color-mix(in srgb, var(--panel-bg) 88%, transparent);
+        }
+        .readout-card span { display: block; color: var(--panel-text-tertiary); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+        .readout-card strong { display: block; margin-top: 4px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+        .toast {
+            position: fixed;
+            z-index: 100;
+            right: var(--space-5);
+            bottom: var(--space-5);
+            padding: 11px 15px;
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-full);
+            background: var(--panel-bg-raised);
+            box-shadow: var(--panel-shadow);
+            color: var(--panel-text);
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 160ms ease, transform 160ms ease;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        @media (max-width: 1040px) {
+            .lab-shell { grid-template-columns: 100%; }
+            .inspector { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--panel-border); }
+            .stage { min-height: auto; }
+        }
+        @media (max-width: 620px) {
+            .inspector__inner, .stage { padding: var(--space-4); }
+            .stage-toolbar { align-items: stretch; flex-direction: column; }
+            .stage-toolbar .context-switch { flex-basis: auto; }
+            .phone-frame { width: min(390px, calc(100vw - 32px)); transform-origin: top center; }
+            .material-readout { grid-template-columns: 1fr 1fr; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0ms !important; }
+        }
+    </style>
+</head>
+<body>
+<main class="lab-shell">
+    <aside class="inspector" aria-label="顶栏材质参数">
+        <div class="inspector__inner">
+            <p class="eyebrow">FlowCloudAI Design Lab</p>
+            <h1>公共顶栏材质实验室</h1>
+            <p class="intro">把渐变、毛玻璃、10% 左右的细边框和柔和阴影拆开调。所有修改即时作用到右侧真实词条场景，亮色与暗色分别保存。</p>
+
+            <div class="theme-switch" aria-label="编辑主题">
+                <button class="segmented-button" type="button" data-theme-option="light" aria-pressed="true">亮色参数</button>
+                <button class="segmented-button" type="button" data-theme-option="dark" aria-pressed="false">暗色参数</button>
+            </div>
+            <div class="profile-hint">
+                <span class="profile-dot" aria-hidden="true"></span>
+                <span><strong id="profileName">亮色参数</strong><br>切换主题不会覆盖另一套数值；调整会自动保存在当前浏览器。</span>
+            </div>
+
+            <h2 class="section-title">快速起点</h2>
+            <div class="preset-grid" id="presetGrid">
+                <button class="preset-button" type="button" data-preset="current" aria-pressed="true">当前实现</button>
+                <button class="preset-button" type="button" data-preset="soft" aria-pressed="false">轻柔玻璃</button>
+                <button class="preset-button" type="button" data-preset="clear" aria-pressed="false">清透边缘</button>
+                <button class="preset-button" type="button" data-preset="dense" aria-pressed="false">稳重高密度</button>
+            </div>
+
+            <div id="controlRoot"></div>
+
+            <h2 class="section-title">导出与恢复</h2>
+            <div class="action-grid">
+                <button class="action-button action-button--primary" type="button" id="copyCss">复制两套 CSS</button>
+                <button class="action-button" type="button" id="copyJson">复制参数 JSON</button>
+                <button class="action-button" type="button" id="resetTheme">重置当前主题</button>
+                <button class="action-button" type="button" id="resetAll">重置全部</button>
+            </div>
+            <details class="control-group">
+                <summary>粘贴 JSON 快速应用</summary>
+                <div class="control-group__body">
+                    <textarea class="json-input" id="jsonInput" spellcheck="false" aria-label="粘贴参数 JSON" placeholder="支持完整的 { light, dark }、单个主题对象，或当前主题的部分参数。"></textarea>
+                    <div class="action-grid">
+                        <button class="action-button" type="button" id="pasteJson">读取并应用剪贴板</button>
+                        <button class="action-button action-button--primary" type="button" id="applyJson">应用输入框 JSON</button>
+                    </div>
+                    <p class="import-status" id="jsonImportStatus" aria-live="polite">粘贴后按 Ctrl/⌘ + Enter 也可立即应用。</p>
+                </div>
+            </details>
+            <textarea class="code-output" id="codeOutput" readonly spellcheck="false" aria-label="生成的 CSS"></textarea>
+            <p class="save-status" id="saveStatus" aria-live="polite">参数已载入</p>
+        </div>
+    </aside>
+
+    <section class="stage" aria-label="实时顶栏预览">
+        <div class="stage-toolbar">
+            <div class="stage-toolbar__copy">
+                <strong>真实界面模拟</strong>
+                <span id="sceneDescription">封面位于顶栏下方，适合判断渐变边界和整体通透度</span>
+            </div>
+            <div class="context-switch" aria-label="背景滚动位置">
+                <button class="segmented-button" type="button" data-scene="cover" aria-pressed="true">主图</button>
+                <button class="segmented-button" type="button" data-scene="identity" aria-pressed="false">标题</button>
+                <button class="segmented-button" type="button" data-scene="body" aria-pressed="false">正文</button>
+            </div>
+        </div>
+
+        <div class="phone-frame" id="phone" aria-label="移动端词条详情预览">
+            <div class="scene-scroll" id="sceneScroll">
+                <article class="scene-content">
+                    <div class="hero-card"><img src="../public/start.png" alt="FlowCloudAI 世界封面"></div>
+                    <p class="entry-kicker">世界观词条</p>
+                    <h2 class="entry-title">流云编年史</h2>
+                    <div class="identity-line"><span class="type-badge">设定</span><span>更新于 8月26日</span></div>
+                    <div class="summary-card">一份围绕云海文明、浮岛城市与失落航路展开的世界设定。滚动它，观察复杂内容经过顶栏时材质是否仍然清晰。</div>
+                    <div class="meta-chips">
+                        <span class="meta-chip"><span>年代</span> 霜历 184 年</span>
+                        <span class="meta-chip"><span>区域</span> 北境云海</span>
+                        <span class="meta-chip"><span>状态</span> 持续演化</span>
+                    </div>
+                    <div class="reading-head"><strong>正文</strong><span>428 字</span></div>
+                    <div class="entry-copy">
+                        <h2>云层之上的城市</h2>
+                        <p>浮岛以风脉相连，航船沿着发光的云流穿行。晴朗时，远处的城邦像悬在天空里的微小灯塔。</p>
+                        <p>每一条航路都会记录风向、季节与旧时代留下的遗迹。创作者需要在阅读和操作之间保持清晰的视觉层级。</p>
+                        <h2>顶栏为何需要材质</h2>
+                        <p>完全透明会让文字穿过按钮，完全实色又会切断内容。合适的渐变、模糊、边框与阴影共同定义了一块既通透又稳定的操作表面。</p>
+                    </div>
+                    <div class="relation-card"><strong>关联词条 · 2</strong><p>云海航路 → 浮岛议会<br>旧时代遗迹 ↔ 风脉核心</p></div>
+                </article>
+            </div>
+
+            <header class="sim-header" aria-label="模拟公共顶栏">
+                <div class="status-row"><span>20:08</span><span>5G · 100%</span></div>
+                <div class="topbar-row">
+                    <div class="topbar-side">
+                        <div class="glass-pill">
+                            <button class="glass-pill__button" type="button" aria-label="返回">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sticky-title">流云编年史</div>
+                    <div class="topbar-side topbar-side--right">
+                        <div class="glass-pill">
+                            <button class="glass-pill__button" type="button" aria-label="AI 讨论">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c1.8 4.4 3.4 6 8 8-4.6 2-6.2 3.6-8 8-1.8-4.4-3.4-6-8-8 4.6-2 6.2-3.6 8-8Z"/></svg>
+                            </button>
+                            <button class="glass-pill__button glass-pill__button--primary" type="button" aria-label="编辑词条">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h4.1L18.7 9.4a2.2 2.2 0 0 0-3.1-3.1L6 15.9 5 19Z"/><path d="m14.5 7.5 2 2"/></svg>
+                            </button>
+                            <button class="glass-pill__button glass-pill__button--more" type="button" aria-label="更多操作">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="12" r="1.25"/><circle cx="12" cy="12" r="1.25"/><circle cx="17.5" cy="12" r="1.25"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <nav class="bottom-nav" aria-label="模拟底部导航">
+                <span class="bottom-nav__item bottom-nav__item--active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg>首页</span>
+                <span class="bottom-nav__item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c1.8 4.4 3.4 6 8 8-4.6 2-6.2 3.6-8 8-1.8-4.4-3.4-6-8-8 4.6-2 6.2-3.6 8-8Z"/></svg>AI</span>
+                <span class="bottom-nav__item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h4.1L18.7 9.4a2.2 2.2 0 0 0-3.1-3.1L6 15.9 5 19Z"/><path d="m14.5 7.5 2 2"/></svg>灵感</span>
+                <span class="bottom-nav__item"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></svg>设置</span>
+            </nav>
+        </div>
+
+        <div class="material-readout" aria-label="当前材质摘要">
+            <div class="readout-card"><span>主题</span><strong id="readoutTheme">亮色</strong></div>
+            <div class="readout-card"><span>顶栏渐变</span><strong id="readoutGradient">5 段 · 180°</strong></div>
+            <div class="readout-card"><span>玻璃</span><strong id="readoutBlur">2px · 100%</strong></div>
+            <div class="readout-card"><span>边框 / 阴影</span><strong id="readoutEdge">1px · 10%</strong></div>
+        </div>
+    </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+    const STORAGE_KEY = 'flowcloudai-mobile-topbar-material-lab-v3';
+    const root = document.documentElement;
+    const phone = document.getElementById('phone');
+    const sceneScroll = document.getElementById('sceneScroll');
+    const controlRoot = document.getElementById('controlRoot');
+    const codeOutput = document.getElementById('codeOutput');
+    const jsonInput = document.getElementById('jsonInput');
+    const jsonImportStatus = document.getElementById('jsonImportStatus');
+    const saveStatus = document.getElementById('saveStatus');
+    const toast = document.getElementById('toast');
+    let toastTimer;
+
+    const defaults = {
+        light: {
+            pageBg: '#fffdfa', pageSecondary: '#f5f4f3', pageElevated: '#ffffff',
+            primary: '#378add', text: '#1a1a1a', textSecondary: '#646464',
+            barHeight: 110, barPaddingX: 20, barAngle: 180, barBlur: 1, barSaturation: 100,
+            barShadowY: 0, barShadowBlur: 0, barShadowOpacity: 0,
+            stops: [{pos: 0, alpha: 1}, {pos: 20, alpha: .9}, {pos: 30, alpha: .8}, {pos: 60, alpha: .5}, {pos: 100, alpha: 0}],
+            pillHeight: 40, pillRadius: 24, pillPaddingX: 2, pillGap: 0, buttonSize: 38,
+            glassTint: '#ffffff', pillGradientAngle: 180, pillStartOpacity: .6, pillEndOpacity: .25,
+            pillBlur: 2, pillSaturation: 100,
+            borderColor: '#919191', borderWidth: .6, borderOpacity: .25, highlightOpacity: .12,
+            shadowColor: '#1a1a1a', shadowX: 0, shadowY: 2, shadowBlur: 15, shadowSpread: 0, shadowOpacity: .15,
+            preset: 'custom'
+        },
+        dark: {
+            pageBg: '#101010', pageSecondary: '#1a1a1a', pageElevated: '#222222',
+            primary: '#5da4e8', text: '#ededeb', textSecondary: '#aaa9a4',
+            barHeight: 112, barPaddingX: 20, barAngle: 180, barBlur: 2, barSaturation: 100,
+            barShadowY: 0, barShadowBlur: 0, barShadowOpacity: 0,
+            stops: [{pos: 0, alpha: 1}, {pos: 20, alpha: .9}, {pos: 30, alpha: .8}, {pos: 60, alpha: .5}, {pos: 100, alpha: 0}],
+            pillHeight: 40, pillRadius: 24, pillPaddingX: 2, pillGap: 0, buttonSize: 38,
+            glassTint: '#2a2a2a', pillGradientAngle: 0, pillStartOpacity: .8, pillEndOpacity: .25,
+            pillBlur: 2, pillSaturation: 100,
+            borderColor: '#ffffff', borderWidth: .6, borderOpacity: .14, highlightOpacity: .05,
+            shadowColor: '#000000', shadowX: 0, shadowY: 4, shadowBlur: 15, shadowSpread: 1, shadowOpacity: .5,
+            preset: 'custom'
+        }
+    };
+
+    const groups = [
+        {
+            title: '颜色基底', open: false, controls: [
+                {key: 'pageBg', label: '页面背景', type: 'color', hint: '顶栏渐变的基色，与 --fc-color-bg 对齐。'},
+                {key: 'pageSecondary', label: '次级背景', type: 'color', hint: '摘要、弱容器与舞台背景。'},
+                {key: 'pageElevated', label: '抬升表面', type: 'color', hint: '卡片与玻璃胶囊混色来源。'},
+                {key: 'primary', label: '主色', type: 'color', hint: '按钮图标与主编辑动作。'},
+                {key: 'text', label: '主文字', type: 'color', hint: '标题与正文。'},
+                {key: 'textSecondary', label: '次级文字', type: 'color', hint: '元信息与解释文字。'}
+            ]
+        },
+        {
+            title: '顶栏背景与过渡', open: true, controls: [
+                {key: 'barHeight', label: '顶栏总高度', min: 88, max: 152, step: 1, unit: 'px', hint: '含模拟状态栏；决定渐变覆盖的垂直范围。'},
+                {key: 'barPaddingX', label: '左右留白', min: 12, max: 32, step: 1, unit: 'px', hint: '公共顶栏横向安全距离。'},
+                {key: 'barAngle', label: '渐变角度', min: 0, max: 360, step: 1, unit: '°', hint: '180° 为从上向下。'},
+                {key: 'barBlur', label: '顶栏背景模糊', min: 0, max: 32, step: 1, unit: 'px', hint: '与胶囊模糊分开；0 表示只保留渐变。'},
+                {key: 'barSaturation', label: '顶栏背景饱和度', min: 70, max: 180, step: 1, unit: '%', hint: '模糊后适度提高饱和度可避免颜色发灰。'},
+                {key: 'barShadowY', label: '顶栏阴影 Y', min: -8, max: 20, step: 1, unit: 'px'},
+                {key: 'barShadowBlur', label: '顶栏阴影模糊', min: 0, max: 48, step: 1, unit: 'px'},
+                {key: 'barShadowOpacity', label: '顶栏阴影透明度', min: 0, max: .4, step: .01, display: 'percent', hint: '只需非常轻；过重会把渐变变成硬分割。'}
+            ], stops: true
+        },
+        {
+            title: '玻璃胶囊', open: true, controls: [
+                {key: 'pillHeight', label: '胶囊高度', min: 36, max: 56, step: 1, unit: 'px'},
+                {key: 'pillRadius', label: '圆角', min: 12, max: 32, step: 1, unit: 'px'},
+                {key: 'pillPaddingX', label: '胶囊内边距', min: 0, max: 12, step: 1, unit: 'px'},
+                {key: 'pillGap', label: '按钮间距', min: 0, max: 10, step: 1, unit: 'px'},
+                {key: 'buttonSize', label: '按钮视觉尺寸', min: 32, max: 48, step: 1, unit: 'px'},
+                {key: 'glassTint', label: '玻璃染色', type: 'color', hint: '线性渐变两端共用的颜色。'},
+                {key: 'pillGradientAngle', label: '胶囊渐变角度', min: 0, max: 360, step: 1, unit: '°'},
+                {key: 'pillStartOpacity', label: '胶囊起点不透明度', min: 0, max: 1, step: .01, display: 'percent'},
+                {key: 'pillEndOpacity', label: '胶囊终点不透明度', min: 0, max: 1, step: .01, display: 'percent'},
+                {key: 'pillBlur', label: '毛玻璃模糊', min: 0, max: 40, step: 1, unit: 'px', hint: 'Blur 不是全部；请与下方边框和阴影一起判断。'},
+                {key: 'pillSaturation', label: '毛玻璃饱和度', min: 70, max: 200, step: 1, unit: '%'}
+            ]
+        },
+        {
+            title: '细边框与内高光', open: true, controls: [
+                {key: 'borderColor', label: '边框颜色', type: 'color'},
+                {key: 'borderWidth', label: '边框宽度', min: .5, max: 2, step: .1, unit: 'px'},
+                {key: 'borderOpacity', label: '边框透明度', min: 0, max: .4, step: .01, display: 'percent', hint: '10% 左右通常只提供轮廓，不会产生描边感。'},
+                {key: 'highlightOpacity', label: '顶部内高光', min: 0, max: .35, step: .01, display: 'percent', hint: '模拟玻璃上沿受光，保持克制。'}
+            ]
+        },
+        {
+            title: '柔和外阴影', open: true, controls: [
+                {key: 'shadowColor', label: '阴影颜色', type: 'color'},
+                {key: 'shadowX', label: 'X 偏移', min: -12, max: 12, step: 1, unit: 'px'},
+                {key: 'shadowY', label: 'Y 偏移', min: -8, max: 24, step: 1, unit: 'px'},
+                {key: 'shadowBlur', label: '模糊半径', min: 0, max: 56, step: 1, unit: 'px'},
+                {key: 'shadowSpread', label: '扩散半径', min: -12, max: 12, step: 1, unit: 'px'},
+                {key: 'shadowOpacity', label: '阴影透明度', min: 0, max: .5, step: .01, display: 'percent', hint: '阴影负责从背景中托起，不应形成黑色光圈。'}
+            ]
+        }
+    ];
+
+    const numericLimits = new Map(
+        groups.flatMap(group => group.controls)
+            .filter(control => Number.isFinite(control.min) && Number.isFinite(control.max))
+            .map(control => [control.key, control])
+    );
+    const colorKeys = new Set(
+        groups.flatMap(group => group.controls)
+            .filter(control => control.type === 'color')
+            .map(control => control.key)
+    );
+    const profileKeys = new Set(Object.keys(defaults.light));
+
+    function deepClone(value) { return JSON.parse(JSON.stringify(value)); }
+
+    function isPlainObject(value) {
+        return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+    }
+
+    function normalizeImportedProfile(candidate, baseProfile, theme) {
+        if (!isPlainObject(candidate)) throw new Error(`${theme === 'light' ? '亮色' : '暗色'}参数必须是对象`);
+        const next = deepClone(baseProfile);
+        let appliedCount = 0;
+
+        Object.entries(candidate).forEach(([key, value]) => {
+            if (!profileKeys.has(key) || key === 'preset') return;
+            if (key === 'stops') {
+                if (!Array.isArray(value) || value.length < 2) throw new Error('渐变色标至少需要两项');
+                next.stops = value.map((stop, index) => {
+                    if (!isPlainObject(stop)) throw new Error(`第 ${index + 1} 个渐变色标格式无效`);
+                    const pos = Number(stop.pos);
+                    const alpha = Number(stop.alpha);
+                    if (!Number.isFinite(pos) || pos < 0 || pos > 100) throw new Error(`第 ${index + 1} 个渐变位置应在 0–100`);
+                    if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) throw new Error(`第 ${index + 1} 个渐变透明度应在 0–1`);
+                    return {pos, alpha};
+                });
+                appliedCount += 1;
+                return;
+            }
+            if (colorKeys.has(key)) {
+                if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${key} 必须是六位十六进制颜色`);
+                next[key] = value;
+                appliedCount += 1;
+                return;
+            }
+            const control = numericLimits.get(key);
+            if (control) {
+                const numericValue = Number(value);
+                if (!Number.isFinite(numericValue) || numericValue < control.min || numericValue > control.max) {
+                    throw new Error(`${key} 应在 ${control.min}–${control.max} 之间`);
+                }
+                next[key] = numericValue;
+                appliedCount += 1;
+            }
+        });
+
+        if (appliedCount === 0) throw new Error(`${theme === 'light' ? '亮色' : '暗色'}对象中没有可应用的参数`);
+        next.preset = 'custom';
+        return next;
+    }
+
+    function setImportStatus(message, isError = false) {
+        jsonImportStatus.textContent = message;
+        jsonImportStatus.classList.toggle('is-error', isError);
+    }
+
+    function applyImportedJson(rawJson) {
+        const parsed = JSON.parse(rawJson.trim());
+        if (!isPlainObject(parsed)) throw new Error('JSON 根节点必须是对象');
+        const hasEnvelope = Object.prototype.hasOwnProperty.call(parsed, 'light') || Object.prototype.hasOwnProperty.call(parsed, 'dark');
+        const nextProfiles = deepClone(profiles);
+        const appliedThemes = [];
+
+        if (hasEnvelope) {
+            ['light', 'dark'].forEach(theme => {
+                if (!Object.prototype.hasOwnProperty.call(parsed, theme)) return;
+                nextProfiles[theme] = normalizeImportedProfile(parsed[theme], nextProfiles[theme], theme);
+                appliedThemes.push(theme);
+            });
+        } else {
+            nextProfiles[activeTheme] = normalizeImportedProfile(parsed, nextProfiles[activeTheme], activeTheme);
+            appliedThemes.push(activeTheme);
+        }
+
+        profiles = nextProfiles;
+        setTheme(activeTheme);
+        const themeNames = appliedThemes.map(theme => theme === 'light' ? '亮色' : '暗色').join('与');
+        setImportStatus(`已应用${themeNames}参数；未提供的主题与字段保持原值。`);
+        showToast(`${themeNames}参数已应用`);
+    }
+
+    function loadProfiles() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if (stored?.light && stored?.dark) return stored;
+        } catch (error) {
+            console.warn('无法读取顶栏实验室参数，将使用默认值。', error);
+        }
+        return deepClone(defaults);
+    }
+
+    let profiles = loadProfiles();
+    let activeTheme = 'light';
+
+    function alphaHex(hex, alpha) {
+        const normalized = hex.replace('#', '');
+        const full = normalized.length === 3 ? normalized.split('').map(part => part + part).join('') : normalized;
+        const value = Number.parseInt(full, 16);
+        const red = (value >> 16) & 255;
+        const green = (value >> 8) & 255;
+        const blue = value & 255;
+        return `rgb(${red} ${green} ${blue} / ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
+    }
+
+    function formatValue(control, value) {
+        if (control.display === 'percent') return `${Math.round(value * 100)}%`;
+        return `${value}${control.unit ?? ''}`;
+    }
+
+    function setRangeFill(input) {
+        const min = Number(input.min);
+        const max = Number(input.max);
+        const value = Number(input.value);
+        const fill = ((value - min) / (max - min)) * 100;
+        input.style.setProperty('--range-fill', `${fill}%`);
+    }
+
+    function buildControl(control) {
+        const profile = profiles[activeTheme];
+        const row = document.createElement('div');
+        row.className = 'control-row';
+
+        const head = document.createElement('div');
+        head.className = 'control-row__head';
+        const label = document.createElement('label');
+        const id = `control-${activeTheme}-${control.key}`;
+        label.htmlFor = id;
+        label.textContent = control.label;
+        head.append(label);
+        row.append(head);
+
+        if (control.type === 'color') {
+            const line = document.createElement('div');
+            line.className = 'color-line';
+            const color = document.createElement('input');
+            color.id = id;
+            color.className = 'color-input';
+            color.type = 'color';
+            color.value = profile[control.key];
+            color.dataset.key = control.key;
+            const text = document.createElement('input');
+            text.className = 'color-text';
+            text.type = 'text';
+            text.value = profile[control.key];
+            text.dataset.colorText = control.key;
+            text.setAttribute('aria-label', `${control.label}十六进制颜色`);
+            color.addEventListener('input', () => {
+                profiles[activeTheme][control.key] = color.value;
+                text.value = color.value;
+                markCustom();
+                updatePreview();
+            });
+            text.addEventListener('change', () => {
+                if (/^#[0-9a-f]{6}$/i.test(text.value.trim())) {
+                    profiles[activeTheme][control.key] = text.value.trim();
+                    color.value = text.value.trim();
+                    markCustom();
+                    updatePreview();
+                } else {
+                    text.value = profiles[activeTheme][control.key];
+                }
+            });
+            line.append(color, text);
+            row.append(line);
+        } else {
+            const line = document.createElement('div');
+            line.className = 'range-line';
+            const range = document.createElement('input');
+            range.id = id;
+            range.type = 'range';
+            range.min = control.min;
+            range.max = control.max;
+            range.step = control.step;
+            range.value = profile[control.key];
+            range.dataset.key = control.key;
+            range.setAttribute('aria-label', control.label);
+            setRangeFill(range);
+            const number = document.createElement('input');
+            number.className = 'number-input';
+            number.type = 'number';
+            number.min = control.min;
+            number.max = control.max;
+            number.step = control.step;
+            number.value = profile[control.key];
+            number.setAttribute('aria-label', `${control.label}数值`);
+
+            const commit = value => {
+                const next = Math.max(control.min, Math.min(control.max, Number(value)));
+                profiles[activeTheme][control.key] = next;
+                range.value = next;
+                number.value = next;
+                setRangeFill(range);
+                markCustom();
+                updatePreview();
+            };
+            range.addEventListener('input', () => commit(range.value));
+            number.addEventListener('change', () => commit(number.value));
+            line.append(range, number);
+            row.append(line);
+        }
+
+        if (control.hint) {
+            const hint = document.createElement('div');
+            hint.className = 'control-row__hint';
+            hint.textContent = control.hint;
+            row.append(hint);
+        }
+        return row;
+    }
+
+    function buildStops() {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'stop-list';
+        profiles[activeTheme].stops.forEach((stop, index) => {
+            const row = document.createElement('div');
+            row.className = 'stop-row';
+            const badge = document.createElement('span');
+            badge.className = 'stop-index';
+            badge.textContent = index + 1;
+            const controls = document.createElement('div');
+            controls.className = 'stop-controls';
+
+            const position = buildStopControl('位置', stop.pos, 0, 100, 1, value => {
+                profiles[activeTheme].stops[index].pos = value;
+            }, value => `${Math.round(value)}%`);
+            const alpha = buildStopControl('可见', stop.alpha, 0, 1, .01, value => {
+                profiles[activeTheme].stops[index].alpha = value;
+            }, value => `${Math.round(value * 100)}%`);
+            controls.append(position, alpha);
+            row.append(badge, controls);
+            wrapper.append(row);
+        });
+        const warning = document.createElement('p');
+        warning.id = 'stopWarning';
+        warning.className = 'stop-warning';
+        warning.textContent = '渐变位置不是递增顺序。浏览器会钳制色标，结果可能不符合直觉。';
+        wrapper.append(warning);
+        return wrapper;
+    }
+
+    function buildStopControl(labelText, value, min, max, step, write, format) {
+        const line = document.createElement('div');
+        line.className = 'stop-control';
+        const label = document.createElement('label');
+        label.textContent = labelText;
+        const range = document.createElement('input');
+        range.type = 'range';
+        range.min = min;
+        range.max = max;
+        range.step = step;
+        range.value = value;
+        range.setAttribute('aria-label', `渐变${labelText}`);
+        setRangeFill(range);
+        const output = document.createElement('output');
+        output.textContent = format(value);
+        range.addEventListener('input', () => {
+            const next = Number(range.value);
+            write(next);
+            output.textContent = format(next);
+            setRangeFill(range);
+            markCustom();
+            updatePreview();
+        });
+        line.append(label, range, output);
+        return line;
+    }
+
+    function renderControls() {
+        controlRoot.replaceChildren();
+        groups.forEach(group => {
+            const details = document.createElement('details');
+            details.className = 'control-group';
+            details.open = group.open;
+            const summary = document.createElement('summary');
+            summary.textContent = group.title;
+            const body = document.createElement('div');
+            body.className = 'control-group__body';
+            group.controls.forEach(control => body.append(buildControl(control)));
+            if (group.stops) body.append(buildStops());
+            details.append(summary, body);
+            controlRoot.append(details);
+        });
+    }
+
+    function markCustom() {
+        profiles[activeTheme].preset = 'custom';
+        document.querySelectorAll('[data-preset]').forEach(button => button.setAttribute('aria-pressed', 'false'));
+    }
+
+    function buildBarGradient(profile) {
+        const stops = profile.stops.map(stop => `${alphaHex(profile.pageBg, stop.alpha)} ${stop.pos}%`).join(', ');
+        return `linear-gradient(${profile.barAngle}deg, ${stops})`;
+    }
+
+    function buildPillGradient(profile) {
+        return `linear-gradient(${profile.pillGradientAngle}deg, ${alphaHex(profile.glassTint, profile.pillStartOpacity)} 0%, ${alphaHex(profile.glassTint, profile.pillEndOpacity)} 100%)`;
+    }
+
+    function hasOrderedStops(profile) {
+        return profile.stops.every((stop, index) => index === 0 || stop.pos >= profile.stops[index - 1].pos);
+    }
+
+    function updatePreview() {
+        const profile = profiles[activeTheme];
+        root.dataset.theme = activeTheme;
+        phone.style.setProperty('--preview-page-bg', profile.pageBg);
+        phone.style.setProperty('--preview-page-secondary', profile.pageSecondary);
+        phone.style.setProperty('--preview-page-elevated', profile.pageElevated);
+        phone.style.setProperty('--preview-primary', profile.primary);
+        phone.style.setProperty('--preview-text', profile.text);
+        phone.style.setProperty('--preview-text-secondary', profile.textSecondary);
+        phone.style.setProperty('--preview-bar-height', `${profile.barHeight}px`);
+        phone.style.setProperty('--preview-bar-padding-x', `${profile.barPaddingX}px`);
+        phone.style.setProperty('--preview-bar-gradient', buildBarGradient(profile));
+        phone.style.setProperty('--preview-bar-blur', `${profile.barBlur}px`);
+        phone.style.setProperty('--preview-bar-saturation', `${profile.barSaturation}%`);
+        phone.style.setProperty('--preview-bar-shadow', `0 ${profile.barShadowY}px ${profile.barShadowBlur}px ${alphaHex(profile.shadowColor, profile.barShadowOpacity)}`);
+        phone.style.setProperty('--preview-pill-height', `${profile.pillHeight}px`);
+        phone.style.setProperty('--preview-pill-radius', `${profile.pillRadius}px`);
+        phone.style.setProperty('--preview-pill-padding-x', `${profile.pillPaddingX}px`);
+        phone.style.setProperty('--preview-pill-gap', `${profile.pillGap}px`);
+        phone.style.setProperty('--preview-button-size', `${profile.buttonSize}px`);
+        phone.style.setProperty('--preview-pill-gradient', buildPillGradient(profile));
+        phone.style.setProperty('--preview-pill-blur', `${profile.pillBlur}px`);
+        phone.style.setProperty('--preview-pill-saturation', `${profile.pillSaturation}%`);
+        phone.style.setProperty('--preview-pill-border-width', `${profile.borderWidth}px`);
+        phone.style.setProperty('--preview-pill-border-color', alphaHex(profile.borderColor, profile.borderOpacity));
+        phone.style.setProperty('--preview-pill-highlight', alphaHex('#ffffff', profile.highlightOpacity));
+        phone.style.setProperty('--preview-pill-shadow', `${profile.shadowX}px ${profile.shadowY}px ${profile.shadowBlur}px ${profile.shadowSpread}px ${alphaHex(profile.shadowColor, profile.shadowOpacity)}`);
+
+        document.getElementById('profileName').textContent = activeTheme === 'light' ? '亮色参数' : '暗色参数';
+        document.getElementById('readoutTheme').textContent = activeTheme === 'light' ? '亮色' : '暗色';
+        document.getElementById('readoutGradient').textContent = `${profile.stops.length} 段 · ${profile.barAngle}°`;
+        document.getElementById('readoutBlur').textContent = `${profile.pillBlur}px · ${profile.pillSaturation}%`;
+        document.getElementById('readoutEdge').textContent = `${profile.borderWidth}px · ${Math.round(profile.borderOpacity * 100)}%`;
+        const warning = document.getElementById('stopWarning');
+        if (warning) warning.classList.toggle('show', !hasOrderedStops(profile));
+        codeOutput.value = buildCss();
+        saveProfiles();
+    }
+
+    function buildProfileCss(theme, profile) {
+        return `:root[data-theme="${theme}"] {
+    --mobile-topbar-material-height: ${profile.barHeight}px;
+    --mobile-topbar-material-padding-x: ${profile.barPaddingX}px;
+    --mobile-topbar-material-background: ${buildBarGradient(profile)};
+    --mobile-topbar-material-filter: blur(${profile.barBlur}px) saturate(${profile.barSaturation}%);
+    --mobile-topbar-material-shadow: 0 ${profile.barShadowY}px ${profile.barShadowBlur}px ${alphaHex(profile.shadowColor, profile.barShadowOpacity)};
+    --mobile-topbar-pill-background: ${buildPillGradient(profile)};
+    --mobile-topbar-pill-filter: blur(${profile.pillBlur}px) saturate(${profile.pillSaturation}%);
+    --mobile-topbar-pill-border: ${profile.borderWidth}px solid ${alphaHex(profile.borderColor, profile.borderOpacity)};
+    --mobile-topbar-pill-shadow: ${profile.shadowX}px ${profile.shadowY}px ${profile.shadowBlur}px ${profile.shadowSpread}px ${alphaHex(profile.shadowColor, profile.shadowOpacity)}, inset 0 1px 0 ${alphaHex('#ffffff', profile.highlightOpacity)};
+    --mobile-topbar-pill-height: ${profile.pillHeight}px;
+    --mobile-topbar-pill-radius: ${profile.pillRadius}px;
+}`;
+    }
+
+    function buildCss() {
+        return `${buildProfileCss('light', profiles.light)}
+
+${buildProfileCss('dark', profiles.dark)}
+
+.mobile-page-topbar {
+    min-height: var(--mobile-topbar-material-height);
+    padding-inline: var(--mobile-topbar-material-padding-x);
+    background: transparent;
+    isolation: isolate;
+}
+
+.mobile-page-topbar::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    background: var(--mobile-topbar-material-background);
+    -webkit-backdrop-filter: var(--mobile-topbar-material-filter);
+    backdrop-filter: var(--mobile-topbar-material-filter);
+    box-shadow: var(--mobile-topbar-material-shadow);
+    content: '';
+    pointer-events: none;
+}
+
+.mobile-top-action-pill {
+    position: relative;
+    height: var(--mobile-topbar-pill-height);
+    border: var(--mobile-topbar-pill-border);
+    border-radius: var(--mobile-topbar-pill-radius);
+    background: transparent;
+    box-shadow: var(--mobile-topbar-pill-shadow);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.mobile-top-action-pill::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--mobile-topbar-pill-background);
+    -webkit-backdrop-filter: var(--mobile-topbar-pill-filter);
+    backdrop-filter: var(--mobile-topbar-pill-filter);
+    content: '';
+    pointer-events: none;
+}
+
+.mobile-page-topbar > *,
+.mobile-top-action-pill > * {
+    position: relative;
+    z-index: 1;
+}`;
+    }
+
+    function saveProfiles() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+            saveStatus.textContent = `${activeTheme === 'light' ? '亮色' : '暗色'}参数已自动保存`;
+        } catch (error) {
+            saveStatus.textContent = '当前浏览器不允许持久保存，但本次调整仍然有效';
+        }
+    }
+
+    function presetFor(name, theme) {
+        const profile = deepClone(defaults[theme]);
+        profile.preset = name;
+        if (name === 'soft') {
+            Object.assign(profile, {
+                barBlur: 6, barSaturation: 118, barShadowY: 8, barShadowBlur: 26, barShadowOpacity: theme === 'light' ? .06 : .24,
+                pillBlur: 14, pillSaturation: 132, pillStartOpacity: theme === 'light' ? .54 : .62, pillEndOpacity: theme === 'light' ? .34 : .42,
+                borderOpacity: .1, highlightOpacity: theme === 'light' ? .2 : .12,
+                shadowY: 7, shadowBlur: 24, shadowSpread: -7, shadowOpacity: theme === 'light' ? .16 : .36
+            });
+            profile.stops = [{pos: 0, alpha: .96}, {pos: 22, alpha: .86}, {pos: 42, alpha: .68}, {pos: 72, alpha: .34}, {pos: 100, alpha: 0}];
+        }
+        if (name === 'clear') {
+            Object.assign(profile, {
+                barBlur: 10, barSaturation: 135, barShadowY: 6, barShadowBlur: 20, barShadowOpacity: theme === 'light' ? .04 : .2,
+                pillBlur: 24, pillSaturation: 150, pillStartOpacity: theme === 'light' ? .36 : .44, pillEndOpacity: theme === 'light' ? .18 : .24,
+                borderOpacity: .14, highlightOpacity: theme === 'light' ? .24 : .16,
+                shadowY: 5, shadowBlur: 20, shadowSpread: -8, shadowOpacity: theme === 'light' ? .12 : .3
+            });
+            profile.stops = [{pos: 0, alpha: .9}, {pos: 20, alpha: .72}, {pos: 44, alpha: .46}, {pos: 76, alpha: .18}, {pos: 100, alpha: 0}];
+        }
+        if (name === 'dense') {
+            Object.assign(profile, {
+                barBlur: 8, barSaturation: 112, barShadowY: 8, barShadowBlur: 28, barShadowOpacity: theme === 'light' ? .09 : .3,
+                pillBlur: 18, pillSaturation: 122, pillStartOpacity: theme === 'light' ? .82 : .78, pillEndOpacity: theme === 'light' ? .68 : .62,
+                borderOpacity: theme === 'light' ? .2 : .16, highlightOpacity: .1,
+                shadowY: 8, shadowBlur: 30, shadowSpread: -7, shadowOpacity: theme === 'light' ? .2 : .42
+            });
+            profile.stops = [{pos: 0, alpha: 1}, {pos: 28, alpha: .96}, {pos: 54, alpha: .82}, {pos: 78, alpha: .48}, {pos: 100, alpha: .12}];
+        }
+        return profile;
+    }
+
+    function setTheme(theme) {
+        activeTheme = theme;
+        document.querySelectorAll('[data-theme-option]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.themeOption === theme)));
+        document.querySelectorAll('[data-preset]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.preset === profiles[theme].preset)));
+        renderControls();
+        updatePreview();
+    }
+
+    function applyPreset(name) {
+        profiles[activeTheme] = presetFor(name, activeTheme);
+        document.querySelectorAll('[data-preset]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.preset === name)));
+        renderControls();
+        updatePreview();
+        showToast(`已应用${document.querySelector(`[data-preset="${name}"]`).textContent}`);
+    }
+
+    function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    async function copyText(text, successMessage) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            const helper = document.createElement('textarea');
+            helper.value = text;
+            helper.style.position = 'fixed';
+            helper.style.opacity = '0';
+            document.body.append(helper);
+            helper.select();
+            document.execCommand('copy');
+            helper.remove();
+        }
+        showToast(successMessage);
+    }
+
+    const sceneTargets = {
+        cover: {top: 0, description: '封面位于顶栏下方，适合判断渐变边界和整体通透度'},
+        identity: {top: 250, description: '标题与元信息经过顶栏，适合判断文字穿透和按钮可读性'},
+        body: {top: 610, description: '高密度正文经过顶栏，适合判断模糊、边框与阴影是否足够稳定'}
+    };
+
+    function selectScene(name) {
+        const target = sceneTargets[name];
+        sceneScroll.scrollTo({top: target.top, behavior: 'smooth'});
+        document.getElementById('sceneDescription').textContent = target.description;
+        document.querySelectorAll('[data-scene]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.scene === name)));
+    }
+
+    sceneScroll.addEventListener('scroll', () => {
+        phone.classList.toggle('has-sticky-title', sceneScroll.scrollTop > 315);
+    }, {passive: true});
+
+    document.querySelectorAll('[data-theme-option]').forEach(button => button.addEventListener('click', () => setTheme(button.dataset.themeOption)));
+    document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => applyPreset(button.dataset.preset)));
+    document.querySelectorAll('[data-scene]').forEach(button => button.addEventListener('click', () => selectScene(button.dataset.scene)));
+    document.getElementById('copyCss').addEventListener('click', () => copyText(buildCss(), '两套 CSS 已复制'));
+    document.getElementById('copyJson').addEventListener('click', () => copyText(JSON.stringify(profiles, null, 2), '参数 JSON 已复制'));
+    document.getElementById('applyJson').addEventListener('click', () => {
+        try {
+            applyImportedJson(jsonInput.value);
+        } catch (error) {
+            setImportStatus(`无法应用：${error.message}`, true);
+        }
+    });
+    document.getElementById('pasteJson').addEventListener('click', async () => {
+        try {
+            jsonInput.value = await navigator.clipboard.readText();
+            applyImportedJson(jsonInput.value);
+        } catch (error) {
+            setImportStatus(`无法读取或应用剪贴板：${error.message}。也可以手动粘贴后应用。`, true);
+        }
+    });
+    jsonInput.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || (!event.ctrlKey && !event.metaKey)) return;
+        event.preventDefault();
+        try {
+            applyImportedJson(jsonInput.value);
+        } catch (error) {
+            setImportStatus(`无法应用：${error.message}`, true);
+        }
+    });
+    document.getElementById('resetTheme').addEventListener('click', () => {
+        profiles[activeTheme] = deepClone(defaults[activeTheme]);
+        setTheme(activeTheme);
+        showToast('当前主题已重置');
+    });
+    document.getElementById('resetAll').addEventListener('click', () => {
+        profiles = deepClone(defaults);
+        setTheme('light');
+        showToast('亮色与暗色均已重置');
+    });
+
+    setTheme('light');
+    selectScene('cover');
+</script>
+</body>
+</html>

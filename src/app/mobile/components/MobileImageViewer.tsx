@@ -12,7 +12,12 @@ import {Button, useAlert} from 'flowcloudai-ui'
 import {type EntryImage, toEntryImageSrc} from '../../../features/entries/lib/entryImage'
 import {Overlay} from '../../../shared/ui/overlay'
 import {getImageLabel} from '../pages/MobileEntryDetailUtils'
-import {MobileAddIcon, MobileBackIcon} from './MobileTopControls'
+import {
+    MobileAddIcon,
+    MobileBackIcon,
+    MobilePageTopBar,
+    MobileTopActionPill,
+} from './MobileTopControls'
 import './MobileImageViewer.css'
 
 const MIN_SCALE = 1
@@ -204,24 +209,31 @@ export default function MobileImageViewer({
 
     return (
         <Overlay open={open} onClose={onClose} variant="fullscreen" className="mobile-image-viewer" ariaLabel={`${title} 图片浏览器`}>
-            <header className="mobile-image-viewer__topbar">
-                <button type="button" className="mobile-image-viewer__top-action" onClick={onClose} aria-label="关闭图片浏览器"><MobileBackIcon/></button>
-                <div className="mobile-image-viewer__heading">
+            <MobilePageTopBar
+                className="mobile-image-viewer__topbar"
+                ariaLabel="图片浏览操作"
+                left={<MobileTopActionPill actions={[{
+                    key: 'back',
+                    label: '关闭图片浏览器',
+                    icon: <MobileBackIcon/>,
+                    onClick: onClose,
+                }]}/>}
+                center={<div className="mobile-image-viewer__heading">
                     <strong>{title}</strong>
                     <small>{viewMode === 'preview' ? `${safeIndex + 1} / ${images.length}` : `${images.length} 张图片`}</small>
-                </div>
-                <button
-                    type="button"
-                    className="mobile-image-viewer__mode-action"
-                    onClick={() => {
+                </div>}
+                right={<MobileTopActionPill actions={[{
+                    key: 'mode',
+                    label: viewMode === 'preview' ? '切换到画廊' : '切换到单图预览',
+                    icon: <span className="mobile-top-action-pill__text">{viewMode === 'preview' ? '画廊' : '预览'}</span>,
+                    kind: 'text',
+                    onClick: () => {
                         setViewMode(current => current === 'preview' ? 'gallery' : 'preview')
                         setSelectionMode(false)
                         setSelectedIndices(new Set())
-                    }}
-                >
-                    {viewMode === 'preview' ? '画廊' : '预览'}
-                </button>
-            </header>
+                    },
+                }]}/>}
+            />
 
             {viewMode === 'preview' ? (
                 <>

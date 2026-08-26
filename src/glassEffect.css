@@ -39,6 +39,12 @@
     --mobile-surface-control: var(--fc-color-bg-elevated);
     --mobile-surface-menu: var(--fc-color-bg-elevated);
     --mobile-nav-surface: var(--fc-color-bg);
+    --mobile-topbar-bg-filter: none;
+    --mobile-topbar-pill-background: var(--fc-color-bg-elevated);
+    --mobile-topbar-pill-filter: none;
+    --mobile-topbar-pill-border: var(--mobile-border);
+    --mobile-topbar-pill-highlight: transparent;
+    --mobile-topbar-pill-box-shadow: none;
 }
 
 :root .fc-overlay__panel--floating,
@@ -139,7 +145,22 @@
     backdrop-filter: var(--mobile-glass-filter);
 }
 
-:root .mobile-top-action-pill,
+:root .mobile-page-topbar::before {
+    -webkit-backdrop-filter: var(--mobile-topbar-bg-filter);
+    backdrop-filter: var(--mobile-topbar-bg-filter);
+}
+
+:root .mobile-top-action-pill {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+:root .mobile-top-action-pill::before {
+    background: var(--mobile-topbar-pill-background);
+    -webkit-backdrop-filter: var(--mobile-topbar-pill-filter);
+    backdrop-filter: var(--mobile-topbar-pill-filter);
+}
+
 :root .mobile-ai-model-pill {
     background: var(--mobile-surface-control);
     -webkit-backdrop-filter: var(--mobile-glass-filter-soft);

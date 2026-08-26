@@ -11,6 +11,7 @@ import {
     useMemo,
     useRef,
     useState,
+    useSyncExternalStore,
 } from 'react'
 import {Button, useAlert, useTheme} from 'flowcloudai-ui'
 import type {MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
@@ -85,6 +86,10 @@ import {
     type MobileEntryEditDraft,
 } from '../stores/mobileEntryEditDraftStore'
 import {discardMobileEntryPlaceholder} from '../mobileEntryPlaceholder'
+import {
+    mobileKeyboardInsetState,
+    subscribeMobileKeyboardInset,
+} from '../mobileKeyboardInset'
 import './MobileEntryDetail.css'
 type Mode = 'view' | 'edit'
 
@@ -118,6 +123,13 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const projectEntriesRequestRef = useRef<Promise<EntryBrief[]> | null>(null)
     const recordedHomeEntryRef = useRef<string | null>(null)
+    // 只订阅“是否可见”这一离散语义；具体遮挡高度仍由原生 --fc-kb 直接驱动 CSS，
+    // 避免每一帧键盘动画都把整页带进 React 渲染链路。
+    const keyboardVisible = useSyncExternalStore(
+        subscribeMobileKeyboardInset,
+        () => mobileKeyboardInsetState().visible,
+        () => false,
+    )
 
     const [entry, setEntry] = useState<Entry | null>(null)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
@@ -611,6 +623,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const draftType = entryType ? entryTypes.find(item => entryTypeKey(item) === entryType) ?? null : null
         return <MobileEntryDetailEditView
             saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
+            keyboardVisible={keyboardVisible}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
             entryTypeLabel={draftType?.name ?? ''}
             categoryLabel={categoryId ? (categoryNameById.get(categoryId) ?? '') : ''}

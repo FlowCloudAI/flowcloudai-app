@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-24
+> 更新日期：2026-08-26
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -82,14 +82,16 @@
 
 ## 7. 设计基线与设计稿（`../designs/`）
 
-`AGENTS.md` 规定：界面改动需先出可审计的单文件 HTML 设计稿，统一存 `designs/<主题名>.html`。当前有 6 份 HTML 设计稿。
+`AGENTS.md` 规定：界面改动需先出可审计的单文件 HTML 设计稿，统一存 `designs/<主题名>.html`。当前有 7 份 HTML 设计稿。
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
-| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-24 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§9 规则 8 规定底部面板不承载滚动或输入内容，并列出两处已知违例 |
+| [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-26 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§5.3 登记公共顶栏固定材质阴影的唯一例外，§9 规则 8 规定底部面板不承载滚动或输入内容 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |
 | [../designs/mobile-ui-baseline-implementation.md](../designs/mobile-ui-baseline-implementation.md) | 现行 | 2026-08-18 | 基线落地记录。作用域 `data-fc-density="touch"`，桌面 `comfortable` 不消费本批覆盖 |
+| [../designs/mobile-topbar-material-spec.md](../designs/mobile-topbar-material-spec.md) | 现行 | 2026-08-26 | 移动端公共顶栏亮暗材质参数与生产映射。固化五段背景渐变、独立顶栏/胶囊 blur、胶囊渐变、细边框、内高光、外阴影，以及安全区和触控命中区的映射边界 |
+| [../designs/mobile-topbar-material-lab.html](../designs/mobile-topbar-material-lab.html) | 现行 | 2026-08-26 | 移动端公共顶栏材质实验室。右侧用真实词条信息层级模拟滚动背景；左侧实时调节顶栏五段渐变、顶栏与胶囊各自独立的模糊层、胶囊线性渐变、细边框、内高光与柔和外阴影。亮色与暗色保存独立参数，支持预设、重置、粘贴 JSON 快速应用以及 CSS / JSON 导出 |
 | [../designs/mobile-entry-detail.html](../designs/mobile-entry-detail.html) | 现行 | 2026-08-25 | 移动端词条详情排版稿，**展示态与编辑态合并在一份**（同属 `MobileEntryDetail.tsx`）。展示态：图片升为主视觉、类型与分类上移到标题下、属性改定义列表、未填写折叠、空正文给主操作。编辑态：元数据整体移到正文之上、类型与分类在身份区可改、正文头压到 40px、保存改文字按钮、属性页改 iOS 分组列表。14 个状态，含 390/360 与深浅色。展示态属性改流式 chip 且不显示未填写、关联用箭头表方向、正反链默认收起、新增图片浏览器（单图 / 画廊多选）；编辑页不再能改所属分类（见 `plans/ENTRY-CLIPBOARD.md`）。原 `mobile-entry-editor.html` 已并入本文件 |
 | [../designs/mobile-entry-editor-design-qa.md](../designs/mobile-entry-editor-design-qa.md) | 结论记录 | 2026-08-03 | 移动端词条编辑设计 QA。视觉证据已丢失 |
 | [../designs/mobile-entry-editor-ai-review-design-qa.md](../designs/mobile-entry-editor-ai-review-design-qa.md) | 结论记录 | 2026-08-02 | 移动端词条编辑与 AI 差异审阅 QA |
@@ -105,6 +107,9 @@
 
 | 审计包 | 日期 | 结论 |
 | --- | --- | --- |
+| [mobile-topbar-material-lab-2026-08-26](../designs/audits/mobile-topbar-material-lab-2026-08-26/README.md) | 2026-08-26 | 公共顶栏材质实验室初始版本的亮暗渲染、实时参数、三种滚动背景、导出与窄屏验证；含真实 Android 顶栏与模拟实现的同画面对照。后续默认参数、独立滤镜层与 JSON 导入按用户要求仅做静态检查 |
+| [mobile-entry-editor-followup-2026-08-26](../designs/audits/mobile-entry-editor-followup-2026-08-26/README.md) | 2026-08-26 | Android 真机复现并闭环词条正文工具栏间距、键盘收起占屏、长文光标错位、预览态蓝底、标准图片顶栏、取消按钮位置与长正文挤压主图；含前后截图、CSS 尺寸和临时草稿恢复证据 |
+| [mobile-entry-ui-2026-08-26](../designs/audits/mobile-entry-ui-2026-08-26/README.md) | 2026-08-26 | 词条查看、编辑、键盘、属性与关系流程的 Android 真机 UI/UX 审计与优化闭环；字段名称、关系无候选空态、属性层级、保存语言和顶栏重量已落地并经最终 APK 复测，图片浏览器仍缺真实图片手势证据 |
 | [mobile-entry-detail-rebuild-2026-08-26](../designs/audits/mobile-entry-detail-rebuild-2026-08-26/README.md) | 2026-08-26 | 词条详情改造首轮实现与设计稿的 16 项偏差修正，含修复前后真机对比。记录了 `mobileAccessibility.css` 公共触控兜底 (0,1,2) 压过业务 `.class button` (0,1,1) 的特异性坑 |
 | [mobile-entry-link-navigation-2026-08-25](../designs/audits/mobile-entry-link-navigation-2026-08-25/README.md) | 2026-08-25 | 编辑态预览的双链把应用导航成 Chrome 错误页的真机前后对比，附首张词条查看态真机截图。问题→方案见 `docs/devlog/2026-08-25-移动端预览链接把应用打没.md`（工作区根仓库） |
 | [mobile-ai-mode-menu-redesign-2026-08-19](../designs/audits/mobile-ai-mode-menu-redesign-2026-08-19/README.md) | 2026-08-19 | AI 模式菜单轻量化，选定 Marker-Only 方案。含实现 QA 与交付清单，Android 真机核对通过 |

@@ -44,6 +44,9 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [search, setSearch] = useState('')
+    const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [loadRevision, setLoadRevision] = useState(0)
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -63,6 +66,10 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
 
     useEffect(() => {
         let disposed = false
+        setLoading(true)
+        setLoadError(null)
+        setEntries([])
+        setCategories([])
         Promise.all([
             db_list_entries({projectId, limit: ENTRY_LOOKUP_LIMIT, offset: 0}),
             db_list_categories(projectId),
@@ -70,9 +77,15 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
             if (disposed) return
             setEntries(nextEntries)
             setCategories(nextCategories)
-        }).catch(error => logger.error('加载关系目标词条失败', error))
+        }).catch(error => {
+            if (disposed) return
+            logger.error('加载关系目标词条失败', error)
+            setLoadError('无法加载项目内词条，请重试。')
+        }).finally(() => {
+            if (!disposed) setLoading(false)
+        })
         return () => { disposed = true }
-    }, [projectId])
+    }, [loadRevision, projectId])
 
     const currentRelation = draft?.relationDrafts[relationIndex] ?? null
     const cleanupBlankRelation = useCallback(() => {
@@ -97,12 +110,15 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
         }))
     }, [entryId, projectId, relationIndex])
 
+    const selectableEntries = useMemo(
+        () => entries.filter(entry => entry.id !== entryId),
+        [entries, entryId],
+    )
     const matchedEntries = useMemo(() => {
         const normalized = search.trim().toLocaleLowerCase()
-        return entries
-            .filter(entry => entry.id !== entryId)
+        return selectableEntries
             .filter(entry => !normalized || entry.title.toLocaleLowerCase().includes(normalized))
-    }, [entries, entryId, search])
+    }, [search, selectableEntries])
     const filteredEntries = useMemo(() => matchedEntries.slice(0, SEARCH_RESULT_LIMIT), [matchedEntries])
     const hiddenMatchCount = matchedEntries.length - filteredEntries.length
 
@@ -132,6 +148,14 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
     const selectedEntry = entries.find(entry => entry.id === currentRelation.otherEntryId)
     // 刚新建、既没选目标也没写说明的关系，退出等于放弃，不该叫「删除」。
     const isBlankNewRelation = isNewRelation && !currentRelation.otherEntryId && !currentRelation.content.trim()
+    const targetSelectionUnavailable = !currentRelation.otherEntryId && (
+        loading || Boolean(loadError) || selectableEntries.length === 0
+    )
+    const candidateStatus = loading
+        ? '加载中'
+        : loadError
+            ? '加载失败'
+            : `项目内 ${selectableEntries.length} 条`
 
     return (
         <div className="mobile-page mobile-entry-relation-editor">
@@ -145,43 +169,71 @@ export default function MobileEntryRelationEditor({pop, setBeforeLeave, params}:
 
             <div className="mobile-entry-relation-editor__content">
                 <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
-                    <div className="mobile-entry-properties__label"><span>目标词条</span><small>项目内 {Math.max(0, entries.length - 1)} 条</small></div>
-                    <Input value={search} onValueChange={setSearch} placeholder="搜索词条标题" className="mobile-entry-relation-editor__search"/>
-                    <div className="mobile-entry-relation-editor__results">
-                        {filteredEntries.map(entry => {
-                            const selected = entry.id === currentRelation.otherEntryId
-                            return (
-                                <button type="button" key={entry.id} aria-pressed={selected} className={`mobile-entry-relation-editor__result${selected ? ' is-selected' : ''}`} onClick={() => updateRelation({otherEntryId: entry.id})}>
-                                    <span><strong>{entry.title}</strong><small>{categoryName(categories, entry.category_id)}</small></span>
-                                    <span>{selected ? '已选择' : '选择'}</span>
-                                </button>
-                            )
-                        })}
-                        {filteredEntries.length === 0 && <div className="mobile-page__empty">没有匹配词条</div>}
-                        {hiddenMatchCount > 0 && (
-                            <div className="mobile-entry-relation-editor__result-more">还有 {hiddenMatchCount} 条匹配，继续输入以缩小范围</div>
+                    <div className="mobile-entry-properties__label"><span>目标词条</span><small>{candidateStatus}</small></div>
+                    {loading ? (
+                        <div className="mobile-entry-relation-editor__state" role="status">正在加载候选词条…</div>
+                    ) : loadError ? (
+                        <div className="mobile-entry-relation-editor__state" role="alert">
+                            <strong>候选词条加载失败</strong>
+                            <span>{loadError}</span>
+                            <Button type="button" size="md" variant="outline" className="mobile-entry-relation-editor__state-action" onClick={() => setLoadRevision(value => value + 1)}>重新加载</Button>
+                        </div>
+                    ) : selectableEntries.length === 0 ? (
+                        <div className="mobile-entry-relation-editor__state">
+                            <strong>{currentRelation.otherEntryId ? '关系目标不可用' : '项目里还没有其他词条'}</strong>
+                            <span>{currentRelation.otherEntryId ? '原目标词条可能已被删除。返回属性页后可以移除这条关系。' : '关系至少需要两条词条。先保存当前内容，再创建另一条词条。'}</span>
+                            <Button type="button" size="md" variant="outline" className="mobile-entry-relation-editor__state-action" onClick={handleBack}>返回词条属性</Button>
+                        </div>
+                    ) : (
+                        <>
+                            <Input aria-label="搜索关系目标词条" value={search} onValueChange={setSearch} placeholder="搜索词条标题" className="mobile-entry-relation-editor__search"/>
+                            <div className="mobile-entry-relation-editor__results">
+                                {filteredEntries.map(entry => {
+                                    const selected = entry.id === currentRelation.otherEntryId
+                                    return (
+                                        <button type="button" key={entry.id} aria-pressed={selected} className={`mobile-entry-relation-editor__result${selected ? ' is-selected' : ''}`} onClick={() => updateRelation({otherEntryId: entry.id})}>
+                                            <span><strong>{entry.title}</strong><small>{categoryName(categories, entry.category_id)}</small></span>
+                                            <span>{selected ? '已选择' : '选择'}</span>
+                                        </button>
+                                    )
+                                })}
+                                {filteredEntries.length === 0 && (
+                                    <div className="mobile-entry-relation-editor__state">
+                                        <strong>没有匹配“{search.trim()}”的词条</strong>
+                                        <span>换一个关键词，或清除搜索查看全部候选。</span>
+                                        <Button type="button" size="md" variant="ghost" className="mobile-entry-relation-editor__state-action" onClick={() => setSearch('')}>清除搜索</Button>
+                                    </div>
+                                )}
+                                {hiddenMatchCount > 0 && (
+                                    <div className="mobile-entry-relation-editor__result-more">还有 {hiddenMatchCount} 条匹配，继续输入以缩小范围</div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </section>
+
+                {!targetSelectionUnavailable && (
+                    <>
+                        <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
+                            <div className="mobile-entry-properties__label"><span>关系方向</span></div>
+                            <div className="mobile-entry-relation-editor__directions" role="group" aria-label="关系方向">
+                                {DIRECTIONS.map(direction => (
+                                    <button type="button" key={direction.value} aria-pressed={currentRelation.direction === direction.value} onClick={() => updateRelation({direction: direction.value})}>{direction.label}</button>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
+                            <div className="mobile-entry-properties__label"><span>关系说明</span><small>选填</small></div>
+                            <Input aria-label="关系说明" value={currentRelation.content} onValueChange={value => updateRelation({content: value})} placeholder="例如：师徒、同伴、敌对"/>
+                        </section>
+
+                        {isBlankNewRelation ? (
+                            <button type="button" className="mobile-entry-relation-editor__discard" onClick={handleBack}>放弃这条关系</button>
+                        ) : (
+                            <button type="button" className="mobile-entry-relation-editor__delete" onClick={() => void handleDelete()}>删除这条关系</button>
                         )}
-                    </div>
-                </section>
-
-                <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
-                    <div className="mobile-entry-properties__label"><span>关系方向</span></div>
-                    <div className="mobile-entry-relation-editor__directions" role="group" aria-label="关系方向">
-                        {DIRECTIONS.map(direction => (
-                            <button type="button" key={direction.value} aria-pressed={currentRelation.direction === direction.value} onClick={() => updateRelation({direction: direction.value})}>{direction.label}</button>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="mobile-entry-properties__group mobile-entry-relation-editor__group">
-                    <div className="mobile-entry-properties__label"><span>关系说明</span><small>选填</small></div>
-                    <Input value={currentRelation.content} onValueChange={value => updateRelation({content: value})} placeholder="例如：师徒、同伴、敌对"/>
-                </section>
-
-                {isBlankNewRelation ? (
-                    <button type="button" className="mobile-entry-relation-editor__discard" onClick={handleBack}>放弃这条关系</button>
-                ) : (
-                    <button type="button" className="mobile-entry-relation-editor__delete" onClick={() => void handleDelete()}>删除这条关系</button>
+                    </>
                 )}
             </div>
         </div>

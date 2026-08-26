@@ -1,10 +1,11 @@
-/** 移动端词条编辑主页：身份与附件位于正文之前，正文聚焦时两者平滑折叠。 */
+/** 移动端词条编辑主页：身份与附件位于正文之前，键盘出现时两者平滑折叠。 */
 import {type ComponentProps, type MouseEvent as ReactMouseEvent, type RefObject, useState} from 'react'
 import {Input} from 'flowcloudai-ui'
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import {type EntryImage} from '../../../features/entries/lib/entryImage'
 import {
+    MobileBackIcon,
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
@@ -23,6 +24,7 @@ type MarkdownTextareaProps = NonNullable<ComponentProps<typeof MarkdownEditor>['
 interface Props {
     saving: boolean
     isDirty: boolean
+    keyboardVisible: boolean
     error: string | null
     onCancel: () => void
     onSave: () => void
@@ -65,6 +67,7 @@ interface Props {
 export default function MobileEntryDetailEditView({editorRef, immersiveProps, imageViewerProps, imageAddProps, ...p}: Props) {
     const [bodyMode, setBodyMode] = useState<'edit' | 'preview'>('edit')
     const [bodyFocused, setBodyFocused] = useState(false)
+    const bodyKeyboardVisible = bodyFocused && p.keyboardVisible
     const wikiPanel = p.wikiDraft ? (
         <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
             <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
@@ -101,6 +104,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
 
     const inlineTextareaProps: MarkdownTextareaProps = {
         ...p.textareaProps,
+        'aria-label': '词条正文',
         onFocus: event => {
             setBodyFocused(true)
             p.textareaProps.onFocus?.(event)
@@ -115,7 +119,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
             className="mobile-page mobile-nav-safe-fixed mobile-entry-detail mobile-entry-detail--edit"
             data-mobile-editing="true"
             data-immersive-open={p.immersiveOpen || undefined}
-            data-body-focused={bodyFocused || undefined}
+            data-body-keyboard-visible={bodyKeyboardVisible || undefined}
             inert={p.immersiveOpen}
         >
             <MobilePageTopBar
@@ -125,27 +129,28 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                 ariaLabel="词条编辑操作"
                 left={<MobileTopActionPill
                     actions={[{
-                        key: 'cancel',
-                        label: '取消编辑',
-                        icon: <span className="mobile-top-action-pill__text">取消</span>,
-                        kind: 'text',
+                        key: 'back',
+                        label: '返回词条',
+                        icon: <MobileBackIcon/>,
                         disabled: p.saving,
                         onClick: p.onCancel,
                     }]}
                 />}
                 center={<div className="mobile-entry-detail__edit-heading">
-                    <span>{bodyFocused ? (p.title || '未命名词条') : '编辑词条'}</span>
+                    <span>{bodyKeyboardVisible ? (p.title || '未命名词条') : '编辑词条'}</span>
                     <small>{p.saving ? '保存中…' : p.isDirty ? '有未保存修改' : '已同步'}</small>
                 </div>}
                 right={<MobileTopActionPill
-                    actions={[{
-                        key: 'save',
-                        label: p.saving ? '保存中' : '保存词条',
-                        icon: <span className="mobile-top-action-pill__text">{p.saving ? '保存中…' : '保存'}</span>,
-                        kind: 'text',
-                        disabled: p.saving,
-                        onClick: p.onSave,
-                    }]}
+                    actions={[
+                        {
+                            key: 'save',
+                            label: p.saving ? '保存中' : '保存词条',
+                            icon: <span className="mobile-top-action-pill__text">{p.saving ? '保存中…' : '保存'}</span>,
+                            kind: 'text',
+                            disabled: p.saving,
+                            onClick: p.onSave,
+                        },
+                    ]}
                 />}
             />
 
@@ -155,7 +160,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                 <div className="mobile-entry-detail__edit-meta-inner">
                     <section className="mobile-entry-detail__identity" aria-label="词条身份">
                         <div className="mobile-entry-detail__identity-inner">
-                            <Input placeholder="未命名词条" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
+                            <Input aria-label="词条标题" placeholder="未命名词条" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
                             {/*
                               * 类型与分类在这里都只读，各自只有一个设置入口：
                               * 类型改在属性页（编辑主页再放一个下拉就是重复入口），
@@ -173,8 +178,11 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                                     {p.categoryLabel || '无分类'}
                                 </span>
                             </div>
-                            {/* 摘要不另起标签行：placeholder 已经说明用途，这一行在 834px 视口里换不来信息量。 */}
-                            <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+                            {/* 摘要标签与输入并排放在同一容器，不新增纵向标题行，也不再依赖 placeholder 表达字段身份。 */}
+                            <label className="mobile-entry-detail__summary-field">
+                                <span className="mobile-entry-detail__summary-label">摘要</span>
+                                <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+                            </label>
                         </div>
                     </section>
 
