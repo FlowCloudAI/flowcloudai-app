@@ -816,46 +816,30 @@
     grid-template-rows: 0fr;
 }
 
-.mobile-entry-detail__identity-selects {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--mobile-gap-inline);
-}
-
-/* 标签常驻在下拉左侧：类型与分类可以同名，只看值分不出是哪一个。 */
-.mobile-entry-detail__identity-field {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: var(--mobile-gap-inline);
-}
-
 .mobile-entry-detail__identity-field-label {
-    flex: 0 0 auto;
+    margin-inline-end: var(--mobile-gap-text);
     color: var(--fc-color-text-tertiary);
     font-size: var(--mobile-text-meta);
 }
 
-.mobile-entry-detail__identity-select {
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
-/* 只读分类：不做成控件的样子，避免看起来可点。 */
-.mobile-entry-detail__identity-readonly {
-    min-width: 0;
-    flex: 1 1 auto;
-    overflow: hidden;
+/*
+ * 编辑主页的类型与分类都是只读展示，各自只有一个设置入口。
+ * 不做成控件的样子，避免看起来可点。
+ */
+.mobile-entry-detail__identity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--mobile-gap-inline);
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-body-sm);
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-/* 触发器压到刚好等于命中区下限：原来的高度是这一屏最大的一块浪费。 */
-.mobile-entry-detail__identity-select .fc-select__trigger {
-    min-height: var(--mobile-tap-min);
-    height: var(--mobile-tap-min);
+.mobile-entry-detail__identity-meta > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* 缩略图条与计数入口并排一行，不再各占一行。 */

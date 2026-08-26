@@ -46,7 +46,10 @@ test('编辑主页保留三行摘要、内联正文与横向工具栏手势标�
 
 test('编辑主页先呈现身份与附件，正文聚焦时整体折叠且顶栏使用文字操作', () => {
     assert.ok(editViewSource.indexOf('mobile-entry-detail__edit-meta') < editViewSource.indexOf('mobile-entry-detail__body-pane'))
-    assert.match(editViewSource, /entryTypeOptions/)
+    // 类型只在属性页设置：编辑主页再放一个下拉就是重复入口，两处都只读展示。
+    assert.match(editViewSource, /entryTypeLabel/)
+    assert.doesNotMatch(editViewSource, /onEntryType/)
+    assert.doesNotMatch(editViewSource, /<Select/)
     // 分类只读属于依赖剪贴板替代入口的步骤 D，本轮继续保留可编辑 Select。
     // 分类归属不在词条编辑内部变更（改归属见 plans/ENTRY-CLIPBOARD.md），
     // 编辑页与属性页都不得再出现可写的分类控件。

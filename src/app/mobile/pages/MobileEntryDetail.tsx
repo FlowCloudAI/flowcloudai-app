@@ -608,14 +608,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             onSelect: (event: ReactSyntheticEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
             onFocus: handleContentFocus, onBlur: handleContentBlur,
         }
-        const entryTypeOptions = [
-            {value: '', label: '无类型'},
-            ...entryTypes.map(type => ({value: entryTypeKey(type), label: type.name})),
-        ]
+        const draftType = entryType ? entryTypes.find(item => entryTypeKey(item) === entryType) ?? null : null
         return <MobileEntryDetailEditView
             saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
-            entryTypeValue={entryType ?? ''} entryTypeOptions={entryTypeOptions} onEntryType={value => updateDraft({entryType: value || null})}
+            entryTypeLabel={draftType?.name ?? ''}
             categoryLabel={categoryId ? (categoryNameById.get(categoryId) ?? '') : ''}
             content={content} previewContent={buildMarkdownPreviewSource(content, images)} onContentChange={handleContentChange}
             editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
