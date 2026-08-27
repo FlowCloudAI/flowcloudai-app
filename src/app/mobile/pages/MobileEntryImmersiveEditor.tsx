@@ -13,8 +13,8 @@ import {
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import {MOBILE_MARKDOWN_TOOLS, type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
-import {MobileMarkdownToolIcon} from './MobileEntryMarkdownTools'
+import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
+import {MobileEntryMarkdownToolbar} from './MobileEntryMarkdownTools'
 
 type MobileMarkdownEditorTextareaProps = NonNullable<ComponentProps<typeof MarkdownEditor>['textareaProps']>
 
@@ -109,26 +109,7 @@ export function MobileEntryImmersiveEditor({
                     />
                     {wikiPanel}
                 </div>
-                <div
-                    className="mobile-entry-detail__markdown-toolbar"
-                    role="toolbar"
-                    aria-label="Markdown 常用工具"
-                    data-mobile-horizontal-scroll="true"
-                >
-                    {MOBILE_MARKDOWN_TOOLS.map(item => (
-                        <button
-                            key={item.tool}
-                            type="button"
-                            className="mobile-entry-detail__markdown-tool"
-                            aria-label={item.label}
-                            title={item.label}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => onMarkdownTool(item.tool)}
-                        >
-                            <MobileMarkdownToolIcon tool={item.tool}/>
-                        </button>
-                    ))}
-                </div>
+                <MobileEntryMarkdownToolbar onTool={onMarkdownTool}/>
             </div>
         </Overlay>
     )

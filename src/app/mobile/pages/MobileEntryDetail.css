@@ -638,12 +638,14 @@
     --mobile-entry-markdown-tool-gap: var(--mobile-gap-inline);
     --mobile-entry-markdown-visible-gap-width: var(--mobile-gap-section);
     --mobile-entry-markdown-tool-width: calc((100% - var(--mobile-entry-markdown-visible-gap-width)) / 5.5);
+    --mobile-entry-markdown-tool-height: 2.25rem;
+    --mobile-entry-markdown-padding-block: calc(var(--mobile-gap-text) / 2);
 
     display: flex;
     flex: 0 0 auto;
     gap: var(--mobile-entry-markdown-tool-gap);
     /* 安全区和键盘遮挡已经由 immersive 外层消费，这里只保留工具栏自身内边距。 */
-    padding: var(--mobile-gap-inline) var(--mobile-page-x);
+    padding: var(--mobile-entry-markdown-padding-block) var(--mobile-page-x);
     overflow-x: auto;
     border-top: var(--mobile-border);
     background: var(--mobile-surface-translucent-strong);
@@ -657,7 +659,7 @@
 .mobile-entry-detail__markdown-tool {
     display: inline-grid;
     width: var(--mobile-entry-markdown-tool-width);
-    height: var(--mobile-tap-min);
+    height: var(--mobile-entry-markdown-tool-height);
     flex: 0 0 var(--mobile-entry-markdown-tool-width);
     padding: 0;
     place-items: center;
@@ -1216,10 +1218,10 @@
     white-space: nowrap;
 }
 
-.mobile-entry-detail__markdown-toolbar--inline {
+.mobile-entry-detail__markdown-toolbar[data-inline='true'] {
     display: none;
     margin-inline: 0;
-    padding: var(--mobile-gap-text) 0;
+    padding-inline: 0;
     /* 右侧渐隐：此前工具栏被硬切在屏幕边缘，看不出还能横滑。 */
     mask-image: linear-gradient(
         90deg,
@@ -1243,7 +1245,7 @@
     overflow: visible;
 }
 
-.mobile-entry-detail--edit[data-body-keyboard-visible='true'] .mobile-entry-detail__markdown-toolbar--inline {
+.mobile-entry-detail--edit[data-body-keyboard-visible='true'] .mobile-entry-detail__markdown-toolbar[data-inline='true'] {
     display: flex;
 }
 

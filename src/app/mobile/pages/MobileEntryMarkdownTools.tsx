@@ -1,4 +1,36 @@
-import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
+/** 移动端词条 Markdown 工具栏：统一内联与沉浸编辑的结构、交互和图标。 */
+import {MOBILE_MARKDOWN_TOOLS, type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
+
+interface MobileEntryMarkdownToolbarProps {
+    inline?: boolean
+    onTool: (tool: MobileMarkdownTool) => void
+}
+
+export function MobileEntryMarkdownToolbar({inline = false, onTool}: MobileEntryMarkdownToolbarProps) {
+    return (
+        <div
+            className="mobile-entry-detail__markdown-toolbar"
+            role="toolbar"
+            aria-label="Markdown 常用工具"
+            data-inline={inline || undefined}
+            data-mobile-horizontal-scroll="true"
+        >
+            {MOBILE_MARKDOWN_TOOLS.map(item => (
+                <button
+                    key={item.tool}
+                    type="button"
+                    className="mobile-entry-detail__markdown-tool"
+                    aria-label={item.label}
+                    title={item.label}
+                    onMouseDown={event => event.preventDefault()}
+                    onClick={() => onTool(item.tool)}
+                >
+                    <MobileMarkdownToolIcon tool={item.tool}/>
+                </button>
+            ))}
+        </div>
+    )
+}
 
 export function MobileMarkdownToolIcon({tool}: { tool: MobileMarkdownTool }) {
     if (tool === 'heading') return <span className="mobile-entry-detail__markdown-tool-text">H</span>

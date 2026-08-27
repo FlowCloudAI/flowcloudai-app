@@ -13,8 +13,8 @@ import MobileImageViewer from '../components/MobileImageViewer'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {MobileEntryImagesSection} from './MobileEntryImagesSection'
-import {MOBILE_MARKDOWN_TOOLS, type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
-import {MobileMarkdownToolIcon} from './MobileEntryMarkdownTools'
+import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
+import {MobileEntryMarkdownToolbar} from './MobileEntryMarkdownTools'
 
 export type MobileWikiDraft = {start: number; end: number; query: string}
 export type MobileWikiOption = {kind: 'entry'; id: string; title: string; categoryId: string | null} | {kind: 'create'; title: string}
@@ -244,13 +244,7 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
                 </div>
             </section>
 
-            <div className="mobile-entry-detail__markdown-toolbar mobile-entry-detail__markdown-toolbar--inline" role="toolbar" aria-label="Markdown 常用工具" data-mobile-horizontal-scroll="true">
-                {MOBILE_MARKDOWN_TOOLS.map(item => (
-                    <button key={item.tool} type="button" className="mobile-entry-detail__markdown-tool" aria-label={item.label} title={item.label} onMouseDown={event => event.preventDefault()} onClick={() => p.onMarkdownTool(item.tool)}>
-                        <MobileMarkdownToolIcon tool={item.tool}/>
-                    </button>
-                ))}
-            </div>
+            <MobileEntryMarkdownToolbar inline onTool={p.onMarkdownTool}/>
 
             {p.immersiveOpen && <MobileEntryImmersiveEditor {...immersiveProps} wikiPanel={wikiPanel}/>}
             <MobileImageViewer {...imageViewerProps}/>

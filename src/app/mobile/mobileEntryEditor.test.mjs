@@ -9,6 +9,7 @@ const appSource = read('./MobileApp.tsx')
 const stackSource = read('./usePageStack.ts')
 const editViewSource = read('./pages/MobileEntryDetailEditView.tsx')
 const immersiveSource = read('./pages/MobileEntryImmersiveEditor.tsx')
+const markdownToolsSource = read('./pages/MobileEntryMarkdownTools.tsx')
 const detailCssSource = read('./pages/MobileEntryDetail.css')
 const topControlsSource = read('./components/MobileTopControls.tsx')
 const topControlsCssSource = read('./components/MobileTopControls.css')
@@ -42,12 +43,14 @@ test('三层编辑页使用共享 store，且不新增 CustomEvent 状态同步'
     assert.doesNotMatch(`${storeSource}\n${propertiesSource}\n${relationSource}`, /CustomEvent/)
 })
 
-test('编辑主页保留三行摘要、内联正文与横向工具栏手势标记', () => {
+test('编辑主页保留三行摘要、内联正文并复用公共 Markdown 工具栏', () => {
     assert.match(editViewSource, /rows=\{3\}/)
     assert.match(editViewSource, /className="mobile-entry-detail__summary-field"/)
     assert.match(editViewSource, /className="mobile-entry-detail__body-pane"/)
     assert.match(editViewSource, /mode=\{bodyMode\}/)
-    assert.match(editViewSource, /data-mobile-horizontal-scroll="true"/)
+    assert.match(editViewSource, /<MobileEntryMarkdownToolbar inline onTool=\{p\.onMarkdownTool\}\/>/)
+    assert.match(immersiveSource, /<MobileEntryMarkdownToolbar onTool=\{onMarkdownTool\}\/>/)
+    assert.match(markdownToolsSource, /data-mobile-horizontal-scroll="true"/)
 })
 
 test('词条编辑字段有稳定名称，布尔标签公开选中状态', () => {
@@ -160,7 +163,10 @@ test('长正文滚动由编辑器 area 单独持有，工具栏与主图不再�
     assert.match(detailCssSource, /mobile-entry-detail__immersive-editor \.w-md-editor-text-pre[\s\S]*?height: auto !important[\s\S]*?min-height: 100% !important/)
     assert.match(detailCssSource, /mobile-entry-detail__immersive-editor \.w-md-editor-text-input[\s\S]*?overflow: hidden !important/)
     assert.match(detailCssSource, /mobile-entry-detail__inline-editor \.w-md-editor-area,[\s\S]*?overflow-y: auto !important/)
-    assert.match(detailCssSource, /mobile-entry-detail__markdown-toolbar[\s\S]*?padding: var\(--mobile-gap-inline\) var\(--mobile-page-x\)/)
+    assert.match(detailCssSource, /mobile-entry-detail__markdown-toolbar[\s\S]*?--mobile-entry-markdown-tool-height: 2\.25rem/)
+    assert.match(detailCssSource, /mobile-entry-detail__markdown-toolbar[\s\S]*?--mobile-entry-markdown-padding-block: calc\(var\(--mobile-gap-text\) \/ 2\)/)
+    assert.match(detailCssSource, /mobile-entry-detail__markdown-toolbar[\s\S]*?padding: var\(--mobile-entry-markdown-padding-block\) var\(--mobile-page-x\)/)
+    assert.match(detailCssSource, /mobile-entry-detail__markdown-tool[\s\S]*?height: var\(--mobile-entry-markdown-tool-height\)/)
     assert.doesNotMatch(
         detailCssSource.match(/\.mobile-entry-detail__markdown-toolbar \{[\s\S]*?\n\}/)?.[0] ?? '',
         /mobile-safe-bottom/,
