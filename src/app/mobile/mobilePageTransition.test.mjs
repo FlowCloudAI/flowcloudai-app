@@ -54,12 +54,15 @@ test('边缘返回与侧边抽屉使用独立拖动态，返回手势不会改�
     assert.doesNotMatch(mobileAppCss, /\.is-edge-back-direct \.mobile-app-side-drawer-shell__surface\s*\{[\s\S]*?border-radius:/)
 })
 
-test('侧边抽屉逐帧位移绕过 React state，只在动画帧写公共宿主变量', () => {
-    assert.match(mobileAppSource, /visualTargetRef:\s*sideDrawerShellRef/)
-    assert.match(mobileAppSource, /ref=\{sideDrawerShellRef\}/)
+test('侧边抽屉逐帧位移绕过 React state，只更新三个直接绘制节点', () => {
+    assert.match(mobileAppSource, /drawerVisualRef:\s*sideDrawerPanelRef/)
+    assert.match(mobileAppSource, /surfaceVisualRef:\s*sideDrawerSurfaceRef/)
+    assert.match(mobileAppSource, /scrimVisualRef:\s*sideDrawerScrimRef/)
     assert.match(sideDrawerGestureSource, /requestAnimationFrame\(flushDrawerVisual\)/)
-    assert.match(sideDrawerGestureSource, /target\.style\.setProperty\('--mobile-entry-drawer-shift'/)
-    assert.match(sideDrawerGestureSource, /target\.style\.setProperty\('--mobile-entry-drawer-progress'/)
+    assert.match(sideDrawerGestureSource, /drawer\.style\.transform/)
+    assert.match(sideDrawerGestureSource, /surface\.style\.transform/)
+    assert.match(sideDrawerGestureSource, /scrim\.style\.opacity/)
+    assert.doesNotMatch(sideDrawerGestureSource, /style\.setProperty\('--mobile-entry-drawer-/)
     assert.doesNotMatch(sideDrawerGestureSource, /setOffset\(/)
     assert.doesNotMatch(mobileAppSource, /sideDrawerSurfaceOffset/)
 })

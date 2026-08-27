@@ -92,6 +92,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const closingRef = useRef(false)
     const mobileAppRef = useRef<HTMLDivElement>(null)
     const sideDrawerShellRef = useRef<HTMLDivElement>(null)
+    const sideDrawerPanelRef = useRef<HTMLDivElement>(null)
+    const sideDrawerSurfaceRef = useRef<HTMLDivElement>(null)
+    const sideDrawerScrimRef = useRef<HTMLButtonElement>(null)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
     const pendingEdgeBackTargetRef = useRef<MobileBackTarget | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
@@ -255,7 +258,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     } = useMobileSideDrawerGesture({
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
-        visualTargetRef: sideDrawerShellRef,
+        drawerVisualRef: sideDrawerPanelRef,
+        surfaceVisualRef: sideDrawerSurfaceRef,
+        scrimVisualRef: sideDrawerScrimRef,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
         beforeEdgeBackGesture: pointerEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
         onEdgeBackGesture: pointerEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
@@ -625,6 +630,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             >
                 {mobileSideDrawerEnabled && (
                     <div
+                        ref={sideDrawerPanelRef}
                         className="mobile-app-side-drawer-shell__drawer"
                         {...sideDrawerPointerHandlers}
                     >
@@ -646,10 +652,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     </div>
                 )}
                 <div
+                    ref={sideDrawerSurfaceRef}
                     className="mobile-app-side-drawer-shell__surface"
                     {...sideDrawerPointerHandlers}
                 >
                     <button
+                        ref={sideDrawerScrimRef}
                         type="button"
                         className="mobile-app-side-drawer-shell__surface-close"
                         aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : mobileSideDrawerKind === 'idea' ? '关闭灵感列表' : '关闭分类树'}

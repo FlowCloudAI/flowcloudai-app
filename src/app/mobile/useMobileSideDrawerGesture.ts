@@ -27,11 +27,10 @@ interface UseMobileSideDrawerGestureOptions {
      */
     enabled: boolean
     width: number
-    /**
-     * 抽屉与页面 surface 的公共定位宿主。拖动帧直接写它的 CSS 变量，避免让整个
-     * MobileApp 跟随 pointermove 重渲染；React state 只保留手势阶段与最终开关状态。
-     */
-    visualTargetRef: RefObject<HTMLElement | null>
+    /** 拖动帧只改三个直接绘制节点，禁止把高频 CSS 变量写在会向整页继承的祖先上。 */
+    drawerVisualRef: RefObject<HTMLElement | null>
+    surfaceVisualRef: RefObject<HTMLElement | null>
+    scrimVisualRef: RefObject<HTMLElement | null>
     logLabel?: string
     /**
      * 是否允许从 input / textarea / contenteditable 等文本编辑区域开始识别抽屉手势。
@@ -203,7 +202,9 @@ function getEdgeBackTransitionDurationMs(): number {
 export function useMobileSideDrawerGesture({
     enabled,
     width,
-    visualTargetRef,
+    drawerVisualRef,
+    surfaceVisualRef,
+    scrimVisualRef,
     logLabel = '[移动端侧边抽屉手势]',
     allowTextEditingTargetGestures = false,
     onEdgeBackGesture,
@@ -240,21 +241,29 @@ export function useMobileSideDrawerGesture({
     const edgeBackPreparedRef = useRef(false)
     const edgeBackGestureActiveRef = useRef(false)
     const drawerVisualFrameRef = useRef<number | null>(null)
-    const pendingDrawerVisualRef = useRef<{offset: number; progress: number} | null>(null)
+    const pendingDrawerVisualRef = useRef<{
+        drawerOffset: number
+        surfaceOffset: number
+        progress: number
+    } | null>(null)
 
     const flushDrawerVisual = useCallback(() => {
         drawerVisualFrameRef.current = null
         const pending = pendingDrawerVisualRef.current
-        const target = visualTargetRef.current
-        if (!pending || !target) return
-        target.style.setProperty('--mobile-entry-drawer-shift', `${pending.offset}px`)
-        target.style.setProperty('--mobile-entry-drawer-progress', String(pending.progress))
-    }, [visualTargetRef])
+        if (!pending) return
+        const drawer = drawerVisualRef.current
+        const surface = surfaceVisualRef.current
+        const scrim = scrimVisualRef.current
+        if (drawer) drawer.style.transform = `translate3d(${pending.drawerOffset}px, 0, 0)`
+        if (surface) surface.style.transform = `translate3d(${pending.surfaceOffset}px, 0, 0)`
+        if (scrim) scrim.style.opacity = String(pending.progress)
+    }, [drawerVisualRef, scrimVisualRef, surfaceVisualRef])
 
     const scheduleDrawerVisual = useCallback((nextOffset: number) => {
         const clampedOffset = clamp(nextOffset, 0, width)
         pendingDrawerVisualRef.current = {
-            offset: clampedOffset,
+            drawerOffset: clampedOffset - width,
+            surfaceOffset: clampedOffset,
             progress: width > 0 ? clampedOffset / width : 0,
         }
         if (drawerVisualFrameRef.current !== null || typeof window === 'undefined') return

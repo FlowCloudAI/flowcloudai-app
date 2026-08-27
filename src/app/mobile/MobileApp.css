@@ -75,7 +75,7 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     background: var(--mobile-side-drawer-bg);
     color: var(--fc-color-text);
     transform: translate3d(
-            calc(var(--mobile-entry-drawer-shift, 0px) - var(--mobile-entry-drawer-width, calc(100vw - 3.5rem))),
+            calc(0px - var(--mobile-entry-drawer-width, calc(100vw - 3.5rem))),
             0,
             0
     );
@@ -95,11 +95,7 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     overflow: hidden;
     background: var(--fc-color-bg);
     border-left: solid 1px transparent;
-    transform: translate3d(
-        var(--mobile-entry-drawer-shift, 0px),
-        0,
-        0
-    );
+    transform: translate3d(0, 0, 0);
     transition:
         transform var(--mobile-duration-base) var(--mobile-ease-standard),
         border-radius var(--mobile-duration-base) var(--mobile-ease-standard),
@@ -143,7 +139,7 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     );
     border-radius: inherit;
     cursor: pointer;
-    opacity: var(--mobile-entry-drawer-progress, 0);
+    opacity: 0;
     pointer-events: none;
     transition: opacity var(--mobile-duration-base) var(--mobile-ease-standard);
 }
