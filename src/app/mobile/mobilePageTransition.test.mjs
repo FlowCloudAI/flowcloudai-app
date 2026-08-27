@@ -28,12 +28,14 @@ test('双层转场只保留当前页和直接前驱，并保持稳定 key', () =
     ])
 })
 
-test('直接前驱保持可绘制但不可交互，手势开始不再从 visibility hidden 冷启动', () => {
+test('直接前驱默认停止绘制，仅在边缘返回预热后显示', () => {
     const baseLayerRule = mobileAppCss.match(/\.mobile-page-transition-host__layer\s*\{[\s\S]*?\n\}/)?.[0] ?? ''
-    assert.match(baseLayerRule, /visibility:\s*visible/)
-    assert.doesNotMatch(baseLayerRule, /^\s*visibility:\s*hidden/m)
+    assert.match(baseLayerRule, /visibility:\s*hidden/)
     assert.match(transitionHostSource, /inert=\{!layerInteractive\}/)
     assert.match(mobileAppCss, /\.mobile-page-transition-host__layer\.is-underlay\s*\{[\s\S]*?z-index:\s*1/)
+    assert.match(mobileAppCss, /\.is-edge-back-prepared \.mobile-page-transition-host__layer\.is-underlay\s*\{[\s\S]*?visibility:\s*visible/)
+    assert.match(mobileAppSource, /edgeBackOrigin \? ' is-edge-back-prepared'/)
+    assert.match(sideDrawerGestureSource, /onPointerDownCapture:\s*preparePointerEdgeBack/)
 })
 
 test('边缘返回以 transform transitionend 完成结算并原子清理页面身份', () => {

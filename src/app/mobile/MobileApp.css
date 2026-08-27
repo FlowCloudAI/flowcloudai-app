@@ -225,11 +225,8 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     flex-direction: column;
     overflow: hidden;
     background: var(--fc-color-bg);
-    /*
-     * 直接前驱必须保持可绘制。手势开始时才从 visibility:hidden 恢复会让 Android
-     * WebView 在首帧同时栅格化整页并建立 transform 层，表现为底层页面闪现。
-     */
-    visibility: visible;
+    /* 前驱页保持挂载，但只在边缘返回预热后绘制；普通抽屉拖动只承担栈顶页。 */
+    visibility: hidden;
     pointer-events: none;
 }
 
@@ -241,6 +238,10 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     z-index: 2;
     visibility: visible;
     pointer-events: auto;
+}
+
+.mobile-app-side-drawer-shell.is-edge-back-prepared .mobile-page-transition-host__layer.is-underlay {
+    visibility: visible;
 }
 
 .mobile-page-transition-host__layer.is-underlay.is-edge-back-underlay {

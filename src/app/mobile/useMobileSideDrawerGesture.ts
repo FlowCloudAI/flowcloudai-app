@@ -2,6 +2,7 @@ import {useDrag} from '@use-gesture/react'
 import {
     type HTMLAttributes,
     type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
     type RefObject,
     useCallback,
     useEffect,
@@ -49,7 +50,10 @@ interface UseMobileSideDrawerGestureOptions {
      * 返回 false 时当前页回弹，不会先滑走再弹回。
      */
     beforeEdgeBackGesture?: () => boolean | void | Promise<boolean | void>
-    /** 首次确认边缘右划时通知外层锁定当前页身份，避免 pop 后新栈顶继承旧页位移。 */
+    /**
+     * 指针在返回边缘按下时先通知外层锁定当前页身份并预绘制前驱页；原生预测返回则在
+     * 系统 start 回调进入同一入口。这样前驱页只为返回服务，不参与普通抽屉拖动。
+     */
     onEdgeBackStart?: () => void
     /** 动画和无过渡归零完成时，与 idle 状态同批清理外层锁定的页面身份。 */
     onEdgeBackFinish?: () => void
@@ -233,6 +237,8 @@ export function useMobileSideDrawerGesture({
     const edgeBackResetFrameRef = useRef<number | null>(null)
     const edgeBackSettlePhaseRef = useRef<'cancelling' | 'committing' | null>(null)
     const edgeBackAttemptRef = useRef(0)
+    const edgeBackPreparedRef = useRef(false)
+    const edgeBackGestureActiveRef = useRef(false)
     const drawerVisualFrameRef = useRef<number | null>(null)
     const pendingDrawerVisualRef = useRef<{offset: number; progress: number} | null>(null)
 
@@ -296,6 +302,8 @@ export function useMobileSideDrawerGesture({
         // 清理页面身份与 phase 前先禁用一帧过渡，避免 transform 层回收时闪回旧页。
         setEdgeBackTransitionDisabled(true)
         edgeBackResetFrameRef.current = window.requestAnimationFrame(() => {
+            edgeBackPreparedRef.current = false
+            edgeBackGestureActiveRef.current = false
             onEdgeBackFinish?.()
             setEdgeBackOffset(0)
             setEdgeBackProgress(0)
@@ -373,6 +381,29 @@ export function useMobileSideDrawerGesture({
         settleDrawer(true)
     }, [enabled, settleDrawer])
 
+    const preparePointerEdgeBack = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        if (
+            edgeBackPreparedRef.current
+            || open
+            || !edgeBackEnabled
+            || event.clientX > MOBILE_EDGE_BACK_GESTURE_TUNING.startWidth
+        ) return
+        if (!allowTextEditingTargetGestures && isTextEditingTarget(event.target)) return
+        if (isInternalGestureTarget(event.target)) return
+        edgeBackPreparedRef.current = true
+        onEdgeBackStart?.()
+    }, [allowTextEditingTargetGestures, edgeBackEnabled, onEdgeBackStart, open])
+
+    const cancelPreparedEdgeBack = useCallback(() => {
+        if (!edgeBackPreparedRef.current || edgeBackGestureActiveRef.current) return
+        edgeBackPreparedRef.current = false
+        onEdgeBackFinish?.()
+    }, [onEdgeBackFinish])
+
+    const finishPointerPreparation = useCallback(() => {
+        cancelPreparedEdgeBack()
+    }, [cancelPreparedEdgeBack])
+
     useEffect(() => {
         if (!enabled) closeDrawer()
     }, [closeDrawer, enabled])
@@ -412,8 +443,12 @@ export function useMobileSideDrawerGesture({
             const suppressedRuntime = dragRuntimeRef.current
             if (suppressedRuntime) {
                 logger.info(`${logLabel} 让路`, {pointerId, reason: '上层手势已接管（如分类树拖拽）'})
-                if (suppressedRuntime.edgeBackCandidate && suppressedRuntime.started) cancelEdgeBack()
-                else settleDrawer(suppressedRuntime.openBefore)
+                if (suppressedRuntime.edgeBackCandidate && suppressedRuntime.started) {
+                    cancelEdgeBack()
+                } else {
+                    cancelPreparedEdgeBack()
+                    settleDrawer(suppressedRuntime.openBefore)
+                }
             }
             dragRuntimeRef.current = null
             cancel()
@@ -436,6 +471,7 @@ export function useMobileSideDrawerGesture({
             // 本页没有抽屉、这一划又不是边缘返回：不归我们管，静默放过。
             // 这在词条详情等无抽屉页面是常态，记日志只会淹掉真正有用的手势日志。
             if (!enabled && !edgeBackCandidate) {
+                cancelPreparedEdgeBack()
                 dragRuntimeRef.current = null
                 cancel()
                 return
@@ -455,6 +491,7 @@ export function useMobileSideDrawerGesture({
                     reason: ignoredReason,
                     target: getTagName(event.target),
                 })
+                cancelPreparedEdgeBack()
                 dragRuntimeRef.current = null
                 cancel()
                 return
@@ -490,15 +527,23 @@ export function useMobileSideDrawerGesture({
                     dy: Math.round(moveY),
                 })
                 dragRuntimeRef.current = null
-                if (runtime.started) cancelEdgeBack()
-                else resetPointerTracking()
+                if (runtime.started) {
+                    cancelEdgeBack()
+                } else {
+                    cancelPreparedEdgeBack()
+                    resetPointerTracking()
+                }
                 cancel()
                 return
             }
 
                 if (!runtime.started) {
                     runtime.started = true
-                    onEdgeBackStart?.()
+                    edgeBackGestureActiveRef.current = true
+                    if (!edgeBackPreparedRef.current) {
+                        edgeBackPreparedRef.current = true
+                        onEdgeBackStart?.()
+                    }
                     setEdgeBackTransitionDisabled(true)
                     setEdgeBackPhase('tracking')
             }
@@ -656,6 +701,9 @@ export function useMobileSideDrawerGesture({
         pointerHandlers: {
             ...bindDrag(),
             onClickCapture: handleClickCapture,
+            onPointerDownCapture: preparePointerEdgeBack,
+            onPointerUpCapture: finishPointerPreparation,
+            onPointerCancelCapture: finishPointerPreparation,
         },
     }
 }
