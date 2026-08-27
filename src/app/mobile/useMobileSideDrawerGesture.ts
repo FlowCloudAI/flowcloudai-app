@@ -2,6 +2,7 @@ import {useDrag} from '@use-gesture/react'
 import {
     type HTMLAttributes,
     type MouseEvent as ReactMouseEvent,
+    type RefObject,
     useCallback,
     useEffect,
     useRef,
@@ -25,6 +26,11 @@ interface UseMobileSideDrawerGestureOptions {
      */
     enabled: boolean
     width: number
+    /**
+     * 抽屉与页面 surface 的公共定位宿主。拖动帧直接写它的 CSS 变量，避免让整个
+     * MobileApp 跟随 pointermove 重渲染；React state 只保留手势阶段与最终开关状态。
+     */
+    visualTargetRef: RefObject<HTMLElement | null>
     logLabel?: string
     /**
      * 是否允许从 input / textarea / contenteditable 等文本编辑区域开始识别抽屉手势。
@@ -68,8 +74,6 @@ export interface MobileSideDrawerGesture {
     open: boolean
     drawerDragging: boolean
     edgeBackTransitionDisabled: boolean
-    offset: number | null
-    surfaceOffset: number
     edgeBackOffset: number
     edgeBackProgress: number
     edgeBackPhase: MobileEdgeBackPhase
@@ -195,6 +199,7 @@ function getEdgeBackTransitionDurationMs(): number {
 export function useMobileSideDrawerGesture({
     enabled,
     width,
+    visualTargetRef,
     logLabel = '[移动端侧边抽屉手势]',
     allowTextEditingTargetGestures = false,
     onEdgeBackGesture,
@@ -209,7 +214,6 @@ export function useMobileSideDrawerGesture({
     const gestureEnabled = enabled || edgeBackEnabled
 
     const [open, setOpen] = useState(false)
-    const [offset, setOffset] = useState<number | null>(null)
     const [drawerDragging, setDrawerDragging] = useState(false)
     const [edgeBackTransitionDisabled, setEdgeBackTransitionDisabled] = useState(false)
     const [edgeBackOffset, setEdgeBackOffset] = useState(0)
@@ -229,6 +233,35 @@ export function useMobileSideDrawerGesture({
     const edgeBackResetFrameRef = useRef<number | null>(null)
     const edgeBackSettlePhaseRef = useRef<'cancelling' | 'committing' | null>(null)
     const edgeBackAttemptRef = useRef(0)
+    const drawerVisualFrameRef = useRef<number | null>(null)
+    const pendingDrawerVisualRef = useRef<{offset: number; progress: number} | null>(null)
+
+    const flushDrawerVisual = useCallback(() => {
+        drawerVisualFrameRef.current = null
+        const pending = pendingDrawerVisualRef.current
+        const target = visualTargetRef.current
+        if (!pending || !target) return
+        target.style.setProperty('--mobile-entry-drawer-shift', `${pending.offset}px`)
+        target.style.setProperty('--mobile-entry-drawer-progress', String(pending.progress))
+    }, [visualTargetRef])
+
+    const scheduleDrawerVisual = useCallback((nextOffset: number) => {
+        const clampedOffset = clamp(nextOffset, 0, width)
+        pendingDrawerVisualRef.current = {
+            offset: clampedOffset,
+            progress: width > 0 ? clampedOffset / width : 0,
+        }
+        if (drawerVisualFrameRef.current !== null || typeof window === 'undefined') return
+        drawerVisualFrameRef.current = window.requestAnimationFrame(flushDrawerVisual)
+    }, [flushDrawerVisual, width])
+
+    const clearDrawerVisualFrame = useCallback(() => {
+        if (drawerVisualFrameRef.current !== null) {
+            window.cancelAnimationFrame(drawerVisualFrameRef.current)
+            drawerVisualFrameRef.current = null
+        }
+        pendingDrawerVisualRef.current = null
+    }, [])
 
     const clearSuppressClickTimer = useCallback(() => {
         if (suppressClickTimerRef.current === null) return
@@ -319,34 +352,44 @@ export function useMobileSideDrawerGesture({
         })
     }, [cancelEdgeBack, finishEdgeBackVisual, logLabel, onEdgeBackGesture])
 
-    const resetDrag = useCallback(() => {
+    const resetPointerTracking = useCallback(() => {
         dragRuntimeRef.current = null
-        setOffset(null)
         setDrawerDragging(false)
     }, [])
 
+    const settleDrawer = useCallback((nextOpen: boolean) => {
+        resetPointerTracking()
+        setOpen(nextOpen)
+        // 等 React 移除拖动态后再写终点，让现有 CSS transition 接管吸附动画。
+        scheduleDrawerVisual(nextOpen ? width : 0)
+    }, [resetPointerTracking, scheduleDrawerVisual, width])
+
     const closeDrawer = useCallback(() => {
-        setOpen(false)
-        resetDrag()
-    }, [resetDrag])
+        settleDrawer(false)
+    }, [settleDrawer])
 
     const openDrawer = useCallback(() => {
         if (!enabled) return
-        resetDrag()
-        setOpen(true)
-    }, [enabled, resetDrag])
+        settleDrawer(true)
+    }, [enabled, settleDrawer])
 
     useEffect(() => {
         if (!enabled) closeDrawer()
     }, [closeDrawer, enabled])
 
     useEffect(() => {
+        if (dragRuntimeRef.current?.started) return
+        scheduleDrawerVisual(open ? width : 0)
+    }, [open, scheduleDrawerVisual, width])
+
+    useEffect(() => {
         return () => {
             edgeBackAttemptRef.current += 1
             clearSuppressClickTimer()
             clearEdgeBackSettle()
+            clearDrawerVisualFrame()
         }
-    }, [clearEdgeBackSettle, clearSuppressClickTimer])
+    }, [clearDrawerVisualFrame, clearEdgeBackSettle, clearSuppressClickTimer])
 
     const bindDrag = useDrag(({
         cancel,
@@ -370,7 +413,7 @@ export function useMobileSideDrawerGesture({
             if (suppressedRuntime) {
                 logger.info(`${logLabel} 让路`, {pointerId, reason: '上层手势已接管（如分类树拖拽）'})
                 if (suppressedRuntime.edgeBackCandidate && suppressedRuntime.started) cancelEdgeBack()
-                else resetDrag()
+                else settleDrawer(suppressedRuntime.openBefore)
             }
             dragRuntimeRef.current = null
             cancel()
@@ -448,7 +491,7 @@ export function useMobileSideDrawerGesture({
                 })
                 dragRuntimeRef.current = null
                 if (runtime.started) cancelEdgeBack()
-                else resetDrag()
+                else resetPointerTracking()
                 cancel()
                 return
             }
@@ -537,7 +580,7 @@ export function useMobileSideDrawerGesture({
                 dx: Math.round(moveX),
                 dy: Math.round(moveY),
             })
-            resetDrag()
+            settleDrawer(false)
             cancel()
             return
         }
@@ -557,7 +600,7 @@ export function useMobileSideDrawerGesture({
 
         if (event.cancelable) event.preventDefault()
         const currentOffset = clamp(nextOffset, 0, width)
-        setOffset(currentOffset)
+        scheduleDrawerVisual(currentOffset)
 
         if (!last) return
 
@@ -582,8 +625,7 @@ export function useMobileSideDrawerGesture({
         })
 
         if (runtime.started) suppressNextClick()
-        resetDrag()
-        setOpen(shouldOpen)
+        settleDrawer(shouldOpen)
     }, {
         axis: 'x',
         bounds: {left: 0, right: width},
@@ -605,8 +647,6 @@ export function useMobileSideDrawerGesture({
         open,
         drawerDragging,
         edgeBackTransitionDisabled,
-        offset,
-        surfaceOffset: offset ?? (open ? width : 0),
         edgeBackOffset,
         edgeBackProgress,
         edgeBackPhase,

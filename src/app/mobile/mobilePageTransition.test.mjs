@@ -51,3 +51,13 @@ test('边缘返回与侧边抽屉使用独立拖动态，返回手势不会改�
     assert.match(mobileAppCss, /\.is-edge-back-direct \.mobile-page-transition-host__layer\.is-edge-back-foreground/)
     assert.doesNotMatch(mobileAppCss, /\.is-edge-back-direct \.mobile-app-side-drawer-shell__surface\s*\{[\s\S]*?border-radius:/)
 })
+
+test('侧边抽屉逐帧位移绕过 React state，只在动画帧写公共宿主变量', () => {
+    assert.match(mobileAppSource, /visualTargetRef:\s*sideDrawerShellRef/)
+    assert.match(mobileAppSource, /ref=\{sideDrawerShellRef\}/)
+    assert.match(sideDrawerGestureSource, /requestAnimationFrame\(flushDrawerVisual\)/)
+    assert.match(sideDrawerGestureSource, /target\.style\.setProperty\('--mobile-entry-drawer-shift'/)
+    assert.match(sideDrawerGestureSource, /target\.style\.setProperty\('--mobile-entry-drawer-progress'/)
+    assert.doesNotMatch(sideDrawerGestureSource, /setOffset\(/)
+    assert.doesNotMatch(mobileAppSource, /sideDrawerSurfaceOffset/)
+})

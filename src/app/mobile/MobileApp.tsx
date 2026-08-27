@@ -91,6 +91,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
     const mobileAppRef = useRef<HTMLDivElement>(null)
+    const sideDrawerShellRef = useRef<HTMLDivElement>(null)
     const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
     const pendingEdgeBackTargetRef = useRef<MobileBackTarget | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
@@ -244,7 +245,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         open: sideDrawerOpen,
         drawerDragging: sideDrawerDragging,
         edgeBackTransitionDisabled,
-        surfaceOffset: sideDrawerSurfaceOffset,
         edgeBackOffset,
         edgeBackProgress,
         edgeBackPhase,
@@ -255,6 +255,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     } = useMobileSideDrawerGesture({
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
+        visualTargetRef: sideDrawerShellRef,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
         beforeEdgeBackGesture: pointerEdgeBackEnabled ? prepareEdgeBackNavigation : undefined,
         onEdgeBackGesture: pointerEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
@@ -292,9 +293,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         if (!event.target.classList.contains('is-edge-back-foreground')) return
         completeEdgeBackTransition()
     }, [completeEdgeBackTransition])
-    const sideDrawerProgress = categoryDrawerWidth > 0
-        ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
-        : 0
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (currentPage?.type === 'projectHome') return {kind: 'projectHome'}
         if (currentPage?.type !== 'entryList') return {kind: 'projectHome'}
@@ -611,11 +609,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     return (
         <div ref={mobileAppRef} className="mobile-app">
             <div
+                ref={sideDrawerShellRef}
                 className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
-                    '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
-                    '--mobile-entry-drawer-progress': sideDrawerProgress,
                     '--mobile-edge-back-shift': `${activeEdgeBackOffset}px`,
                     '--mobile-edge-back-progress': activeEdgeBackProgress,
                     '--mobile-edge-back-underlay-shift': activeEdgeBackPhase === 'idle'
