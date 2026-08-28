@@ -26,21 +26,8 @@
     --app-glass-bg-error: color-mix(in srgb, var(--fc-color-danger, #ef4444) 20%, transparent);
 }
 
-/*
- * 两个触发点共用同一份降级值：设置里关掉毛玻璃，以及移动端侧栏正在运动。
- *
- * 侧栏运动期间必须降级，是因为这些 backdrop-filter 元素都住在会整体位移的 surface 里，
- * transform 一变就得每帧重新取样背景、重跑模糊、重建离屏通道（真机 120Hz 实测
- * GPU p50 6.02→2.36ms、整帧 p50 21.2→13.2ms，详见 MobileApp.css 的运动态说明）。
- * 但**只摘滤镜不摘半透明**会让背景在开关那一下从模糊跳成清晰，看起来就是闪一下——
- * 所以底色必须同时换成不透明档，运动期间干脆看不到背后的内容。
- *
- * 复用关闭态这份清单而不是另写一份：新增玻璃面只要在下面登记一次，两个触发点自动都对。
- */
 :root:not([data-glass-effect="enabled"]),
-:root:not([data-glass-effect="enabled"]) .mobile-app,
-.mobile-app-side-drawer-shell.is-drawer-dragging,
-.mobile-app-side-drawer-shell.is-drawer-moving {
+:root:not([data-glass-effect="enabled"]) .mobile-app {
     --mobile-glass-filter: none;
     --mobile-glass-filter-soft: none;
     --mobile-nav-glass-filter: none;
