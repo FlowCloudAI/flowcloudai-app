@@ -55,6 +55,18 @@ function suppressNextClick() {
  */
 const MOBILE_ANCHORED_MENU_MIN_SPACE = 128
 
+/*
+ * clearAnchor 下改用「哪边宽裕去哪边」，另一侧要宽裕到这个倍数才翻面。
+ *
+ * MIN_SPACE 那条判据是为顶栏胶囊调的：锚点固定在屏幕顶部，向下几乎总是够用。
+ * 但 clearAnchor 的锚点是列表行，可能落在任何高度上，「放得下 128px 就不翻」太松——
+ * 实测一行落在 y≈600 时下方只剩 183px、上方有 571px，菜单仍旧向下展开被压成三行半。
+ *
+ * 留倍率而不是直接比大小，是为了避免锚点接近屏幕中线时两个方向来回横跳：
+ * 那种位置两侧都放得下，翻不翻都不影响可读性，稳定比「最优」重要。
+ */
+const MOBILE_ANCHORED_MENU_FLIP_RATIO = 1.35
+
 /**
  * 定下实际生效的展开方向。`placement` 退化为「偏好」：只有偏好那一侧确实放不下、
  * 且另一侧更宽裕时才翻面。
@@ -79,9 +91,15 @@ function resolveAnchoredMenuPlacement(
         - MOBILE_ANCHORED_MENU_VIEWPORT_GAP
     const preferredSpace = preferred === 'bottom' ? spaceForBottom : spaceForTop
     const flippedSpace = preferred === 'bottom' ? spaceForTop : spaceForBottom
+    const flipped = preferred === 'bottom' ? 'top' : 'bottom'
+
+    if (clearAnchor) {
+        return flippedSpace > preferredSpace * MOBILE_ANCHORED_MENU_FLIP_RATIO ? flipped : preferred
+    }
+
     if (preferredSpace >= MOBILE_ANCHORED_MENU_MIN_SPACE) return preferred
     if (flippedSpace <= preferredSpace) return preferred
-    return preferred === 'bottom' ? 'top' : 'bottom'
+    return flipped
 }
 
 /**

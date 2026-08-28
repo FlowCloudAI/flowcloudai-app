@@ -150,6 +150,9 @@ test('锚点菜单避开锚点时，CSS 偏移与 JS 翻面判据用同一套算
     assert.match(topControls, /clearAnchor \? anchorBottom : anchorTop/)
     assert.match(topControls, /\(clearAnchor \? anchorTop : anchorBottom\)/)
     assert.match(topControls, /clearAnchor \? ' mobile-anchored-menu--clear-anchor' : ''/)
+    // 列表行可能落在任何高度上，MIN_SPACE 那条「放得下就不翻」会让菜单挤在小的一侧。
+    assert.match(topControls, /MOBILE_ANCHORED_MENU_FLIP_RATIO = 1\.35/)
+    assert.match(topControls, /flippedSpace > preferredSpace \* MOBILE_ANCHORED_MENU_FLIP_RATIO/)
     // CSS 两个方向都要偏移，且 max-height 同步减掉这一段，否则菜单顶出视口。
     const bottomRule = topControlsCss.match(/^\.mobile-anchored-menu--clear-anchor \{[\s\S]*?\n\}/m)?.[0] ?? ''
     const topRule = topControlsCss.match(/^\.mobile-anchored-menu--clear-anchor\.mobile-anchored-menu--placement-top \{[\s\S]*?\n\}/m)?.[0] ?? ''
