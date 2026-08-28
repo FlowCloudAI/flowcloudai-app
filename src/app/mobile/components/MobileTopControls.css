@@ -371,14 +371,30 @@
  * 自己往这一列放勾，所以只对前者收，且按菜单整体收：行级 grid 是各自独立的，
  * 让空 span 逐行塌缩会使带图标与不带图标的行在同一个菜单里对不齐。
  *
- * 图标列不收——它是 items API 的真实槽位，另外三个菜单在用；留着还能让所有动作菜单
- * 的文字起始位置一致。
  */
 .mobile-anchored-menu--no-check .mobile-anchored-menu__row {
     grid-template-columns: 1.9rem minmax(0, 1fr);
 }
 
 .mobile-anchored-menu--no-check .mobile-anchored-menu__check {
+    display: none;
+}
+
+/*
+ * 一个图标都没有时，图标列同样要收。
+ *
+ * 曾经想留着它当统一的文字缩进，但空列不是缩进——它只加在左边：文字左侧留白变成
+ * 24 + 30.4 = 54.4px，右侧仍是 24px，菜单看起来整个偏右。宁可让不同菜单的文字起点
+ * 不一致，也不要单个菜单内部左右不对称。
+ *
+ * 同样按菜单整体判定（items.some(i => i.icon)），不按行：行级 grid 各自独立，
+ * 逐行塌缩会让同一菜单里带图标和不带图标的行对不齐。
+ */
+.mobile-anchored-menu--no-icon .mobile-anchored-menu__row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.mobile-anchored-menu--no-icon .mobile-anchored-menu__icon {
     display: none;
 }
 

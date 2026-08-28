@@ -415,10 +415,12 @@ export function MobileAnchoredActionMenu({
     className,
     ...menuProps
 }: MobileAnchoredActionMenuProps) {
-    // 勾选列对 items 驱动的菜单永远填不上，整菜单收掉；见 CSS 里 --no-check 的说明。
+    // 勾选列对 items 驱动的菜单永远填不上；没有任何一项带图标时图标列也是空的。
+    // 两者都按菜单整体收，见 CSS 里 --no-check / --no-icon 的说明。
     const menuClassName = [
         className,
         'mobile-anchored-menu--no-check',
+        items.some(item => item.icon) ? '' : 'mobile-anchored-menu--no-icon',
         items.length === 1 ? 'mobile-anchored-menu--compact' : '',
     ]
         .filter(Boolean)
