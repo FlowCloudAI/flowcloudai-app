@@ -4,6 +4,7 @@
       {
         "title": "流云AI",
         "label": "main",
+        "create": false,
         "width": 800,
         "height": 600,
         "minWidth": 600,
@@ -12,9 +13,13 @@
         "zoomHotkeysEnabled": true,
         "fullscreen": false,
         "visible": false,
-        "transparent": false,
+        "transparent": true,
         "decorations": true,
         "titleBarStyle": "Overlay",
+        "windowEffects": {
+          "effects": ["underWindowBackground"],
+          "state": "followsWindowActiveState"
+        },
         "trafficLightPosition": {
           "x": 16,
           "y": 26

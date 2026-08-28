@@ -7,6 +7,7 @@ import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
 import {getAppSettingsSnapshot, subscribeAppSettings} from './features/settings/appSettingsStore'
 import {getFormFactorOverride, isDevPreviewBackendEnabled, isTauriRuntime} from './shared/devPreview'
 import {resolveDensity} from './shared/formFactor'
+import {resolveNativeShellBackdrop} from './shared/nativeShellBackdrop'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 import './glassEffect.css'
@@ -74,13 +75,14 @@ function syncShellBackdrop(platformInfo: PlatformInfo, shellAcrylicEnabled: bool
         document.documentElement.removeAttribute('data-glass-effect')
     }
 
-    const enabled = isTauriRuntime()
-        && platformInfo.os === 'windows'
-        && platformInfo.formFactor === 'desktop'
-        && shellAcrylicEnabled
+    const backdrop = resolveNativeShellBackdrop(
+        platformInfo,
+        isTauriRuntime(),
+        shellAcrylicEnabled,
+    )
 
-    if (enabled) {
-        document.documentElement.setAttribute('data-backdrop', 'acrylic')
+    if (backdrop) {
+        document.documentElement.setAttribute('data-backdrop', backdrop)
     } else {
         document.documentElement.removeAttribute('data-backdrop')
     }

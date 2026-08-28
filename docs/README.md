@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-26
+> 更新日期：2026-08-28
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -18,7 +18,7 @@
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
-| [tauri_macos_debug_and_release.md](tauri_macos_debug_and_release.md) | 现行 | 2026-08-17 | macOS 原生窗口、调试、DMG、Developer ID 签名与公证边界。`AGENTS.md` 指定的 macOS 权威手册 |
+| [tauri_macos_debug_and_release.md](tauri_macos_debug_and_release.md) | 现行 | 2026-08-28 | macOS 原生窗口、`underWindowBackground` 材质、透明 WKWebView 私有 API、调试、DMG、Developer ID 签名与公证边界。`AGENTS.md` 指定的 macOS 权威手册 |
 | [tauri_ios_debug_and_release.md](tauri_ios_debug_and_release.md) | 现行 | 2026-08-17 | iOS 环境自检、真机调试、Archive 与 IPA 导出。`AGENTS.md` 指定的 iOS 权威手册。最低支持 iOS 16.2 |
 | [Android.md](Android.md) | 现行 | 2026-05-07 | Android 测试流程与 ADB 约定，包名 `cn.flowcloudai.www` |
 | [publish.md](publish.md) | 现行 | 2026-05-27 | 桌面端 Windows 发布与 Tauri updater 签名、上传流程 |

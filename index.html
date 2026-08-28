@@ -41,8 +41,8 @@
             }
         }
 
-        /* 亚克力毛玻璃模式：启动期也保持 body 透明，避免不透明底色盖住磨砂层 */
-        html[data-backdrop="acrylic"] body {
+        /* 桌面原生毛玻璃模式：启动期也保持 body 透明，避免不透明底色盖住系统材质 */
+        html[data-backdrop] body {
             background: transparent;
         }
 

@@ -7,7 +7,7 @@
  * 本机环境读取，不写入仓库。
  */
 
-import {existsSync} from 'node:fs'
+import {existsSync, readFileSync} from 'node:fs'
 import {spawnSync} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
 import path from 'node:path'
@@ -83,7 +83,33 @@ function doctor() {
   report(rustTargets.ok && rustTargets.output.includes('x86_64-apple-darwin'), 'Rust Intel target', 'x86_64-apple-darwin')
 
   report(existsSync(tauriBinary), '本地 Tauri CLI', tauriBinary)
-  report(existsSync(path.join(repositoryRoot, 'src-tauri', 'tauri.macos.conf.json')), 'macOS 平台配置', 'src-tauri/tauri.macos.conf.json')
+  const sharedConfigPath = path.join(repositoryRoot, 'src-tauri', 'tauri.conf.json')
+  const macosConfigPath = path.join(repositoryRoot, 'src-tauri', 'tauri.macos.conf.json')
+  report(existsSync(macosConfigPath), 'macOS 平台配置', 'src-tauri/tauri.macos.conf.json')
+  try {
+    const sharedConfig = JSON.parse(readFileSync(sharedConfigPath, 'utf8'))
+    const macosConfig = JSON.parse(readFileSync(macosConfigPath, 'utf8'))
+    const mainWindow = macosConfig.app?.windows?.find(window => window.label === 'main')
+    report(
+      sharedConfig.app?.macOSPrivateApi === true,
+      'macOS 透明背景 API',
+      '当前站外 DMG 可用；Mac App Store 不接受该私有 API',
+    )
+    report(mainWindow?.create === false, 'macOS 主窗口单一创建者', 'create=false，由 setup 按合并配置创建')
+    report(mainWindow?.transparent === true, 'macOS 主窗口透明', 'transparent=true')
+    report(
+      mainWindow?.decorations === true && mainWindow?.titleBarStyle === 'Overlay',
+      'macOS 原生标题栏',
+      'decorations=true, titleBarStyle=Overlay',
+    )
+    report(
+      mainWindow?.windowEffects?.effects?.[0] === 'underWindowBackground',
+      'macOS 系统背景材质',
+      'underWindowBackground',
+    )
+  } catch (error) {
+    report(false, 'macOS 窗口配置解析', String(error))
+  }
   report(existsSync(path.join(repositoryRoot, 'src-tauri', 'icons', 'icon.icns')), 'macOS 图标', 'src-tauri/icons/icon.icns')
   report(existsSync(path.join(repositoryRoot, 'src-tauri', 'Info.macos.plist')), 'macOS 文件类型声明', 'src-tauri/Info.macos.plist')
   report(existsSync(path.join(repositoryRoot, 'src-tauri', 'icons', 'fcplug.icns')), '.fcplug 文件图标', 'src-tauri/icons/fcplug.icns')

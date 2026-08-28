@@ -365,38 +365,38 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   亚克力毛玻璃模式
-   仅在 Windows 透明窗 + tauri.conf.json windowEffects:["acrylic"] 生效时启用，
-   由 main.tsx 确认平台后在 <html> 写入 data-backdrop="acrylic"。
+   桌面原生毛玻璃模式
+   Windows 使用 Acrylic，macOS 使用 NSVisualEffectView 的 Under Window Background 材质；
+   由 main.tsx 确认平台后在 <html> 写入对应的 data-backdrop 值。
    思路：外层 chrome（顶栏 / 画布 / 间隙 / 树栏）透出磨砂桌面，
         内容卡片（page-container 与 pe-content 内部）保持实色以保证可读性。
         Win11 下 windowEffects 的 color 字段无效，毛玻璃着色统一由这层 CSS 控制。
    ═══════════════════════════════════════════════════════════════════════════ */
-[data-backdrop="acrylic"] {
+[data-backdrop] {
     /* 外层画布磨砂底色：占比越高越实、越低越透出桌面，可按需调整 */
     --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, transparent);
 }
 
-[data-backdrop="acrylic"] body {
+[data-backdrop] body {
     background: transparent;
 }
 
-[data-backdrop="acrylic"] .app-layout {
+[data-backdrop] .app-layout {
     background: var(--app-shell-bg);
 }
 
-[data-backdrop="acrylic"] .dockable-side-panel--fullscreen {
+[data-backdrop] .dockable-side-panel--fullscreen {
     --dockable-side-panel-fullscreen-bg: transparent;
 }
 
 /* 组件库外层 chrome：右侧图标栏与浮动标签栏底色透明，露出磨砂层。
    .fc-sidebar.side-bar 提至 (0,3,0)，稳压组件库 [data-theme=dark] .fc-sidebar 的同级背景；
    .fc-tab-bar 的背景仅由 --tab-bar-bg 提供（floating 变体不另铺底），改该变量即可。 */
-[data-backdrop="acrylic"] .fc-sidebar.side-bar {
+[data-backdrop] .fc-sidebar.side-bar {
     background: transparent;
 }
 
-[data-backdrop="acrylic"] .fc-tab-bar {
+[data-backdrop] .fc-tab-bar {
     --tab-bar-bg: transparent;
 }
 

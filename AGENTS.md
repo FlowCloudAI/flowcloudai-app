@@ -42,7 +42,7 @@ macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri
 
 ### 文件职责与平台边界
 
-- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；保留 `decorations: true`、`titleBarStyle: Overlay` 和不透明窗口，只把标题栏、交通灯与系统菜单交给 AppKit。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
+- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；必须保留 `create: false`，由 setup 读取合并配置创建唯一的 `main` 窗口，否则会因重复 label 在启动时崩溃。窗口保留 `decorations: true`、`titleBarStyle: Overlay`，并使用 `transparent: true` + `underWindowBackground` 系统材质。透明 WKWebView 依赖共享配置 `app.macOSPrivateApi: true` 与 Cargo 的 `macos-private-api` 特性：当前官网 Developer ID DMG 路线可使用，但 Mac App Store 不接受该私有 API，改变发行渠道前必须先替换实现。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
 - `src-tauri/Info.macos.plist` 与 `src-tauri/icons/fcplug.icns`、`fcworld.icns` 是 macOS 自定义文件类型和 Finder 图标的长期来源；Windows 仍由 `tauri.conf.json` + NSIS `DefaultIcon` 使用 `.ico`。不要给 `fileAssociations` 添加当前 schema 不支持的 `icon` 字段，也不要把 macOS 文件类型配置写入生成的 `.app/Contents/Info.plist`。
 - `.fcworld` / `.fcplug` 的桌面系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列：Windows/Linux 由单实例参数转发，macOS 由 `RunEvent::Opened` 转发，再由 `src/features/desktop-file-open/DesktopFileOpenController.tsx` 串行消费并进入现有导入/安装确认。macOS 禁止在 setup 阶段启用 `tauri-plugin-single-instance`，否则新进程可能在 Launch Services 交付文件 URL 前退出并吞掉 Finder 双击事件；任何平台都不能在原生事件回调中绕过确认直接改数据。
 - `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
@@ -60,7 +60,7 @@ macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri
 
 - `npm run macos:build:local` 生成当前架构、优化后的 `.app`/`.dmg`，使用 ad-hoc 签名，只适合本机安装与功能验收；它不是可公开分发的已公证包。
 - `MACOS_BUILD_NUMBER=... npm run macos:build:release` 默认构建 Apple Silicon + Intel Universal 包，并强制检查 `APPLE_SIGNING_IDENTITY`、Apple 公证凭据和 `TAURI_SIGNING_PRIVATE_KEY`。这些材料只放本机钥匙串、环境变量或 CI secrets，禁止提交；Personal Team 不能替代 Developer ID Application 站外签名。
-- 当前发行边界是官网 DMG，不是 Mac App Store。启用 App Sandbox 前必须专项验证自定义数据目录、插件、文件导入、Keychain 与网络能力，不能直接复用站外包配置。
+- 当前发行边界是官网 DMG，不是 Mac App Store。除 App Sandbox、自定义数据目录、插件、文件导入、Keychain 与网络能力外，透明 WKWebView 使用的 `macos-private-api` 也不符合 Mac App Store 要求；不得直接复用站外包配置。
 - `target/release/bundle/` 是可再生产物，不提交。前端或 Tauri 配置变化会重新嵌入资源并触发 Release 链接，本项目在 Apple Silicon 开发机上可能耗时数分钟，这不是默认的全平台编译。
 - 构建成功不等于适配完成：必须实际运行最终 `.app`，检查模板/数据库/插件初始化、窗口显示、CSP 与未处理拒绝日志，并验证原生交通灯、拖拽/全屏/关闭拦截、Command 快捷键、项目与聊天恢复、插件/文件访问、Keychain、自定义数据目录。DMG 还要做完整性校验；Gatekeeper 与公证状态只能用正式 Developer ID 包验收。
 
@@ -229,4 +229,4 @@ app_main/
   **不要再为键盘问题去改这个 viewport meta**。完整现行方案、兼容边界与验收项见
   `docs/mobile_keyboard_layout.md`。
 
-文档同步时间：2026-08-25 +08:00
+文档同步时间：2026-08-28 +08:00

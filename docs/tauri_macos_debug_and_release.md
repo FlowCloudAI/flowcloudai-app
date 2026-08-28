@@ -1,5 +1,7 @@
 # macOS 调试与发布流程
 
+> 状态：现行 ｜ 日期：2026-08-28
+
 本文记录 `app_main` 的 macOS 原生窗口、调试、打包、签名与公证边界。所有命令都在 Mac 的 `app_main` 根目录执行。
 
 ## 1. 当前架构
@@ -8,7 +10,8 @@
 - `src-tauri/tauri.macos.conf.json` 只在 macOS 构建时覆盖窗口与安装包配置，不影响 Windows、Linux、Android 或 iOS。
 - macOS 使用 AppKit 原生标题栏、交通灯和系统菜单。Windows/Linux 继续使用应用内的自绘窗口按钮。
 - `.fcplug` 与 `.fcworld` 的扩展名关联由共享 `tauri.conf.json` 声明；macOS 专属 UTI 和 Finder 图标由 `src-tauri/Info.macos.plist`、`src-tauri/icons/*.icns` 提供，不复用 Windows 的 NSIS 注册表钩子。
-- macOS 明确关闭透明窗口私有 API，避免给签名、公证和未来发行留下阻碍；界面内部的毛玻璃 CSS 仍可使用。
+- macOS 主窗口保持 `create: false`，由 setup 读取合并后的平台配置创建唯一窗口；同时保留 `decorations: true` 与 `titleBarStyle: Overlay`，启用透明 WKWebView 和 `underWindowBackground` 系统材质。设置中的“毛玻璃效果”会同时控制原生材质与 WebView 半透明着色层。
+- Tauri 的透明 WKWebView 依赖 `app.macOSPrivateApi: true` 和 Cargo `macos-private-api` 特性。该实现使用系统 `NSVisualEffectView` 做模糊，但透明背景入口仍属于 Tauri 标注的私有 API：当前官网 Developer ID DMG 路线接受这一取舍，Mac App Store 不接受。正式 DMG 必须以实际公证结果为准。
 - 当前正式发行目标是官网直接下载的已签名、公证 DMG。Mac App Store 需要 App Sandbox，而现有自定义数据目录、插件和通用文件访问必须先完成单独的沙箱兼容评估。
 
 ## 2. 首次环境检查
@@ -31,12 +34,14 @@ npm run macos:dev
 首轮至少验证：
 
 1. 左上角显示原生红黄绿交通灯，顶部没有重复的 Windows 风格按钮。
-2. 拖动顶栏、最小化、全屏、关闭窗口和未保存内容拦截均正常。
-3. `Command+C/V/A/Q`、系统菜单与文本输入正常。
-4. 项目、词条、聊天、插件、图片/文件导入和日志读取能够工作。
-5. API Key 重启后仍可从 Keychain 读取。
-6. 默认数据目录和桌面端自定义数据目录都能重启恢复；iOS 的移动沙箱路径策略不会覆盖 macOS 设置。
-7. Finder 中 `.fcplug` 与 `.fcworld` 显示各自图标；“打开方式”包含流云AI。图标正确只代表 Launch Services 元数据生效，不代表双击后的导入/安装业务已经接通。
+2. 顶栏、侧栏与内容卡片间隙能透出经过模糊的桌面或后方窗口；不得只看到锐利透明背景，也不得被不透明 WebView 底色完全盖住。窗口失焦时材质应跟随系统切换为非活动状态。
+3. 在设置中关闭“毛玻璃效果”后原生材质与半透明着色层同时消失，重新开启后恢复；不能只切换组件 CSS。
+4. 拖动顶栏、缩放、最小化、全屏、关闭窗口和未保存内容拦截均正常，重点检查透明窗口阴影与圆角是否出现黑边或闪烁。
+5. `Command+C/V/A/Q`、系统菜单与文本输入正常。
+6. 项目、词条、聊天、插件、图片/文件导入和日志读取能够工作。
+7. API Key 重启后仍可从 Keychain 读取。
+8. 默认数据目录和桌面端自定义数据目录都能重启恢复；iOS 的移动沙箱路径策略不会覆盖 macOS 设置。
+9. Finder 中 `.fcplug` 与 `.fcworld` 显示各自图标；“打开方式”包含流云AI。图标正确只代表 Launch Services 元数据生效，不代表双击后的导入/安装业务已经接通。
 
 ## 4. 本地安装包
 
@@ -75,6 +80,8 @@ MACOS_TARGET=aarch64-apple-darwin MACOS_BUILD_NUMBER=42 npm run macos:build:rele
 ```
 
 每次发布必须递增 `MACOS_BUILD_NUMBER`。构建完成后还要在另一台 Mac 或全新用户账户验证 DMG 挂载、拖入 Applications、首次启动、Gatekeeper、公证状态、自动更新和数据恢复。
+
+透明 WKWebView 使用了 Tauri 的 `macos-private-api`。每个正式版本都必须对最终 DMG 执行公证并验证 Gatekeeper；如果 Apple 后续收紧站外公证规则，应回退为不透明窗口或改用不需要透明 WKWebView 的原生容器方案，不能绕过公证发布。
 
 参考：[Tauri macOS 签名与公证](https://v2.tauri.app/distribute/sign/macos/)、[Tauri DMG](https://v2.tauri.app/distribute/dmg/)。
 

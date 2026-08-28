@@ -2405,7 +2405,7 @@ export default function Settings({
                                                 } : null)
                                             }}
                                         />
-                                        <span>启用组件毛玻璃背景；Windows 桌面端同时应用 Acrylic 窗口效果</span>
+                                        <span>启用组件毛玻璃背景；Windows 使用 Acrylic，macOS 使用系统背景材质</span>
                                     </label>
                                 </div>
                                 <ThemeColorPreview

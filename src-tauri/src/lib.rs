@@ -331,9 +331,9 @@ pub fn run() {
 
             let mut settings = AppSettings::load(&settings_path);
             if let Err(error) =
-                apply_shell_acrylic_setting(&app_handle, settings.shell_acrylic_enabled)
+                apply_shell_window_effect_setting(&app_handle, settings.shell_acrylic_enabled)
             {
-                log::warn!("应用窗口 Acrylic 效果失败: {}", error);
+                log::warn!("应用窗口原生材质效果失败: {}", error);
             }
 
             // 在 settings 移入 manage 之前应用平台存储策略。

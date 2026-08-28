@@ -34,7 +34,8 @@ document-pdf-extract = ["dep:pdf-extract"]
 
 [dependencies]
 # ── 核心框架 ──
-tauri = { version = "2", features = [] }
+# macOS 的透明 WKWebView 由该特性开启；配置保持全局一致，但实际窗口材质只在 tauri.macos.conf.json 声明。
+tauri = { version = "2", features = ["macos-private-api"] }
 tokio = { version = "1.50", features = ["rt-multi-thread", "sync", "time", "fs", "process"] }
 futures = "0.3"
 

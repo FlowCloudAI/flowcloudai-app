@@ -6,7 +6,9 @@ use crate::{AiState, ApiKeyStore, AppSettings, SettingsState};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-#[cfg(windows)]
+#[cfg(target_os = "macos")]
+use tauri::window::EffectState;
+#[cfg(any(windows, target_os = "macos"))]
 use tauri::window::{Effect, EffectsBuilder};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
@@ -147,8 +149,10 @@ pub async fn setting_update_settings(
     drop(s);
 
     if old_shell_acrylic_enabled != new_settings.shell_acrylic_enabled {
-        if let Err(error) = apply_shell_acrylic_setting(&app, new_settings.shell_acrylic_enabled) {
-            log::warn!("应用窗口 Acrylic 效果失败: {}", error);
+        if let Err(error) =
+            apply_shell_window_effect_setting(&app, new_settings.shell_acrylic_enabled)
+        {
+            log::warn!("应用窗口原生材质效果失败: {}", error);
         }
     }
 
@@ -194,17 +198,27 @@ pub async fn setting_update_settings(
     Ok(messages.join("；"))
 }
 
-pub(crate) fn apply_shell_acrylic_setting(app: &AppHandle, enabled: bool) -> Result<(), String> {
-    #[cfg(windows)]
+pub(crate) fn apply_shell_window_effect_setting(
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    #[cfg(any(windows, target_os = "macos"))]
     {
         let Some(window) = app.get_webview_window("main") else {
             return Ok(());
         };
 
         if enabled {
-            window
-                .set_effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
-                .map_err(|e| e.to_string())
+            #[cfg(windows)]
+            let effects = EffectsBuilder::new().effect(Effect::Acrylic).build();
+
+            #[cfg(target_os = "macos")]
+            let effects = EffectsBuilder::new()
+                .effect(Effect::UnderWindowBackground)
+                .state(EffectState::FollowsWindowActiveState)
+                .build();
+
+            window.set_effects(effects).map_err(|e| e.to_string())
         } else {
             window
                 .set_effects(Option::<tauri::utils::config::WindowEffectsConfig>::None)
@@ -212,7 +226,7 @@ pub(crate) fn apply_shell_acrylic_setting(app: &AppHandle, enabled: bool) -> Res
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = (app, enabled);
         Ok(())
