@@ -415,7 +415,12 @@ export function MobileAnchoredActionMenu({
     className,
     ...menuProps
 }: MobileAnchoredActionMenuProps) {
-    const menuClassName = [className, items.length === 1 ? 'mobile-anchored-menu--compact' : '']
+    // 勾选列对 items 驱动的菜单永远填不上，整菜单收掉；见 CSS 里 --no-check 的说明。
+    const menuClassName = [
+        className,
+        'mobile-anchored-menu--no-check',
+        items.length === 1 ? 'mobile-anchored-menu--compact' : '',
+    ]
         .filter(Boolean)
         .join(' ')
     return (

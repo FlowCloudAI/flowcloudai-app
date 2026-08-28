@@ -337,7 +337,20 @@
     display: grid;
     top: var(--mobile-anchored-menu-top);
     right: var(--mobile-anchored-menu-right);
-    width: min(15.75rem, calc(100% - 2rem));
+    /*
+     * 宽度按内容取，不写死。
+     *
+     * 原来固定 15.75rem（252px），而「新建子分类 / 重命名 / 删除分类」这种短菜单实测
+     * 只需要 153px，多出来的近百像素全是右侧空白；菜单又是贴着锚点弹出的，虚宽会盖住
+     * 更多本来该看得见的内容。
+     *
+     * max-width 保持原来那个数：内容再长也不会比从前宽，只会更窄，所以带描述的菜单
+     * （AI 模型、灵感、项目主页）观感不变。min-width 防止「删除」这种两字菜单缩成细带。
+     * 文字本来就 nowrap + ellipsis，max-content 不会引入换行差异。
+     */
+    width: max-content;
+    min-width: 7rem;
+    max-width: min(15.75rem, calc(100% - 2rem));
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-top) - 1rem));
     box-sizing: border-box;
     padding: var(--mobile-gap-item) 0;
@@ -349,7 +362,24 @@
 }
 
 .mobile-anchored-menu--compact {
-    width: min(13.25rem, calc(100% - 2rem));
+    max-width: min(13.25rem, calc(100% - 2rem));
+}
+
+/*
+ * items 驱动的动作菜单没有勾选态——MobileAnchoredMenuItem 里没有 checked 字段，
+ * 这一列永远是空的，白占 1.35rem。自定义 children 的菜单（AI 模型、首页排序）
+ * 自己往这一列放勾，所以只对前者收，且按菜单整体收：行级 grid 是各自独立的，
+ * 让空 span 逐行塌缩会使带图标与不带图标的行在同一个菜单里对不齐。
+ *
+ * 图标列不收——它是 items API 的真实槽位，另外三个菜单在用；留着还能让所有动作菜单
+ * 的文字起始位置一致。
+ */
+.mobile-anchored-menu--no-check .mobile-anchored-menu__row {
+    grid-template-columns: 1.9rem minmax(0, 1fr);
+}
+
+.mobile-anchored-menu--no-check .mobile-anchored-menu__check {
+    display: none;
 }
 
 /*
