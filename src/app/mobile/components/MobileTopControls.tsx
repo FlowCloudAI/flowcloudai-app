@@ -11,6 +11,7 @@ import {
     useRef,
     useState,
 } from 'react'
+import {createPortal} from 'react-dom'
 import {pushOverlay, removeOverlay} from '../../../shared/ui/overlay/overlayStack'
 import './MobileTopControls.css'
 
@@ -166,6 +167,18 @@ export interface MobileAnchoredMenuProps {
     placement?: 'bottom' | 'top'
     rightBoundaryRef?: RefObject<HTMLElement | null>
     rightBoundaryGap?: number
+    /*
+     * 把浮层挂到 document.body 再渲染。
+     *
+     * 锚点坐标取自 getBoundingClientRect，是视口坐标；浮层靠 position: fixed 消费它们。
+     * 一旦浮层的某个祖先带 transform / will-change: transform（侧边抽屉面板就是），
+     * 那个祖先会成为 fixed 的包含块，inset: 0 缩成祖先的盒子，视口坐标随即失真——
+     * 抽屉里量到的 right 会把菜单往左推一个抽屉宽度，且菜单被限制在抽屉宽度内。
+     *
+     * 默认不开：现有调用点都挂在整屏的页面层上，包含块本来就等于视口，开了只是白搬 DOM。
+     * --mobile-* token 声明在 :root 上，搬到 body 下不会丢样式。
+     */
+    portal?: boolean
 }
 
 export function MobileAnchoredMenu({
@@ -180,6 +193,7 @@ export function MobileAnchoredMenu({
     placement = 'bottom',
     rightBoundaryRef,
     rightBoundaryGap = 0,
+    portal = false,
 }: MobileAnchoredMenuProps) {
     const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; borderColor: string; rightBoundary: number | null; placement: 'bottom' | 'top'} | null>(null)
     const [rendered, setRendered] = useState(open)
@@ -283,7 +297,7 @@ export function MobileAnchoredMenu({
      */
     if (open && !anchorReady) return null
 
-    return (
+    const layer = (
         <div
             className={`mobile-anchored-menu-layer${closing ? ' mobile-anchored-menu-layer--closing' : ''}`}
             role="presentation"
@@ -317,6 +331,8 @@ export function MobileAnchoredMenu({
             </div>
         </div>
     )
+
+    return portal ? createPortal(layer, document.body) : layer
 }
 
 export interface MobileAnchoredMenuItem {

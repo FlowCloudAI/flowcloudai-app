@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     type CategoryTreeNode,
     type DropPosition,
@@ -72,6 +72,8 @@ export default function MobileCategoryDrawer({
     const [searchText, setSearchText] = useState('')
     const [busy, setBusy] = useState(false)
     const [menuTarget, setMenuTarget] = useState<Category | null>(null)
+    const treeHostRef = useRef<HTMLDivElement | null>(null)
+    const menuAnchorRef = useRef<HTMLElement | null>(null)
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
     const [moveTarget, setMoveTarget] = useState<Category | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
@@ -397,13 +399,30 @@ export default function MobileCategoryDrawer({
     /* 搜索态下看到的是过滤后的局部顺序，此时排序结果没有意义；写库期间同样不接受新拖拽。 */
     const canDragCategory = useCallback(() => !busy && !normalizedSearch, [busy, normalizedSearch])
 
+    /*
+     * 「⋯」的菜单要贴着被点的那一行展开，所以得先拿到行的 DOM。
+     * Tree 的操作项 onClick 不带事件，行上也没有身份属性，于是在 renderTitle 里给标题打一个
+     * key，再往上找 .fc-tree__item。行是虚拟滚动出来的、会被回收，不能长期持有，每次点开时现查。
+     */
+    const renderCategoryTitle = useCallback((node: CategoryTreeNode) => (
+        <span data-fc-category-key={node.key}>{node.title}</span>
+    ), [])
+
+    const resolveCategoryRow = useCallback((key: string): HTMLElement | null => {
+        const marker = treeHostRef.current?.querySelector(`[data-fc-category-key="${CSS.escape(key)}"]`)
+        return (marker?.closest('.fc-tree__item') as HTMLElement | null) ?? null
+    }, [])
+
     const getCategoryActions = useCallback((node: CategoryTreeNode): TreeActionItem[] => [{
         key: 'manage',
         label: '管理',
         title: `管理分类 ${node.title}`,
         icon: <MobileMoreIcon/>,
-        onClick: () => setMenuTarget(categoryById.get(node.key) ?? null),
-    }], [categoryById])
+        onClick: () => {
+            menuAnchorRef.current = resolveCategoryRow(node.key)
+            setMenuTarget(categoryById.get(node.key) ?? null)
+        },
+    }], [categoryById, resolveCategoryRow])
 
     const handleTreeSelect = useCallback((key: string) => {
         const category = categoryById.get(key)
@@ -471,7 +490,7 @@ export default function MobileCategoryDrawer({
 
             </div>
 
-            <div className="mobile-category-drawer__tree">
+            <div className="mobile-category-drawer__tree" ref={treeHostRef}>
                 <Tree
                     treeData={treeData}
                     selectedKey={selected.kind === 'category' ? selected.categoryId : ''}
@@ -482,6 +501,7 @@ export default function MobileCategoryDrawer({
                     onDragStateChange={onDragStateChange}
                     canDrag={canDragCategory}
                     getNodeActions={getCategoryActions}
+                    renderTitle={renderCategoryTitle}
                     actionDisplayMode="inline"
                     dragActivation="long-press"
                     indentSize={indentSize}
@@ -496,6 +516,8 @@ export default function MobileCategoryDrawer({
             <MobileCategoryDrawerDialogs
                 busy={busy}
                 menuTarget={menuTarget}
+                menuAnchorRef={menuAnchorRef}
+                menuContainerRef={treeHostRef}
                 onCloseMenu={() => setMenuTarget(null)}
                 onOpenCategory={category => onSelect({kind: 'category', categoryId: category.id}, category.name)}
                 onCreateChild={category => setRenameTarget({mode: 'create', parentId: category.id})}

@@ -1,12 +1,17 @@
-import type {CSSProperties} from 'react'
+import type {CSSProperties, RefObject} from 'react'
 import {Button} from 'flowcloudai-ui'
 import type {Category} from '../../../api'
-import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {MobileAnchoredActionMenu} from './MobileTopControls'
 import type {CategoryRow, DeleteMode, SiblingDirection} from './mobileCategoryTree'
 
 interface Props {
     busy: boolean
     menuTarget: Category | null
+    /** 菜单要贴合的那一行；由抽屉在点开「⋯」时按分类 id 现查。 */
+    menuAnchorRef: RefObject<HTMLElement | null>
+    /** 量视口尺寸时的兜底容器，取树的滚动宿主即可。 */
+    menuContainerRef: RefObject<HTMLElement | null>
     onCloseMenu: () => void
     onOpenCategory: (category: Category) => void
     onCreateChild: (category: Category) => void
@@ -36,7 +41,21 @@ interface Props {
 export default function MobileCategoryDrawerDialogs(props: Props) {
     const {busy, menuTarget, moveTarget, moveCandidates, onCloseMove, onMove, deleteTarget, deleteImpact, onCloseDelete, onDelete} = props
     return <>
-        <ActionMenu open={!!menuTarget} onClose={props.onCloseMenu} title={menuTarget?.name} items={menuTarget ? [
+        {/*
+          * 锚定到被点的那一行，而不是居中浮层：菜单的上边缘（放不下时改为下边缘）与该行对齐，
+          * 由 MobileAnchoredMenu 按剩余高度自行翻面。
+          * portal 是必须的——抽屉面板带 will-change: transform，会成为 position: fixed 的
+          * 包含块，不搬出去菜单会整体左移一个抽屉宽度并被裁在抽屉内。
+          */}
+        <MobileAnchoredActionMenu
+            open={!!menuTarget}
+            onClose={props.onCloseMenu}
+            anchorRef={props.menuAnchorRef}
+            containerRef={props.menuContainerRef}
+            ariaLabel={menuTarget ? `分类「${menuTarget.name}」的操作` : '分类操作'}
+            placement="bottom"
+            portal
+            items={menuTarget ? [
             {key: 'open', label: '浏览词条', onSelect: () => props.onOpenCategory(menuTarget)},
             {key: 'create-child', label: '新建子分类', onSelect: () => props.onCreateChild(menuTarget)},
             {key: 'rename', label: '重命名', onSelect: () => props.onRenameCategory(menuTarget)},
@@ -44,7 +63,8 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
             {key: 'move-up', label: '上移一位', disabled: !props.canMoveUp || busy, onSelect: () => props.onMoveSibling(menuTarget, 'up')},
             {key: 'move-down', label: '下移一位', disabled: !props.canMoveDown || busy, onSelect: () => props.onMoveSibling(menuTarget, 'down')},
             {key: 'delete', label: '删除分类', danger: true, onSelect: () => props.onChooseDelete(menuTarget)},
-        ] : []}/>
+        ] : []}
+        />
         <RenameDialog open={props.renameOpen} title={props.renameTitle} label={props.renameLabel} initialValue={props.renameInitialValue} placeholder="分类名称" confirmText={props.renameConfirmText} busy={busy} onClose={props.onCloseRename} onConfirm={props.onConfirmRename}/>
         <FloatingPanel open={!!moveTarget} onClose={onCloseMove} dismissible={!busy} title="移动分类" ariaLabel="移动分类" className="mobile-category-drawer-dialog">
             <div className="mobile-category-drawer-dialog__summary">将「{moveTarget?.name ?? ''}」移动到新的父分类。</div>
