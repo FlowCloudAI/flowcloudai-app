@@ -53,7 +53,6 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
             containerRef={props.menuContainerRef}
             ariaLabel={menuTarget ? `分类「${menuTarget.name}」的操作` : '分类操作'}
             placement="bottom"
-            align="left"
             portal
             clearAnchor
             className="mobile-category-drawer-menu"

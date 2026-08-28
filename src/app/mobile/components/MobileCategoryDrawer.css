@@ -223,3 +223,17 @@
 .mobile-anchored-menu.mobile-category-drawer-menu .mobile-anchored-menu__text > span {
     font-size: var(--mobile-text-body-sm);
 }
+
+/*
+ * 分类菜单的行高取触控下限的一半（48 → 24px）。
+ *
+ * 纵向内边距必须一起去掉：文字盒 18.8px 加上下各 8px 已经 34.8px，只改 min-height 压不下来。
+ * 去掉之后行高由 min-height 决定，文字仍靠 align-items: center 居中。
+ *
+ * 这个值明显低于 --mobile-tap-min 的触控目标下限，相邻项（下移一位 / 删除分类）误触概率
+ * 会上升——是按明确要求做的取舍，不是疏漏。作用域限本菜单，其他锚点菜单仍是 48px。
+ */
+.mobile-anchored-menu.mobile-category-drawer-menu .mobile-anchored-menu__row {
+    min-height: calc(var(--mobile-tap-min) / 2);
+    padding-block: 0;
+}
