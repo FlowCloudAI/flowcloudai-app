@@ -66,3 +66,42 @@ test('侧边抽屉逐帧位移绕过 React state，只更新三个直接绘制�
     assert.doesNotMatch(sideDrawerGestureSource, /setOffset\(/)
     assert.doesNotMatch(mobileAppSource, /sideDrawerSurfaceOffset/)
 })
+
+test('抽屉吸附阶段保留运动几何，圆角不与 transform 收尾同帧拆除', () => {
+    const surfaceRule = mobileAppCss.match(/^\.mobile-app-side-drawer-shell__surface \{[\s\S]*?\n\}/m)?.[0] ?? ''
+    assert.match(surfaceRule, /transition:\s*transform var\(--mobile-duration-base\) var\(--mobile-ease-standard\);/)
+    // 注释里可以提 border-radius，声明里不行：它一旦回到 transition 列表就会和 transform 同批收尾。
+    assert.doesNotMatch(surfaceRule, /transition:[^;]*border-radius/)
+    assert.doesNotMatch(surfaceRule, /\n\s*border-radius\s*:/)
+
+    const motionRule = mobileAppCss.match(
+        /^\.mobile-app-side-drawer-shell\.is-drawer-dragging \.mobile-app-side-drawer-shell__surface,[\s\S]*?\n\}/m,
+    )?.[0] ?? ''
+    assert.match(motionRule, /\.is-drawer-settling \.mobile-app-side-drawer-shell__surface/)
+    assert.match(motionRule, /\.is-open \.mobile-app-side-drawer-shell__surface/)
+    assert.match(motionRule, /border-left-color:\s*var\(--fc-color-border\)/)
+    assert.match(motionRule, /border-radius:\s*var\(--mobile-radius-sheet\)/)
+
+    assert.match(mobileAppSource, /sideDrawerSettling \? ' is-drawer-settling'/)
+    assert.match(mobileAppSource, /onTransitionEnd=\{handleSurfaceTransitionEnd\}/)
+    assert.match(
+        mobileAppSource,
+        /event\.propertyName !== 'transform'[\s\S]*?event\.target !== event\.currentTarget[\s\S]*?completeDrawerSettle\(\)/,
+    )
+    // 吸附态只作用于外壳 surface，不得渗到页面层，否则又变回泛化拖动态。
+    assert.doesNotMatch(mobileAppCss, /is-drawer-settling[^{]*\.mobile-page-transition-host__layer/)
+    assert.doesNotMatch(mobileAppCss, /is-drawer-settling[^{]*\.mobile-app__tab-view/)
+})
+
+test('吸附结束靠 transitionend 加静止帧，并对丢事件与 0ms 动效兜底', () => {
+    assert.match(sideDrawerGestureSource, /const \[drawerSettling, setDrawerSettling\] = useState\(false\)/)
+    assert.match(sideDrawerGestureSource, /if \(hadMotion\) beginDrawerSettle\(\)/)
+    // transitionend 之后再空转两帧，保证静止画面已经真正绘制过才拆几何。
+    assert.match(
+        sideDrawerGestureSource,
+        /drawerSettleFrameRef\.current = window\.requestAnimationFrame\(\(\) => \{\s*drawerSettleFrameRef\.current = window\.requestAnimationFrame\(/,
+    )
+    // transform 终点与起点相同、WebView 丢事件、reduced-motion 压成 0ms 时都收不到 transitionend。
+    assert.match(sideDrawerGestureSource, /drawerSettleTimerRef\.current = window\.setTimeout/)
+    assert.match(sideDrawerGestureSource, /getMobileShellTransitionDurationMs\(\) \+ 1\d\d\)/)
+})

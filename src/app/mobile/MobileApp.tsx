@@ -247,6 +247,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const {
         open: sideDrawerOpen,
         drawerDragging: sideDrawerDragging,
+        drawerSettling: sideDrawerSettling,
+        completeDrawerSettle,
         edgeBackTransitionDisabled,
         edgeBackOffset,
         edgeBackProgress,
@@ -292,6 +294,15 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const activeEdgeBackOffset = edgeBackPhase !== 'idle'
         ? edgeBackOffset
         : androidPredictiveBack.offset
+    /*
+     * surface 自己的 transform 吸附动画结束才允许拆运动几何。只认本节点的 transform：
+     * 子树里任意按钮的 transition 都会冒泡到这里，误接会让圆角提前塌回直角。
+     */
+    const handleSurfaceTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
+        if (event.propertyName !== 'transform') return
+        if (event.target !== event.currentTarget) return
+        completeDrawerSettle()
+    }, [completeDrawerSettle])
     const handleEdgeBackTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
         if (event.propertyName !== 'transform') return
         if (!(event.target instanceof HTMLElement)) return
@@ -615,7 +626,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         <div ref={mobileAppRef} className="mobile-app">
             <div
                 ref={sideDrawerShellRef}
-                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${edgeBackOrigin ? ' is-edge-back-prepared' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${sideDrawerSettling ? ' is-drawer-settling' : ''}${edgeBackOrigin ? ' is-edge-back-prepared' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-edge-back-shift': `${activeEdgeBackOffset}px`,
@@ -655,6 +666,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     ref={sideDrawerSurfaceRef}
                     className="mobile-app-side-drawer-shell__surface"
                     {...sideDrawerPointerHandlers}
+                    onTransitionEnd={handleSurfaceTransitionEnd}
                 >
                     <button
                         ref={sideDrawerScrimRef}

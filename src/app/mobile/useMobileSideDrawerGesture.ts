@@ -76,6 +76,9 @@ interface MobileSideDrawerDragRuntime {
 export interface MobileSideDrawerGesture {
     open: boolean
     drawerDragging: boolean
+    /** 吸附动画进行中：surface 已停止跟手，但运动几何还不能拆。 */
+    drawerSettling: boolean
+    completeDrawerSettle: () => void
     edgeBackTransitionDisabled: boolean
     edgeBackOffset: number
     edgeBackProgress: number
@@ -188,7 +191,7 @@ function getTagName(target: EventTarget | null): string {
     return target instanceof HTMLElement ? target.tagName : 'unknown'
 }
 
-function getEdgeBackTransitionDurationMs(): number {
+function getMobileShellTransitionDurationMs(): number {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0
     const value = getComputedStyle(document.documentElement)
         .getPropertyValue('--mobile-duration-base')
@@ -220,6 +223,7 @@ export function useMobileSideDrawerGesture({
 
     const [open, setOpen] = useState(false)
     const [drawerDragging, setDrawerDragging] = useState(false)
+    const [drawerSettling, setDrawerSettling] = useState(false)
     const [edgeBackTransitionDisabled, setEdgeBackTransitionDisabled] = useState(false)
     const [edgeBackOffset, setEdgeBackOffset] = useState(0)
     const [edgeBackProgress, setEdgeBackProgress] = useState(0)
@@ -241,6 +245,14 @@ export function useMobileSideDrawerGesture({
     const edgeBackPreparedRef = useRef(false)
     const edgeBackGestureActiveRef = useRef(false)
     const drawerVisualFrameRef = useRef<number | null>(null)
+    // 逻辑 open 立刻提交，运动几何（左边框 + 圆角裁剪）却要活到 surface 真正停稳之后，
+    // 因此吸附阶段需要一组独立于 open/dragging 的计时器与代次号。
+    const drawerSettleAttemptRef = useRef(0)
+    const drawerSettleTimerRef = useRef<number | null>(null)
+    const drawerSettleFrameRef = useRef<number | null>(null)
+    const drawerSettlePendingRef = useRef(false)
+    // setOpen 只在 settleDrawer 里发生，用 ref 同步一份即时值，判断这一次结算是否真的有位移。
+    const openRef = useRef(false)
     const pendingDrawerVisualRef = useRef<{
         drawerOffset: number
         surfaceOffset: number
@@ -277,6 +289,56 @@ export function useMobileSideDrawerGesture({
         }
         pendingDrawerVisualRef.current = null
     }, [])
+
+    const clearDrawerSettleTimers = useCallback(() => {
+        if (drawerSettleTimerRef.current !== null) {
+            window.clearTimeout(drawerSettleTimerRef.current)
+            drawerSettleTimerRef.current = null
+        }
+        if (drawerSettleFrameRef.current !== null) {
+            window.cancelAnimationFrame(drawerSettleFrameRef.current)
+            drawerSettleFrameRef.current = null
+        }
+    }, [])
+
+    /*
+     * 拆掉运动几何前先空转两帧。transitionend 派发的那一帧合成器还在收尾 transform 动画，
+     * 圆角裁剪节点若在同帧塌成直角，整个 surface 的渲染通道会连同内部 backdrop-filter
+     * 一起重建——那正是关闭到位瞬间整页闪一帧主题底色的成因。等到至少一帧静止画面画完再拆。
+     */
+    const finishDrawerSettle = useCallback((attemptId: number) => {
+        clearDrawerSettleTimers()
+        drawerSettlePendingRef.current = false
+        drawerSettleFrameRef.current = window.requestAnimationFrame(() => {
+            drawerSettleFrameRef.current = window.requestAnimationFrame(() => {
+                drawerSettleFrameRef.current = null
+                if (attemptId !== drawerSettleAttemptRef.current) return
+                setDrawerSettling(false)
+            })
+        })
+    }, [clearDrawerSettleTimers])
+
+    const beginDrawerSettle = useCallback(() => {
+        clearDrawerSettleTimers()
+        const attemptId = drawerSettleAttemptRef.current + 1
+        drawerSettleAttemptRef.current = attemptId
+        drawerSettlePendingRef.current = true
+        setDrawerSettling(true)
+        // transitionend 是主路径；transform 终点与起点相同、WebView 丢事件、
+        // 或减少动态效果把 --mobile-duration-base 压成 0ms 时都收不到，必须有定时兜底。
+        // 余量比边缘返回大：终点 transform 要等一次 rAF 才写下去，动画起点本就晚一帧，
+        // 兜底早于 transitionend 触发反而会把几何拆在动画尾帧上，正是本次要修的那一帧。
+        drawerSettleTimerRef.current = window.setTimeout(() => {
+            drawerSettleTimerRef.current = null
+            if (attemptId !== drawerSettleAttemptRef.current) return
+            finishDrawerSettle(attemptId)
+        }, getMobileShellTransitionDurationMs() + 120)
+    }, [clearDrawerSettleTimers, finishDrawerSettle])
+
+    const completeDrawerSettle = useCallback(() => {
+        if (!drawerSettlePendingRef.current) return
+        finishDrawerSettle(drawerSettleAttemptRef.current)
+    }, [finishDrawerSettle])
 
     const clearSuppressClickTimer = useCallback(() => {
         if (suppressClickTimerRef.current === null) return
@@ -333,7 +395,7 @@ export function useMobileSideDrawerGesture({
         setEdgeBackProgress(0)
         setEdgeBackPhase('cancelling')
         // transitionend 是主路径；兜底防止 WebView 丢事件或系统启用减少动态效果。
-        const fallbackDuration = getEdgeBackTransitionDurationMs() + 80
+        const fallbackDuration = getMobileShellTransitionDurationMs() + 80
         edgeBackSettleTimerRef.current = window.setTimeout(() => {
             edgeBackSettleTimerRef.current = null
             if (edgeBackSettlePhaseRef.current !== 'cancelling') return
@@ -375,11 +437,15 @@ export function useMobileSideDrawerGesture({
     }, [])
 
     const settleDrawer = useCallback((nextOpen: boolean) => {
+        // 关闭页面时的空结算（本来就是关的、也没拖过）不该进吸附阶段，否则每次挂载都白排一次定时器。
+        const hadMotion = openRef.current || nextOpen || dragRuntimeRef.current?.started === true
+        openRef.current = nextOpen
         resetPointerTracking()
+        if (hadMotion) beginDrawerSettle()
         setOpen(nextOpen)
         // 等 React 移除拖动态后再写终点，让现有 CSS transition 接管吸附动画。
         scheduleDrawerVisual(nextOpen ? width : 0)
-    }, [resetPointerTracking, scheduleDrawerVisual, width])
+    }, [beginDrawerSettle, resetPointerTracking, scheduleDrawerVisual, width])
 
     const closeDrawer = useCallback(() => {
         settleDrawer(false)
@@ -428,8 +494,10 @@ export function useMobileSideDrawerGesture({
             clearSuppressClickTimer()
             clearEdgeBackSettle()
             clearDrawerVisualFrame()
+            drawerSettleAttemptRef.current += 1
+            clearDrawerSettleTimers()
         }
-    }, [clearDrawerVisualFrame, clearEdgeBackSettle, clearSuppressClickTimer])
+    }, [clearDrawerSettleTimers, clearDrawerVisualFrame, clearEdgeBackSettle, clearSuppressClickTimer])
 
     const bindDrag = useDrag(({
         cancel,
@@ -601,7 +669,7 @@ export function useMobileSideDrawerGesture({
                     return
                 }
 
-                const completionDuration = getEdgeBackTransitionDurationMs()
+                const completionDuration = getMobileShellTransitionDurationMs()
                 edgeBackSettlePhaseRef.current = 'committing'
                 setEdgeBackPhase('committing')
                 setEdgeBackProgress(1)
@@ -700,6 +768,8 @@ export function useMobileSideDrawerGesture({
     return {
         open,
         drawerDragging,
+        drawerSettling,
+        completeDrawerSettle,
         edgeBackTransitionDisabled,
         edgeBackOffset,
         edgeBackProgress,

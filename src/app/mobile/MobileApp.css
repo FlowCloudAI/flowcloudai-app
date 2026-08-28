@@ -96,10 +96,13 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     background: var(--fc-color-bg);
     border-left: solid 1px transparent;
     transform: translate3d(0, 0, 0);
-    transition:
-        transform var(--mobile-duration-base) var(--mobile-ease-standard),
-        border-radius var(--mobile-duration-base) var(--mobile-ease-standard),
-        box-shadow var(--mobile-duration-base) var(--mobile-ease-standard);
+    /*
+     * 只过渡 transform。border-radius 曾经一起过渡，于是圆角在关闭动画的最后几帧塌成
+     * 直角——圆角裁剪节点消失会让整个 surface（含内部 backdrop-filter 顶栏/底栏）的渲染
+     * 通道在合成器还在收尾 transform 的同一帧重建，真机表现为整页闪一帧主题底色。
+     * 现在圆角是离散状态，只在 surface 静止的那一帧切换，见下方 is-drawer-settling。
+     */
+    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
     will-change: transform;
     touch-action: pan-y;
 }
@@ -117,7 +120,13 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     transition: none;
 }
 
+/*
+ * 抽屉运动几何：跟手、吸附动画与展开态共用一份，中途不得变化。
+ * is-drawer-settling 一直保留到 surface 的 transform transitionend 之后再空转两帧，
+ * 逻辑上的 open=false 提前提交也不会把圆角裁剪和左边框提前拆掉。
+ */
 .mobile-app-side-drawer-shell.is-drawer-dragging .mobile-app-side-drawer-shell__surface,
+.mobile-app-side-drawer-shell.is-drawer-settling .mobile-app-side-drawer-shell__surface,
 .mobile-app-side-drawer-shell.is-open .mobile-app-side-drawer-shell__surface {
     border-left-color: var(--fc-color-border);
     border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
