@@ -9,6 +9,7 @@ const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), '
 const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const transitionHostSource = readFileSync(new URL('./MobilePageTransitionHost.tsx', import.meta.url), 'utf8')
 const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
+const glassEffectCss = readFileSync(new URL('../../glassEffect.css', import.meta.url), 'utf8')
 
 test('双层转场在空栈中只保留根页', () => {
     assert.deepEqual(getMobilePageTransitionLayers([], 'home-root'), [
@@ -106,19 +107,26 @@ test('吸附结束靠 transitionend 加静止帧，并对丢事件与 0ms 动效
     assert.match(sideDrawerGestureSource, /getMobileShellTransitionDurationMs\(\) \+ 1\d\d\)/)
 })
 
-test('运动期间降级 surface 内毛玻璃，且恢复模糊与拆圆角不同帧', () => {
-    const glassRule = mobileAppCss.match(
-        /^\.mobile-app-side-drawer-shell\.is-drawer-dragging,\n\.mobile-app-side-drawer-shell\.is-drawer-moving \{[\s\S]*?\n\}/m,
+test('运动期间连滤镜带半透明一起降级，复用关闭态那份清单', () => {
+    const degradeRule = glassEffectCss.match(
+        /^:root:not\(\[data-glass-effect="enabled"\]\),[\s\S]*?\n\}/m,
     )?.[0] ?? ''
-    for (const token of [
-        '--mobile-nav-glass-filter',
-        '--mobile-topbar-bg-filter',
-        '--mobile-topbar-pill-filter',
-        '--mobile-glass-filter',
-        '--mobile-glass-filter-soft',
-    ]) assert.match(glassRule, new RegExp(`${token}:\\s*none`))
-    // 只降滤镜档：底色/渐变/边框/阴影不在运动态里改，静止态参数必须原样。
-    assert.doesNotMatch(glassRule, /background|border|box-shadow|--mobile-nav-surface|--mobile-surface-/)
+    // 两个触发点必须共用同一条规则，否则新增玻璃面会漏登记其中一个。
+    assert.match(degradeRule, /\.mobile-app-side-drawer-shell\.is-drawer-dragging,/)
+    assert.match(degradeRule, /\.mobile-app-side-drawer-shell\.is-drawer-moving \{/)
+    // 滤镜档
+    for (const token of ['--mobile-glass-filter', '--mobile-glass-filter-soft',
+        '--mobile-nav-glass-filter', '--mobile-topbar-bg-filter', '--mobile-topbar-pill-filter']) {
+        assert.match(degradeRule, new RegExp(`${token}:\\s*none`))
+    }
+    // 底色档：只摘滤镜会让背景从模糊跳成清晰，半透明必须同时换成不透明。
+    for (const token of ['--mobile-surface-glass', '--mobile-surface-panel', '--mobile-surface-dialog',
+        '--mobile-surface-control', '--mobile-surface-menu', '--mobile-surface-translucent',
+        '--mobile-surface-translucent-strong', '--mobile-nav-surface', '--mobile-topbar-pill-background']) {
+        assert.match(degradeRule, new RegExp(`${token}:\\s*var\\(--fc-color-`))
+    }
+    // 降级值只有这一处，MobileApp.css 不得再写一份平行清单。
+    assert.doesNotMatch(mobileAppCss, /--mobile-nav-glass-filter\s*:/)
 
     assert.match(mobileAppSource, /sideDrawerMoving \? ' is-drawer-moving'/)
     // is-drawer-moving 必须早于 is-drawer-settling 结束，否则重建与拆除又落回同一帧。

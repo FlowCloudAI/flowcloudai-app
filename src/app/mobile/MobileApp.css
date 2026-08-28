@@ -134,28 +134,18 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
 }
 
 /*
- * 运动期间降级 surface 内的毛玻璃。底栏 24px、顶栏与胶囊、页面里的标签/模型胶囊/输入卡
- * 都是 backdrop-filter 元素，而它们全都住在会整体位移的 surface 里：transform 一变，
- * 它们相对 backdrop root 的位置就变，Chromium 必须每帧重新取样背景、重跑模糊、
- * 重建各自的离屏通道；静止时这些通道结果不变，几乎免费。
+ * 运动期间的毛玻璃降级值写在 src/glassEffect.css：那里是玻璃面的唯一登记处，
+ * is-drawer-dragging / is-drawer-moving 直接复用「设置里关掉毛玻璃」那一份清单，
+ * 滤镜与半透明底色一起降，避免只摘滤镜导致背景从模糊跳成清晰。
  *
- * 真机实测（Xiaomi / Android 16 / 120Hz 面板 / DPR 3.25，纯合成器动画，帧预算 8.31ms）：
- * GPU p50 6.11→2.14ms、Issue→Swap p90 9.07→6.98ms、整帧 p50 17.52→11.64ms。
+ * 真机实测（Xiaomi / Android 16 / 120Hz 面板 / DPR 3.25，纯合成器动画，帧预算 8.31ms，
+ * 3 组配对 A/B）：GPU p50 6.02→2.36ms、p90 9.16→3.11ms、整帧 p50 21.2→13.2ms。
  * 同批测过的遮罩渐变与 will-change 在噪声内，不要顺手一起改。
  *
- * 只降滤镜档：半透明底色、渐变、边框与阴影保留，静止态参数完全不动。
- * is-drawer-moving 比 is-drawer-settling 早一步结束（transitionend 当帧），
- * 于是「恢复模糊」（重建通道）与「拆圆角」（拆通道）落在两个不同的静止帧上——
- * 两者同帧正是 2026-08-28 那次关闭白闪的成因。变量清单与消费方见 src/glassEffect.css。
+ * is-drawer-moving 比 is-drawer-settling 早一步结束（transitionend 当帧），于是
+ * 「恢复玻璃」（重建离屏通道）与「拆圆角」（拆通道）落在两个不同的静止帧上；
+ * 两者同帧正是 0255eff 修掉的那次关闭白闪的成因。
  */
-.mobile-app-side-drawer-shell.is-drawer-dragging,
-.mobile-app-side-drawer-shell.is-drawer-moving {
-    --mobile-nav-glass-filter: none;
-    --mobile-topbar-bg-filter: none;
-    --mobile-topbar-pill-filter: none;
-    --mobile-glass-filter: none;
-    --mobile-glass-filter-soft: none;
-}
 
 .mobile-app-side-drawer-shell__surface-close {
     position: absolute;
