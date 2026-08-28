@@ -76,6 +76,11 @@ interface MobileSideDrawerDragRuntime {
 export interface MobileSideDrawerGesture {
     open: boolean
     drawerDragging: boolean
+    /**
+     * surface 的 transform 正在变化。比 drawerSettling 早一步结束（transitionend 当帧），
+     * 让「恢复毛玻璃」和「拆运动几何」落在两个不同的静止帧上。
+     */
+    drawerMoving: boolean
     /** 吸附动画进行中：surface 已停止跟手，但运动几何还不能拆。 */
     drawerSettling: boolean
     completeDrawerSettle: () => void
@@ -223,6 +228,7 @@ export function useMobileSideDrawerGesture({
 
     const [open, setOpen] = useState(false)
     const [drawerDragging, setDrawerDragging] = useState(false)
+    const [drawerMoving, setDrawerMoving] = useState(false)
     const [drawerSettling, setDrawerSettling] = useState(false)
     const [edgeBackTransitionDisabled, setEdgeBackTransitionDisabled] = useState(false)
     const [edgeBackOffset, setEdgeBackOffset] = useState(0)
@@ -309,6 +315,8 @@ export function useMobileSideDrawerGesture({
     const finishDrawerSettle = useCallback((attemptId: number) => {
         clearDrawerSettleTimers()
         drawerSettlePendingRef.current = false
+        // 先放开玻璃：此刻 surface 已静止、圆角还在，重建离屏通道有一整帧可用。
+        setDrawerMoving(false)
         drawerSettleFrameRef.current = window.requestAnimationFrame(() => {
             drawerSettleFrameRef.current = window.requestAnimationFrame(() => {
                 drawerSettleFrameRef.current = null
@@ -323,6 +331,7 @@ export function useMobileSideDrawerGesture({
         const attemptId = drawerSettleAttemptRef.current + 1
         drawerSettleAttemptRef.current = attemptId
         drawerSettlePendingRef.current = true
+        setDrawerMoving(true)
         setDrawerSettling(true)
         // transitionend 是主路径；transform 终点与起点相同、WebView 丢事件、
         // 或减少动态效果把 --mobile-duration-base 压成 0ms 时都收不到，必须有定时兜底。
@@ -768,6 +777,7 @@ export function useMobileSideDrawerGesture({
     return {
         open,
         drawerDragging,
+        drawerMoving,
         drawerSettling,
         completeDrawerSettle,
         edgeBackTransitionDisabled,

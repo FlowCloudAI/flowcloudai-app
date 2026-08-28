@@ -247,6 +247,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const {
         open: sideDrawerOpen,
         drawerDragging: sideDrawerDragging,
+        drawerMoving: sideDrawerMoving,
         drawerSettling: sideDrawerSettling,
         completeDrawerSettle,
         edgeBackTransitionDisabled,
@@ -626,7 +627,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         <div ref={mobileAppRef} className="mobile-app">
             <div
                 ref={sideDrawerShellRef}
-                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${sideDrawerSettling ? ' is-drawer-settling' : ''}${edgeBackOrigin ? ' is-edge-back-prepared' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-drawer-dragging' : ''}${sideDrawerMoving ? ' is-drawer-moving' : ''}${sideDrawerSettling ? ' is-drawer-settling' : ''}${edgeBackOrigin ? ' is-edge-back-prepared' : ''}${edgeBackTransitionDisabled || activeEdgeBackPhase === 'tracking' ? ' is-edge-back-direct' : ''}${activeEdgeBackPhase !== 'idle' ? ' is-edge-back-active' : ''}${activeEdgeBackPhase === 'cancelling' ? ' is-edge-back-cancelling' : ''}${activeEdgeBackPhase === 'committing' ? ' is-edge-back-committing' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-edge-back-shift': `${activeEdgeBackOffset}px`,

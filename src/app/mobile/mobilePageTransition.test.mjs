@@ -105,3 +105,30 @@ test('吸附结束靠 transitionend 加静止帧，并对丢事件与 0ms 动效
     assert.match(sideDrawerGestureSource, /drawerSettleTimerRef\.current = window\.setTimeout/)
     assert.match(sideDrawerGestureSource, /getMobileShellTransitionDurationMs\(\) \+ 1\d\d\)/)
 })
+
+test('运动期间降级 surface 内毛玻璃，且恢复模糊与拆圆角不同帧', () => {
+    const glassRule = mobileAppCss.match(
+        /^\.mobile-app-side-drawer-shell\.is-drawer-dragging,\n\.mobile-app-side-drawer-shell\.is-drawer-moving \{[\s\S]*?\n\}/m,
+    )?.[0] ?? ''
+    for (const token of [
+        '--mobile-nav-glass-filter',
+        '--mobile-topbar-bg-filter',
+        '--mobile-topbar-pill-filter',
+        '--mobile-glass-filter',
+        '--mobile-glass-filter-soft',
+    ]) assert.match(glassRule, new RegExp(`${token}:\\s*none`))
+    // 只降滤镜档：底色/渐变/边框/阴影不在运动态里改，静止态参数必须原样。
+    assert.doesNotMatch(glassRule, /background|border|box-shadow|--mobile-nav-surface|--mobile-surface-/)
+
+    assert.match(mobileAppSource, /sideDrawerMoving \? ' is-drawer-moving'/)
+    // is-drawer-moving 必须早于 is-drawer-settling 结束，否则重建与拆除又落回同一帧。
+    const finishBody = sideDrawerGestureSource.match(
+        /const finishDrawerSettle = useCallback\([\s\S]*?\n {4}\}, \[/,
+    )?.[0] ?? ''
+    assert.match(finishBody, /setDrawerMoving\(false\)/)
+    assert.ok(
+        finishBody.indexOf('setDrawerMoving(false)') < finishBody.indexOf('requestAnimationFrame'),
+        'setDrawerMoving(false) 必须在两帧空转之前，先于 setDrawerSettling(false) 生效',
+    )
+    assert.doesNotMatch(finishBody, /setDrawerSettling\(false\)[\s\S]*setDrawerMoving\(false\)/)
+})
