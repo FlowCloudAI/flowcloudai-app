@@ -488,7 +488,12 @@
 
     right: auto;
     left: var(--mobile-anchored-menu-left);
-    max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
+    /*
+     * 这条盖住基础规则里的 max-width（同为单类名，靠书写顺序取胜），所以必须自己带上
+     * 15.75rem 那个上限。宽度改成 max-content 之后漏掉它的话，左对齐的菜单会一路长到
+     * 视口边缘——固定宽度时代这条只写视口约束不出问题，现在会。
+     */
+    max-width: min(15.75rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
 }
 
 .mobile-anchored-menu--left::before {
