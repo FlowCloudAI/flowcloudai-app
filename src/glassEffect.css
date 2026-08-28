@@ -135,8 +135,14 @@
     backdrop-filter: var(--mobile-glass-filter-soft);
 }
 
+/*
+ * 用 --mobile-surface-menu（80%）而不是 --mobile-surface-control（60%）。
+ * control 那一档是给 AI 模型胶囊这类控件用的，菜单挂在上面偏透，底下的树行会透过来
+ * 干扰正文；menu 档本来就是为菜单定义的，只是一直空置着没人用。
+ * 关闭毛玻璃时两档都回退到实色，无差别。
+ */
 :root .mobile-anchored-menu::before {
-    background: var(--mobile-surface-control);
+    background: var(--mobile-surface-menu);
 }
 
 :root .mobile-entry-card__tag {
