@@ -605,9 +605,6 @@ export default function ProjectRelationGraph({
             <div className="fc-op-header">
                 <div className="fc-op-header__title-block">
                     <h2 className="fc-op-header__title">关系图谱</h2>
-                    <p className="fc-op-header__subtitle">
-                        可视化展示项目内词条之间的关联结构。
-                    </p>
                 </div>
                 <div className="fc-op-header__actions">
                     <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(true)}>

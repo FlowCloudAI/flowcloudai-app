@@ -297,7 +297,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 <div className="about-section-action-row">
                     <div className="about-section-action-copy">
                         <span className="about-section-action-title">用户知情同意书</span>
-                        <span className="about-section-action-desc">查看应用使用中的数据与权限说明。</span>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
                         查看
@@ -306,9 +305,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 <div className="about-section-action-row">
                     <div className="about-section-action-copy">
                         <span className="about-section-action-title">字体版权与授权</span>
-                        <span className="about-section-action-desc">
-                            查看 Noto CJK、霞鹜文楷的版权、使用范围及完整 OFL 1.1。
-                        </span>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => setFontLicenseModalOpen(true)}>
                         查看
@@ -317,9 +313,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 <div className="about-section-action-row">
                     <div className="about-section-action-copy">
                         <span className="about-section-action-title">日志目录</span>
-                        <span className="about-section-action-desc">
-                            app.log 位于配置目录内，仅 release 构建写入。
-                        </span>
                     </div>
                     <Button type="button"
                         variant="outline"

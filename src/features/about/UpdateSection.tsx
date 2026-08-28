@@ -124,9 +124,6 @@ export default function UpdateSection() {
             <section className="settings-section fc-section-card about-section-update">
                 <div className="about-section-update-copy">
                     <h2 className="settings-section-title fc-section-title">应用更新</h2>
-                    <p className="about-section-update-desc">
-                        自动更新会从官网获取已签名的 Windows 更新包，安装前会校验签名。
-                    </p>
                     {updateStatus && <p className="about-section-update-status">{updateStatus}</p>}
                     {availableUpdate && (
                         <div className="about-section-update-meta">
@@ -153,7 +150,6 @@ export default function UpdateSection() {
                         />
                         <span>
                             <strong>自动检查更新</strong>
-                            <small>软件启动时静默检查一次；只有发现新版本时才会提示。</small>
                         </span>
                     </label>
                 </div>

@@ -367,9 +367,6 @@ export default function ProjectTimeline({
                     )}
                     <div className="fc-op-header__title-block">
                         <h2 className="fc-op-header__title">时间线</h2>
-                        <p className="fc-op-header__subtitle">
-                            系统会扫描项目中的词条标签，并自动识别时间线语义。
-                        </p>
                     </div>
                     <div className="fc-op-header__actions">
                         {selectedEvent && onOpenEntry && (
@@ -442,7 +439,6 @@ export default function ProjectTimeline({
                         <div className="project-timeline__section-header">
                             <div className="project-timeline__section-heading">
                                 <span className="project-timeline__section-title">事件列表</span>
-                                <span className="project-timeline__section-copy">按时间顺序浏览事件，点击后下方时间线会同步聚焦。</span>
                             </div>
                             <div className="project-timeline__event-header-actions">
                                 <span className="fc-op-count">

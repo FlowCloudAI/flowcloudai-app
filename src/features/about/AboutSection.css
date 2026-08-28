@@ -154,7 +154,6 @@
     min-width: 0;
 }
 
-.about-section-update-desc,
 .about-section-update-status,
 .about-section-update-notes {
     margin: 0.35rem 0 0;
@@ -502,12 +501,6 @@
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: 600;
-}
-
-.about-section-action-desc {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: var(--fc-line-height-normal);
 }
 
 @media (max-width: 760px) {

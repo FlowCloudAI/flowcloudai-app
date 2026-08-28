@@ -31,7 +31,6 @@ export default function ThemeTokenColorEditor({
         <div className="theme-color-preview__token-editor">
             <div className="theme-color-preview__token-editor-header">
                 <strong>FC 主题令牌颜色</strong>
-                <span>主色令牌通用，背景、边框、滚动条和文字可按浅色/深色分别覆盖。</span>
             </div>
             <div className="theme-color-preview__token-tabs" role="tablist" aria-label="令牌分组">
                 {availableGroups.map((group) => {

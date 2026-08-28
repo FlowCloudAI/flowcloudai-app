@@ -192,9 +192,6 @@ function ProjectConfigOverview({
                 <div className="pe-config-section__header">
                     <div>
                         <h2 className="pe-feature-section__title">词条类型</h2>
-                        <p className="pe-feature-section__desc">
-                            浏览全部词条类型；自定义类型可直接编辑。
-                        </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
                 </div>
@@ -246,9 +243,6 @@ function ProjectConfigOverview({
                 <div className="pe-config-section__header">
                     <div>
                         <h2 className="pe-feature-section__title">标签</h2>
-                        <p className="pe-feature-section__desc">
-                            管理标签类型、默认值和默认植入范围。
-                        </p>
                     </div>
                     <Button type="button" variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
                 </div>

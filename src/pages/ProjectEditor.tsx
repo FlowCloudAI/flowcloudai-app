@@ -1386,7 +1386,6 @@ function ProjectEditorInner({
                         {activeToolPanel === 'world-map' && (
                             <WorldMapPanel
                                 projectId={projectId}
-                                projectName={project.name}
                                 initialMapId={worldMapInitialMapId}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 sidebarContainer={worldMapSidebarHost}

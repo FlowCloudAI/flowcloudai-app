@@ -159,7 +159,6 @@ function ProjectContradictionPanel({
                 <div className="pe-contradiction-toolbar__left">
                     <div className="fc-op-header__title-block">
                         <h2 className="pe-contradiction-title fc-op-header__title">设定检测</h2>
-                        <p className="pe-contradiction-desc fc-op-header__subtitle">检查项目设定的一致性、契合度与公开发布风险；检测可收起到后台继续运行。</p>
                     </div>
                 </div>
                 <div className="pe-contradiction-toolbar__actions fc-op-header__actions">

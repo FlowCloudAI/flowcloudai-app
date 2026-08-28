@@ -678,7 +678,6 @@ function TemplatesPanel({editorFontSize, defaultPrompt, onDefaultPromptChange}: 
                                 <div className="settings-title fc-page-header">
                                     <div className="fc-page-title-block">
                                         <h1 className="fc-page-title">AI 指令模板</h1>
-                                        <p className="fc-page-subtitle">集中管理内置 AI 指令模板，保存后自动检查格式是否正确。</p>
                                     </div>
                                 </div>
 
@@ -1150,7 +1149,6 @@ function PluginsPanel({
                 <div className="settings-title fc-page-header">
                     <div className="fc-page-title-block">
                         <h1 className="fc-page-title">插件管理</h1>
-                        <p className="fc-page-subtitle">管理已安装的 AI 插件，并配置插件访问密钥。</p>
                     </div>
                 </div>
 
@@ -2184,7 +2182,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">存储与备份</h1>
-                                    <p className="fc-page-subtitle">管理应用数据目录、插件目录和自动备份策略。</p>
                                 </div>
                             </div>
 
@@ -2337,7 +2334,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">外观</h1>
-                                    <p className="fc-page-subtitle">调整界面语言、编辑器字号和窗口显示效果。</p>
                                 </div>
                             </div>
 
@@ -2396,6 +2392,7 @@ export default function Settings({
                                     <label className="settings-checkbox-field">
                                         <input
                                             type="checkbox"
+                                            aria-label="毛玻璃效果"
                                             checked={settings.shell_acrylic_enabled}
                                             onChange={(event) => {
                                                 const checked = event.currentTarget.checked
@@ -2405,7 +2402,6 @@ export default function Settings({
                                                 } : null)
                                             }}
                                         />
-                                        <span>启用组件毛玻璃背景；Windows 使用 Acrylic，macOS 使用系统背景材质</span>
                                     </label>
                                 </div>
                                 <ThemeColorPreview
@@ -2420,7 +2416,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">提交反馈</h1>
-                                    <p className="fc-page-subtitle">提交建议或问题，不会自动上传项目数据或日志。</p>
                                 </div>
                             </div>
 
@@ -2432,7 +2427,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">关于</h1>
-                                    <p className="fc-page-subtitle">查看应用版本、官方渠道和许可信息。</p>
                                 </div>
                             </div>
 
@@ -2444,7 +2438,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">更新</h1>
-                                    <p className="fc-page-subtitle">检查新版本、安装更新并查看版本说明。</p>
                                 </div>
                             </div>
 
@@ -2456,7 +2449,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">模型管理</h1>
-                                    <p className="fc-page-subtitle">配置默认模型、生成参数和上下文策略。</p>
                                 </div>
                             </div>
 
@@ -2717,7 +2709,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">权限与工具</h1>
-                                    <p className="fc-page-subtitle">控制 AI 操作授权、搜索工具和可使用的信源。</p>
                                 </div>
                             </div>
 
@@ -2763,9 +2754,6 @@ export default function Settings({
                                 <div className="settings-field settings-field-stack settings-field-stack--full">
                                     <div className="settings-search-source-heading">
                                         <span className="settings-search-source-heading-title">搜索信源</span>
-                                        <span className="settings-field-hint">
-                                            AI 搜索工具仅会使用已启用的信源组。
-                                        </span>
                                     </div>
                                     <div className="settings-search-source-list">
                                         {SEARCH_SOURCE_OPTIONS.map((source) => (
@@ -2827,7 +2815,6 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">用量统计</h1>
-                                    <p className="fc-page-subtitle">查看模型调用次数与消耗明细。</p>
                                 </div>
                             </div>
 

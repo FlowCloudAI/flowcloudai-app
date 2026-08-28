@@ -367,7 +367,6 @@ export default function ThemeColorPreview({value, onChange}: ThemeColorPreviewPr
             <div className="theme-color-preview__header">
                 <div>
                     <h3 className="theme-color-preview__title">颜色主题</h3>
-                    <p className="theme-color-preview__subtitle">主色、背景、边框和文字层级；功能色保持不变。</p>
                 </div>
                 <div className="theme-color-preview__header-actions">
                     <Button type="button" size="sm" variant="outline" onClick={resetDefault}>

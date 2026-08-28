@@ -494,7 +494,6 @@ function ImageIcon() {
 
 interface WorldMapPanelProps {
     projectId: string
-    projectName: string
     initialMapId?: string | null
     onOpenEntry?: (entry: { id: string; title: string }) => void
     sidebarContainer?: HTMLElement | null
@@ -507,7 +506,6 @@ function readLinkedEntryId(location: MapKeyLocationDraft | MapPreviewKeyLocation
 
 export default function WorldMapPanel({
                                           projectId,
-                                          projectName,
                                           initialMapId,
                                           onOpenEntry,
                                           sidebarContainer,
@@ -2089,7 +2087,6 @@ export default function WorldMapPanel({
             <div className="wm-header">
                 <div className="wm-header__title-block fc-page-title-block">
                     <h2 className="wm-title">世界地图</h2>
-                    <p className="wm-subtitle">当前项目：{projectName}。编辑区域、地点与海岸线风格。</p>
                 </div>
                 <div className="wm-style-switcher">
                     {(['flat', 'tolkien', 'ink'] as MapStyle[]).map(s => (
