@@ -8,13 +8,15 @@ import {URL} from 'node:url'
 const readSource = relativePath => readFile(new URL(relativePath, import.meta.url), 'utf8')
 
 test('设置大项与外观配置不再渲染说明性副标题', async () => {
-    const [settings, themePreview, tokenEditor] = await Promise.all([
+    const [settings, settingsStyles, themePreview, tokenEditor] = await Promise.all([
         readSource('../pages/Settings.tsx'),
+        readSource('../pages/Settings.css'),
         readSource('../pages/settings/ThemeColorPreview.tsx'),
         readSource('../pages/settings/ThemeTokenColorEditor.tsx'),
     ])
 
     assert.doesNotMatch(settings, /className="fc-page-subtitle"/)
+    assert.match(settingsStyles, /\.settings-title\s*\{[^}]*margin-bottom:\s*var\(--fc-space-lg\)/s)
     assert.doesNotMatch(settings, /启用组件毛玻璃背景/)
     assert.match(settings, /aria-label="毛玻璃效果"/)
     assert.doesNotMatch(settings, /AI 搜索工具仅会使用已启用的信源组/)

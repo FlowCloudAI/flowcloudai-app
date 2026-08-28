@@ -164,7 +164,7 @@
 }
 
 .settings-title {
-    margin-bottom: 0;
+    margin-bottom: var(--fc-space-lg);
 }
 
 .settings-section {
