@@ -59,19 +59,24 @@ const MOBILE_ANCHORED_MENU_MIN_SPACE = 128
  * 定下实际生效的展开方向。`placement` 退化为「偏好」：只有偏好那一侧确实放不下、
  * 且另一侧更宽裕时才翻面。
  *
- * 注意两侧可用高度的算法不对称，因为菜单不是贴着锚点外侧排的：
+ * 注意两侧可用高度的算法不对称，因为菜单默认不是贴着锚点外侧排的：
  * placement=bottom 时容器 top 对齐锚点的**上**边往下长，所以可用高度从 anchor.top 算起；
  * placement=top 时容器 bottom 对齐锚点的**下**边往上长，可用高度到 anchor.bottom 为止。
- * 这两条和 CSS 里那两个 max-height 是同一套算式，改一处要一起改。
+ * clearAnchor 把菜单挪到锚点外侧，两侧起算点随之各让出一个锚点高。
+ * 这几条和 CSS 里那几个 max-height 是同一套算式，改一处要一起改。
  */
 function resolveAnchoredMenuPlacement(
     preferred: 'bottom' | 'top',
     anchorTop: number,
     anchorBottom: number,
     viewportHeight: number,
+    clearAnchor: boolean,
 ): 'bottom' | 'top' {
-    const spaceForBottom = viewportHeight - anchorTop - MOBILE_ANCHORED_MENU_VIEWPORT_GAP
-    const spaceForTop = anchorBottom - MOBILE_ANCHORED_MENU_VIEWPORT_GAP
+    const spaceForBottom = viewportHeight
+        - (clearAnchor ? anchorBottom : anchorTop)
+        - MOBILE_ANCHORED_MENU_VIEWPORT_GAP
+    const spaceForTop = (clearAnchor ? anchorTop : anchorBottom)
+        - MOBILE_ANCHORED_MENU_VIEWPORT_GAP
     const preferredSpace = preferred === 'bottom' ? spaceForBottom : spaceForTop
     const flippedSpace = preferred === 'bottom' ? spaceForTop : spaceForBottom
     if (preferredSpace >= MOBILE_ANCHORED_MENU_MIN_SPACE) return preferred
@@ -206,6 +211,12 @@ export interface MobileAnchoredMenuProps {
      * --mobile-* token 声明在 :root 上，搬到 body 下不会丢样式。
      */
     portal?: boolean
+    /*
+     * 让菜单避开锚点本身，贴在它外侧展开，而不是盖住它。
+     * 默认 false：顶栏那几个胶囊菜单是刻意「从按钮长出来」并盖住按钮的。
+     * 锚点是一行列表项时要打开——被操作的那一行得一直看得见。
+     */
+    clearAnchor?: boolean
 }
 
 export function MobileAnchoredMenu({
@@ -221,6 +232,7 @@ export function MobileAnchoredMenu({
     rightBoundaryRef,
     rightBoundaryGap = 0,
     portal = false,
+    clearAnchor = false,
 }: MobileAnchoredMenuProps) {
     const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; borderColor: string; rightBoundary: number | null; placement: 'bottom' | 'top'} | null>(null)
     const [rendered, setRendered] = useState(open)
@@ -253,9 +265,10 @@ export function MobileAnchoredMenu({
                 Math.max(0, anchorRect.top),
                 Math.min(viewportHeight, anchorRect.bottom),
                 viewportHeight,
+                clearAnchor,
             ),
         })
-    }, [anchorRef, containerRef, placement, rightBoundaryGap, rightBoundaryRef])
+    }, [anchorRef, clearAnchor, containerRef, placement, rightBoundaryGap, rightBoundaryRef])
 
     useEffect(() => {
         if (open) {
@@ -336,7 +349,7 @@ export function MobileAnchoredMenu({
         >
             <div
                 ref={menuRef}
-                className={`mobile-anchored-menu mobile-anchored-menu--${align} mobile-anchored-menu--placement-${anchor?.placement ?? placement}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
+                className={`mobile-anchored-menu mobile-anchored-menu--${align} mobile-anchored-menu--placement-${anchor?.placement ?? placement}${clearAnchor ? ' mobile-anchored-menu--clear-anchor' : ''}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
                 data-open={open}

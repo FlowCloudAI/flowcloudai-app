@@ -54,6 +54,7 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
             ariaLabel={menuTarget ? `分类「${menuTarget.name}」的操作` : '分类操作'}
             placement="bottom"
             portal
+            clearAnchor
             className="mobile-category-drawer-menu"
             items={menuTarget ? [
             {key: 'create-child', label: '新建子分类', onSelect: () => props.onCreateChild(menuTarget)},

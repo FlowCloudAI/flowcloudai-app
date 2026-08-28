@@ -142,3 +142,21 @@ test('锚点菜单点空白只收起自己，不把点击透传给底下的元�
     assert.match(topControls, /MOBILE_ANCHORED_MENU_DISMISS_CLICK_SUPPRESS_MS = 350/)
     assert.match(topControls, /window\.setTimeout\(\(\) => \{\s*document\.removeEventListener\('click', swallow, true\)/)
 })
+
+test('锚点菜单避开锚点时，CSS 偏移与 JS 翻面判据用同一套算式', () => {
+    const topControls = readFileSync(join(mobileRoot, 'components/MobileTopControls.tsx'), 'utf8')
+    const topControlsCss = readFileSync(join(mobileRoot, 'components/MobileTopControls.css'), 'utf8')
+    // 翻面判据必须跟着让出一个锚点高，否则会以为某一侧放得下、翻到实际塞不下的那边。
+    assert.match(topControls, /clearAnchor \? anchorBottom : anchorTop/)
+    assert.match(topControls, /\(clearAnchor \? anchorTop : anchorBottom\)/)
+    assert.match(topControls, /clearAnchor \? ' mobile-anchored-menu--clear-anchor' : ''/)
+    // CSS 两个方向都要偏移，且 max-height 同步减掉这一段，否则菜单顶出视口。
+    const bottomRule = topControlsCss.match(/^\.mobile-anchored-menu--clear-anchor \{[\s\S]*?\n\}/m)?.[0] ?? ''
+    const topRule = topControlsCss.match(/^\.mobile-anchored-menu--clear-anchor\.mobile-anchored-menu--placement-top \{[\s\S]*?\n\}/m)?.[0] ?? ''
+    for (const rule of [bottomRule, topRule]) {
+        assert.match(rule, /var\(--mobile-anchored-menu-anchor-height\)/)
+        assert.match(rule, /max-height:[\s\S]*?var\(--mobile-anchored-menu-anchor-height\)/)
+    }
+    assert.match(bottomRule, /top:\s*calc\(/)
+    assert.match(topRule, /bottom:\s*calc\(/)
+})

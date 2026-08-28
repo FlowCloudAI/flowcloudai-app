@@ -481,6 +481,37 @@
     bottom: 0;
 }
 
+/*
+ * 避开锚点：菜单贴在锚点外侧展开，不盖住它。
+ *
+ * 偏移量正好是锚点高——placement=bottom 的 top 本来对齐锚点上边，加一个锚点高就落到
+ * 它的下边；placement=top 同理。max-height 必须同步减掉这一段，否则菜单会顶出视口。
+ * 翻面判据在 MobileAnchoredMenu.resolveAnchoredMenuPlacement 里，与这里同一套算式，
+ * 改一处要一起改。
+ *
+ * 两条都要排在 --placement-top 之后：单类名同级，靠书写顺序取胜。
+ */
+.mobile-anchored-menu--clear-anchor {
+    top: calc(var(--mobile-anchored-menu-top) + var(--mobile-anchored-menu-anchor-height));
+    max-height: min(31rem, calc(
+        100%
+        - var(--mobile-anchored-menu-top)
+        - var(--mobile-anchored-menu-anchor-height)
+        - 1rem
+    ));
+}
+
+.mobile-anchored-menu--clear-anchor.mobile-anchored-menu--placement-top {
+    top: auto;
+    bottom: calc(var(--mobile-anchored-menu-bottom) + var(--mobile-anchored-menu-anchor-height));
+    max-height: min(31rem, calc(
+        100%
+        - var(--mobile-anchored-menu-bottom)
+        - var(--mobile-anchored-menu-anchor-height)
+        - 1rem
+    ));
+}
+
 .mobile-anchored-menu__content::-webkit-scrollbar {
     display: none;
 }
