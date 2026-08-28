@@ -134,22 +134,28 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
 }
 
 /*
- * 运动期间降级 surface 内的毛玻璃。底栏 24px、顶栏与胶囊、页面里的标签/模型胶囊/输入卡
- * 都是 backdrop-filter 元素，而它们全都住在会整体位移的 surface 里：transform 一变，
- * 它们相对 backdrop root 的位置就变，Chromium 必须每帧重新取样背景、重跑模糊、
- * 重建各自的离屏通道；静止时这些通道结果不变，几乎免费。
+ * 抽屉一旦离开「完全收起」，surface 内的毛玻璃就一直保持降级，直到重新完全收起为止。
  *
- * 真机实测（Xiaomi / Android 16 / 120Hz 面板 / DPR 3.25，纯合成器动画，帧预算 8.31ms）：
- * GPU p50 6.11→2.14ms、Issue→Swap p90 9.07→6.98ms、整帧 p50 17.52→11.64ms。
+ * 为什么要降级：底栏 24px、顶栏与胶囊、页面里的标签/模型胶囊/输入卡都是 backdrop-filter
+ * 元素，而它们全都住在会整体位移的 surface 里。transform 一变，它们相对 backdrop root
+ * 的位置就变，Chromium 必须每帧重新取样背景、重跑模糊、重建各自的离屏通道；静止时这些
+ * 通道结果不变，几乎免费。真机实测（Xiaomi / Android 16 / 120Hz / DPR 3.25，纯合成器
+ * 动画，帧预算 8.31ms，配对 A/B）：GPU p50 5.85→2.03ms、p90 8.23→2.72ms，整帧 20.1→11.7ms。
  * 同批测过的遮罩渐变与 will-change 在噪声内，不要顺手一起改。
  *
- * 只降滤镜档：半透明底色、渐变、边框与阴影保留，静止态参数完全不动。
- * is-drawer-moving 比 is-drawer-settling 早一步结束（transitionend 当帧），
- * 于是「恢复模糊」（重建通道）与「拆圆角」（拆通道）落在两个不同的静止帧上——
- * 两者同帧正是 2026-08-28 那次关闭白闪的成因。变量清单与消费方见 src/glassEffect.css。
+ * 为什么要带上 is-open：**每一次降级/恢复切换本身就是一次可见的跳变**，与切换后长什么样
+ * 无关。原先在「完全展开」处也切一次（运动 → 静止），抽屉停稳的那一刻底栏材质会跳一下，
+ * 用户正盯着它看，最显眼。把展开态并入降级态后，一个开合周期只剩收起端的一次切换，
+ * 而那一端抽屉已经不在视野重心上。抽屉展开时 surface 只露出 54px，降级几乎不可见。
+ *
+ * 只降滤镜档：半透明底色、渐变、边框、阴影保留，静止态参数完全不动。变量定义见
+ * src/glassEffect.css。恢复时机由 is-drawer-moving 决定——它在 transform 的 transitionend
+ * 当帧结束，比 is-drawer-settling 早两帧，于是「恢复模糊」（重建离屏通道）与「拆圆角」
+ * （拆通道）落在两个不同的静止帧上；两者同帧正是 0255eff 修掉的那次关闭白闪的成因。
  */
 .mobile-app-side-drawer-shell.is-drawer-dragging,
-.mobile-app-side-drawer-shell.is-drawer-moving {
+.mobile-app-side-drawer-shell.is-drawer-moving,
+.mobile-app-side-drawer-shell.is-open {
     --mobile-nav-glass-filter: none;
     --mobile-topbar-bg-filter: none;
     --mobile-topbar-pill-filter: none;
