@@ -519,7 +519,6 @@ export default function MobileCategoryDrawer({
                 menuAnchorRef={menuAnchorRef}
                 menuContainerRef={treeHostRef}
                 onCloseMenu={() => setMenuTarget(null)}
-                onOpenCategory={category => onSelect({kind: 'category', categoryId: category.id}, category.name)}
                 onCreateChild={category => setRenameTarget({mode: 'create', parentId: category.id})}
                 onRenameCategory={category => setRenameTarget({mode: 'rename', category})}
                 onChooseMove={setMoveTarget}

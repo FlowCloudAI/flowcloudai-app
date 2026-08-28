@@ -13,7 +13,6 @@ interface Props {
     /** 量视口尺寸时的兜底容器，取树的滚动宿主即可。 */
     menuContainerRef: RefObject<HTMLElement | null>
     onCloseMenu: () => void
-    onOpenCategory: (category: Category) => void
     onCreateChild: (category: Category) => void
     onRenameCategory: (category: Category) => void
     onChooseMove: (category: Category) => void
@@ -55,8 +54,8 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
             ariaLabel={menuTarget ? `分类「${menuTarget.name}」的操作` : '分类操作'}
             placement="bottom"
             portal
+            className="mobile-category-drawer-menu"
             items={menuTarget ? [
-            {key: 'open', label: '浏览词条', onSelect: () => props.onOpenCategory(menuTarget)},
             {key: 'create-child', label: '新建子分类', onSelect: () => props.onCreateChild(menuTarget)},
             {key: 'rename', label: '重命名', onSelect: () => props.onRenameCategory(menuTarget)},
             {key: 'move', label: '移动到…', onSelect: () => props.onChooseMove(menuTarget)},
