@@ -130,3 +130,15 @@ test('纵向页面根容器不会被宽内容拖离可见区域', () => {
     assert.match(mobilePageRule, /overscroll-behavior-x:\s*none;/)
     assert.match(mobilePageRule, /overscroll-behavior-y:\s*contain;/)
 })
+
+test('锚点菜单点空白只收起自己，不把点击透传给底下的元素', () => {
+    const topControls = readFileSync(join(mobileRoot, 'components/MobileTopControls.tsx'), 'utf8')
+    // 关菜单发生在 pointerdown，浮层随即 pointer-events: none，补发的 click 会落到底下的元素上。
+    assert.match(topControls, /onPointerDown=\{event => \{\s*if \(closing \|\| event\.target !== event\.currentTarget\) return\s*suppressNextClick\(\)\s*onClose\(\)/)
+    // 必须在捕获阶段吞，冒泡阶段已经晚于 React 挂在根容器上的监听。
+    assert.match(topControls, /document\.addEventListener\('click', swallow, true\)/)
+    assert.match(topControls, /event\.stopPropagation\(\)/)
+    // 超时兜底：手势没产生 click 时要自己摘掉，否则会误吞下一次真实点击。
+    assert.match(topControls, /MOBILE_ANCHORED_MENU_DISMISS_CLICK_SUPPRESS_MS = 350/)
+    assert.match(topControls, /window\.setTimeout\(\(\) => \{\s*document\.removeEventListener\('click', swallow, true\)/)
+})

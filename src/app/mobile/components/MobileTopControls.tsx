@@ -21,6 +21,33 @@ const MOBILE_ANCHORED_MENU_CLOSE_FALLBACK_MS = 220
 /** 与 CSS 里 max-height 的 `- 1rem` 留白保持一致，用来算某一侧真正能用多少高度。 */
 const MOBILE_ANCHORED_MENU_VIEWPORT_GAP = 16
 
+/*
+ * 点浮层空白处关菜单之后，屏蔽紧随其后那一次 click 的时长。
+ *
+ * 关菜单是在 pointerdown 上做的（按下就开始收，比等到 pointerup 跟手）。但浮层一进入
+ * closing 就 pointer-events: none，于是 pointerup 之后补发的 click 会重新做命中测试，
+ * 落到浮层底下的元素上——表现为「点空白只想收起菜单，却顺手把那一行也点开了」。
+ *
+ * 安卓 WebView（实测 Chrome 143 / Android 16）在 touchend 之后约 61ms 才补发 click，
+ * 窗口取得比它宽裕得多；350ms 与 flowcloudai-ui 里 Tree 处理拖拽尾巴用的是同一个值。
+ */
+const MOBILE_ANCHORED_MENU_DISMISS_CLICK_SUPPRESS_MS = 350
+
+/** 在文档捕获阶段吞掉下一次 click；先到者生效，超时自动摘掉，不会误吞后续的真实点击。 */
+function suppressNextClick() {
+    let timer = 0
+    const swallow = (event: MouseEvent) => {
+        event.stopPropagation()
+        event.preventDefault()
+        window.clearTimeout(timer)
+        document.removeEventListener('click', swallow, true)
+    }
+    document.addEventListener('click', swallow, true)
+    timer = window.setTimeout(() => {
+        document.removeEventListener('click', swallow, true)
+    }, MOBILE_ANCHORED_MENU_DISMISS_CLICK_SUPPRESS_MS)
+}
+
 /**
  * 一侧至少要有这么多高度才算「放得下」：容器上下内边距（2 * --fc-space-md ≈ 24px）
  * 加两行（row 的 min-height 是 3.15rem ≈ 50px）。低于这个值菜单已经不成菜单，
@@ -302,7 +329,9 @@ export function MobileAnchoredMenu({
             className={`mobile-anchored-menu-layer${closing ? ' mobile-anchored-menu-layer--closing' : ''}`}
             role="presentation"
             onPointerDown={event => {
-                if (!closing && event.target === event.currentTarget) onClose()
+                if (closing || event.target !== event.currentTarget) return
+                suppressNextClick()
+                onClose()
             }}
         >
             <div
