@@ -80,6 +80,8 @@ type PageProps = {
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
     startReportDiscussion: (params: WorldCheckDiscussionParams) => Promise<void>
+    /** 角色对话：由词条页触发，实际会话在 AI Tab 的 controller 里创建。 */
+    startCharacterConversation: (params: {projectId: string; entryId: string}) => Promise<void>
 }
 
 interface MobileEdgeBackOrigin {
@@ -125,6 +127,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         [platformInfo.os],
     )
     const reportDiscussionRef = useRef<((params: WorldCheckDiscussionParams) => Promise<void>) | null>(null)
+    const characterConversationRef = useRef<((params: {projectId: string; entryId: string}) => Promise<void>) | null>(null)
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
     const {
         active: mobileInputModeActive,
@@ -373,7 +376,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [])
 
-    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey' | 'startReportDiscussion'>>(() => ({
+    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey' | 'startReportDiscussion' | 'startCharacterConversation'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
@@ -397,8 +400,25 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         reportDiscussionRef.current = handler
     }, [])
 
+    const registerCharacterConversation = useCallback((
+        handler: ((params: {projectId: string; entryId: string}) => Promise<void>) | null,
+    ) => {
+        characterConversationRef.current = handler
+    }, [])
+
     const startReportDiscussion = useCallback(async (params: WorldCheckDiscussionParams) => {
         const handler = reportDiscussionRef.current
+        if (!handler) throw new Error('AI 对话尚未准备好，请稍后重试。')
+        await handler(params)
+        navigation.navigateToTab('ai')
+    }, [navigation])
+
+    /*
+     * 角色对话的会话必须由 AI Tab 里那个 controller 创建（会话状态、插件与模型都在它手上），
+     * 所以词条页只是发起，实际创建走注册进来的 handler，成功后再切 Tab。
+     */
+    const startCharacterConversation = useCallback(async (params: {projectId: string; entryId: string}) => {
+        const handler = characterConversationRef.current
         if (!handler) throw new Error('AI 对话尚未准备好，请稍后重试。')
         await handler(params)
         navigation.navigateToTab('ai')
@@ -540,7 +560,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         aiFocus,
         setAiFocus,
         startReportDiscussion,
-    }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus, startReportDiscussion])
+        startCharacterConversation,
+    }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus, startCharacterConversation, startReportDiscussion])
 
     const createLayerPageProps = useCallback((pageKey: string, interactive: boolean): PageProps => ({
         ...navigation,
@@ -549,7 +570,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         aiFocus,
         setAiFocus,
         startReportDiscussion,
-    }), [aiFocus, ignoreBeforeLeave, navigation, setBeforeLeave, startReportDiscussion])
+        startCharacterConversation,
+    }), [aiFocus, ignoreBeforeLeave, navigation, setBeforeLeave, startCharacterConversation, startReportDiscussion])
 
     const homeTransitionLayers = useMemo(
         () => getMobilePageTransitionLayers(homeStack.entries, 'home-root'),
@@ -710,6 +732,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 onOpenConversationDrawer={openAiConversationDrawer}
                                 onCloseConversationDrawer={closeCategoryDrawer}
                                 onStartReportDiscussionReady={registerReportDiscussion}
+                                onStartCharacterConversationReady={registerCharacterConversation}
                             />
                         </div>
 

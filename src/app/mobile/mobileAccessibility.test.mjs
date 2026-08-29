@@ -59,7 +59,9 @@ test('底部导航覆盖到机器底部，滚动页穿过其背后且固定页�
     assert.match(mobileAppCss, /\.mobile-page\s*\{[\s\S]*?--mobile-scroll-nav-spacer:\s*max\(/)
     assert.match(mobileAppCss, /\.mobile-page:not\(\.mobile-nav-safe-fixed\)\s*\{[\s\S]*?padding-bottom:\s*calc\([\s\S]*?var\(--mobile-scroll-nav-spacer\)/)
     assert.match(mobileAppCss, /\.mobile-nav-safe-fixed\s*\{[\s\S]*?padding-bottom:\s*var\(--mobile-nav-reserved-height\)/)
-    assert.match(mobileAiChatSource, /className="mobile-ai-chat mobile-nav-safe-fixed"/)
+    // 角色对话会在同一个 className 上追加 is-character，所以这里钉的是「两个基础类都在」，
+    // 不是整串字面量。
+    assert.match(mobileAiChatSource, /className=\{`mobile-ai-chat mobile-nav-safe-fixed\$\{/)
     // composer 必须消费外壳的保留高度，但允许在其上再叠键盘上沿间距（--mobile-ai-keyboard-gap）。
     assert.match(mobileAiChatCss, /\.mobile-ai-chat__composer\s*\{[\s\S]*?bottom:\s*(?:calc\()?var\(--mobile-nav-reserved-height\)/)
     assert.match(mobileIdeaSource, /className="mobile-idea mobile-nav-safe-fixed"/)

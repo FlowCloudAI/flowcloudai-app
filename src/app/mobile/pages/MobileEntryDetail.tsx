@@ -111,7 +111,7 @@ function buildEditDraft(projectId: string, entry: Entry, relations: EntryRelatio
     }
 }
 
-export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, params}: Props) {
+export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, startCharacterConversation, params}: Props) {
     const projectId = params.projectId
     const entryId = params.entryId ?? ''
     const saveSourceIdRef = useRef(globalThis.crypto.randomUUID())
@@ -426,6 +426,23 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         navigateToTab('ai')
     }, [navigateToTab, projectId, entryId, setAiFocus])
 
+    const handleCharacterChat = useCallback(() => {
+        void (async () => {
+            try {
+                setAiFocus({projectId, entryId})
+                await startCharacterConversation({projectId, entryId})
+            } catch (error) {
+                logger.error('[MobileEntryDetail] 开启角色对话失败', error)
+                await showAlert(
+                    error instanceof Error ? error.message : '开启角色对话失败',
+                    'error',
+                    'nonInvasive',
+                    2600,
+                )
+            }
+        })()
+    }, [entryId, projectId, setAiFocus, showAlert, startCharacterConversation])
+
     const handleOpenLinkedEntry = useCallback((targetProjectId: string, targetId?: string, title?: string) => {
         const resolvedProjectId = targetId ? targetProjectId : projectId
         const resolvedEntryId = targetId ?? targetProjectId
@@ -695,6 +712,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 setMenuOpen={setMenuOpen}
                 onBack={pop}
                 onAiDiscuss={handleAiDiscuss}
+                onCharacterChat={handleCharacterChat}
                 onEdit={enterEdit}
                 onDelete={handleDelete}
                 onOpenImage={imageActions.openImage}

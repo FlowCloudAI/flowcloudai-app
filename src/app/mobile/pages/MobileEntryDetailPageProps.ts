@@ -10,5 +10,6 @@ export interface MobileEntryDetailProps {
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setBeforeLeave: (handler: MobileBeforeLeave | null) => void
     setAiFocus: (focus: AiFocus) => void
+    startCharacterConversation: (params: {projectId: string; entryId: string}) => Promise<void>
     params: MobileEntryDetailPageParams
 }

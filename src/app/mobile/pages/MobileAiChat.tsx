@@ -63,6 +63,7 @@ export default function MobileAiChat({
     onOpenConversationDrawer,
     onCloseConversationDrawer,
     onStartReportDiscussionReady,
+    onStartCharacterConversationReady,
 }: MobileAiChatProps) {
     const {showAlert} = useAlert()
     const appSettings = useAppSettingsStore()
@@ -87,13 +88,18 @@ export default function MobileAiChat({
         toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams,
         updateConversationSettings, switchActiveConversationModel, focusContext,
         autoScroll, setAutoScroll,
-        startReportDiscussion,
+        startReportDiscussion, startCharacterConversation,
     } = controller
 
     useEffect(() => {
         onStartReportDiscussionReady?.(startReportDiscussion)
         return () => onStartReportDiscussionReady?.(null)
     }, [onStartReportDiscussionReady, startReportDiscussion])
+
+    useEffect(() => {
+        onStartCharacterConversationReady?.(startCharacterConversation)
+        return () => onStartCharacterConversationReady?.(null)
+    }, [onStartCharacterConversationReady, startCharacterConversation])
 
     const [conversationSearch, setConversationSearch] = useState('')
     const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
@@ -115,6 +121,7 @@ export default function MobileAiChat({
     const contextUsageRef = useRef<HTMLButtonElement>(null)
 
     const activeConversation = controllerActiveConversation ?? null
+    const isCharacterConversation = activeConversation?.mode === 'character'
     const activeLlmPluginId = activeConversation?.pluginId || selectedPlugin
     const activeLlmPluginInfo = useMemo(
         () => plugins.find(plugin => plugin.id === activeLlmPluginId) ?? null,
@@ -638,8 +645,18 @@ export default function MobileAiChat({
 
 
     return (
-        <div ref={pageRef} className="mobile-ai-chat mobile-nav-safe-fixed" hidden={!active}>
+        <div
+            ref={pageRef}
+            className={`mobile-ai-chat mobile-nav-safe-fixed${isCharacterConversation ? ' is-character' : ''}`}
+            hidden={!active}
+        >
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
+            {/* 角色背景铺满页面，压在消息与输入卡下方；aria-hidden，纯装饰。 */}
+            {isCharacterConversation && activeConversation?.backgroundImageUrl ? (
+                <div className="mobile-ai-chat__background" aria-hidden="true">
+                    <img src={activeConversation.backgroundImageUrl} alt=""/>
+                </div>
+            ) : null}
             <MobilePageTopBar
                 className="mobile-ai-chat__topbar"
                 ariaLabel="AI 对话操作"

@@ -64,6 +64,7 @@ interface MobileEntryDetailViewProps {
     setMenuOpen: Dispatch<SetStateAction<boolean>>
     onBack: () => void
     onAiDiscuss: () => void
+    onCharacterChat: () => void
     onEdit: () => void
     onDelete: () => void
     onOpenImage: (index: number) => void
@@ -102,6 +103,7 @@ export function MobileEntryDetailView({
     setMenuOpen,
     onBack,
     onAiDiscuss,
+    onCharacterChat,
     onEdit,
     onDelete,
     onOpenImage,
@@ -115,7 +117,18 @@ export function MobileEntryDetailView({
     const coverImage = viewImages[coverIndex]
     const coverSrc = coverImage ? toEntryImageSrc(coverImage) : null
 
-    const entryMenuItems: MobileAnchoredMenuItem[] = [{
+    /*
+     * 角色对话只对 character 类型的词条出现：非角色词条开不了角色会话
+     * （controller 里会用 ai_build_character_project_snapshot 再校验一次类型）。
+     */
+    const isCharacterEntry = (entry.type ?? '').trim().toLowerCase() === 'character'
+    const entryMenuItems: MobileAnchoredMenuItem[] = [...(isCharacterEntry ? [{
+        key: 'character-chat',
+        label: '角色对话',
+        description: `以「${entry.title}」的身份聊天`,
+        icon: <MobileEntryDetailActionIcon type="ai"/>,
+        onSelect: onCharacterChat,
+    }] : []), {
         key: 'delete',
         label: '删除词条',
         description: '永久删除当前词条',

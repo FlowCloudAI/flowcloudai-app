@@ -17,4 +17,7 @@ export interface MobileAiChatProps {
     onStartReportDiscussionReady?: (
         handler: ((params: WorldCheckDiscussionParams) => Promise<void>) | null,
     ) => void
+    onStartCharacterConversationReady?: (
+        handler: ((params: {projectId: string; entryId: string}) => Promise<void>) | null,
+    ) => void
 }
