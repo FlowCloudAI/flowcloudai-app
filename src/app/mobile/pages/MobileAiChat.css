@@ -661,6 +661,84 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 }
 
 /*
+ * 对话记忆用量环。默认只有环、不写百分比字符：小屏上一串数字会和右侧两颗圆钮抢位置，
+ * 具体数值放进点击后的浮窗。视觉是 1.35rem 的小环，命中区由公共 48px 基线兜住。
+ */
+.mobile-ai-context-ring {
+    position: relative;
+    display: inline-grid;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: 0 0 auto;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-context-ring.is-open {
+    color: var(--fc-color-primary);
+}
+
+/*
+ * 命中层。输入卡整体把 --fc-control-tap-min 置零（见 .mobile-ai-composer-card 的说明），
+ * 所以这里必须和同排的圆形图标钮一样自己补一个透明热区，否则命中区只有 21.6px。
+ */
+.mobile-ai-context-ring::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--mobile-ai-composer-icon-hit-size);
+    height: var(--mobile-ai-composer-icon-hit-size);
+    transform: translate(-50%, -50%);
+    content: '';
+}
+
+.mobile-ai-context-ring svg {
+    width: 100%;
+    height: 100%;
+    /* 从 12 点方向顺时针增长，和桌面端一致。 */
+    transform: rotate(-90deg);
+}
+
+.mobile-ai-context-ring__track {
+    fill: none;
+    stroke: color-mix(in srgb, currentColor 28%, transparent);
+    stroke-width: 2.4;
+}
+
+.mobile-ai-context-ring__value {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2.4;
+    transition: stroke-dashoffset var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-ai-context-usage-popover .mobile-ai-context-usage-popover__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-text);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+}
+
+.mobile-ai-context-usage-popover__body strong {
+    color: var(--fc-color-text);
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight) ;
+}
+
+.mobile-ai-context-usage-popover__body span {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
+}
+
+/*
  * 已引用文档轨道。放在输入卡上方、composer 内部：它必须跟着键盘一起上移，
  * 也不能塞进底部面板（面板不承载滚动内容，见 designs/mobile-ui-baseline.md §9 规则 8）。
  */

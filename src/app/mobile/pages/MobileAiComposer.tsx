@@ -2,6 +2,7 @@
 import type {ReactNode, RefObject} from 'react'
 import type {DocumentContextItem, PluginInfo} from '../../../api'
 import type {AiToolAccessMode, Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
+import type {AiContextUsage} from '../../../features/ai-chat/hooks/useAiContextUsage'
 import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import MobileBottomSheet from '../components/MobileBottomSheet'
 import {
@@ -30,10 +31,17 @@ interface Props {
     topMenuOpen: boolean; onCloseTopMenu: () => void; activeConversationMenuItems: MobileAnchoredMenuItem[]
     onAttachDocuments: () => void; webSearchEnabled: boolean; onToggleWebSearch: () => void
     documentContextItems: DocumentContextItem[]
+    contextUsage: AiContextUsage | null; contextUsageOpen: boolean
+    contextUsageRef: RefObject<HTMLButtonElement | null>; onToggleContextUsage: () => void
+    onCloseContextUsage: () => void
     onRetryDocument: (itemId: string) => void; onRemoveDocument: (itemId: string) => void
     conversationControls: ReactNode; conversationActionTarget: Conversation | null; onCloseConversationAction: () => void; conversationActionMenuItems: MobileAnchoredMenuItem[]
     renameTarget: Conversation | null; renaming: boolean; onCloseRename: () => void; onRename: (title: string) => void
 }
+
+/* 环画在 24x24 视口里；半径留出描边宽度，不要贴边。 */
+const CONTEXT_RING_RADIUS = 9
+const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS
 
 /** 与桌面端 documentContextStatusLabel 同一套措辞；ready 不显示状态词，由「已引用」兜底。 */
 const DOCUMENT_STATUS_LABELS: Record<string, string> = {
@@ -93,11 +101,58 @@ export default function MobileAiComposer(p: Props) {
                 <button type="button" className={`mobile-ai-composer-card__chip${p.thinking ? ' active' : ''}`} aria-pressed={p.thinking} disabled={p.isStreaming} onClick={p.onToggleThinking}><MobileAiIcon type="thinking"/><span>思考</span></button>
                 <button ref={p.toolModeMenuRef} type="button" className={`mobile-ai-composer-card__chip mobile-ai-composer-card__chip--mode active${p.toolAccessMode === 'reader' ? ' is-reader' : ''}${p.toolAccessMode === 'writer' ? ' is-writer' : ''}${p.toolModeMenuOpen ? ' is-menu-open' : ''}`} aria-haspopup="menu" aria-expanded={p.toolModeMenuOpen} aria-label={`切换写入模式，当前为${AI_TOOL_ACCESS_LABELS[p.toolAccessMode]}`} disabled={p.isStreaming} onClick={() => { p.onBeforeToolModeMenuOpen(); p.onToolModeMenuOpen(!p.toolModeMenuOpen) }}><MobileAiIcon type={p.toolAccessMode}/><span>{p.activeToolModeShortLabel}</span></button>
             </div><div className="mobile-ai-composer-card__actions">
+                {/*
+                  * 对话记忆用量环。放在「更多」左边，默认只画环不写百分比字符——小屏上
+                  * 一串数字会和右侧两颗圆钮抢位置；需要具体数值时点开浮窗看。
+                  */}
+                {p.contextUsage ? (
+                    <button
+                        ref={p.contextUsageRef}
+                        type="button"
+                        className={`mobile-ai-context-ring${p.contextUsageOpen ? ' is-open' : ''}`}
+                        aria-haspopup="dialog"
+                        aria-expanded={p.contextUsageOpen}
+                        aria-label={p.contextUsage.title}
+                        onClick={p.onToggleContextUsage}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle className="mobile-ai-context-ring__track" cx="12" cy="12" r={CONTEXT_RING_RADIUS}/>
+                            <circle
+                                className="mobile-ai-context-ring__value"
+                                cx="12"
+                                cy="12"
+                                r={CONTEXT_RING_RADIUS}
+                                strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+                                strokeDashoffset={CONTEXT_RING_CIRCUMFERENCE * (1 - p.contextUsage.ringPercent / 100)}
+                            />
+                        </svg>
+                    </button>
+                ) : null}
                 <button type="button" className="mobile-ai-composer-card__icon-btn" aria-label="更多" aria-expanded={p.morePanelOpen} onClick={p.morePanelOpen ? p.onCloseMore : p.onOpenMore}><MobileAddIcon className="mobile-top-control-svg--inline"/></button>
                 <button type="button" className="mobile-ai-composer-card__icon-btn mobile-ai-composer-card__icon-btn--send" aria-label={p.isStreaming ? '停止生成' : '发送'} onClick={p.isStreaming ? p.onStop : p.onSend} disabled={!p.isStreaming && (!p.inputValue.trim() || p.inputDisabled)}><MobileAiIcon type={p.isStreaming ? 'stop' : 'send'}/></button>
             </div></div>
             </div>
         </footer>
+
+        {/*
+          * 用量浮窗：复用锚点菜单，从环上向上长出。默认只画环，具体数值放这里，
+          * 这样小屏上不用为一串百分比数字腾位置。
+          */}
+        <MobileAnchoredMenu
+            open={p.contextUsageOpen}
+            onClose={p.onCloseContextUsage}
+            anchorRef={p.contextUsageRef}
+            containerRef={p.pageRef}
+            ariaLabel="对话记忆用量"
+            className="mobile-ai-context-usage-popover"
+            align="right"
+            placement="top"
+        >
+            <div className="mobile-ai-context-usage-popover__body">
+                <strong>{p.contextUsage?.label ?? '0%'}</strong>
+                <span>{p.contextUsage?.title ?? ''}</span>
+            </div>
+        </MobileAnchoredMenu>
 
         <MobileAnchoredMenu open={p.toolModeMenuOpen} onClose={() => p.onToolModeMenuOpen(false)} anchorRef={p.toolModeMenuRef} containerRef={p.pageRef} ariaLabel="切换写入模式" className="mobile-ai-tool-mode-menu" align="left" placement="top">
             <div className="mobile-anchored-menu__group">{p.toolModeOptions.map(option => { const active = p.toolAccessMode === option.mode; return <button key={option.mode} type="button" role="menuitemradio" aria-checked={active} className={`mobile-anchored-menu__row mobile-ai-tool-mode-menu__row mobile-ai-tool-mode-menu__row--${option.mode}${active ? ' active' : ''}`} disabled={p.isStreaming} onClick={() => { p.onToolModeMenuOpen(false); p.onToolModeChange(option.mode) }}><span className="mobile-anchored-menu__icon" aria-hidden="true"><MobileAiIcon type={option.mode} strokeWidth={1.7}/></span><span className="mobile-anchored-menu__text"><span className="mobile-ai-tool-mode-menu__label">{option.label}</span><small>{option.description}</small></span></button> })}</div>

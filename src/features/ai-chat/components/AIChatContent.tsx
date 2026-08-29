@@ -27,11 +27,7 @@ import type {
     ConversationSettings,
 } from '../model/AiControllerTypes'
 import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
-import {
-    estimateMessagesTokens,
-    formatTokenCount,
-    resolveTokenCalibrationFactor,
-} from '../lib/contextUsage'
+import {useAiContextUsage} from '../hooks/useAiContextUsage'
 import {
     buildRenderableAiChatBlocks,
     buildRenderableAiChatMarkdown,
@@ -99,10 +95,6 @@ const formatConversationSettingNumber = (value: number) => {
     const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
     const trimmed = fixed.replace(/\.?0+$/, '')
     return trimmed || '0'
-}
-const formatContextUsagePercent = (percent: number, usedTokens: number) => {
-    if (usedTokens > 0 && percent > 0 && percent < 1) return '<1%'
-    return `${Math.min(100, Math.max(0, Math.round(percent)))}%`
 }
 const parseConversationNumber = (value: string, fallback: number) => {
     const parsed = Number(value)
@@ -637,87 +629,17 @@ export default function AIChatContent({
     const modelPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
     const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 AI 对话插件'
-    const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
+    // 模型选择器也要用它显示当前模型，所以这一行留在组件里，不跟着用量逻辑搬走。
     const contextModelId = activeConversation?.model || ctx.selectedModel
-    const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
-    const contextWindowTokens = contextModelInfo?.context_window_tokens ?? null
-    const calibrationFactor = resolveTokenCalibrationFactor(
-        appSettings?.llm.token_calibration_factors,
-        contextPluginInfo?.id,
-        contextModelId,
-    )
-    const latestUsage = useMemo(() => {
-        for (let index = ctx.messages.length - 1; index >= 0; index -= 1) {
-            const usage = ctx.messages[index].usage
-            if (usage) return usage
-        }
-        return null
-    }, [ctx.messages])
-    const [estimatedContextTokens, setEstimatedContextTokens] = useState(0)
-    useEffect(() => {
-        const estimatedMessages = [
-            ...ctx.messages,
-            ...(activeConversation?.settings.systemPrompt.trim()
-                ? [{content: activeConversation.settings.systemPrompt}]
-                : []),
-            ...(ctx.inputValue.trim() ? [{content: ctx.inputValue}] : []),
-        ]
-        if (estimatedMessages.length === 0) {
-            setEstimatedContextTokens(0)
-            return
-        }
-
-        let active = true
-        const timer = window.setTimeout(() => {
-            void estimateMessagesTokens(
-                estimatedMessages,
-                calibrationFactor,
-                contextPluginInfo?.id,
-                contextModelId,
-            )
-                .then(tokens => {
-                    if (active) setEstimatedContextTokens(tokens)
-                })
-                .catch(() => {
-                    if (active) setEstimatedContextTokens(0)
-                })
-        }, 150)
-        return () => {
-            active = false
-            window.clearTimeout(timer)
-        }
-    }, [
-        activeConversation?.settings.systemPrompt,
-        calibrationFactor,
-        contextModelId,
-        contextPluginInfo?.id,
-        ctx.inputValue,
-        ctx.messages,
-    ])
-    const contextUsage = useMemo(() => {
-        const usageTokens = latestUsage?.total_tokens ?? 0
-        const usedTokens = Math.max(usageTokens, estimatedContextTokens)
-        const source = latestUsage && usageTokens >= estimatedContextTokens ? '服务返回' : '核心估算'
-        if (!contextWindowTokens || contextWindowTokens <= 0) {
-            return {
-                label: usedTokens > 0 ? '?' : '0%',
-                percent: 0,
-                ringPercent: 0,
-                title: usedTokens > 0
-                    ? `对话记忆容量信息未返回，已估算当前对话记忆约 ${formatTokenCount(usedTokens)}`
-                    : '对话记忆容量信息未返回，暂以 0% 显示',
-            }
-        }
-        const percent = Math.min(100, Math.max(0, (usedTokens / contextWindowTokens) * 100))
-        const label = formatContextUsagePercent(percent, usedTokens)
-        return {
-            label,
-            percent,
-            ringPercent: percent > 0 && percent < 1 ? 1 : percent,
-            title: `对话记忆已用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)}）`,
-        }
-    }, [contextWindowTokens, estimatedContextTokens, latestUsage])
-    const showContextUsageIndicator = Boolean(contextModelId)
+    const {usage: contextUsage, hasModel: showContextUsageIndicator} = useAiContextUsage({
+        messages: ctx.messages,
+        inputValue: ctx.inputValue,
+        activeConversation,
+        plugins: ctx.plugins,
+        selectedPlugin: ctx.selectedPlugin,
+        selectedModel: ctx.selectedModel,
+        tokenCalibrationFactors: appSettings?.llm.token_calibration_factors,
+    })
     const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsage.ringPercent / 100)
     const conversationSettings = normalizeConversationSettings(activeConversation?.settings)
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings,>(

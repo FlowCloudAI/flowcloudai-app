@@ -10,6 +10,7 @@ import {useDrag} from '@use-gesture/react'
 import {createPortal} from 'react-dom'
 import {useAlert} from 'flowcloudai-ui'
 import {useAiController} from '../../../features/ai-chat/hooks/useAiController'
+import {useAppSettingsStore} from '../../../features/settings/appSettingsStore'
 import {
     normalizeConversationSettings,
     type AiToolAccessMode,
@@ -50,6 +51,7 @@ import {useMobileAiMessageScroll} from './useMobileAiMessageScroll'
 import {useMobileAiMessageLinks} from './useMobileAiMessageLinks'
 import {useMobileAiMessageActions} from './useMobileAiMessageActions'
 import {useMobileAiConversationFiles} from './useMobileAiConversationFiles'
+import {useAiContextUsage} from '../../../features/ai-chat/hooks/useAiContextUsage'
 import './MobileAiChat.css'
 
 export default function MobileAiChat({
@@ -63,6 +65,7 @@ export default function MobileAiChat({
     onStartReportDiscussionReady,
 }: MobileAiChatProps) {
     const {showAlert} = useAlert()
+    const appSettings = useAppSettingsStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
@@ -101,6 +104,7 @@ export default function MobileAiChat({
     const [modelMenuMode, setModelMenuMode] = useState<'models' | 'plugins'>('models')
     const [toolModeMenuOpen, setToolModeMenuOpen] = useState(false)
     const [morePanelOpen, setMorePanelOpen] = useState(false)
+    const [contextUsageOpen, setContextUsageOpen] = useState(false)
     const [renameTarget, setRenameTarget] = useState<Conversation | null>(null)
     const [conversationActionTarget, setConversationActionTarget] = useState<Conversation | null>(null)
     const [renaming, setRenaming] = useState(false)
@@ -108,6 +112,7 @@ export default function MobileAiChat({
     const suppressConversationClickRef = useRef(false)
     const modelMenuRef = useRef<HTMLButtonElement>(null)
     const toolModeMenuRef = useRef<HTMLButtonElement>(null)
+    const contextUsageRef = useRef<HTMLButtonElement>(null)
 
     const activeConversation = controllerActiveConversation ?? null
     const activeLlmPluginId = activeConversation?.pluginId || selectedPlugin
@@ -498,6 +503,16 @@ export default function MobileAiChat({
         projectId: activeConversation?.reportContext?.projectId ?? focusContext.projectId,
         navigateToTab,
     })
+    const {usage: contextUsage, hasModel: contextUsageAvailable} = useAiContextUsage({
+        messages,
+        inputValue,
+        activeConversation,
+        plugins,
+        selectedPlugin,
+        selectedModel,
+        tokenCalibrationFactors: appSettings.settings?.llm.token_calibration_factors,
+    })
+
     const {handleCopyMessage, handleRegenerateMessage} = useMobileAiMessageActions({
         isArchivedConversation,
         regenerateMessage,
@@ -716,6 +731,11 @@ export default function MobileAiChat({
                 topMenuOpen={topMenuOpen} onCloseTopMenu={closeTopMenu} activeConversationMenuItems={activeConversationMenuItems}
                 onAttachDocuments={() => void handleAttachDocuments()} webSearchEnabled={webSearchEnabled} onToggleWebSearch={() => void toggleWebSearch()}
                 documentContextItems={documentContextItems}
+                contextUsage={contextUsageAvailable ? contextUsage : null}
+                contextUsageOpen={contextUsageOpen}
+                contextUsageRef={contextUsageRef}
+                onToggleContextUsage={() => setContextUsageOpen(open => !open)}
+                onCloseContextUsage={() => setContextUsageOpen(false)}
                 onRetryDocument={itemId => void retryDocumentContextItem(itemId)}
                 onRemoveDocument={itemId => void removeDocumentContextItem(itemId)}
                 conversationControls={conversationControls} conversationActionTarget={conversationActionTarget}
