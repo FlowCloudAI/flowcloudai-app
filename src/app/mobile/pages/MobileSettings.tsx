@@ -1,4 +1,5 @@
 import {logger} from '../../../shared/logger'
+import {copyTextToClipboard} from '../../../shared/clipboard'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
@@ -402,13 +403,11 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
 
     const handleCopyLog = useCallback(async () => {
         if (!logSnapshot?.content) return
-        try {
-            await navigator.clipboard.writeText(logSnapshot.content)
+        if (await copyTextToClipboard(logSnapshot.content)) {
             await showAlert('日志内容已复制', 'success', 'nonInvasive', 1500)
-        } catch (error) {
-            logger.error('[MobileSettings] 复制日志失败', error)
-            await showAlert(`复制日志失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
+            return
         }
+        await showAlert('复制日志失败', 'error', 'nonInvasive', 3000)
     }, [logSnapshot, showAlert])
 
     const handleOpenOfficialUrl = useCallback((url: string) => {
@@ -419,13 +418,11 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     }, [showAlert])
 
     const handleCopyOfficialEmail = useCallback(async () => {
-        try {
-            await navigator.clipboard.writeText(OFFICIAL_EMAIL)
+        if (await copyTextToClipboard(OFFICIAL_EMAIL)) {
             await showAlert('邮箱已复制', 'success', 'nonInvasive', 1500)
-        } catch (error) {
-            logger.error('[MobileSettings] 复制官方邮箱失败', error)
-            await showAlert(`复制邮箱失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
+            return
         }
+        await showAlert('复制邮箱失败', 'error', 'nonInvasive', 3000)
     }, [showAlert])
 
     const openSettingsPage = useCallback((type: MobileSettingsPageType) => {

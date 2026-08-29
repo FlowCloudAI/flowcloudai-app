@@ -3,6 +3,7 @@ import {getVersion} from '@tauri-apps/api/app'
 import {openUrl} from '../../api/opener'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {submit_public_feedback, type PublicFeedbackPayload} from '../../api/feedback'
+import {copyTextToClipboard} from '../../shared/clipboard'
 import {logger} from '../../shared/logger'
 import FontLicenseModal from './FontLicenseModal'
 import LicenseModal from './LicenseModal'
@@ -180,13 +181,11 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
     }, [])
 
     const handleCopyEmail = useCallback(async () => {
-        try {
-            await navigator.clipboard.writeText(OFFICIAL_EMAIL)
+        if (await copyTextToClipboard(OFFICIAL_EMAIL)) {
             void showAlert('邮箱已复制', 'success', 'nonInvasive', 1600)
-        } catch (error) {
-            logger.error('复制官方邮箱失败:', error)
-            void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'nonInvasive', 2200)
+            return
         }
+        void showAlert('复制邮箱失败', 'error', 'nonInvasive', 2200)
     }, [showAlert])
 
     const officialLinks: OfficialLink[] = [
