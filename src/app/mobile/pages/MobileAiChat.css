@@ -416,7 +416,17 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 
 .mobile-ai-tool-mode-menu {
     /* 字号回到 5 档标尺（基线 §3.1）；此前的 14px/11.5px 是第六、七档。 */
-    width: min(11rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
+    /*
+     * 宽度按内容取。原来写死 11rem（176px），而三行「模式名 + 一句说明」实测只需要
+     * 132px，右侧多出 44px 空白；菜单又是从输入卡的模式胶囊上长出来的，虚宽会盖住
+     * 更多正文。
+     *
+     * 左下角锚点不受影响：--left + --placement-top 用 left/bottom 定位，宽度只向右伸缩。
+     * max-width 保留原来那个数当上限，说明文案再长也不会比从前宽；min-width 由公共
+     * .mobile-anchored-menu 的 7rem 兜底。
+     */
+    width: max-content;
+    max-width: min(11rem, calc(100% - var(--mobile-anchored-menu-left) - 1rem));
     padding: var(--mobile-gap-text);
     border-radius: var(--mobile-radius-card);
 }

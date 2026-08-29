@@ -154,7 +154,9 @@ test('AI 工具模式菜单使用轻量标记选中态与紧邻标题的普通�
     // 2026-08-24：本条曾要求菜单自带 0.875rem/0.71875rem 两个局部字号变量，与
     // mobileUiBaseline 的「字号只有 5 档」断言直接冲突，整套 test:mobile-shell 因此长期阻塞。
     // 以基线为准，改为断言菜单消费标尺内字号。
-    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu\s*\{[\s\S]*?width:\s*min\(11rem,[\s\S]*?padding:\s*var\(--mobile-gap-text\)/)
+    // 宽度按内容取，11rem 只作为上限；左下角锚点由 --left/--placement-top 的 left/bottom 决定，
+    // 与宽度无关，所以这里只钉宽度策略，不钉具体像素。
+    assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu\s*\{[\s\S]*?width:\s*max-content;\s*max-width:\s*min\(11rem,[\s\S]*?padding:\s*var\(--mobile-gap-text\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__label\s*\{[\s\S]*?font-size:\s*var\(--mobile-text-body-sm\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row .mobile-anchored-menu__text small\s*\{[\s\S]*?font-size:\s*var\(--mobile-text-meta\)/)
     assert.match(mobileAiChatCss, /\.mobile-ai-tool-mode-menu__row\s*\{[\s\S]*?grid-template-columns:\s*1\.375rem minmax\(0, 1fr\);[\s\S]*?min-height:\s*calc\(var\(--mobile-tap-min\) \+ var\(--mobile-gap-text\)\)/)
