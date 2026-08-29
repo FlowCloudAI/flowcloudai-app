@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-28
+> 更新日期：2026-08-30
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -55,6 +55,7 @@
 | --- | --- | --- | --- |
 | [Mobile_world.md](Mobile_world.md) | 现行 | 2026-08-02 | 移动端世界观/词条能力缺口与方案。§7 持续记录实现进展，含 10 处未完成项。总计划见 `../plans/ANDROID-01.md` |
 | [mobile_keyboard_layout.md](mobile_keyboard_layout.md) | 现行 | 2026-08-24 | **移动端软键盘布局接管方案与完整复盘**：Android 用 `WindowInsetsCompat`，iOS 用 `UIKeyboard` 事件与 `keyboardLayoutGuide` 兜底；两端共享 `--fc-kb` 内部布局契约但保持原生来源互斥。记录预测/整壳移动等失败方案、旧 WebView 边界、系统输入附件栏的构造期移除、AI/灵感差异化间距及目标真机验收。跨系统版本、第三方输入法与 iPad 矩阵仍是发布闸门 |
+| [mobile_ai_capability_scope.md](mobile_ai_capability_scope.md) | 现行 | 2026-08-30 | **移动端 AI 能力范围与已知取舍**：哪些能力有意不做、为什么。含指令能力（应用感知指令 / 指令模板 / 对话级提示词）移动端不提供入口、分支切换两端一并压后、工具面板与权限模式重叠故不做、相机图库保留占位。附已补齐清单与复核触发条件 |
 | [mobile_keyboard_platform_diff.html](mobile_keyboard_platform_diff.html) | 历史教学模型 | 2026-08-23 | 并排演示旧纯前端方案中的视觉视口平移与“预让修复”。只用于理解被替换方案为何失败；现行 Android 已改用原生实际 Insets，不能用该模型验收当前实现 |
 
 > 移动端的问题排查记录（返回手势、键盘布局、WebView 光栅化、TLS、图标安全区等 7 篇）已迁至 `docs/devlog/`，见 §8。
