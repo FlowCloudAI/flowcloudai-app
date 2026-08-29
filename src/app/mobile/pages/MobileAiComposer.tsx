@@ -23,6 +23,7 @@ interface Props {
     toolAccessMode: AiToolAccessMode; activeToolModeShortLabel: string; toolModeMenuOpen: boolean; onToolModeMenuOpen: (open: boolean) => void; onBeforeToolModeMenuOpen: () => void
     toolModeOptions: ToolModeOption[]; onToolModeChange: (mode: AiToolAccessMode) => void
     morePanelOpen: boolean; onOpenMore: () => void; onCloseMore: () => void
+    editing: boolean; onCancelEditing: () => void
     modelMenuOpen: boolean; onCloseModelMenu: () => void; modelMenuMode: 'models' | 'plugins'; onModelMenuMode: (mode: 'models' | 'plugins') => void
     plugins: PluginInfo[]; activeLlmPluginName: string; activeLlmPluginId: string; activeModelOptions: ModelOption[]; activeModelId: string
     onSelectModel: (modelId: string) => void; onSelectPlugin: (pluginId: string) => void
@@ -36,6 +37,8 @@ export default function MobileAiComposer(p: Props) {
     return <>
         <footer className="mobile-ai-chat__composer"><div className="mobile-ai-composer-card">
             {p.isCompacting ? <div className="mobile-ai-composer-card__status" role="status">正在压缩对话历史…</div> : null}
+            {/* 编辑态必须可见：MessageBox 的「编辑」只是把原文放回输入框，发送时会替换那条消息而不是追加。 */}
+            {p.editing ? <div className="mobile-ai-composer-card__status mobile-ai-composer-card__status--editing" role="status"><span>正在编辑已发送的消息</span><button type="button" onClick={p.onCancelEditing}>取消</button></div> : null}
             <textarea aria-label="AI 消息" value={p.inputValue} onChange={event => p.onInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); p.onSend() } }} placeholder={p.inputPlaceholder} rows={1} disabled={p.inputDisabled && !p.isStreaming}/>
             <div className="mobile-ai-composer-card__bar"><div className="mobile-ai-composer-card__chips">
                 <button type="button" className={`mobile-ai-composer-card__chip${p.thinking ? ' active' : ''}`} aria-pressed={p.thinking} disabled={p.isStreaming} onClick={p.onToggleThinking}><MobileAiIcon type="thinking"/><span>思考</span></button>

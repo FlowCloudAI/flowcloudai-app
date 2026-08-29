@@ -665,6 +665,27 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     font-size: var(--mobile-text-meta);
 }
 
+/* 编辑态是有后果的状态（发送会替换原消息），所以给主色 + 一个显式的取消出口。 */
+.mobile-ai-composer-card__status--editing {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mobile-gap-inline);
+    color: var(--fc-color-primary);
+}
+
+.mobile-ai-composer-card__status--editing button {
+    /* 视觉贴着文字走，命中区由公共 48px 基线兜底。 */
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: var(--mobile-weight-strong);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
 .mobile-ai-composer-card__bar {
     display: flex;
     flex: 0 0 auto;

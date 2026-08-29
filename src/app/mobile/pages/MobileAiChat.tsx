@@ -60,6 +60,7 @@ import {runMobileViewTransition} from './mobileViewTransition'
 import {useMobileAiApiKeyAvailability} from './useMobileAiApiKeyAvailability'
 import {useMobileAiMessageScroll} from './useMobileAiMessageScroll'
 import {useMobileAiMessageLinks} from './useMobileAiMessageLinks'
+import {useMobileAiMessageActions} from './useMobileAiMessageActions'
 import './MobileAiChat.css'
 
 export default function MobileAiChat({
@@ -83,6 +84,7 @@ export default function MobileAiChat({
         isComposingNewConversation,
         messages, sendMessage, stopStreaming,
         regenerateMessage, compactAndRetryMessage, continueMessage,
+        editMessage, editingMessageId, setEditingMessageId,
         inputValue, setInputValue, isStreaming, isCompacting, streamingBlocks, continuationNodeId,
         continuationSubmittingMessageId,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
@@ -570,6 +572,23 @@ export default function MobileAiChat({
         projectId: activeConversation?.reportContext?.projectId ?? focusContext.projectId,
         navigateToTab,
     })
+    const {handleCopyMessage, handleRegenerateMessage} = useMobileAiMessageActions({
+        isArchivedConversation,
+        regenerateMessage,
+    })
+
+    const handleEditMessage = useCallback((messageId: string) => {
+        if (isArchivedConversation) {
+            void showAlert('已归档对话不可编辑消息。', 'warning', 'nonInvasive', 1800)
+            return
+        }
+        editMessage(messageId)
+    }, [editMessage, isArchivedConversation, showAlert])
+
+    const handleCancelEditing = useCallback(() => {
+        setEditingMessageId(null)
+        setInputValue('')
+    }, [setEditingMessageId, setInputValue])
 
 
     const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation && !isComposingNewConversation ? [
@@ -748,6 +767,9 @@ export default function MobileAiChat({
                 onCompactRetryMessage={messageId => void compactAndRetryMessage(messageId)}
                 onContinueMessage={messageId => void continueMessage(messageId)}
                 onMessageLinkClick={handleMessageLinkClick}
+                onCopyMessage={content => void handleCopyMessage(content)}
+                onRegenerateMessage={messageId => void handleRegenerateMessage(messageId)}
+                onEditMessage={handleEditMessage}
             />
 
             <MobileAiComposer
@@ -760,6 +782,7 @@ export default function MobileAiChat({
                 onBeforeToolModeMenuOpen={() => { closeModelMenu(); setTopMenuOpen(false) }}
                 toolModeOptions={toolModeOptions} onToolModeChange={mode => void handleToolModeChange(mode)}
                 morePanelOpen={morePanelOpen} onOpenMore={openMorePanel} onCloseMore={closeMorePanel}
+                editing={Boolean(editingMessageId)} onCancelEditing={handleCancelEditing}
                 modelMenuOpen={modelMenuOpen} onCloseModelMenu={closeModelMenu} modelMenuMode={modelMenuMode} onModelMenuMode={changeModelMenuMode}
                 plugins={plugins} activeLlmPluginName={activeLlmPluginName} activeLlmPluginId={activeLlmPluginId}
                 activeModelOptions={activeModelOptions} activeModelId={activeModelId}

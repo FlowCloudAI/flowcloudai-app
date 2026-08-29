@@ -31,6 +31,9 @@ interface MobileAiMessageListProps {
      * 见 app_main/AGENTS.md「任何渲染 Markdown 的表面都必须自己接管锚点点击」。
      */
     onMessageLinkClick: (event: ReactMouseEvent<HTMLElement>) => void
+    onCopyMessage: (content: string) => void
+    onRegenerateMessage: (messageId: string) => void
+    onEditMessage: (messageId: string) => void
 }
 
 export default function MobileAiMessageList({
@@ -50,6 +53,9 @@ export default function MobileAiMessageList({
     onCompactRetryMessage,
     onContinueMessage,
     onMessageLinkClick,
+    onCopyMessage,
+    onRegenerateMessage,
+    onEditMessage,
 }: MobileAiMessageListProps) {
     const showEmptyState = messages.length === 0 && !isStreaming
 
@@ -112,6 +118,11 @@ export default function MobileAiMessageList({
                                 toolCallDetail="verbose"
                                 lineHeight={1.5}
                                 streaming={isContinuing}
+                                onCopy={() => onCopyMessage(message.content)}
+                                onEdit={() => onEditMessage(message.id)}
+                                onRegenerate={message.role === 'assistant' && !isContinuing && !isIncompleteMessage(message)
+                                    ? () => onRegenerateMessage(message.id)
+                                    : undefined}
                             />
                             {canContinue ? (
                                 <Button type="button" size="sm" onClick={() => onContinueMessage(message.id)}>
@@ -139,6 +150,8 @@ export default function MobileAiMessageList({
                                 toolCallDetail="verbose"
                                 lineHeight={1.5}
                                 streaming={isContinuing}
+                                onCopy={() => onCopyMessage(message.content)}
+                                onEdit={() => onEditMessage(message.id)}
                             />
                         ) : null}
                         <AiChatErrorNotice
