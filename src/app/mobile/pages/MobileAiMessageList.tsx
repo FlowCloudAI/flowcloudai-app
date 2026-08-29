@@ -1,6 +1,10 @@
-import {Fragment, type RefObject} from 'react'
+import {Fragment, type MouseEvent as ReactMouseEvent, type RefObject} from 'react'
 import {Button, MessageBox} from 'flowcloudai-ui'
 import {type AiContextValue} from '../../../features/ai-chat/model/AiControllerTypes'
+import {
+    buildRenderableAiChatBlocks,
+    buildRenderableAiChatMarkdown,
+} from '../../../features/ai-chat/lib/aiChatMarkdown'
 import AiChatErrorNotice from '../../../features/ai-chat/components/AiChatErrorNotice'
 import AiResponsePendingIndicator from '../../../features/ai-chat/components/AiResponsePendingIndicator'
 import {isIncompleteMessage} from '../../../features/ai-chat/model/conversationState'
@@ -22,6 +26,11 @@ interface MobileAiMessageListProps {
     onRetryMessage: (messageId: string) => void
     onCompactRetryMessage: (messageId: string) => void
     onContinueMessage: (messageId: string) => void
+    /**
+     * 消息区的锚点接管。AI 回复是 Markdown 表面，必须自己拦链接：
+     * 见 app_main/AGENTS.md「任何渲染 Markdown 的表面都必须自己接管锚点点击」。
+     */
+    onMessageLinkClick: (event: ReactMouseEvent<HTMLElement>) => void
 }
 
 export default function MobileAiMessageList({
@@ -40,11 +49,15 @@ export default function MobileAiMessageList({
     onRetryMessage,
     onCompactRetryMessage,
     onContinueMessage,
+    onMessageLinkClick,
 }: MobileAiMessageListProps) {
     const showEmptyState = messages.length === 0 && !isStreaming
 
     return (
-        <main className={`mobile-ai-chat__messages${showEmptyState ? ' mobile-ai-chat__messages--empty' : ''}`}>
+        <main
+            className={`mobile-ai-chat__messages${showEmptyState ? ' mobile-ai-chat__messages--empty' : ''}`}
+            onClick={onMessageLinkClick}
+        >
             {showEmptyState && (
                 <div className="mobile-ai-chat__empty">
                     <p>开始 AI 对话</p>
@@ -76,13 +89,24 @@ export default function MobileAiMessageList({
                 const visibleBlocks = isContinuing
                     ? [...(message.blocks ?? []), ...streamingBlocks]
                     : message.blocks
+                /*
+                 * 与桌面端共用同一条可渲染化管线：把模型产出的 [[标题]] / fc:// / entry://
+                 * 改写成同文档 hash 链接，并给已经结束的会话里悬挂的工具调用收尾。
+                 * 只对 assistant 做——用户输入按原文显示，不该被改写。
+                 */
+                const renderableBlocks = message.role === 'assistant'
+                    ? buildRenderableAiChatBlocks(visibleBlocks, !isContinuing)
+                    : visibleBlocks
+                const renderableContent = message.role === 'assistant'
+                    ? buildRenderableAiChatMarkdown(message.content)
+                    : message.content
                 if (!message.error) {
                     return (
                         <Fragment key={message.id}>
                             <MessageBox
                                 role={message.role}
-                                blocks={visibleBlocks}
-                                content={message.content}
+                                blocks={renderableBlocks}
+                                content={renderableContent}
                                 markdown={message.role === 'assistant'}
                                 contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                 toolCallDetail="verbose"
@@ -108,8 +132,8 @@ export default function MobileAiMessageList({
                         {hasRenderableMessage ? (
                             <MessageBox
                                 role={message.role}
-                                blocks={visibleBlocks}
-                                content={message.content}
+                                blocks={renderableBlocks}
+                                content={renderableContent}
                                 markdown={message.role === 'assistant'}
                                 contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                 toolCallDetail="verbose"
@@ -141,7 +165,7 @@ export default function MobileAiMessageList({
             {isStreaming && continuationNodeId == null && streamingBlocks.length > 0 && (
                 <MessageBox
                     role="assistant"
-                    blocks={streamingBlocks}
+                    blocks={buildRenderableAiChatBlocks(streamingBlocks)}
                     streaming
                     markdown
                     toolCallDetail="verbose"

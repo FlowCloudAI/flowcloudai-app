@@ -19,6 +19,7 @@
     "test:world-check-task": "node --test --experimental-test-isolation=none ./scripts/world-check-task-state.test.ts",
     "test:app-update-policy": "node --experimental-strip-types ./scripts/app-update-policy.test.ts",
     "test:edge-geometry": "node ./scripts/check-edge-geometry.ts",
+    "test:ai-chat-markdown": "node --test --experimental-strip-types ./scripts/ai-chat-markdown.test.mjs",
     "test:markdown-wiki-link-highlight": "node --experimental-strip-types ./scripts/markdown-wiki-link-highlight.test.mjs",
     "test:entry-markdown-toolbar": "node --experimental-strip-types ./scripts/entry-markdown-toolbar.test.mjs",
     "test:entry-editor-reliability": "node --experimental-strip-types ./scripts/entry-editor-reliability.test.mjs",

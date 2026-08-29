@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import {createPortal} from 'react-dom'
 import {listenNativeFileDrop, openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
-import {Button, MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
     ai_cancel_tts,
@@ -32,6 +32,11 @@ import {
     formatTokenCount,
     resolveTokenCalibrationFactor,
 } from '../lib/contextUsage'
+import {
+    buildRenderableAiChatBlocks,
+    buildRenderableAiChatMarkdown,
+    parseAiChatEntryHref,
+} from '../lib/aiChatMarkdown'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
@@ -45,7 +50,6 @@ import AiToolAccessIcon from './AiToolAccessIcon'
 import {
     buildInternalEntryMarkdown,
     type InternalEntryLink,
-    parseInternalEntryHref,
     resolveInternalEntryProjectId,
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
@@ -62,7 +66,6 @@ import './AIChatContent.css'
 const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
-const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 const AI_CHAT_DROP_ZONE_ID = 'ai-chat-drop-zone'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
 const CONTEXT_USAGE_RING_RADIUS = 10
@@ -239,76 +242,6 @@ function resolveActionMenuPlacement(anchorRect: DOMRect): ActionMenuPlacement {
     return spaceBelow >= ACTION_MENU_ESTIMATED_HEIGHT || spaceBelow >= spaceAbove ? 'down' : 'up'
 }
 
-function buildAiChatEntryHref(link: InternalEntryLink): string {
-    const params = new URLSearchParams()
-    if (link.projectId) params.set('projectId', link.projectId)
-    if (link.isSelfProject) params.set('selfProject', '1')
-    if (link.entryId) params.set('entryId', link.entryId)
-    params.set('title', link.title)
-    return `${AI_CHAT_ENTRY_LINK_PREFIX}${params.toString()}`
-}
-
-function parseAiChatEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
-    if (href.startsWith(AI_CHAT_ENTRY_LINK_PREFIX)) {
-        const params = new URLSearchParams(href.slice(AI_CHAT_ENTRY_LINK_PREFIX.length))
-        const title = (params.get('title') ?? fallbackTitle).trim()
-        const projectId = params.get('projectId')?.trim() || null
-        const entryId = params.get('entryId')?.trim() || null
-        if (!title && !entryId) return null
-        return {title, projectId, entryId, isSelfProject: params.get('selfProject') === '1'}
-    }
-
-    return parseInternalEntryHref(href, fallbackTitle)
-}
-
-function buildRenderableAiChatMarkdown(content: string): string {
-    return content
-        .replace(/\[([^\]\n]+?)]\((fc:\/\/[^)\s]+\/entry\/[^)\s]+|entry:\/\/[^)\s]+|entry-title:\/\/[^)]+)\)/g, (_match, rawTitle, rawHref) => {
-            const title = String(rawTitle).trim()
-            const link = parseInternalEntryHref(String(rawHref), title)
-            if (!link) return _match
-            return `[${title}](${buildAiChatEntryHref(link)})`
-        })
-        .replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
-            const title = String(rawTitle).trim()
-            if (!title) return _match
-            return `[${title}](${buildAiChatEntryHref({title, projectId: null, entryId: null})})`
-        })
-}
-
-function buildRenderableAiChatBlocks(
-    blocks?: MessageBoxBlock[],
-    finalizePendingTools = false,
-): MessageBoxBlock[] | undefined {
-    if (!blocks) return undefined
-    return blocks.map((block) => {
-        if (block.type === 'content') {
-            return {
-                ...block,
-                content: buildRenderableAiChatMarkdown(block.content),
-                streaming: finalizePendingTools ? false : block.streaming,
-            }
-        }
-        if (block.type === 'reasoning') {
-            return finalizePendingTools ? {...block, streaming: false} : block
-        }
-        if (finalizePendingTools && block.type === 'tool' && block.tool.result == null) {
-            return {
-                ...block,
-                tool: {...block.tool, result: '会话已结束，未返回工具结果。'},
-            }
-        }
-        if (finalizePendingTools && block.type === 'tool_use') {
-            return {
-                ...block,
-                tools: block.tools.map(tool => (
-                    tool.result == null ? {...tool, result: '会话已结束，未返回工具结果。'} : tool
-                )),
-            }
-        }
-        return block
-    })
-}
 
 const getDocumentContextFileExtension = (path: string) => {
     const fileName = path.split(/[\\/]/).pop() ?? ''
@@ -1994,7 +1927,7 @@ export default function AIChatContent({
                                             <MessageBox
                                                 role={message.role}
                                                 blocks={message.role === 'assistant'
-                                                    ? buildRenderableAiChatBlocks(visibleBlocks, true)
+                                                    ? buildRenderableAiChatBlocks(visibleBlocks, !isContinuing)
                                                     : visibleBlocks}
                                                 contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                                 content={message.role === 'assistant'

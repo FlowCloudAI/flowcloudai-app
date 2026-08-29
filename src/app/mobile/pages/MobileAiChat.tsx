@@ -59,6 +59,7 @@ import type {MobileAiChatProps} from './MobileAiChat.types'
 import {runMobileViewTransition} from './mobileViewTransition'
 import {useMobileAiApiKeyAvailability} from './useMobileAiApiKeyAvailability'
 import {useMobileAiMessageScroll} from './useMobileAiMessageScroll'
+import {useMobileAiMessageLinks} from './useMobileAiMessageLinks'
 import './MobileAiChat.css'
 
 export default function MobileAiChat({
@@ -564,6 +565,13 @@ export default function MobileAiChat({
         }
     }, [activeConversation, addDocumentContextFiles, closeMorePanel, isArchivedConversation, showAlert])
 
+    const handleMessageLinkClick = useMobileAiMessageLinks({
+        // 矛盾检测会话自带项目上下文；普通会话用当前聚焦的项目。
+        projectId: activeConversation?.reportContext?.projectId ?? focusContext.projectId,
+        navigateToTab,
+    })
+
+
     const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation && !isComposingNewConversation ? [
         {
             key: 'pin',
@@ -739,6 +747,7 @@ export default function MobileAiChat({
                 onRetryMessage={messageId => void regenerateMessage(messageId)}
                 onCompactRetryMessage={messageId => void compactAndRetryMessage(messageId)}
                 onContinueMessage={messageId => void continueMessage(messageId)}
+                onMessageLinkClick={handleMessageLinkClick}
             />
 
             <MobileAiComposer
