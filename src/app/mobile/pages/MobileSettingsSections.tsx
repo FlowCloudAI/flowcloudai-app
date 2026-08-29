@@ -75,7 +75,6 @@ interface AppearanceSectionProps {
     onLanguageChange: (value: string) => void
     onEditorFontSizeChange: (value: number) => void
     onGlassEffectChange: (value: boolean) => void
-    onSaveSettings: () => void | Promise<void>
 }
 
 interface UsageSectionProps {
@@ -160,7 +159,6 @@ export function MobileSettingsMenuSection({
                     label: '权限与工具',
                     summary: `${writerModeEnabled ? '作家模式已允许' : '作家模式未允许'} · ${searchEngineLabel}`,
                 },
-                {type: 'settingsTemplates', label: '指令模板', summary: '应用感知指令与模板文件'},
                 {type: 'settingsUsage', label: '用量统计', summary: 'AI 使用次数与消耗统计'},
             ],
         },
@@ -591,7 +589,6 @@ export function MobileSettingsAppearanceSection({
     onLanguageChange,
     onEditorFontSizeChange,
     onGlassEffectChange,
-    onSaveSettings,
 }: AppearanceSectionProps) {
     return (
         <div className="mobile-settings-section">
@@ -648,9 +645,6 @@ export function MobileSettingsAppearanceSection({
                         onChange={event => onGlassEffectChange(event.currentTarget.checked)}
                     />
                 </label>
-                <Button type="button" onClick={onSaveSettings} className="mobile-settings-full-button">
-                    保存设置
-                </Button>
             </div>
         </div>
     )

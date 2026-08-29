@@ -1,24 +1,12 @@
-import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
-import {useCallback, useEffect, useMemo, useState} from 'react'
-import {
-    template_get,
-    template_get_default,
-    template_list,
-    template_save,
-    type SearchSourceSettings,
-    type TemplateDocument,
-    type TemplateMeta,
-    type TemplateValidationError,
-} from '../../../api'
+import {Input, Select} from 'flowcloudai-ui'
+import {type SearchSourceSettings} from '../../../api'
 import {FeedbackSection} from '../../../features/about/AboutSection'
-import {logger} from '../../../shared/logger'
 
 interface StorageProps {
     autoBackupSecs: number
     maxBackupCount: number
     onAutoBackupSecsChange: (value: number) => void
     onMaxBackupCountChange: (value: number) => void
-    onSave: () => void | Promise<void>
 }
 
 interface PermissionsProps {
@@ -28,14 +16,6 @@ interface PermissionsProps {
     onWriterModeChange: (enabled: boolean) => void
     onSearchEngineChange: (value: string) => void
     onSearchSourceChange: (key: keyof SearchSourceSettings, enabled: boolean) => void
-    onSave: () => void | Promise<void>
-}
-
-interface TemplatesProps {
-    defaultPrompt: string
-    editorFontSize: number
-    onDefaultPromptChange: (value: string) => void
-    onSaveSettings: () => void | Promise<void>
 }
 
 const SEARCH_SOURCE_OPTIONS: Array<{
@@ -62,7 +42,6 @@ export function MobileSettingsStorageSection({
     maxBackupCount,
     onAutoBackupSecsChange,
     onMaxBackupCountChange,
-    onSave,
 }: StorageProps) {
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
@@ -103,9 +82,6 @@ export function MobileSettingsStorageSection({
                     </label>
                 </div>
             </section>
-            <Button type="button" radius="full" block onClick={() => void onSave()}>
-                保存存储设置
-            </Button>
         </div>
     )
 }
@@ -117,7 +93,6 @@ export function MobileSettingsPermissionsSection({
     onWriterModeChange,
     onSearchEngineChange,
     onSearchSourceChange,
-    onSave,
 }: PermissionsProps) {
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
@@ -168,182 +143,6 @@ export function MobileSettingsPermissionsSection({
                         ))}
                     </div>
                 </div>
-            </section>
-            <Button type="button" radius="full" block onClick={() => void onSave()}>
-                保存权限设置
-            </Button>
-        </div>
-    )
-}
-
-export function MobileSettingsTemplatesSection({
-    defaultPrompt,
-    editorFontSize,
-    onDefaultPromptChange,
-    onSaveSettings,
-}: TemplatesProps) {
-    const {showAlert} = useAlert()
-    const [templates, setTemplates] = useState<TemplateMeta[]>([])
-    const [selectedId, setSelectedId] = useState('')
-    const [document, setDocument] = useState<TemplateDocument | null>(null)
-    const [draft, setDraft] = useState('')
-    const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
-    const [error, setError] = useState('')
-    const [validationError, setValidationError] = useState<TemplateValidationError | null>(null)
-
-    const loadTemplates = useCallback(async () => {
-        setLoading(true)
-        setError('')
-        try {
-            const items = await template_list()
-            setTemplates(items)
-            setSelectedId(current => current || items[0]?.id || '')
-        } catch (nextError) {
-            const message = String(nextError)
-            logger.error('[MobileSettings] 加载指令模板失败', nextError)
-            setError(message)
-        } finally {
-            setLoading(false)
-        }
-    }, [])
-
-    useEffect(() => {
-        void loadTemplates()
-    }, [loadTemplates])
-
-    useEffect(() => {
-        if (!selectedId) {
-            setDocument(null)
-            setDraft('')
-            return
-        }
-        let disposed = false
-        setLoading(true)
-        setError('')
-        setValidationError(null)
-        template_get(selectedId)
-            .then(next => {
-                if (disposed) return
-                setDocument(next)
-                setDraft(next.content)
-            })
-            .catch(nextError => {
-                if (!disposed) setError(String(nextError))
-            })
-            .finally(() => {
-                if (!disposed) setLoading(false)
-            })
-        return () => {
-            disposed = true
-        }
-    }, [selectedId])
-
-    const templateOptions = useMemo(() => templates.map(template => ({
-        value: template.id,
-        label: `${template.group} · ${template.title}`,
-    })), [templates])
-
-    const restoreDefault = useCallback(async () => {
-        if (!selectedId) return
-        try {
-            setDraft(await template_get_default(selectedId))
-            setValidationError(null)
-            await showAlert('已载入内置默认内容，保存后生效', 'success', 'nonInvasive', 1800)
-        } catch (nextError) {
-            await showAlert(`读取默认模板失败：${String(nextError)}`, 'error', 'nonInvasive', 3000)
-        }
-    }, [selectedId, showAlert])
-
-    const saveTemplate = useCallback(async () => {
-        if (!selectedId) return
-        setSaving(true)
-        setValidationError(null)
-        try {
-            const result = await template_save(selectedId, draft)
-            if (result.status === 'success') {
-                setDocument(result.document)
-                setDraft(result.document.content)
-                await showAlert('指令模板已保存', 'success', 'nonInvasive', 1600)
-            } else if (result.status === 'validation_error') {
-                setValidationError(result.error)
-            } else {
-                await showAlert(`保存失败：${result.message}`, 'error', 'nonInvasive', 3000)
-            }
-        } catch (nextError) {
-            await showAlert(`保存失败：${String(nextError)}`, 'error', 'nonInvasive', 3000)
-        } finally {
-            setSaving(false)
-        }
-    }, [draft, selectedId, showAlert])
-
-    return (
-        <div className="mobile-settings-section mobile-settings-form-stack">
-            <section className="mobile-settings-panel mobile-settings-form-stack">
-                <h2 className="mobile-settings-panel__title">应用感知自定义指令</h2>
-                <p className="mobile-settings-field-hint">追加到应用感知模式的系统指令中。</p>
-                <textarea
-                    className="mobile-settings-textarea"
-                    value={defaultPrompt}
-                    aria-label="应用感知自定义指令"
-                    style={{fontSize: `max(${editorFontSize}px, var(--mobile-text-body))`}}
-                    placeholder="可选"
-                    onChange={event => onDefaultPromptChange(event.currentTarget.value)}
-                />
-                <Button type="button" radius="full" onClick={() => void onSaveSettings()}>
-                    保存自定义指令
-                </Button>
-            </section>
-
-            <section className="mobile-settings-panel mobile-settings-form-stack">
-                <div className="mobile-settings-section__header">
-                    <h2 className="mobile-settings-panel__title">模板文件</h2>
-                    <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void loadTemplates()} disabled={loading}>
-                        {loading ? '加载中…' : '刷新'}
-                    </Button>
-                </div>
-                {error && <div className="mobile-settings-plugin-error">加载失败：{error}</div>}
-                <Select
-                    value={selectedId}
-                    options={templateOptions}
-                    placeholder="选择模板"
-                    radius="full"
-                    onValueChange={value => setSelectedId(String(value ?? ''))}
-                />
-                {document && (
-                    <>
-                        <div className="mobile-settings-template-meta">
-                            <strong>{document.meta.title}</strong>
-                            <span>{document.meta.purpose}</span>
-                            <span>出现位置：{document.meta.appear_in}</span>
-                            <span>{document.is_override ? '当前使用本地覆盖' : '当前使用内置默认'}</span>
-                        </div>
-                        <textarea
-                            className="mobile-settings-textarea mobile-settings-textarea--template"
-                            value={draft}
-                            aria-label={`${document.meta.title}模板内容`}
-                            spellCheck={false}
-                            style={{fontSize: `max(${editorFontSize}px, var(--mobile-text-body))`}}
-                            onChange={event => {
-                                setDraft(event.currentTarget.value)
-                                setValidationError(null)
-                            }}
-                        />
-                        {validationError && (
-                            <div className="mobile-settings-template-error" role="alert">
-                                {validationError.line ? `第 ${validationError.line} 行：` : ''}{validationError.message}
-                            </div>
-                        )}
-                        <div className="mobile-settings-inline-actions">
-                            <Button type="button" variant="outline" radius="full" onClick={() => void restoreDefault()} disabled={saving}>
-                                载入默认值
-                            </Button>
-                            <Button type="button" radius="full" onClick={() => void saveTemplate()} disabled={saving || !draft.trim()}>
-                                {saving ? '保存中…' : '保存模板'}
-                            </Button>
-                        </div>
-                    </>
-                )}
             </section>
         </div>
     )

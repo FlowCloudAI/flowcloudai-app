@@ -109,10 +109,6 @@
     gap: var(--mobile-gap-item);
 }
 
-.mobile-settings-full-button {
-    width: 100%;
-}
-
 .mobile-settings-switch-field {
     display: flex;
     align-items: center;
@@ -672,7 +668,6 @@
     border-radius: var(--mobile-radius-field);
 }
 
-.mobile-settings-full-button.fc-btn,
 .mobile-settings-api-key__actions .fc-btn,
 .mobile-settings-log-viewer__actions .fc-btn,
 .mobile-settings-exit-button.fc-btn {
@@ -799,53 +794,6 @@
     border-bottom: 0;
 }
 
-.mobile-settings-textarea {
-    width: 100%;
-    min-height: 8rem;
-    padding: var(--mobile-gap-item);
-    resize: vertical;
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-field);
-    outline: none;
-    box-sizing: border-box;
-    background: var(--fc-color-bg);
-    color: var(--fc-color-text);
-    font: inherit;
-    line-height: var(--mobile-leading-snug);
-}
-
-.mobile-settings-textarea:focus {
-    border-color: var(--fc-color-primary);
-    outline: var(--mobile-focus-ring);
-    outline-offset: -2px;
-}
-
-.mobile-settings-textarea--template {
-    min-height: 18rem;
-    font-family: var(--fc-font-family-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
-}
-
-.mobile-settings-template-meta {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-text);
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    line-height: var(--mobile-leading-snug);
-}
-
-.mobile-settings-template-meta strong {
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-body-sm);
-}
-
-.mobile-settings-template-error {
-    color: var(--fc-color-error);
-    font-size: var(--mobile-text-meta);
-    line-height: var(--mobile-leading-snug);
-}
-
-.mobile-settings-inline-actions,
 .mobile-settings-plugin-item__actions {
     display: flex;
     justify-content: flex-end;

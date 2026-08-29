@@ -1,4 +1,4 @@
-import {Button, Input, Select, Slider} from 'flowcloudai-ui'
+import {Input, Select, Slider} from 'flowcloudai-ui'
 import type {AppSettings, LlmCompactDetail, PluginInfo} from '../../../api'
 import {CONVERSATION_TEMPERATURE_MAX} from '../../../features/ai-chat/model/AiControllerTypes'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../../../features/plugins/ttsVoice'
@@ -9,7 +9,6 @@ interface Props {
     imagePlugins: PluginInfo[]
     ttsPlugins: PluginInfo[]
     onChange: (settings: AppSettings) => void
-    onSave: () => void | Promise<void>
 }
 
 type ModelKind = 'llm' | 'image' | 'tts'
@@ -39,7 +38,6 @@ export default function MobileSettingsModelsSection({
     imagePlugins,
     ttsPlugins,
     onChange,
-    onSave,
 }: Props) {
     const pluginsByKind: Record<ModelKind, PluginInfo[]> = {
         llm: llmPlugins,
@@ -290,10 +288,6 @@ export default function MobileSettingsModelsSection({
                     </div>
                 )}
             </section>
-
-            <Button type="button" radius="full" block onClick={() => void onSave()}>
-                保存模型设置
-            </Button>
         </div>
     )
 }

@@ -49,7 +49,6 @@ export interface MobilePageParamsMap {
     settingsPlugins: undefined
     settingsModels: undefined
     settingsPermissions: undefined
-    settingsTemplates: undefined
     settingsAppearance: undefined
     settingsUsage: undefined
     settingsUpdate: undefined
@@ -65,7 +64,6 @@ export type MobileSettingsPageType =
     | 'settingsPlugins'
     | 'settingsModels'
     | 'settingsPermissions'
-    | 'settingsTemplates'
     | 'settingsAppearance'
     | 'settingsUsage'
     | 'settingsUpdate'

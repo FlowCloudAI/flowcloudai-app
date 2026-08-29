@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_get_usage_by_model,
@@ -47,7 +47,6 @@ import {
     MobileSettingsFeedbackSection,
     MobileSettingsPermissionsSection,
     MobileSettingsStorageSection,
-    MobileSettingsTemplatesSection,
 } from './MobileSettingsAdditionalSections'
 import './MobileSettings.css'
 
@@ -65,13 +64,18 @@ type SettingsSection =
     | 'plugins'
     | 'models'
     | 'permissions'
-    | 'templates'
     | 'appearance'
     | 'usage'
     | 'update'
     | 'feedback'
     | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
+
+/*
+ * 设置改动自动落盘的防抖窗口。与桌面端 `pages/Settings.tsx` 取同一个值：
+ * 两端都是「改完等一小会儿再写」，没有理由各写一个数。
+ */
+const MOBILE_SETTINGS_AUTOSAVE_DEBOUNCE_MS = 500
 
 const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
 const OFFICIAL_GITHUB_URL = 'https://github.com/FlowCloudAI/Local_App'
@@ -108,7 +112,6 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
         case 'settingsPlugins': return 'plugins'
         case 'settingsModels': return 'models'
         case 'settingsPermissions': return 'permissions'
-        case 'settingsTemplates': return 'templates'
         case 'settingsAppearance': return 'appearance'
         case 'settingsUsage': return 'usage'
         case 'settingsUpdate': return 'update'
@@ -123,7 +126,6 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'plugins') return '插件管理'
     if (section === 'models') return '模型管理'
     if (section === 'permissions') return '权限与工具'
-    if (section === 'templates') return '指令模板'
     if (section === 'appearance') return '外观'
     if (section === 'usage') return '用量统计'
     if (section === 'update') return '更新'
@@ -158,6 +160,8 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const installingPluginIds = pluginCatalog.installingIds
     const uninstallingPluginId = pluginCatalog.uninstallingId
     const [settings, setSettings] = useState<AppSettings | null>(null)
+    // 用户改过、但还没落盘。见下方自动保存与 store 回灌保护。
+    const settingsDirtyRef = useRef(false)
     const [version, setVersion] = useState('')
     const loading = appSettingsStore.loading && !settings
     const [logViewerOpen, setLogViewerOpen] = useState(false)
@@ -185,7 +189,12 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     useEffect(() => {
         const nextSettings = appSettingsStore.settings
         if (!nextSettings) return
-        setSettings(nextSettings)
+        /*
+         * 本地还有没落盘的编辑时，不能用 store 快照回灌。
+         * 每次自动保存都会刷新 store 并推回来一份新对象；用户在「保存请求发出」到
+         * 「快照推回」之间的连续调节（拖滑条、连点开关）会被这份旧快照吞掉。
+         */
+        if (!settingsDirtyRef.current) setSettings(nextSettings)
         const requestedPluginId = page?.type === 'settingsAi' ? page.params.pluginId : undefined
         setSelectedApiKeyPlugin(current => resolveApiKeyPluginId(
             requestedPluginId,
@@ -208,20 +217,31 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
             : appSettingsStore.apiKeyStatus[selectedApiKeyPlugin] ? 'configured' : 'missing')
     }, [appSettingsStore.apiKeyStatus, appSettingsStore.loading, selectedApiKeyPlugin])
 
-    const handleSave = useCallback(async () => {
-        if (!settings) return
-        const merged: AppSettings = {
-            ...settings,
-            theme,
-        }
+    /*
+     * 成功时不弹提示：改动本身在界面上已经可见（开关翻了、滑条动了），
+     * 而自动保存会让每一次调节都弹一次，反而盖住正在操作的控件。失败仍然要说。
+     */
+    const persistSettings = useCallback(async (next: AppSettings) => {
         try {
-            const saved = await saveAppSettings(merged)
+            const saved = await saveAppSettings(next)
             setSettings(saved.settings)
-            await showAlert('设置已保存', 'success', 'nonInvasive', 1500)
         } catch (e) {
             await showAlert(`保存失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
-    }, [theme, settings, showAlert])
+    }, [showAlert])
+
+    /*
+     * 只有用户改过才写盘：store 推回快照同样会更新 settings，
+     * 没有这个标记的话每次保存完都会被推回的新对象引用触发成一次新的保存。
+     */
+    useEffect(() => {
+        if (!settings || !settingsDirtyRef.current) return
+        const timer = window.setTimeout(() => {
+            settingsDirtyRef.current = false
+            void persistSettings({...settings, theme})
+        }, MOBILE_SETTINGS_AUTOSAVE_DEBOUNCE_MS)
+        return () => window.clearTimeout(timer)
+    }, [persistSettings, settings, theme])
 
     const handleSaveApiKey = useCallback(async () => {
         if (!selectedApiKeyPlugin) {
@@ -417,8 +437,21 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     }, [push])
 
     const updateSettingsDraft = useCallback((patch: Partial<AppSettings>) => {
+        settingsDirtyRef.current = true
         setSettings(current => current ? {...current, ...patch} : current)
     }, [])
+
+    /** 模型管理整份替换 settings，同样要打脏值标记，否则那一页改完不会自动落盘。 */
+    const replaceSettingsDraft = useCallback((next: AppSettings) => {
+        settingsDirtyRef.current = true
+        setSettings(next)
+    }, [])
+
+    /** 主题不在 settings 里，由 useTheme 持有；自动保存时合并进去，所以这里也要打标记。 */
+    const handleThemeChange = useCallback((next: 'system' | 'light' | 'dark') => {
+        settingsDirtyRef.current = true
+        setTheme(next)
+    }, [setTheme])
 
     const loadUsageStats = useCallback(async () => {
         setUsageLoading(true)
@@ -455,6 +488,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     })
     const currentPlugin = appSettingsStore.llmPlugins.find(plugin => plugin.id === settings.llm.plugin_id)
     const updateLlmDraft = (patch: Partial<AppSettings['llm']>) => {
+        settingsDirtyRef.current = true
         setSettings(current => current ? {...current, llm: {...current.llm, ...patch}} : current)
     }
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
@@ -524,7 +558,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     maxBackupCount={settings.max_backup_count}
                     onAutoBackupSecsChange={value => updateSettingsDraft({auto_backup_secs: value})}
                     onMaxBackupCountChange={value => updateSettingsDraft({max_backup_count: value})}
-                    onSave={handleSave}
                 />
             )}
 
@@ -534,8 +567,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     llmPlugins={appSettingsStore.llmPlugins}
                     imagePlugins={appSettingsStore.imagePlugins}
                     ttsPlugins={appSettingsStore.ttsPlugins}
-                    onChange={setSettings}
-                    onSave={handleSave}
+                    onChange={replaceSettingsDraft}
                 />
             )}
 
@@ -549,16 +581,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     onSearchSourceChange={(key, enabled) => updateSettingsDraft({
                         search_sources: {...settings.search_sources, [key]: enabled},
                     })}
-                    onSave={handleSave}
-                />
-            )}
-
-            {section === 'templates' && (
-                <MobileSettingsTemplatesSection
-                    defaultPrompt={settings.llm.app_sense_custom_prompt}
-                    editorFontSize={settings.editor_font_size}
-                    onDefaultPromptChange={value => updateLlmDraft({app_sense_custom_prompt: value})}
-                    onSaveSettings={handleSave}
                 />
             )}
 
@@ -605,11 +627,10 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     languageOptions={languageOptions}
                     editorFontSize={settings?.editor_font_size ?? 14}
                     glassEffectEnabled={settings?.shell_acrylic_enabled ?? true}
-                    onThemeChange={setTheme}
+                    onThemeChange={handleThemeChange}
                     onLanguageChange={language => updateSettingsDraft({language})}
                     onEditorFontSizeChange={fontSize => updateSettingsDraft({editor_font_size: clampEditorFontSize(fontSize)})}
                     onGlassEffectChange={enabled => updateSettingsDraft({shell_acrylic_enabled: enabled})}
-                    onSaveSettings={handleSave}
                 />
             )}
 
