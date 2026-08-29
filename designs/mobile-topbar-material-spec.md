@@ -108,7 +108,7 @@
 | 实验参数 | 生产实现 | 说明 |
 | --- | --- | --- |
 | 页面色、主色、文字色 | `flowcloudai-ui` 的 `--fc-*` 主题 token | 不在移动端重复硬编码主题；当前主题值与确认稿一致或由其推导 |
-| `barPaddingX: 20` | `--mobile-page-topbar-x: max(1.25rem, safe-left, safe-right)` | 20px 是基线，下限仍受横向安全区保护 |
+| `barPaddingX: 20` | `--mobile-page-topbar-x: var(--mobile-page-x)` | 实验里的 20px 没有整体落地：`--edge-to-edge` 的页面外扩与内边距相抵，内容列一直落在页面正文列上，只有 AI、灵感、时间线、关系图这几个不带页面内边距的顶栏真的缩进 20px。2026-08-29 统一取 `--mobile-page-x`（375px 视口 = 16px），横向安全区由该 token 自身兜住 |
 | 屏幕顶部距离 | `--mobile-topbar-edge-gap` + `--mobile-topbar-safe-offset` | 按钮固定从安全区下沿再留 `group + text`；全屏 Portal 由公共顶栏自行补入顶部安全区 |
 | 顶栏五段渐变 | `.mobile-page-topbar::before` | 五个位置与不透明度逐项对应 JSON |
 | `barBlur` | `--mobile-topbar-bg-filter` | 亮色 1px、暗色 2px；独占顶栏背景伪元素 |

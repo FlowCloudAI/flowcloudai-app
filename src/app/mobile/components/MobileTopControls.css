@@ -5,16 +5,20 @@
         + var(--mobile-topbar-edge-gap)
     );
     /*
+     * 顶栏内容列必须和页面正文列落在同一条竖线上，所以直接取页面左右间距。
+     *
+     * 原来单写 1.25rem 基线，但它只在一部分页面真正生效：--edge-to-edge 先按这个值外扩、
+     * 再拿它当内边距，一外一内相抵，内容列实际落回父级的 --mobile-page-x；而 AI、灵感、
+     * 时间线、关系图的顶栏不在带页面内边距的容器里，才真的用到 20px。同一个组件因此在
+     * 两类页面缩进不一致，按钮可用宽度差 8px（375px 视口真机实测 342.46 vs 334.46）。
+     */
+    --mobile-page-topbar-x: var(--mobile-page-x);
+    /*
      * 顶栏背景渐变调试区：
      * 1. bg-stop-*：从顶栏顶部到顶栏底部的关键点位置，0% 在最上，100% 在最下。
      * 2. bg-visible-*：该关键点处页面背景色的可见度，100% 为完全实色，0% 为完全透明。
      * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
      */
-    --mobile-page-topbar-x: max(
-        1.25rem,
-        var(--mobile-safe-left),
-        var(--mobile-safe-right)
-    );
     --mobile-page-topbar-bg-stop-1: 0%;
     --mobile-page-topbar-bg-visible-1: 100%;
     --mobile-page-topbar-bg-stop-2: 20%;
