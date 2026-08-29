@@ -148,8 +148,23 @@
  * 不在这里重写 .fc-tree__* 的结构样式，避免和库的内部实现耦合。
  */
 .mobile-category-drawer__tree .fc-tree {
-    --fc-tree-bg-selected: color-mix(in srgb, var(--fc-color-primary) 11%, var(--fc-color-bg-elevated));
+    /*
+     * 选中底色比默认深一档：11% → 16%。
+     * 没有换成别的语义 token 是因为不存在合适的——primary-subtle 实测比这个混合结果还浅，
+     * 再往下就是全强度的 primary，当底色太重。所以仍用 --fc-color-primary 本身提高比例，
+     * 不引入色值字面量。
+     *
+     * 16% 是踩着对比度选的：选中行文字改用 primary 之后，实测对比度 11% 为 3.18、
+     * 16% 为 3.00、22% 为 2.80。3:1 是界面元素的下限，再深就守不住了。
+     * 注意这仍低于正文 4.5:1 的标准——浅蓝底配 primary 文字达不到，是取舍。
+     */
+    --fc-tree-bg-selected: color-mix(in srgb, var(--fc-color-primary) 16%, var(--fc-color-bg-elevated));
     --fc-tree-drop-indicator: var(--fc-color-primary);
+}
+
+/* 选中行文字走 primary；标题继承这里的 color，展开箭头保持 muted 不跟随。 */
+.mobile-category-drawer .fc-tree__item--selected {
+    color: var(--fc-color-primary);
 }
 
 .mobile-category-drawer-dialog {
