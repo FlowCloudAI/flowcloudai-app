@@ -444,6 +444,22 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     color: var(--fc-color-primary);
 }
 
+/*
+ * 选中色跟输入卡上的模式胶囊同一套：读者绿、助手蓝、作家黄。
+ * 菜单里只染文字和左侧标记，不铺底色——底色那一档留给胶囊，
+ * 菜单是从胶囊上长出来的，两处都铺会变成两块同色实心面。
+ *
+ * 三条 --row--<mode>.active 与上面的 .row.active 同为 (0,2,0)，靠书写顺序取胜，
+ * 必须排在它后面。assistant 不单列，直接用上面那条的 --fc-color-primary。
+ */
+.mobile-ai-tool-mode-menu__row--reader.active {
+    color: var(--fc-color-success);
+}
+
+.mobile-ai-tool-mode-menu__row--writer.active {
+    color: var(--fc-color-warning);
+}
+
 .mobile-ai-tool-mode-menu__row.active::before {
     position: absolute;
     top: 50%;
@@ -451,7 +467,8 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     width: 2px;
     height: calc(var(--mobile-tap-min) - var(--mobile-gap-item));
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-primary);
+    /* 跟着行的文字色走，不再单独写主色，否则三种模式的标记会全是蓝的。 */
+    background: currentColor;
     content: '';
     transform: translateY(-50%);
 }
@@ -478,13 +495,6 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 .mobile-ai-tool-mode-menu__row .mobile-ai-svg {
     width: 1.375rem;
     height: 1.375rem;
-}
-
-.mobile-ai-tool-mode-menu__label .mobile-check-icon {
-    width: 0.875rem;
-    height: 0.875rem;
-    flex: 0 0 auto;
-    stroke-width: 2;
 }
 
 .mobile-ai-model-menu__divider {
