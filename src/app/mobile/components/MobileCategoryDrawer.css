@@ -257,17 +257,16 @@
 /*
  * 菜单打开期间高亮它所属的那一行。
  *
- * Tree 自带的 --fc-tree-bg-hover 默认取的正是抽屉面板那一档底色，两者实测同色——
- * 那条 hover 规则在这里本来就是空操作，所以先把这一档换成看得见的中性叠加，再用它画高亮。
- * 用 hover 档而不是 selected 档：selected 是蓝色调，会和「当前打开的分类」混淆，
+ * 底色直接写在这条规则上，不去改 --fc-tree-bg-hover。曾经那样做过，代价是：
+ * 那一档同时喂给 Tree 的行 hover 和拖拽源样式，而触屏上 :hover 是粘滞的——点过的行
+ * 会一直亮着同一个颜色，看起来像菜单还开着（lib_ui 已把行 hover 收进 @media (hover: hover)，
+ * 但这一档不该被一个无关用途绑架）。
+ *
+ * 用中性叠加而不是 selected 那档蓝：蓝色会和「当前打开的分类」混淆，
  * 而这一行只是菜单的宿主，不代表选中。
  *
  * 标记属性由 MobileCategoryDrawer 在菜单开合时直接写到行元素上，原因见那里的注释。
  */
-.mobile-category-drawer .fc-tree {
-    --fc-tree-bg-hover: color-mix(in srgb, var(--fc-color-text) 6%, transparent);
-}
-
 .mobile-category-drawer .fc-tree__item[data-fc-menu-open] {
-    background: var(--fc-tree-bg-hover);
+    background: color-mix(in srgb, var(--fc-color-text) 6%, transparent);
 }
