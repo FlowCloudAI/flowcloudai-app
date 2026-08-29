@@ -324,12 +324,16 @@ L1 token 一律挂在 `:root[data-fc-density="touch"]` 上，**不挂在 `.mobil
 
    **面板适用的是**：一屏内放得下的动作清单、少量开关、单选列表。
 
-   **已知违例（记录于 2026-08-24，尚未整改）：**
+   **已知违例（首次记录于 2026-08-24）：**
 
-   | 位置 | 违反 | 说明 |
+   | 位置 | 违反 | 状态 |
    |---|---|---|
-   | `MobileAiComposer.tsx` 的「更多对话设置」 | 滚动 + 输入 | 面板内含 `MobileAiConversationControls`：5 个数值输入与 1 个多行「当前对话独有提示词」`textarea`，叠加 4 个快捷动作后必然超高 |
-   | `MobileRelationGraph.tsx` 的「关系索引」 | 滚动 | 关系列表长度不可控，靠内层 `height: min(28rem, 48dvh)` 的嵌套滚动容器兜底 |
+   | `MobileAiComposer.tsx` 的「更多对话设置」 | 滚动 + 输入 | **2026-08-29 已整改。** 原先面板内是 `MobileAiConversationControls` 的 5 个数值输入 + 1 个多行「当前对话独有提示词」`textarea`，叠加 4 个快捷动作后必然超高。现在 4 个采样参数全部改为滑条、`textarea` 撤除（对话级提示词仍在数据里，只是移动端不再提供编辑入口）。真机复核见下 |
+   | `MobileRelationGraph.tsx` 的「关系索引」 | 滚动 | 未整改。关系列表长度不可控，靠内层 `height: min(28rem, 48dvh)` 的嵌套滚动容器兜底 |
+
+   「更多对话设置」的整改复核（Xiaomi 24129RT7CC / Android 16 / 375×834 CSS 视口，debug APK + CDP 实测）：
+   面板高 444.56px，上限 684.26px；`scrollHeight == clientHeight`（面板自身不滚动）；
+   面板内可滚动容器 0 个；`input / textarea / select / [contenteditable]` 命中 0 个。
 
 
 ---

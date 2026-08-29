@@ -655,7 +655,6 @@ export default function MobileAiChat({
         onTopP={value => updateConversationSetting('topP', value)}
         onFrequencyPenalty={value => updatePenaltySetting('frequencyPenalty', value)}
         onPresencePenalty={value => updatePenaltySetting('presencePenalty', value)}
-        onSystemPrompt={value => updateConversationSetting('systemPrompt', value)}
     />
     const conversationDrawer = <MobileAiConversationDrawer
         search={conversationSearch} onSearch={setConversationSearch}
