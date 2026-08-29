@@ -1,7 +1,14 @@
 .mobile-ai-chat {
     --mobile-ai-topbar-space: 4.25rem;
     --mobile-ai-composer-space: 8.25rem;
-    --mobile-ai-keyboard-gap: 0px;
+    /*
+     * 输入卡与键盘上沿之间的额外呼吸位，只在键盘展开时生效：--fc-kb 为 0 时整项取 0，
+     * 收起态（输入卡贴 Tab）的几何一行都不变。
+     * 与 composer 自身的 padding-bottom 叠加后，卡片底部离键盘约 8px；
+     * 原来这里是 0，只剩 4px padding，卡片看上去是粘在键盘上的。
+     * iOS 另有更宽的一档覆盖在下面（移除系统附件栏后需要更多间距）。
+     */
+    --mobile-ai-keyboard-gap: min(var(--fc-kb, 0px), var(--mobile-gap-text));
     /*
      * 软键盘接管：只重定义保留高度，不给具体元素散写键盘偏移。
      * 这样 __composer 的 `bottom: var(--mobile-nav-reserved-height)` 等既有声明一行都不用改。

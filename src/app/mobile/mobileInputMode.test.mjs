@@ -312,10 +312,16 @@ test('iOS 表单辅助栏在主窗口构造阶段关闭', () => {
     assert.doesNotMatch(iosProductionBridgeSource, /inputAssistantItem/)
 })
 
-test('iOS 键盘上沿间距按 AI 与灵感页面分别校正', () => {
-    assert.match(mobileAiChatCss, /data-mobile-keyboard-owner='ios'[\s\S]*--mobile-ai-keyboard-gap:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-gap-inline\)\)/)
+test('键盘上沿间距按 AI 与灵感页面分别校正', () => {
+    // 两项都必须挂在 --fc-kb 上：收起态取 0，页面在没有键盘时的几何不受影响。
+    assert.match(mobileAiChatCss, /--mobile-ai-keyboard-gap:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-gap-text\)\)/)
     assert.match(mobileAiChatCss, /bottom:\s*calc\(var\(--mobile-nav-reserved-height\) \+ var\(--mobile-ai-keyboard-gap\)\)/)
-    assert.match(mobileIdeaCss, /data-mobile-keyboard-owner='ios'[\s\S]*--mobile-idea-keyboard-safe-reduction:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-safe-bottom\)\)/)
+    // iOS 移除了系统附件栏，需要比默认档更宽的一档，因此仍保留平台覆盖。
+    assert.match(mobileAiChatCss, /data-mobile-keyboard-owner='ios'[\s\S]*--mobile-ai-keyboard-gap:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-gap-inline\)\)/)
+    // 灵感的重复安全区扣减与平台无关：外壳保留高度里已经含一份 --mobile-safe-bottom，
+    // 编辑器再加一份就是双份留白，因此这条不能退回 iOS 专属选择器。
+    assert.match(mobileIdeaCss, /--mobile-idea-keyboard-safe-reduction:\s*min\(var\(--fc-kb, 0px\), var\(--mobile-safe-bottom\)\)/)
+    assert.doesNotMatch(mobileIdeaCss, /data-mobile-keyboard-owner='ios'/)
     assert.match(mobileIdeaCss, /var\(--mobile-safe-bottom\)[\s\S]*- var\(--mobile-idea-keyboard-safe-reduction\)/)
 })
 

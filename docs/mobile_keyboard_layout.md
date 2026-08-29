@@ -149,9 +149,9 @@ AI 聊天页与灵感页继续复用现有 `--mobile-nav-reserved-height`：
 键盘收起时 `--fc-kb = 0px`，布局退化到正常 Tab 保留高度。键盘展开时：
 
 - `.mobile-nav` 仍绝对定位在机器底部，被系统键盘覆盖；
-- AI composer 的 `bottom` 变为实际键盘高度；iOS 在移除系统附件栏后另加一档紧凑间距；
+- AI composer 的 `bottom` 变为实际键盘高度，再加一档 `--mobile-ai-keyboard-gap`；默认档是 `--mobile-gap-text`（约 4px，与 composer 自身的 4px `padding-bottom` 叠加后卡片离键盘约 8px），iOS 在移除系统附件栏后覆盖为 `--mobile-gap-inline`；
 - `mobile-nav-safe-fixed` 的内部可用空间按相同高度缩短；
-- 灵感 textarea 在 flex 容器中缩短并保持内部滚动；iOS 键盘展开时扣除已被键盘覆盖的底部安全区，避免重复留白。
+- 灵感 textarea 在 flex 容器中缩短并保持内部滚动；键盘展开时扣除编辑器自己那份底部安全区（外壳保留高度里已含一份），避免重复留白。该扣减与平台无关，Android 与 iOS 同样命中。
 
 ### 5.3 消息列表不能重复消费键盘高度
 
@@ -307,9 +307,10 @@ UIKit 在真机上曾短暂报告 `143 → 587 → 401.7`、`401.7 → 629.7 →
 
 页面分配如下：
 
-- AI/灵感继续复用原有 `--mobile-nav-reserved-height`；iOS 只在页面边界追加间距校正：AI 输入卡与键盘上沿
-  保留 `--mobile-gap-inline`（当前约 8px），灵感编辑器键盘展开时扣掉重复的 `safe-area-inset-bottom`，
-  最终保留 `--mobile-gap-item`（当前约 12px）。Android 不命中这些选择器；
+- AI/灵感继续复用原有 `--mobile-nav-reserved-height`；iOS 在页面边界追加一档更宽的间距校正：AI 输入卡的
+  `--mobile-ai-keyboard-gap` 由默认的 `--mobile-gap-text` 覆盖为 `--mobile-gap-inline`（当前约 8px）。
+  灵感编辑器扣掉重复 `safe-area-inset-bottom`、最终保留 `--mobile-gap-item`（当前约 12px）的那条，
+  2026-08-29 起改为所有平台共用，不再是 iOS 专属；
 - iOS 普通 `.mobile-page` 在同一个变量下获得可滚到键盘上方的尾部空间；
 - Portal 的 floating/sheet 浮层在 iOS 下缩到键盘上方，覆盖 AI 更多设置与项目表单；
 - 沉浸正文编辑器保留自己已有的 `visualViewport` 内层工作区 owner，外层 Overlay 不再叠加 `--fc-kb`，

@@ -1,5 +1,13 @@
 .mobile-idea {
-    --mobile-idea-keyboard-safe-reduction: 0px;
+    /*
+     * 键盘展开时扣掉编辑器自己那份底部安全区。
+     *
+     * 页面外壳（.mobile-nav-safe-fixed）已经按 --mobile-nav-reserved-height 缩到键盘上沿，
+     * 而该高度里本来就含一份 --mobile-safe-bottom；编辑器再加一份就是重复留白——真机实测
+     * 正文底到键盘上沿有 59.54px，其中 48px 是这份多出来的安全区。扣掉后只剩页面常规
+     * 的 --mobile-gap-item。--fc-kb 为 0 时 min() 取 0，收起态留白不变。
+     */
+    --mobile-idea-keyboard-safe-reduction: min(var(--fc-kb, 0px), var(--mobile-safe-bottom));
     /*
      * 软键盘接管：同 MobileAiChat，只重定义保留高度。
      * 本页带 mobile-nav-safe-fixed，其 padding-bottom 读的就是这个变量；
@@ -17,11 +25,6 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
-}
-
-/* 键盘本身已覆盖底部安全区；展开时只保留编辑器的常规页面间距。 */
-html[data-mobile-keyboard-owner='ios'] .mobile-idea {
-    --mobile-idea-keyboard-safe-reduction: min(var(--fc-kb, 0px), var(--mobile-safe-bottom));
 }
 
 .mobile-idea-svg {
