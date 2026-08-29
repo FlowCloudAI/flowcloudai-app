@@ -52,7 +52,7 @@ export function buildConversationExportFileName(conversation: Conversation, form
     return `${safeTitle || 'AI会话'}.${format === 'json' ? 'json' : 'md'}`
 }
 
-type IconType = 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | AiToolAccessMode
+type IconType = 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | 'retry' | 'close' | AiToolAccessMode
 const AI_TOOL_ACCESS_ICON_PATHS: Record<AiToolAccessMode, string[]> = {
     reader: [
         'M12 8.8C10 7.2 7.6 6.4 4.7 6.4v10.3c2.9 0 5.3.8 7.3 2.5Z',
@@ -100,6 +100,8 @@ export function MobileAiIcon({type, strokeWidth}: {type: IconType; strokeWidth?:
         file: ['M7 4.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V6A1.5 1.5 0 0 1 7.5 4.5Z', 'M14 4.5V9h4', 'M8.5 13h7', 'M8.5 16h5'],
         web: ['M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Z', 'M4.5 12h17', 'M12 3.5c4.3 4.7 4.3 12.3 0 17', 'M12 3.5c-4.3 4.7-4.3 12.3 0 17'],
         send: ['M12 20V4', 'M4.5 11.5 12 4l7.5 7.5'],
+        retry: ['M4 12a8 8 0 1 1 2.6 5.9', 'M4 18.5V13h5.5'],
+        close: ['M7 7l10 10', 'M17 7 7 17'],
     }
     if (type === 'stop') return <svg className="mobile-ai-svg" viewBox="0 0 24 24"><rect x="8" y="8" width="8" height="8" rx="1.5"/></svg>
     if (type === 'camera') return <svg className="mobile-ai-svg" viewBox="0 0 24 24"><path d="M8.5 7 10 5h4l1.5 2H18a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="3.2"/></svg>

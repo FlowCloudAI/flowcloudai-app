@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/refs -- 仅透传父组件 refs 给锚点组件，不读取 ref.current */
 import type {ReactNode, RefObject} from 'react'
-import type {PluginInfo} from '../../../api'
+import type {DocumentContextItem, PluginInfo} from '../../../api'
 import type {AiToolAccessMode, Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
 import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import MobileBottomSheet from '../components/MobileBottomSheet'
@@ -29,13 +29,62 @@ interface Props {
     onSelectModel: (modelId: string) => void; onSelectPlugin: (pluginId: string) => void
     topMenuOpen: boolean; onCloseTopMenu: () => void; activeConversationMenuItems: MobileAnchoredMenuItem[]
     onAttachDocuments: () => void; webSearchEnabled: boolean; onToggleWebSearch: () => void
+    documentContextItems: DocumentContextItem[]
+    onRetryDocument: (itemId: string) => void; onRemoveDocument: (itemId: string) => void
     conversationControls: ReactNode; conversationActionTarget: Conversation | null; onCloseConversationAction: () => void; conversationActionMenuItems: MobileAnchoredMenuItem[]
     renameTarget: Conversation | null; renaming: boolean; onCloseRename: () => void; onRename: (title: string) => void
 }
 
+/** 与桌面端 documentContextStatusLabel 同一套措辞；ready 不显示状态词，由「已引用」兜底。 */
+const DOCUMENT_STATUS_LABELS: Record<string, string> = {
+    pending: '排队中',
+    parsing: '解析中',
+    ready: '',
+    failed: '解析失败',
+}
+
 export default function MobileAiComposer(p: Props) {
     return <>
-        <footer className="mobile-ai-chat__composer"><div className="mobile-ai-composer-card">
+        <footer className="mobile-ai-chat__composer">
+            {/*
+              * 已引用文档必须看得见：移动端此前只能「添加」，加进去之后既看不到列表、
+              * 解析失败也没有重试入口，加错了也删不掉，只能弃用整个会话。
+              * 横向滚动区必须带 data-mobile-horizontal-scroll，否则会和侧边抽屉手势抢横滑。
+              */}
+            {p.documentContextItems.length > 0 ? (
+                <div className="mobile-ai-doc-rail" data-mobile-horizontal-scroll aria-label="本对话引用文档">
+                    {p.documentContextItems.map(item => {
+                        const typeLabel = item.extension ? item.extension.toUpperCase() : '文件'
+                        const statusLabel = DOCUMENT_STATUS_LABELS[item.status] ?? item.status
+                        return (
+                            <article
+                                key={item.id}
+                                className={`mobile-ai-doc-chip mobile-ai-doc-chip--${item.status}`}
+                            >
+                                <span className="mobile-ai-doc-chip__meta">
+                                    <span className="mobile-ai-doc-chip__name">{item.fileName}</span>
+                                    <small>{statusLabel ? `${typeLabel} · ${statusLabel}` : `${typeLabel} · 已引用`}</small>
+                                </span>
+                                {item.status === 'failed' ? (
+                                    <button
+                                        type="button"
+                                        className="mobile-ai-doc-chip__action"
+                                        aria-label={`重新解析 ${item.fileName}`}
+                                        onClick={() => p.onRetryDocument(item.id)}
+                                    ><MobileAiIcon type="retry"/></button>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    className="mobile-ai-doc-chip__action"
+                                    aria-label={`停止引用 ${item.fileName}`}
+                                    onClick={() => p.onRemoveDocument(item.id)}
+                                ><MobileAiIcon type="close"/></button>
+                            </article>
+                        )
+                    })}
+                </div>
+            ) : null}
+            <div className="mobile-ai-composer-card">
             {p.isCompacting ? <div className="mobile-ai-composer-card__status" role="status">正在压缩对话历史…</div> : null}
             {/* 编辑态必须可见：MessageBox 的「编辑」只是把原文放回输入框，发送时会替换那条消息而不是追加。 */}
             {p.editing ? <div className="mobile-ai-composer-card__status mobile-ai-composer-card__status--editing" role="status"><span>正在编辑已发送的消息</span><button type="button" onClick={p.onCancelEditing}>取消</button></div> : null}
@@ -47,7 +96,8 @@ export default function MobileAiComposer(p: Props) {
                 <button type="button" className="mobile-ai-composer-card__icon-btn" aria-label="更多" aria-expanded={p.morePanelOpen} onClick={p.morePanelOpen ? p.onCloseMore : p.onOpenMore}><MobileAddIcon className="mobile-top-control-svg--inline"/></button>
                 <button type="button" className="mobile-ai-composer-card__icon-btn mobile-ai-composer-card__icon-btn--send" aria-label={p.isStreaming ? '停止生成' : '发送'} onClick={p.isStreaming ? p.onStop : p.onSend} disabled={!p.isStreaming && (!p.inputValue.trim() || p.inputDisabled)}><MobileAiIcon type={p.isStreaming ? 'stop' : 'send'}/></button>
             </div></div>
-        </div></footer>
+            </div>
+        </footer>
 
         <MobileAnchoredMenu open={p.toolModeMenuOpen} onClose={() => p.onToolModeMenuOpen(false)} anchorRef={p.toolModeMenuRef} containerRef={p.pageRef} ariaLabel="切换写入模式" className="mobile-ai-tool-mode-menu" align="left" placement="top">
             <div className="mobile-anchored-menu__group">{p.toolModeOptions.map(option => { const active = p.toolAccessMode === option.mode; return <button key={option.mode} type="button" role="menuitemradio" aria-checked={active} className={`mobile-anchored-menu__row mobile-ai-tool-mode-menu__row mobile-ai-tool-mode-menu__row--${option.mode}${active ? ' active' : ''}`} disabled={p.isStreaming} onClick={() => { p.onToolModeMenuOpen(false); p.onToolModeChange(option.mode) }}><span className="mobile-anchored-menu__icon" aria-hidden="true"><MobileAiIcon type={option.mode} strokeWidth={1.7}/></span><span className="mobile-anchored-menu__text"><span className="mobile-ai-tool-mode-menu__label">{option.label}</span><small>{option.description}</small></span></button> })}</div>

@@ -660,6 +660,89 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     color: var(--mobile-color-text-readable-tertiary);
 }
 
+/*
+ * 已引用文档轨道。放在输入卡上方、composer 内部：它必须跟着键盘一起上移，
+ * 也不能塞进底部面板（面板不承载滚动内容，见 designs/mobile-ui-baseline.md §9 规则 8）。
+ */
+.mobile-ai-doc-rail {
+    display: flex;
+    gap: var(--mobile-gap-inline);
+    margin-bottom: var(--mobile-gap-text);
+    padding-bottom: var(--mobile-gap-text);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+
+.mobile-ai-doc-rail::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-ai-doc-chip {
+    display: flex;
+    max-width: 15rem;
+    min-width: 0;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-panel);
+}
+
+.mobile-ai-doc-chip--failed {
+    border-color: color-mix(in srgb, var(--fc-color-danger) 46%, transparent);
+}
+
+.mobile-ai-doc-chip__meta {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--mobile-gap-text);
+}
+
+.mobile-ai-doc-chip__name {
+    overflow: hidden;
+    color: var(--fc-color-text);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight) ;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-ai-doc-chip__meta small {
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-tight) ;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-ai-doc-chip--failed .mobile-ai-doc-chip__meta small {
+    color: var(--fc-color-danger);
+}
+
+/* 视觉是紧凑图标；命中区由公共 48px 基线撑开，不缩小。 */
+.mobile-ai-doc-chip__action {
+    display: inline-grid;
+    flex: 0 0 auto;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-doc-chip__action .mobile-ai-svg {
+    width: 1.05rem;
+    height: 1.05rem;
+}
+
 .mobile-ai-composer-card__status {
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-meta);
