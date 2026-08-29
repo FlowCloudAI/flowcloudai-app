@@ -265,8 +265,11 @@
  * 用中性叠加而不是 selected 那档蓝：蓝色会和「当前打开的分类」混淆，
  * 而这一行只是菜单的宿主，不代表选中。
  *
+ * 排除已选中的行：它本来就是蓝底，再盖一层灰等于把选中态降级成普通高亮，反而丢信息。
+ * 选中行的菜单宿主身份由菜单本身贴在它边上表达，不需要再改色。
+ *
  * 标记属性由 MobileCategoryDrawer 在菜单开合时直接写到行元素上，原因见那里的注释。
  */
-.mobile-category-drawer .fc-tree__item[data-fc-menu-open] {
+.mobile-category-drawer .fc-tree__item[data-fc-menu-open]:not(.fc-tree__item--selected) {
     background: color-mix(in srgb, var(--fc-color-text) 6%, transparent);
 }
