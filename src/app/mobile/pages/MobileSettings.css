@@ -674,6 +674,44 @@
     border-radius: var(--fc-radius-full);
 }
 
+/*
+ * capsule 按钮：把高度交还给 padding。
+ *
+ * lib_ui 已经按 capsule 规范把内边距写成 1:2（sm 8/16、md 12/24），但触控密度下有两条
+ * 48px 下限压在上面——`.fc-btn` 的 `min-height` 和 `mobileAccessibility.css` 的
+ * `min-block-size`，两条读的都是 --fc-control-tap-min。48 比 padding 撑出来的 36 高，
+ * 纵向留白被下限接管，真机实测成了 16 : 14.93 ≈ 1.07：声明的是胶囊，画出来是圆头矩形。
+ *
+ * 就地把 --fc-control-tap-min 置零，两条下限一起解除，高度回到 padding + 行盒决定的值，
+ * 比例回到 1:2。这里的 0 不是尺寸值，是「不设下限」。
+ *
+ * 命中区不缩小：由下面的透明 ::after 补回 48px，符合基线 §6.1 规则 2「图标视觉尺寸可以小，
+ * 命中区不可以」，与 .mobile-ai-model-pill 是同一套做法。
+ * circle / icon-only / square 按 lib_ui/README.md 不套用 capsule 留白规则，排除在外。
+ *
+ * 第二条选择器是提交反馈按钮：它来自共享的 AboutSection，没有传 radius="full"，
+ * 胶囊圆角是本文件下面那条移动端规则给的。圆角在这里给，比例和高度就得在这里一起给，
+ * 否则它会是全设置页唯一漏网的 48px 圆头矩形（真机上确实漏过一次）。
+ */
+.mobile-settings-page .fc-btn--radius-full:not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only),
+.mobile-settings-feedback .about-section-feedback-actions .fc-btn {
+    --fc-control-tap-min: 0;
+
+    position: relative;
+}
+
+.mobile-settings-page .fc-btn--radius-full:not(.fc-btn--square):not(.fc-btn--circle):not(.fc-btn--icon-only)::after,
+.mobile-settings-feedback .about-section-feedback-actions .fc-btn::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* 宽度同样补回下限：--fc-control-tap-min 置零把 min-inline-size 也一起解除了。 */
+    width: max(100%, var(--mobile-tap-min));
+    height: var(--mobile-tap-min);
+    transform: translate(-50%, -50%);
+    content: '';
+}
+
 .mobile-settings-menu {
     gap: var(--mobile-gap-group);
     padding-bottom: var(--mobile-gap-section);
