@@ -238,3 +238,21 @@
     min-height: calc(var(--mobile-tap-min) * 0.75);
     padding-block: 0;
 }
+
+/*
+ * 菜单打开期间高亮它所属的那一行。
+ *
+ * Tree 自带的 --fc-tree-bg-hover 默认取的正是抽屉面板那一档底色，两者实测同色——
+ * 那条 hover 规则在这里本来就是空操作，所以先把这一档换成看得见的中性叠加，再用它画高亮。
+ * 用 hover 档而不是 selected 档：selected 是蓝色调，会和「当前打开的分类」混淆，
+ * 而这一行只是菜单的宿主，不代表选中。
+ *
+ * 标记属性由 MobileCategoryDrawer 在菜单开合时直接写到行元素上，原因见那里的注释。
+ */
+.mobile-category-drawer .fc-tree {
+    --fc-tree-bg-hover: color-mix(in srgb, var(--fc-color-text) 6%, transparent);
+}
+
+.mobile-category-drawer .fc-tree__item[data-fc-menu-open] {
+    background: var(--fc-tree-bg-hover);
+}

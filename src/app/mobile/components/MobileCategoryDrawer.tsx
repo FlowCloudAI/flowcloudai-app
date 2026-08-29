@@ -413,6 +413,22 @@ export default function MobileCategoryDrawer({
         return (marker?.closest('.fc-tree__item') as HTMLElement | null) ?? null
     }, [])
 
+    /*
+     * 菜单打开期间在那一行上挂个标记，用来画高亮，指明菜单正在操作谁。
+     *
+     * 不能走 renderTitle 传标记：Tree 的 renderTitle 是从 ref 读的，行组件按
+     * {node, level, isSelected, isExpanded, isEditing} 做 memo，menuTarget 变化既不改
+     * 这几个 prop 也不改 context 身份，行根本不会重渲染，标记永远更新不了。
+     * 所以直接在上面已经解析出来的行元素上开关属性。菜单打开时浮层盖住整屏、列表滚不动，
+     * 不用担心虚拟滚动把这一行回收给别的节点。
+     */
+    useEffect(() => {
+        const row = menuTarget ? menuAnchorRef.current : null
+        if (!row) return
+        row.setAttribute('data-fc-menu-open', '')
+        return () => row.removeAttribute('data-fc-menu-open')
+    }, [menuTarget])
+
     const getCategoryActions = useCallback((node: CategoryTreeNode): TreeActionItem[] => [{
         key: 'manage',
         label: '管理',
