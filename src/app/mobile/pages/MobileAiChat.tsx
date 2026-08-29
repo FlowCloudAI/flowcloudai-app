@@ -202,7 +202,8 @@ export default function MobileAiChat({
                                 ? '请先配置访问密钥'
                                 : isCompacting
                                     ? '正在压缩对话历史…'
-                                    : '发消息或按住说话'
+                                    // 全仓没有任何语音输入实现，占位文案不能承诺「按住说话」。
+                                    : '发消息'
 
     const messageListEmpty = messages.length === 0 && !isStreaming
     useMobileAiMessageScroll({
