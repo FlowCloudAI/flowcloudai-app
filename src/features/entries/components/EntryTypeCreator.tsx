@@ -10,7 +10,11 @@ function isValidHexColor(value: string): boolean {
     return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)
 }
 
-interface EntryTypeCreatorProps {
+interface EntryTypeCreatorFormProps {
+    /**
+     * 表单是否处于「已打开」状态。浮层用它做打开时重置；
+     * 独立页面每次挂载都是新的，固定传 true 即可。
+     */
     open: boolean
     projectId: string
     initialEntryType?: CustomEntryType | null
@@ -18,9 +22,16 @@ interface EntryTypeCreatorProps {
     onClose: () => void
     onSaved?: (entryType: CustomEntryType) => void
     onDeleted?: (entryTypeId: string) => void
+    /** 提交中状态回传给外壳：浮层据此禁用点背板关闭，页面据此禁用返回。 */
+    onBusyChange?: (busy: boolean) => void
 }
 
-export default function EntryTypeCreator({
+/**
+ * 词条类型表单本体，不含浮层/页面外壳。
+ * 桌面端包在 FloatingPanel 里（本文件默认导出），移动端包在独立页面里
+ * （见 app/mobile/pages/MobileEntryTypeEditor）。
+ */
+export function EntryTypeCreatorForm({
                                              open,
                                              projectId,
                                              initialEntryType = null,
@@ -28,7 +39,8 @@ export default function EntryTypeCreator({
                                              onClose,
                                              onSaved,
                                              onDeleted,
-                                         }: EntryTypeCreatorProps) {
+                                             onBusyChange,
+                                         }: EntryTypeCreatorFormProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [icon, setIcon] = useState('')
@@ -37,6 +49,10 @@ export default function EntryTypeCreator({
     const [apiError, setApiError] = useState<string | null>(null)
     const {showAlert} = useAlert()
     const isEditMode = Boolean(initialEntryType)
+
+    useEffect(() => {
+        onBusyChange?.(submitting)
+    }, [onBusyChange, submitting])
 
     useEffect(() => {
         if (open) {
@@ -127,14 +143,7 @@ export default function EntryTypeCreator({
     }
 
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            dismissible={!submitting}
-            title={isEditMode ? '编辑词条类型' : '新建词条类型'}
-            ariaLabel={isEditMode ? '编辑词条类型' : '新建词条类型'}
-            className="entry-type-creator-dialog"
-        >
+        <>
             <div className="entry-type-creator-body">
                     <div className="entry-type-creator-field">
                         <label className="entry-type-creator-label">
@@ -251,6 +260,23 @@ export default function EntryTypeCreator({
                         </Button>
                     </div>
                 </div>
+        </>
+    )
+}
+
+/** 桌面端的浮层外壳。表单本体见 EntryTypeCreatorForm。 */
+export default function EntryTypeCreator(props: EntryTypeCreatorFormProps) {
+    const [busy, setBusy] = useState(false)
+    return (
+        <FloatingPanel
+            open={props.open}
+            onClose={props.onClose}
+            dismissible={!busy}
+            title={props.initialEntryType ? '编辑词条类型' : '新建词条类型'}
+            ariaLabel={props.initialEntryType ? '编辑词条类型' : '新建词条类型'}
+            className="entry-type-creator-dialog"
+        >
+            <EntryTypeCreatorForm {...props} onBusyChange={setBusy}/>
         </FloatingPanel>
     )
 }

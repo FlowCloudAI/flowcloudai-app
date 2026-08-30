@@ -45,7 +45,11 @@ function normalizeTagTargets(target: string[] | string | null | undefined): stri
     return [...new Set(trimmed.split(',').map(item => item.trim()).filter(Boolean))]
 }
 
-interface TagCreatorProps {
+interface TagCreatorFormProps {
+    /**
+     * 表单是否处于「已打开」状态。浮层用它做打开时重置；
+     * 独立页面每次挂载都是新的，固定传 true 即可。
+     */
     open: boolean
     projectId: string
     entryTypes: EntryTypeView[]
@@ -55,9 +59,16 @@ interface TagCreatorProps {
     onClose: () => void
     onSaved?: (schema: TagSchema) => void
     onDeleted?: (schemaId: string) => void
+    /** 提交中状态回传给外壳：浮层据此禁用点背板关闭，页面据此禁用返回。 */
+    onBusyChange?: (busy: boolean) => void
 }
 
-export default function TagCreator({
+/**
+ * 标签表单本体，不含任何浮层/页面外壳。
+ * 桌面端包在 FloatingPanel 里（见本文件默认导出），移动端包在独立页面里
+ * （见 app/mobile/pages/MobileTagEditor）——输入型重操作在手机上不进浮层。
+ */
+export function TagCreatorForm({
                                        open,
                                        projectId,
                                        entryTypes,
@@ -67,7 +78,8 @@ export default function TagCreator({
                                        onClose,
                                        onSaved,
                                        onDeleted,
-                                   }: TagCreatorProps) {
+                                       onBusyChange,
+                                   }: TagCreatorFormProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [valueType, setValueType] = useState<TagValueType>('string')
@@ -79,6 +91,10 @@ export default function TagCreator({
     const [apiError, setApiError] = useState<string | null>(null)
     const {showAlert} = useAlert()
     const isEditMode = Boolean(initialTag)
+
+    useEffect(() => {
+        onBusyChange?.(submitting)
+    }, [onBusyChange, submitting])
 
     const allTargetKeys = useMemo(
         () => entryTypes.map(entryType => entryTypeKey(entryType)),
@@ -227,14 +243,7 @@ export default function TagCreator({
     }
 
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            dismissible={!submitting}
-            title={isEditMode ? '编辑标签' : '新建标签'}
-            ariaLabel={isEditMode ? '编辑标签' : '新建标签'}
-            className="tag-creator-dialog"
-        >
+        <>
             <div className="tag-creator-body">
                     <div className="tag-creator-field">
                         <label className="tag-creator-label">
@@ -452,6 +461,23 @@ export default function TagCreator({
                         </Button>
                     </div>
                 </div>
+        </>
+    )
+}
+
+/** 桌面端的浮层外壳。表单本体见 TagCreatorForm。 */
+export default function TagCreator(props: TagCreatorFormProps) {
+    const [busy, setBusy] = useState(false)
+    return (
+        <FloatingPanel
+            open={props.open}
+            onClose={props.onClose}
+            dismissible={!busy}
+            title={props.initialTag ? '编辑标签' : '新建标签'}
+            ariaLabel={props.initialTag ? '编辑标签' : '新建标签'}
+            className="tag-creator-dialog"
+        >
+            <TagCreatorForm {...props} onBusyChange={setBusy}/>
         </FloatingPanel>
     )
 }

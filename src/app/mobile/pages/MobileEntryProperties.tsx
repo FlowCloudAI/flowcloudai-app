@@ -14,9 +14,9 @@ import {
     entryTypeKey,
     type TagSchema,
 } from '../../../api'
-import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
-import TagCreator from '../../../features/entries/components/TagCreator'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
+import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useMobileEditorResult} from './useMobileEditorResult'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import type {EntryImage} from '../../../features/entries/lib/entryImage'
 import {logger} from '../../../shared/logger'
@@ -62,8 +62,13 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(true)
-    const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
-    const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
+    /*
+     * 新建类型 / 新建标签走独立页面（输入型重操作不进浮层），
+     * 新建结果通过 token 回递（见 stores/mobileEditorHandoff）。
+     * token 每个页面实例固定一个，用 useState 的惰性初值保证不随 render 变。
+     */
+    const [typeResultToken] = useState(() => createMobileEditorToken('entryProperties:type'))
+    const [tagResultToken] = useState(() => createMobileEditorToken('entryProperties:tag'))
 
     useMobileEntryEditLeaveGuard({projectId, entryId, isPlaceholder, setBeforeLeave})
 
@@ -119,14 +124,14 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
             logger.error('刷新词条类型失败', error)
         }
         updateDraft({entryType: created.id})
-        setTypeCreatorOpen(false)
     }, [projectId, updateDraft])
 
     const handleTagSchemaSaved = useCallback((schema: TagSchema) => {
-        const nextSchemas = entryTags.handleTagSchemaSaved(schema)
-        setTagSchemas(nextSchemas)
-        setTagCreatorOpen(false)
+        setTagSchemas(entryTags.handleTagSchemaSaved(schema))
     }, [entryTags])
+
+    useMobileEditorResult<CustomEntryType>(typeResultToken, created => void handleTypeCreated(created))
+    useMobileEditorResult<TagSchema>(tagResultToken, handleTagSchemaSaved)
 
     if (!draft) {
         return <div className="mobile-page__error" role="alert"><span>编辑会话已结束，请返回词条重新进入编辑。</span><Button type="button" size="sm" variant="outline" onClick={pop}>返回</Button></div>
@@ -146,7 +151,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
             {!loading && (
                 <div className="mobile-entry-properties__content">
                     <section className="mobile-entry-properties__group mobile-entry-properties__group--types">
-                        <div className="mobile-entry-properties__label"><span>词条类型</span><button type="button" onClick={() => setTypeCreatorOpen(true)}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button></div>
+                        <div className="mobile-entry-properties__label"><span>词条类型</span><button type="button" onClick={() => push({type: 'typeEditor', params: {projectId, resultToken: typeResultToken, displayName: '新建词条类型'}})}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button></div>
                         <div className="mobile-entry-detail__type-options">
                             <button type="button" aria-pressed={draft.entryType === null} className={`mobile-entry-detail__type-option${draft.entryType === null ? ' is-active' : ''}`} onClick={() => updateDraft({entryType: null})}>不设置</button>
                             {entryTypes.map(type => {
@@ -162,7 +167,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                     </section>
 
                     <section className="mobile-entry-properties__group mobile-entry-properties__group--tags">
-                        <div className="mobile-entry-properties__label"><span>标签</span><button type="button" onClick={() => setTagCreatorOpen(true)}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建标签</button></div>
+                        <div className="mobile-entry-properties__label"><span>标签</span><button type="button" onClick={() => push({type: 'tagEditor', params: {projectId, resultToken: tagResultToken, displayName: '新建标签'}})}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建标签</button></div>
                         <MobileEntryTagsSection
                             hasTagDefinitions={entryTags.localTagSchemas.length > 0}
                             availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
@@ -190,8 +195,6 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                 </div>
             )}
 
-            <EntryTypeCreator open={typeCreatorOpen} projectId={projectId} existingNames={entryTypes.map(type => type.name)} onClose={() => setTypeCreatorOpen(false)} onSaved={created => void handleTypeCreated(created)}/>
-            <TagCreator open={tagCreatorOpen} projectId={projectId} entryTypes={entryTypes} existingNames={entryTags.localTagSchemas.map(schema => schema.name)} existingCount={entryTags.localTagSchemas.length} onClose={() => setTagCreatorOpen(false)} onSaved={handleTagSchemaSaved}/>
             <MobileImageViewer open={imageActions.lightboxOpen} images={draft.images} currentIndex={imageActions.lightboxIndex} title={draft.title || '未命名词条'} mode="manage" onClose={() => imageActions.setLightboxOpen(false)} onIndexChange={imageActions.setLightboxIndex} onSetCover={imageActions.handleSetCover} onRemove={imageActions.handleRemoveImage} onRemoveMany={imageActions.handleRemoveImages} onAddImage={() => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }}/>
             <EntryImageAddModal open={imageActions.imageAddModalOpen} projectId={projectId} entryTitle={draft.title || null} entrySummary={draft.summary || null} entryType={draft.entryType} existingImages={draft.images} onClose={() => imageActions.setImageAddModalOpen(false)} onUploadLocal={imageActions.handleUploadImages} onCapturePhoto={imageActions.handleCaptureImage} onAddAiImages={imageActions.handleAddAiImages} onOpenAiSettings={pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}/>
         </div>

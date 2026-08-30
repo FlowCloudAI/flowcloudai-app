@@ -1,0 +1,12 @@
+/*
+ * 子编辑页（标签、词条类型）的页面外壳。表单本体的样式仍来自各自的
+ * TagCreator.css / EntryTypeCreator.css，这里只负责页面留白与标题。
+ */
+.mobile-sub-editor {
+    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
+    background: var(--fc-color-bg);
+}
+
+.mobile-sub-editor__heading {
+    margin-bottom: var(--mobile-gap-group);
+}

@@ -1,53 +1,33 @@
-import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useState} from 'react'
-import {
-    db_list_all_entry_types,
-    db_list_custom_entry_types,
-    type CustomEntryType,
-    type EntryTypeView,
-} from '../../../api'
-import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
+import {useState} from 'react'
+import {type CustomEntryType, type EntryTypeView} from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
+import {useProjectDetailStore} from '../../../features/projects/projectDetailStore'
 import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
-import {type MobileProjectScopedPageParams} from '../usePageStack'
+import {type MobilePage, type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
 interface Props {
+    push: (page: MobilePage) => void
     pop: () => void
     params: MobileProjectScopedPageParams
 }
 
-export default function MobileEntryTypeManager({pop, params}: Props) {
+export default function MobileEntryTypeManager({push, pop, params}: Props) {
     const projectId = params.projectId
 
-    const [customTypes, setCustomTypes] = useState<CustomEntryType[]>([])
-    const [allEntryTypes, setAllEntryTypes] = useState<EntryTypeView[]>([])
-    const [loading, setLoading] = useState(true)
-    const [creatorOpen, setCreatorOpen] = useState(false)
-    const [editingType, setEditingType] = useState<CustomEntryType | null>(null)
+    // 类型列表改读项目详情 store：编辑页保存后 invalidate，这里自动跟上，
+    // 不再各自 db_list_* 一份。
+    const {entryTypes: allEntryTypes, loading, hasLoaded} = useProjectDetailStore(projectId)
     const [builtinExpanded, setBuiltinExpanded] = useState(true)
 
-    const reloadTypes = useCallback(async () => {
-        const [custom, all] = await Promise.all([
-            db_list_custom_entry_types(projectId),
-            db_list_all_entry_types(projectId),
-        ])
-        setCustomTypes(custom)
-        setAllEntryTypes(all)
-    }, [projectId])
-
-    useEffect(() => {
-        setLoading(true)
-        reloadTypes()
-            .catch(logger.error)
-            .finally(() => setLoading(false))
-    }, [reloadTypes])
-
-    const openCreator = (type: CustomEntryType | null = null) => {
-        setEditingType(type)
-        setCreatorOpen(true)
+    const openEditor = (type: CustomEntryType | null = null) => {
+        push({
+            type: 'typeEditor',
+            params: {projectId, entryTypeId: type?.id, displayName: type ? '编辑词条类型' : '新建词条类型'},
+        })
     }
     const builtinTypes = allEntryTypes.filter((type): type is Extract<EntryTypeView, {kind: 'builtin'}> => type.kind === 'builtin')
+    const customTypes = allEntryTypes.filter((type): type is {kind: 'custom'} & CustomEntryType => type.kind === 'custom')
 
     return (
         <div className="mobile-page mobile-type-tag">
@@ -69,16 +49,16 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                         label: '新建类型',
                         icon: <MobileAddIcon/>,
                         kind: 'add',
-                        onClick: () => openCreator(null),
+                        onClick: () => openEditor(null),
                     }]}
                 />}
             />
             <div className="mobile-type-tag__heading">
-                <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading ? '正在同步' : `${allEntryTypes.length} 个类型`}</span>
+                <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading && !hasLoaded ? '正在同步' : `${allEntryTypes.length} 个类型`}</span>
                 <h2 className="mobile-page__hero-title">类型管理</h2>
             </div>
 
-            {loading ? (
+            {loading && !hasLoaded ? (
                 <div className="mobile-page__loading">加载中…</div>
             ) : (
                 <div className="mobile-type-tag__list">
@@ -124,12 +104,12 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                             type="button"
                             className="mobile-list-card"
                             key={type.id}
-                            onClick={() => openCreator(type)}
+                            onClick={() => openEditor(type)}
                         >
                             <span className="mobile-list-card__row">
                                 <span className="mobile-list-card__main">
                                     <span className="mobile-list-card__title mobile-type-tag__type-title">
-                                        <EntryTypeIcon entryType={{kind: 'custom', ...type}} className=""/> {type.name}
+                                        <EntryTypeIcon entryType={type} className=""/> {type.name}
                                     </span>
                                     {type.description && <span className="mobile-list-card__description">{type.description}</span>}
                                 </span>
@@ -140,17 +120,6 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                 </div>
             )}
 
-            <EntryTypeCreator
-                open={creatorOpen}
-                projectId={projectId}
-                initialEntryType={editingType}
-                existingNames={allEntryTypes
-                    .filter(type => !(type.kind === 'custom' && type.id === editingType?.id))
-                    .map(type => type.name)}
-                onClose={() => { setCreatorOpen(false); setEditingType(null) }}
-                onSaved={() => { setCreatorOpen(false); setEditingType(null); void reloadTypes() }}
-                onDeleted={() => { setCreatorOpen(false); setEditingType(null); void reloadTypes() }}
-            />
         </div>
     )
 }

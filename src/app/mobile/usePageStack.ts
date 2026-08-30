@@ -28,6 +28,18 @@ export interface MobileEntryRelationPageParams extends MobileEntryEditChildPageP
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
 
+export interface MobileTagEditorPageParams extends MobileProjectPageParams {
+    /** 有 id 是编辑，没有是新建。 */
+    tagId?: string
+    /** 打开方希望拿回新建对象时传（见 stores/mobileEditorHandoff）。 */
+    resultToken?: string
+}
+
+export interface MobileEntryTypeEditorPageParams extends MobileProjectPageParams {
+    entryTypeId?: string
+    resultToken?: string
+}
+
 export interface MobileWorldCheckGeneratePageParams extends MobileProjectPageParams {
     /** 从「选择检测方式」直接进来时带上的初始类型。 */
     checkKind?: WorldCheckKind
@@ -46,7 +58,9 @@ export interface MobilePageParamsMap {
     entryProperties: MobileEntryEditChildPageParams
     entryRelation: MobileEntryRelationPageParams
     typeManager: MobileProjectScopedPageParams
+    typeEditor: MobileEntryTypeEditorPageParams
     tagManager: MobileProjectScopedPageParams
+    tagEditor: MobileTagEditorPageParams
     categoryManager: MobileProjectScopedPageParams
     worldCheck: MobileProjectScopedPageParams
     worldCheckGenerate: MobileWorldCheckGeneratePageParams

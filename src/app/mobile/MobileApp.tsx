@@ -34,6 +34,7 @@ import MobileNav, {type MobileTab} from './MobileNav'
 import MobilePageTransitionHost from './MobilePageTransitionHost'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
+import MobileEntryTypeEditor from './pages/MobileEntryTypeEditor'
 import MobileEntryTypeManager from './pages/MobileEntryTypeManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
 import MobileEntryProperties from './pages/MobileEntryProperties'
@@ -46,6 +47,7 @@ import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileRelationGraph from './pages/MobileRelationGraph'
 import MobileSettings from './pages/MobileSettings'
+import MobileTagEditor from './pages/MobileTagEditor'
 import MobileTagManager from './pages/MobileTagManager'
 import MobileTimeline from './pages/MobileTimeline'
 import MobileWorldCheck from './pages/MobileWorldCheck'
@@ -612,7 +614,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 {page?.type === 'entryProperties' && <MobileEntryProperties {...layerProps} params={page.params}/>}
                 {page?.type === 'entryRelation' && <MobileEntryRelationEditor {...layerProps} params={page.params}/>}
                 {page?.type === 'typeManager' && <MobileEntryTypeManager {...layerProps} params={page.params}/>}
+                {page?.type === 'typeEditor' && <MobileEntryTypeEditor {...layerProps} params={page.params}/>}
                 {page?.type === 'tagManager' && <MobileTagManager {...layerProps} params={page.params}/>}
+                {page?.type === 'tagEditor' && <MobileTagEditor {...layerProps} params={page.params}/>}
                 {page?.type === 'categoryManager' && <MobileCategoryManager {...layerProps} params={page.params}/>}
                 {page?.type === 'worldCheck' && <MobileWorldCheck {...layerProps} params={page.params}/>}
                 {page?.type === 'worldCheckGenerate' && <MobileWorldCheckGenerate {...layerProps} params={page.params}/>}
