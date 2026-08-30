@@ -36,6 +36,8 @@ interface Props {
     contextUsageRef: RefObject<HTMLButtonElement | null>; onToggleContextUsage: () => void
     onCloseContextUsage: () => void
     onRetryDocument: (itemId: string) => void; onRemoveDocument: (itemId: string) => void
+    /** 「更多」面板里描述本次请求注入了什么的一行文本。 */
+    contextScopeText: string
     conversationControls: ReactNode; conversationActionTarget: Conversation | null; onCloseConversationAction: () => void; conversationActionMenuItems: MobileAnchoredMenuItem[]
     renameTarget: Conversation | null; renaming: boolean; onCloseRename: () => void; onRename: (title: string) => void
 }
@@ -172,7 +174,7 @@ export default function MobileAiComposer(p: Props) {
         <MobileAnchoredActionMenu open={p.topMenuOpen} onClose={p.onCloseTopMenu} anchorRef={p.topActionsRef} containerRef={p.pageRef} ariaLabel="对话操作" className="mobile-ai-conversation-menu" items={p.activeConversationMenuItems}/>
         <MobileBottomSheet open={p.morePanelOpen} onClose={p.onCloseMore} ariaLabel="更多对话设置" className="mobile-ai-more-sheet"><div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
             <button type="button" disabled aria-label="相机，即将支持"><MobileAiIcon type="camera"/><span>相机</span><small>即将支持</small></button><button type="button" disabled aria-label="图库，即将支持"><MobileAiIcon type="image"/><span>图库</span><small>即将支持</small></button><button type="button" onClick={p.onAttachDocuments}><MobileAiIcon type="file"/><span>文件</span></button><button type="button" className={p.webSearchEnabled ? 'active' : ''} aria-pressed={p.webSearchEnabled} onClick={p.onToggleWebSearch}><MobileAiIcon type="web"/><span>联网搜索</span></button>
-        </div>{p.conversationControls}</MobileBottomSheet>
+        </div><p className="mobile-ai-more-sheet__scope">{p.contextScopeText}</p>{p.conversationControls}</MobileBottomSheet>
         <ActionMenu open={!!p.conversationActionTarget} onClose={p.onCloseConversationAction} title={p.conversationActionTarget?.title} ariaLabel="对话操作菜单" items={p.conversationActionMenuItems}/>
         <RenameDialog open={!!p.renameTarget} title="重命名对话" initialValue={p.renameTarget?.title ?? ''} placeholder="对话名称" busy={p.renaming} onClose={p.onCloseRename} onConfirm={p.onRename}/>
     </>

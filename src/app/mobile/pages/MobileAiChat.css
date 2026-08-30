@@ -1100,10 +1100,28 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     opacity: 0.45;
 }
 
+/* 四条采样滑轨两列排：单列时面板要滚，两列刚好一屏放下。 */
 .mobile-ai-settings-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-item);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mobile-gap-item) var(--mobile-gap-group);
+}
+
+/*
+ * 快捷键与滑轨之间的场景说明。四个快捷键改的是「注入什么」，滑轨改的是「怎么生成」，
+ * 这一行把前者的结果摊开，正好卡在两段中间。
+ */
+.mobile-ai-more-sheet__scope {
+    margin: 0 0 var(--mobile-gap-item);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-muted-soft);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-ai-more-sheet__quick {

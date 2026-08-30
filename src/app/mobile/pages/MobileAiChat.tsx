@@ -626,6 +626,22 @@ export default function MobileAiChat({
         },
     ] : []
 
+    /*
+     * 「更多」面板里那一行：把这次请求会带给模型的东西摊开说。
+     * 四个快捷键（文件 / 联网）改的就是这里面的内容，放在它们和采样滑轨之间，
+     * 正好是「改了什么」到「结果如何」的中间环节。
+     */
+    const contextScopeText = useMemo(() => {
+        const parts: string[] = []
+        if (focusContext.projectId) parts.push(`项目「${focusContext.projectName ?? '加载中'}」`)
+        if (focusContext.entryId) parts.push(`词条「${focusContext.entryTitle ?? '加载中'}」`)
+        if (documentContextItems.length > 0) parts.push(`${documentContextItems.length} 个文件`)
+        if (webSearchEnabled) parts.push('联网搜索')
+        return parts.length > 0
+            ? `本次注入：${parts.join(' · ')}`
+            : '本次不注入项目或词条，模型只看得到当前对话'
+    }, [documentContextItems.length, focusContext, webSearchEnabled])
+
     const conversationControls = <MobileAiConversationControls
         disabled={!activeConversation}
         settings={conversationSettings}
@@ -758,6 +774,7 @@ export default function MobileAiChat({
                 onCloseContextUsage={() => setContextUsageOpen(false)}
                 onRetryDocument={itemId => void retryDocumentContextItem(itemId)}
                 onRemoveDocument={itemId => void removeDocumentContextItem(itemId)}
+                contextScopeText={contextScopeText}
                 conversationControls={conversationControls} conversationActionTarget={conversationActionTarget}
                 onCloseConversationAction={() => setConversationActionTarget(null)} conversationActionMenuItems={conversationActionMenuItems}
                 renameTarget={renameTarget} renaming={renaming} onCloseRename={() => setRenameTarget(null)} onRename={title => void handleRenameConfirm(title)}
