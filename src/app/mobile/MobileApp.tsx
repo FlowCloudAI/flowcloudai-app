@@ -125,6 +125,23 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const pageType = currentPage?.type ?? ''
     const edgeBackTarget = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
 
+    /*
+     * 设置 Tab 不记住上次停在哪一层：离开就把栈清空，下次进来一定落在设置主页。
+     * 其余三个 Tab 保留栈——它们承载正在进行的工作（正在编辑的词条、正在看的项目），
+     * 切走再切回来必须回到原处；设置是查完就走的配置面板，记住位置只会让人
+     * 「点了设置却进到某个子页」。
+     *
+     * 挂在 activeTab 上而不是各处调用点：切 Tab、navigateToTab 深链、
+     * 从设置根页返回首页（commitBackTarget 只 setActiveTab）三条路都要覆盖，
+     * 逐个补迟早漏一条。清空发生在设置 Tab 已经卸载之后，看不到中间态；
+     * popToRoot 在空栈时直接返回，不会引起多余渲染。
+     */
+    const resetSettingsStack = settingsStack.popToRoot
+    useEffect(() => {
+        if (activeTab === 'settings') return
+        resetSettingsStack()
+    }, [activeTab, resetSettingsStack])
+
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [backendError, setBackendError] = useState<string | null>(null)
