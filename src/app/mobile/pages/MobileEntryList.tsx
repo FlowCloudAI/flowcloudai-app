@@ -392,7 +392,9 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                                     ) : undefined}
                                     variant="shadow"
                                     hoverable
-                                    imageHeight="58%"
+                                    imageHeight="100%"
+                                    overlayStartOpacity={0}
+                                    overlayEndOpacity={0.94}
                                     onClick={() => handleOpenEntry(entry)}
                                 />
                             )

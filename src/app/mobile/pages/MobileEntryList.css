@@ -95,8 +95,8 @@
 }
 
 /*
- * 宽高比对齐桌面 .pe-entry-card 的 3:4。封面仍是 4:3，正文占剩下的高度——正文块是
- * flex:1，Card 会按实测可用高度重算 description 的行数，够不着两行时自动收成一行。
+ * 版式对齐桌面 .pe-entry-card：3:4 的卡片，封面铺满整卡，文字压在底部的渐变遮罩上。
+ * 原先是「封面 4:3 + 下方一块实色面板」，面板把卡片下半截糊成一片白。
  */
 .mobile-entry-card {
     --mobile-entry-card-color: var(--fc-color-primary);
@@ -115,10 +115,10 @@
 }
 
 .mobile-entry-card .fc-card__image-wrapper {
-    position: relative;
-    flex: 0 0 auto;
-    aspect-ratio: 4 / 3;
-    height: auto !important;
+    position: absolute;
+    inset: 0;
+    aspect-ratio: auto;
+    height: 100% !important;
     min-height: 0;
     background: var(--fc-color-bg-secondary);
 }
@@ -203,25 +203,31 @@
     color: var(--mobile-entry-card-color);
 }
 
+/*
+ * 文字块压在封面上（z-index 1 盖过 fc-card 的渐变遮罩伪元素），不铺任何实色底。
+ * min-height 与 justify-content 跟桌面 .pe-entry-card 的写法一致：文字贴底，
+ * 高度随内容长，遮罩高度由 Card 按实测内容高写入 --fc-card-overlay-content-height。
+ */
 .mobile-entry-card .fc-card__content {
     position: relative;
+    z-index: 1;
     left: auto;
     right: auto;
     bottom: auto;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
+    margin-top: auto;
     height: auto;
-    min-height: 0;
-    justify-content: flex-start;
+    min-height: 45%;
+    justify-content: flex-end;
     gap: var(--mobile-gap-text);
     padding: var(--mobile-gap-item) var(--mobile-gap-item) var(--mobile-gap-item);
-    background: var(--mobile-surface-raised);
-    color: var(--fc-color-text);
+    background: none;
 }
 
 .mobile-entry-card .fc-card__title,
 .mobile-entry-card .fc-card__description,
 .mobile-entry-card .fc-card__extra-info {
-    color: var(--fc-color-text);
+    color: var(--fc-color-text-on-primary);
     transform: none;
 }
 
@@ -232,15 +238,15 @@
 }
 
 .mobile-entry-card .fc-card__description {
-    color: var(--fc-color-text-secondary);
+    color: color-mix(in srgb, var(--fc-color-text-on-primary) 80%, transparent);
     font-size: var(--mobile-text-body-sm);
     line-height: var(--mobile-leading-snug);
 }
 
 .mobile-entry-card .fc-card__extra-info,
 .mobile-entry-date {
-    margin-top: auto;
-    color: var(--fc-color-text-tertiary);
+    margin-top: 0;
+    color: color-mix(in srgb, var(--fc-color-text-on-primary) 92%, transparent);
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-medium);
     line-height: var(--mobile-leading-tight) ;
