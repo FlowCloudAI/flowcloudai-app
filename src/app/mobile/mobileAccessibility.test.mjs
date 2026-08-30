@@ -108,7 +108,7 @@ test('可选择状态同时提供非颜色视觉提示与 ARIA 状态', () => {
 
 test('AI 输入区使用紧凑 capsule，同时保留独立的透明命中层', () => {
     const capsuleRule = mobileAiChatCss.match(/\.mobile-ai-composer-card__chip\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    assert.match(capsuleRule, /padding:\s*var\(--mobile-gap-text\) var\(--mobile-gap-inline\)/)
+    assert.match(capsuleRule, /padding:\s*var\(--mobile-gap-inline\) var\(--mobile-gap-item\)/)
     assert.match(capsuleRule, /border-radius:\s*var\(--fc-radius-full\)/)
     assert.match(capsuleRule, /line-height:\s*var\(--mobile-leading-snug\)/)
     assert.doesNotMatch(capsuleRule, /(?:^|\n)\s*(?:min-)?height:/)

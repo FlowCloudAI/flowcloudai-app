@@ -997,13 +997,13 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     position: relative;
     align-items: center;
     gap: var(--mobile-gap-text);
-    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
+    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font: inherit;
-    font-size: var(--mobile-text-meta);
+    font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-medium);
     line-height: var(--mobile-leading-snug);
     cursor: pointer;
@@ -1028,9 +1028,9 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 }
 
 .mobile-ai-composer-card__chip .mobile-ai-svg {
-    width: 0.92rem;
-    height: 0.92rem;
-    stroke-width: 2.45;
+    width: 1.05rem;
+    height: 1.05rem;
+    stroke-width: 2.3;
 }
 
 .mobile-ai-composer-card__chip.active {
