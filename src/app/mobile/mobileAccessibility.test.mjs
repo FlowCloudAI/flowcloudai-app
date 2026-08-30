@@ -22,7 +22,7 @@ const mobileTopControlsCss = readFileSync(new URL('./components/MobileTopControl
 const overlaySource = readFileSync(new URL('../../shared/ui/overlay/Overlay.tsx', import.meta.url), 'utf8')
 const overlayCss = readFileSync(new URL('../../shared/ui/overlay/Overlay.css', import.meta.url), 'utf8')
 const mobileAiConversationDrawerSource = readFileSync(new URL('./pages/MobileAiConversationDrawer.tsx', import.meta.url), 'utf8')
-const mobileSettingsSectionsSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
+const mobileSettingsPluginPagesSource = readFileSync(new URL('./pages/MobileSettingsPluginPages.tsx', import.meta.url), 'utf8')
 const mobileWorldCheckGenerateSource = readFileSync(new URL('./pages/MobileWorldCheckGenerate.tsx', import.meta.url), 'utf8')
 const accessibilityCss = readFileSync(new URL('./mobileAccessibility.css', import.meta.url), 'utf8')
 const tokensCss = readFileSync(new URL('./mobileTokens.css', import.meta.url), 'utf8')
@@ -100,7 +100,8 @@ test('可选择状态同时提供非颜色视觉提示与 ARIA 状态', () => {
     assert.match(mobileNavCss, /\.mobile-nav__item\.active \.mobile-nav__label[\s\S]*font-weight:\s*var\(--mobile-weight-strong\)/)
     assert.match(mobileAiComposerSource, /aria-pressed=\{p\.thinking\}/)
     assert.match(mobileAiConversationDrawerSource, /aria-current=\{conversation\.id === props\.activeConversationId/)
-    assert.match(mobileSettingsSectionsSource, /aria-pressed=\{pluginKindFilter === value\}/)
+    // 插件类型筛选随插件库一起搬到了独立设置页。
+    assert.match(mobileSettingsPluginPagesSource, /aria-pressed=\{pluginKindFilter === value\}/)
     // 目标词条候选随「生成新报告」一起搬到了独立页面。
     assert.match(mobileWorldCheckGenerateSource, /role="option"[\s\S]{0,120}aria-selected=\{entry\.id === targetEntryId\}/)
 })

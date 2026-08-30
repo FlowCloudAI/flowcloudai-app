@@ -981,44 +981,42 @@
     padding-top: var(--mobile-gap-inline);
 }
 
-.mobile-settings-plugin-library-panel {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
+/*
+ * 插件库与访问密钥已经是独立设置页（重操作不进浮层），
+ * 外边距归页面自己管，这里只留内部布局。
+ */
 .mobile-settings-plugin-library-content {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-height: 0;
-    padding: 0 var(--mobile-gap-group) var(--mobile-gap-group);
+    margin-bottom: 0;
+    gap: var(--mobile-gap-inline);
     background: transparent;
 }
 
 .mobile-settings-plugin-library-actions {
-    margin-bottom: var(--mobile-gap-item);
+    margin-bottom: 0;
 }
 
-.mobile-settings-plugin-library-panel .mobile-settings-plugin-search-row {
+.mobile-settings-plugin-library-content .mobile-settings-plugin-search-row {
     grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 0;
 }
 
-.mobile-settings-plugin-library-panel .mobile-settings-plugin-list {
+.mobile-settings-plugin-library-content .mobile-settings-plugin-filter {
+    margin-bottom: 0;
+}
+
+.mobile-settings-plugin-library-content .mobile-settings-plugin-list {
     border: 0;
     background: transparent;
     box-shadow: none;
 }
 
-.mobile-settings-api-key-panel {
-    width: 100%;
-}
-
 .mobile-settings-api-key--panel {
     margin: 0;
-    padding: 0 var(--mobile-gap-group) var(--mobile-gap-group);
+    padding: 0;
     border: 0;
     background: transparent;
     box-shadow: none;

@@ -42,6 +42,10 @@ import {
     MobileSettingsPluginsSection,
     MobileSettingsUsageSection,
 } from './MobileSettingsSections'
+import {
+    MobileSettingsApiKeySection,
+    MobileSettingsPluginLibrarySection,
+} from './MobileSettingsPluginPages'
 import MobileSettingsModelsSection from './MobileSettingsModelsSection'
 import MobileSettingsUpdateSection from './MobileSettingsUpdateSection'
 import {
@@ -63,6 +67,8 @@ type SettingsSection =
     | 'menu'
     | 'storage'
     | 'plugins'
+    | 'pluginLibrary'
+    | 'apiKeys'
     | 'models'
     | 'permissions'
     | 'appearance'
@@ -111,6 +117,8 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
         // 兼容图片等入口的旧深链：访问密钥现归属插件管理。
         case 'settingsAi': return 'plugins'
         case 'settingsPlugins': return 'plugins'
+        case 'settingsPluginLibrary': return 'pluginLibrary'
+        case 'settingsApiKeys': return 'apiKeys'
         case 'settingsModels': return 'models'
         case 'settingsPermissions': return 'permissions'
         case 'settingsAppearance': return 'appearance'
@@ -125,6 +133,8 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
 function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'storage') return '存储与备份'
     if (section === 'plugins') return '插件管理'
+    if (section === 'pluginLibrary') return '插件库'
+    if (section === 'apiKeys') return '访问密钥'
     if (section === 'models') return '模型管理'
     if (section === 'permissions') return '权限与工具'
     if (section === 'appearance') return '外观'
@@ -585,16 +595,21 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                 <MobileSettingsPluginsSection
                     localPluginCount={localPlugins.length}
                     pluginSourcesRefreshing={pluginSourcesRefreshing}
-                    installingLocalFile={installingLocalFile}
-                    pluginSearch={pluginSearch}
-                    pluginKindFilter={pluginKindFilter}
                     localPluginError={localPluginError}
-                    marketPluginError={marketPluginError}
-                    loadingMarketPlugins={loadingMarketPlugins}
                     localPlugins={sortedLocalPlugins}
-                    marketPlugins={filteredMarketPlugins}
-                    installingPluginIds={installingPluginIds}
                     uninstallingPluginId={uninstallingPluginId}
+                    onRefreshPluginSources={refreshPluginInstallSources}
+                    onUninstallPlugin={handleUninstallPlugin}
+                    onOpenApiKeys={pluginId => {
+                        setSelectedApiKeyPlugin(pluginId)
+                        openSettingsPage('settingsApiKeys')
+                    }}
+                    onOpenPluginLibrary={() => openSettingsPage('settingsPluginLibrary')}
+                />
+            )}
+
+            {section === 'apiKeys' && (
+                <MobileSettingsApiKeySection
                     selectedApiKeyPlugin={selectedApiKeyPlugin}
                     apiKeyPluginOptions={apiKeyPluginOptions}
                     apiKeyStatus={apiKeyStatus}
@@ -602,17 +617,29 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     apiKeyDraft={apiKeyDraft}
                     apiKeyBusy={apiKeyBusy}
                     apiKeyPlaceholder={apiKeyPlaceholder}
+                    onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
+                    onApiKeyDraftChange={setApiKeyDraft}
+                    onSaveApiKey={handleSaveApiKey}
+                    onDeleteApiKey={handleDeleteApiKey}
+                />
+            )}
+
+            {section === 'pluginLibrary' && (
+                <MobileSettingsPluginLibrarySection
+                    pluginSourcesRefreshing={pluginSourcesRefreshing}
+                    installingLocalFile={installingLocalFile}
+                    pluginSearch={pluginSearch}
+                    pluginKindFilter={pluginKindFilter}
+                    marketPluginError={marketPluginError}
+                    loadingMarketPlugins={loadingMarketPlugins}
+                    marketPlugins={filteredMarketPlugins}
+                    installingPluginIds={installingPluginIds}
                     onPluginSearchChange={setPluginSearch}
                     onPluginKindFilterChange={setPluginKindFilter}
                     getInstalledPlugin={getInstalledPlugin}
                     onRefreshPluginSources={refreshPluginInstallSources}
                     onInstallFromFile={handleInstallFromFile}
                     onInstallMarketPlugin={handleInstallMarketPlugin}
-                    onUninstallPlugin={handleUninstallPlugin}
-                    onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
-                    onApiKeyDraftChange={setApiKeyDraft}
-                    onSaveApiKey={handleSaveApiKey}
-                    onDeleteApiKey={handleDeleteApiKey}
                 />
             )}
 

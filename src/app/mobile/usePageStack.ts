@@ -55,6 +55,8 @@ export interface MobilePageParamsMap {
     settingsStorage: undefined
     settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined
+    settingsPluginLibrary: undefined
+    settingsApiKeys: undefined
     settingsModels: undefined
     settingsPermissions: undefined
     settingsAppearance: undefined
@@ -70,6 +72,8 @@ export type MobileSettingsPageType =
     | 'settingsStorage'
     | 'settingsAi'
     | 'settingsPlugins'
+    | 'settingsPluginLibrary'
+    | 'settingsApiKeys'
     | 'settingsModels'
     | 'settingsPermissions'
     | 'settingsAppearance'
