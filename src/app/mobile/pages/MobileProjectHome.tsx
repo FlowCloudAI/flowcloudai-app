@@ -7,6 +7,7 @@ import {
     db_delete_project,
     db_export_project_fcworld,
     db_update_project,
+    type EntryBrief,
     formatApiError,
     toApiError,
 } from '../../../api'
@@ -32,6 +33,8 @@ import {invalidateProjectList} from '../../../features/projects/projectListStore
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {buildProjectExportFileName, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import MobileEntryBrowser from './MobileEntryBrowser'
+import {useMobileEntryBrowser} from './useMobileEntryBrowser'
 import {
     ProjectHomeHero,
     ProjectHomePrimaryActions,
@@ -162,9 +165,22 @@ export default function MobileProjectHome({
         }
     }, [projectId, push, setAiFocus])
 
-    const handleOpenEntryList = useCallback((categoryId: string | null, categoryName: string) => {
-        push({type: 'entryList', params: {projectId, categoryId: categoryId ?? '', displayName: categoryName}})
-    }, [projectId, push])
+    /*
+     * 「全部词条」直接内嵌在本页底部，和桌面把 CategoryView 挂在项目总览下方一致。
+     * 分页记忆键单独取一个稳定串：pageKey 是页面栈实例，换项目要换记忆。
+     */
+    const entryBrowser = useMobileEntryBrowser({
+        projectId,
+        categoryId: null,
+        uncategorizedOnly: false,
+        memoryKey: `projectHome:${projectId}`,
+        scrollRef: pageRef,
+    })
+
+    const handleOpenEntry = useCallback((entry: EntryBrief) => {
+        setAiFocus({projectId, entryId: entry.id})
+        push({type: 'entryDetail', params: {projectId, entryId: entry.id, displayName: entry.title}})
+    }, [projectId, push, setAiFocus])
 
     const handleOpenAi = useCallback(() => {
         setAiFocus({projectId, entryId: null})
@@ -296,7 +312,6 @@ export default function MobileProjectHome({
     const relationCount = stats?.relationCount ?? 0
     const internalLinkCount = stats?.internalLinkCount ?? 0
     const categoryCount = categories.length
-    const customTypeCount = entryTypes.filter(type => type.kind === 'custom').length
     const statItems: ProjectHomeStatItem[] = [
         {key: 'entries', label: '词条', value: formatNumber(entryCount)},
         {key: 'categories', label: '分类', value: formatNumber(categoryCount)},
@@ -428,10 +443,8 @@ export default function MobileProjectHome({
             />
 
             <ProjectHomeResourceList
-                entryCount={formatNumber(entryCount)}
-                customTypeCount={formatNumber(customTypeCount)}
+                entryTypeCount={formatNumber(entryTypes.length)}
                 tagSchemaCount={formatNumber(tagSchemas.length)}
-                onOpenEntries={() => handleOpenEntryList(null, '全部词条')}
                 onOpenTypeManager={() => push({
                     type: 'typeManager',
                     params: {projectId, displayName: '类型管理'},
@@ -446,6 +459,23 @@ export default function MobileProjectHome({
                 tools={advancedTools}
                 onSelectTool={handleSelectTool}
             />
+
+            <section className="mobile-project-home__section mobile-project-home__entries">
+                <div className="mobile-project-home__section-head">
+                    <h3 className="mobile-project-home__section-title">全部词条</h3>
+                    <span className="mobile-project-home__section-meta">
+                        {entryBrowser.pageCount > 1
+                            ? `${formatNumber(entryBrowser.total ?? entryCount)} 条 · 第 ${entryBrowser.currentPage} / ${entryBrowser.pageCount} 页`
+                            : `${formatNumber(entryBrowser.total ?? entryCount)} 条`}
+                    </span>
+                </div>
+                <MobileEntryBrowser
+                    projectId={projectId}
+                    state={entryBrowser}
+                    onOpenEntry={handleOpenEntry}
+                    onCreateEntry={() => void handleCreateEntry(null)}
+                />
+            </section>
 
             <MobileAnchoredActionMenu
                 open={menuOpen}

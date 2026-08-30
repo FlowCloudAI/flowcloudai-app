@@ -152,6 +152,16 @@
     gap: var(--mobile-gap-inline);
 }
 
+/* 两个管理入口并排；单元格内不再有说明小字，高度也跟着降一档。 */
+.mobile-project-home__list--pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-project-home__list--pair .mobile-project-home__cell {
+    min-height: var(--mobile-tap-min);
+}
+
 .mobile-project-home__cell {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -202,6 +212,31 @@
     font-style: normal;
     font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-strong);
+    white-space: nowrap;
+}
+
+/*
+ * 内嵌的「全部词条」。浏览区各块自带 margin-bottom，section 的 flex gap 会和它们叠加，
+ * 所以这一段退回普通块级流，只让标题保留一档间距。
+ */
+.mobile-project-home__entries {
+    display: block;
+}
+
+.mobile-project-home__entries .mobile-project-home__section-head {
+    margin-bottom: var(--mobile-gap-inline);
+}
+
+/* 分页条已经是本页最后一块，页面底部留白由 .mobile-project-home 负责。 */
+.mobile-project-home__entries .mobile-entry-list__pagination {
+    padding-bottom: 0;
+}
+
+.mobile-project-home__section-meta {
+    flex: 0 0 auto;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--mobile-text-meta);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 

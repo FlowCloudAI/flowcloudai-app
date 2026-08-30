@@ -102,19 +102,20 @@ export function ProjectHomePrimaryActions({onCreateEntry, onOpenAi}: ProjectHome
 }
 
 interface ProjectHomeResourceListProps {
-    entryCount: string
-    customTypeCount: string
+    /** 类型总数含内置类型：管理页里内置类型同样可见可改，只数自定义会和页面对不上。 */
+    entryTypeCount: string
     tagSchemaCount: string
-    onOpenEntries: () => void
     onOpenTypeManager: () => void
     onOpenTagManager: () => void
 }
 
+/*
+ * 「全部词条」不在这里：它已按桌面的结构内嵌到项目主页底部，
+ * 这一段只剩两个管理入口，并排放，不再写说明小字——标题本身已经说清去向。
+ */
 export function ProjectHomeResourceList({
-    entryCount,
-    customTypeCount,
+    entryTypeCount,
     tagSchemaCount,
-    onOpenEntries,
     onOpenTypeManager,
     onOpenTagManager,
 }: ProjectHomeResourceListProps) {
@@ -123,19 +124,7 @@ export function ProjectHomeResourceList({
             <div className="mobile-project-home__section-head">
                 <h3 className="mobile-project-home__section-title">资料</h3>
             </div>
-            <div className="mobile-project-home__list">
-                <button
-                    type="button"
-                    className="mobile-project-home__cell"
-                    onClick={onOpenEntries}
-                >
-                    <span>
-                        <strong>全部词条</strong>
-                        <small>浏览项目中所有词条</small>
-                    </span>
-                    <em>{entryCount}</em>
-                </button>
-
+            <div className="mobile-project-home__list mobile-project-home__list--pair">
                 <button
                     type="button"
                     className="mobile-project-home__cell"
@@ -143,9 +132,8 @@ export function ProjectHomeResourceList({
                 >
                     <span>
                         <strong>类型管理</strong>
-                        <small>管理自定义词条类型</small>
                     </span>
-                    <em>{customTypeCount}</em>
+                    <em>{entryTypeCount}</em>
                 </button>
 
                 <button
@@ -155,7 +143,6 @@ export function ProjectHomeResourceList({
                 >
                     <span>
                         <strong>标签管理</strong>
-                        <small>管理词条标签定义</small>
                     </span>
                     <em>{tagSchemaCount}</em>
                 </button>
