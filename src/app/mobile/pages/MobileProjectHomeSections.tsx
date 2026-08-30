@@ -226,14 +226,14 @@ export function ProjectHomeToolGrid({tools, onSelectTool}: ProjectHomeToolGridPr
                         disabled={tool.disabled}
                         onClick={() => onSelectTool(tool)}
                     >
-                        <span className="mobile-project-home__tool-label">
-                            {/* 图标与桌面同源；放在标题行内联，按钮高度仍由 min-height 决定，不变。 */}
-                            <span className="mobile-project-home__tool-icon" aria-hidden="true">
-                                {TOOL_ICONS[tool.key]}
-                            </span>
-                            {tool.label}
+                        {/* 图标独占左侧一列并撑满按钮高度，标题与说明在右侧上下排。 */}
+                        <span className="mobile-project-home__tool-icon" aria-hidden="true">
+                            {TOOL_ICONS[tool.key]}
                         </span>
-                        <small>{tool.unavailableReason ?? tool.meta}</small>
+                        <span className="mobile-project-home__tool-body">
+                            <span className="mobile-project-home__tool-title">{tool.label}</span>
+                            <small>{tool.unavailableReason ?? tool.meta}</small>
+                        </span>
                     </button>
                 ))}
             </div>
