@@ -12,6 +12,8 @@ import {
 } from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import MobilePagination from '../components/MobilePagination'
+import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useMobileEditorResult} from './useMobileEditorResult'
 import {
     db_count_entries,
     db_create_idea_note,
@@ -39,7 +41,6 @@ import HomeContinueCoverImage from '../../../features/home/HomeContinueCoverImag
 import {refreshIdeas} from '../../../features/ideas/ideaStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
-import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
 import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
 import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
@@ -109,7 +110,8 @@ export default function MobileHome({
     const [sortMode, setSortMode] = useState<WorldSortMode>('updated-desc')
     const [worldPage, setWorldPage] = useState(1)
     const [filterOpen, setFilterOpen] = useState(false)
-    const [creatorOpen, setCreatorOpen] = useState(false)
+    /* 新建世界观走独立页面（输入型重操作不进浮层），新项目按 token 回递。 */
+    const [creatorResultToken] = useState(() => createMobileEditorToken('projectCreator'))
     const [ideaText, setIdeaText] = useState('')
     const [ideaSaving, setIdeaSaving] = useState(false)
 
@@ -338,6 +340,16 @@ export default function MobileHome({
         push({type: 'projectHome', params: {projectId: project.id, displayName: project.name}})
     }, [push, setAiFocus])
 
+    const openProjectCreator = useCallback(() => {
+        push({type: 'projectCreator', params: {
+            displayName: '新建世界观',
+            existingNames: projects.map(project => project.name),
+            resultToken: creatorResultToken,
+        }})
+    }, [creatorResultToken, projects, push])
+
+    useMobileEditorResult<Project>(creatorResultToken, handleOpenProject)
+
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
         const projectId = getHomeTargetProjectId(target)
         if (hasLoadedProjects && isHomeProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
@@ -513,7 +525,7 @@ export default function MobileHome({
                     label: '新建世界观',
                     icon: <MobileAddIcon/>,
                     kind: 'add',
-                    onClick: () => setCreatorOpen(true),
+                    onClick: () => openProjectCreator(),
                 },
                 {
                     key: 'filter',
@@ -530,12 +542,6 @@ export default function MobileHome({
 
     return (
         <div ref={homeRef} className="mobile-page mobile-home">
-            <ProjectCreator
-                open={creatorOpen}
-                onClose={() => setCreatorOpen(false)}
-                onCreated={handleOpenProject}
-                existingNames={projects.map(project => project.name)}
-            />
             <ProjectImportConflictDialog
                 open={Boolean(importConflict)}
                 preview={importConflict}

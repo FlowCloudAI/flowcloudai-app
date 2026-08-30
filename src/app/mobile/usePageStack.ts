@@ -28,6 +28,14 @@ export interface MobileEntryRelationPageParams extends MobileEntryEditChildPageP
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
 
+export interface MobileProjectCreatorPageParams {
+    displayName?: string
+    /** 用于重名校验；调用方已有项目列表，避免子页再取一次。 */
+    existingNames?: string[]
+    /** 创建成功后按它回递新项目（见 stores/mobileEditorHandoff）。 */
+    resultToken?: string
+}
+
 export interface MobileTagEditorPageParams extends MobileProjectPageParams {
     /** 有 id 是编辑，没有是新建。 */
     tagId?: string
@@ -51,6 +59,7 @@ export interface MobileAiSettingsPageParams {
 
 export interface MobilePageParamsMap {
     projectList: undefined
+    projectCreator: MobileProjectCreatorPageParams
     projectHome: MobileProjectPageParams
     projectDescription: MobileProjectScopedPageParams
     entryList: MobileEntryListPageParams

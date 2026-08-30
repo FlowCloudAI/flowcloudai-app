@@ -5,20 +5,32 @@ import {FloatingPanel} from '../../../shared/ui/overlay'
 import {invalidateProjectList} from '../projectListStore'
 import './ProjectCreator.css'
 
-interface ProjectCreatorProps {
+interface ProjectCreatorFormProps {
+    /** 浮层用它做打开时重置；独立页面每次挂载都是新的，固定传 true。 */
     open: boolean
     onClose: () => void
     onCreated?: (project: Project) => void
     existingNames?: string[]
+    /** 提交中状态回传给外壳：浮层据此禁用点背板关闭，页面据此禁用返回。 */
+    onBusyChange?: (busy: boolean) => void
 }
 
-export default function ProjectCreator({open, onClose, onCreated, existingNames = []}: ProjectCreatorProps) {
+/**
+ * 新建世界观的表单本体，不含浮层/页面外壳。
+ * 桌面端包在 FloatingPanel 里（本文件默认导出），移动端包在独立页面里
+ * （见 app/mobile/pages/MobileProjectCreator）。
+ */
+export function ProjectCreatorForm({open, onClose, onCreated, existingNames = [], onBusyChange}: ProjectCreatorFormProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [createDefaultTemplate, setCreateDefaultTemplate] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [apiError, setApiError] = useState<string | null>(null)
     const {showAlert} = useAlert()
+
+    useEffect(() => {
+        onBusyChange?.(submitting)
+    }, [onBusyChange, submitting])
 
     useEffect(() => {
         if (open) {
@@ -58,15 +70,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
     }
 
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            dismissible={!submitting}
-            title="新建世界观"
-            ariaLabel="新建世界观"
-            className="project-creator-dialog"
-            dataTourId="project-creator-dialog"
-        >
+        <>
             <div className="project-creator-body">
                     <div className="project-creator-field">
                         <label className="project-creator-label">
@@ -134,6 +138,24 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                         {submitting ? '创建中…' : '创建'}
                     </Button>
                 </div>
+        </>
+    )
+}
+
+/** 桌面端的浮层外壳。表单本体见 ProjectCreatorForm。 */
+export default function ProjectCreator(props: ProjectCreatorFormProps) {
+    const [busy, setBusy] = useState(false)
+    return (
+        <FloatingPanel
+            open={props.open}
+            onClose={props.onClose}
+            dismissible={!busy}
+            title="新建世界观"
+            ariaLabel="新建世界观"
+            className="project-creator-dialog"
+            dataTourId="project-creator-dialog"
+        >
+            <ProjectCreatorForm {...props} onBusyChange={setBusy}/>
         </FloatingPanel>
     )
 }

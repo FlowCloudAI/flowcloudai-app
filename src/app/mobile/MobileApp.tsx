@@ -42,6 +42,7 @@ import MobileEntryRelationEditor from './pages/MobileEntryRelationEditor'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
+import MobileProjectCreator from './pages/MobileProjectCreator'
 import MobileProjectDescription from './pages/MobileProjectDescription'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
@@ -593,6 +594,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             <>
                 {!page && <MobileHome {...layerProps}/>}
                 {page?.type === 'projectList' && <MobileProjectList {...layerProps}/>}
+                {page?.type === 'projectCreator' && <MobileProjectCreator {...layerProps} params={page.params}/>}
                 {page?.type === 'projectHome' && (
                     <MobileProjectHome
                         {...layerProps}

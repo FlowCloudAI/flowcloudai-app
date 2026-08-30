@@ -13,7 +13,6 @@ import {
     toApiError,
 } from '../../../api'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
-import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
 import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
 import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
@@ -23,6 +22,8 @@ import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {formatProjectDate} from '../../../features/projects/projectDisplay'
 import MobilePagination from '../components/MobilePagination'
+import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useMobileEditorResult} from './useMobileEditorResult'
 import {MobileAddIcon} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileProjectList.css'
@@ -48,7 +49,8 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
     const [importing, setImporting] = useState(false)
     const [countsError, setCountsError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
-    const [creatorOpen, setCreatorOpen] = useState(false)
+    /* 新建世界观走独立页面（输入型重操作不进浮层），新项目按 token 回递。 */
+    const [creatorResultToken] = useState(() => createMobileEditorToken('projectCreator'))
     const [projectPage, setProjectPage] = useState(1)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
@@ -123,10 +125,20 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
         pageRef.current?.scrollTo({top: 0})
     }, [currentProjectPage])
 
+    const openProjectCreator = useCallback(() => {
+        push({type: 'projectCreator', params: {
+            displayName: '新建世界观',
+            existingNames: projects.map(project => project.name),
+            resultToken: creatorResultToken,
+        }})
+    }, [creatorResultToken, projects, push])
+
     const handleOpenProject = useCallback((project: Project) => {
         setAiFocus({projectId: project.id, entryId: null})
         push({type: 'projectHome', params: {projectId: project.id, displayName: project.name}})
     }, [push, setAiFocus])
+
+    useMobileEditorResult<Project>(creatorResultToken, project => handleOpenProject(project))
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
         await invalidateProjectList()
@@ -240,12 +252,6 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
 
     return (
         <div ref={pageRef} className="mobile-page mobile-project-list">
-            <ProjectCreator
-                open={creatorOpen}
-                onClose={() => setCreatorOpen(false)}
-                onCreated={handleOpenProject}
-                existingNames={projects.map(p => p.name)}
-            />
             <ProjectImportConflictDialog
                 open={Boolean(importConflict)}
                 preview={importConflict}
@@ -267,7 +273,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                 <button
                     type="button"
                     className="mobile-project-list__create"
-                    onClick={() => setCreatorOpen(true)}
+                    onClick={() => openProjectCreator()}
                     aria-label="新建项目"
                 >
                     <MobileAddIcon/>
@@ -310,7 +316,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
             {projects.length === 0 && !loading ? (
                 <div className="mobile-page__empty">
                     <p>还没有任何项目</p>
-                    <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
+                    <Button type="button" onClick={() => openProjectCreator()}>创建第一个世界</Button>
                 </div>
             ) : (
                 <div className="mobile-project-list__cards">
