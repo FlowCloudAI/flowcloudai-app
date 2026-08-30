@@ -192,6 +192,13 @@ test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
     // 都读作闪现；现值 y1=0.25 + 450ms 摊到约 245ms。改这两个值要重新量。
     assert.match(overlayCss, /--fc-overlay-transition-easing:\s*cubic-bezier\(0\.33, 0\.25, 0\.25, 1\)/)
     assert.match(overlaySource, /SHEET_TRANSITION_MS = 450/)
+    /*
+     * 进场必须是关键帧动画，不能退回纯过渡。
+     * 过渡依赖「起始状态被绘制过一帧」，而真实触摸事件在一帧开头派发、早于该帧的
+     * rAF，Overlay.tsx 的双 rAF 兜不住，过渡整个不启动；合成 click 测不出来。
+     */
+    assert.match(overlayCss, /\.fc-overlay--sheet\[data-state='open'\] \.fc-overlay__panel\s*\{[\s\S]*?animation:\s*fc-overlay-sheet-rise/)
+    assert.match(overlayCss, /@keyframes fc-overlay-sheet-rise\s*\{[\s\S]*?from\s*\{[\s\S]*?translateY\(calc\(100% \+ 2rem\)\)/)
     assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
 })
 

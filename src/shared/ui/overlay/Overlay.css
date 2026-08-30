@@ -32,17 +32,17 @@
 /* 上滑：贴底铺满，底部留安全区。变体组件后续接入。 */
 .fc-overlay--sheet {
     /*
-     * 上滑要看得见「升起」这个过程，不能用浮动层那档 100ms——
-     * 那个时长下面板几乎是一帧就位。280ms 与 Overlay.tsx 的 SHEET_TRANSITION_MS
-     * 对齐：在此之前 JS 等 280ms 卸载、CSS 只动 100ms，两边本来就对不上。
+     * 时长与缓动都是真机 CDP screencast 逐帧量出来的（量绘制帧里的面板上沿，
+     * 不是 getComputedStyle —— 后者只能证明动画在跑，证明不了看得见在跑）：
+     *
+     *   280ms + easeOutQuint(0.22, 1, 0.36, 1)   83% 行程约 95ms 走完
+     *   320ms + y1=0.45                          约 127ms，肉眼分辨不出差别
+     *   450ms + y1=0.25                          约 245ms
+     *
+     * y1 决定起手速度，是这里最敏感的一位；调这两个值请重新量，别凭感觉。
+     * JS 侧的 SHEET_TRANSITION_MS 必须跟着改，它决定何时卸载。
      */
     --fc-overlay-transition-duration: 450ms;
-    /*
-     * 缓动不能太前倾。原来的 easeOutQuint（0.22, 1, 0.36, 1）y1=1，起手就是满速：
-     * 真机逐帧采样显示前 60ms 已经走完 75% 行程，剩下 220ms 在挪最后几十像素，
-     * 看上去就是「闪一下然后不动」。把 y1 压到 0.45 并把时长提到 320ms，
-     * 行程摊到整段时长上；JS 侧的 SHEET_TRANSITION_MS 同步跟到 320。
-     */
     --fc-overlay-transition-easing: cubic-bezier(0.33, 0.25, 0.25, 1);
     align-items: flex-end;
     justify-content: stretch;
@@ -130,6 +130,38 @@
     transform: translateY(calc(100% + 2rem));
 }
 
+/*
+ * 进场用关键帧动画，不是过渡。
+ *
+ * 过渡要求「起始状态被真正绘制过一帧」，Overlay.tsx 为此排了两个 rAF。但真实触摸的
+ * 事件是在一帧的开头派发的，早于该帧的 rAF 回调，两个 rAF 都在起始状态被绘制之前
+ * 跑完 —— 过渡直接不启动，面板出现在终点。真机 trace：pointerdown 之后 113ms
+ * data-state 转 open，随后每一帧 transform 都是 none。
+ * 用 CDP 合成 click 反而正常，因为那段 JS 跑在帧与帧之间，rAF 落到下一帧，
+ * 起始状态被画了一帧 —— 所以只用合成事件是测不出这个 bug 的。
+ *
+ * 关键帧动画在 animation-name 变为可用时就从 from 起跑，不看绘制历史，两条路径一致。
+ * 退场仍走过渡：那时元素已经在屏幕上，起始状态天然存在（实测退场一直是正常的）。
+ *
+ * 没用 @starting-style：Safari 17.5 起才支持，本项目最低 iOS 16.2。
+ */
+.fc-overlay--sheet[data-state='open'] .fc-overlay__panel {
+    animation: fc-overlay-sheet-rise
+        var(--fc-overlay-transition-duration)
+        var(--fc-overlay-transition-easing)
+        both;
+}
+
+@keyframes fc-overlay-sheet-rise {
+    from {
+        transform: translateY(calc(100% + 2rem));
+    }
+
+    to {
+        transform: none;
+    }
+}
+
 .fc-overlay[data-state='open'] .fc-overlay__panel {
     transform: none;
     opacity: 1;
@@ -139,5 +171,9 @@
     .fc-overlay,
     .fc-overlay__panel {
         transition: none;
+    }
+
+    .fc-overlay--sheet[data-state='open'] .fc-overlay__panel {
+        animation: none;
     }
 }
