@@ -19,6 +19,18 @@ interface AboutSectionProps {
     onExit: () => void | Promise<void>
 }
 
+/**
+ * 链接展示文案：去掉 scheme 与结尾斜杠。
+ *
+ * `https://github.com/FlowCloudAI/Local_App` 实测 264px，比它那一栏（232px）宽 32px，
+ * 而 URL 里没有可断行的空白，于是整串直接画到右侧「打开」按钮上。去掉 8 个字符的
+ * scheme 就回到栏内；跳转仍用完整 URL，这里只影响显示。
+ * 下面的 overflow-wrap 是结构兜底，防的是以后换成更长的地址。
+ */
+function formatLinkDisplay(url: string): string {
+    return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
+
 function LogIcon() {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
@@ -118,7 +130,7 @@ export default function MobileSettingsAboutSection({
                 <div className="mobile-settings-about-action">
                     <div className="mobile-settings-about-action__copy">
                         <span className="mobile-settings-about-action__title">官网</span>
-                        <span className="mobile-settings-about-action__desc">{officialSiteUrl}</span>
+                        <span className="mobile-settings-about-action__desc">{formatLinkDisplay(officialSiteUrl)}</span>
                     </div>
                     <Button type="button" variant="outline" size="sm" radius="full" onClick={() => onOpenOfficialUrl(officialSiteUrl)}>
                         打开
@@ -127,7 +139,7 @@ export default function MobileSettingsAboutSection({
                 <div className="mobile-settings-about-action">
                     <div className="mobile-settings-about-action__copy">
                         <span className="mobile-settings-about-action__title">官方 GitHub</span>
-                        <span className="mobile-settings-about-action__desc">{officialGithubUrl}</span>
+                        <span className="mobile-settings-about-action__desc">{formatLinkDisplay(officialGithubUrl)}</span>
                     </div>
                     <Button type="button" variant="outline" size="sm" radius="full" onClick={() => onOpenOfficialUrl(officialGithubUrl)}>
                         打开

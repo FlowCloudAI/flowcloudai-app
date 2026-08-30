@@ -572,6 +572,8 @@
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-meta);
     line-height: var(--mobile-leading-snug);
+    /* URL 里没有空白可断行，不给 anywhere 的话整串会溢出本栏画到右侧按钮上。 */
+    overflow-wrap: anywhere;
 }
 
 .mobile-settings-log-viewer {
