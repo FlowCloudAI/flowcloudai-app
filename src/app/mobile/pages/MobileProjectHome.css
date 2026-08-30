@@ -146,6 +146,65 @@
     font-weight: var(--mobile-weight-strong);
 }
 
+/*
+ * 资料整理评分。环形进度用 conic-gradient 画，中心用 radial-gradient 挖空，
+ * 与桌面 .pe-dashboard-health__ring 同一套画法，只是尺寸与字号降到移动端档位。
+ */
+.mobile-project-home__health {
+    display: flex;
+    align-items: center;
+    gap: var(--mobile-gap-group);
+    padding: var(--mobile-gap-item) var(--mobile-gap-group);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent-strong);
+}
+
+.mobile-project-home__health-ring {
+    --mobile-health-ring-value: 0%;
+
+    display: grid;
+    width: 3.6rem;
+    height: 3.6rem;
+    flex: 0 0 3.6rem;
+    place-items: center;
+    border-radius: var(--fc-radius-full);
+    background:
+        radial-gradient(circle, var(--mobile-surface-translucent-strong) 58%, transparent 60%),
+        conic-gradient(
+            var(--fc-color-primary) var(--mobile-health-ring-value),
+            color-mix(in srgb, var(--fc-color-border) 48%, transparent) 0
+        );
+}
+
+.mobile-project-home__health-ring span {
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-title);
+    font-weight: var(--mobile-weight-strong);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--mobile-leading-tight);
+}
+
+.mobile-project-home__health-body {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--mobile-gap-text);
+}
+
+.mobile-project-home__health-body strong {
+    color: var(--fc-color-text);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-strong);
+    line-height: var(--mobile-leading-tight);
+}
+
+.mobile-project-home__health-body small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
+}
+
 .mobile-project-home__list {
     display: flex;
     flex-direction: column;

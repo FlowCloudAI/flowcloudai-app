@@ -36,6 +36,7 @@ import {buildProjectExportFileName, toProjectImageSrc} from '../../../features/p
 import MobileEntryBrowser from './MobileEntryBrowser'
 import {useMobileEntryBrowser} from './useMobileEntryBrowser'
 import {
+    ProjectHomeHealthScore,
     ProjectHomeHero,
     ProjectHomePrimaryActions,
     ProjectHomeResourceList,
@@ -440,6 +441,11 @@ export default function MobileProjectHome({
             <ProjectHomePrimaryActions
                 onCreateEntry={() => void handleCreateEntry(null)}
                 onOpenAi={handleOpenAi}
+            />
+
+            <ProjectHomeHealthScore
+                score={stats?.governanceScore.score ?? 0}
+                entryCount={entryCount}
             />
 
             <ProjectHomeResourceList
