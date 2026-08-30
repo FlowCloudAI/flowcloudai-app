@@ -324,7 +324,7 @@ export default function MobileProjectHome({
     const advancedTools: ProjectHomeTool[] = [
         {key: 'relation', label: '关系图谱', meta: `${formatNumber(relationCount)} 关系`},
         {key: 'timeline', label: '时间线', meta: '时序'},
-        {key: 'map', label: '世界地图', meta: '地图', disabled: true, unavailableReason: '仅桌面端'},
+        {key: 'map', label: '世界地图', meta: '地图', disabled: true, unavailableReason: '暂未开放'},
         {key: 'check', label: '设定检测', meta: internalLinkCount > 0 ? `${formatNumber(internalLinkCount)} 内链` : '质检'},
     ]
     const projectMenuItems: MobileAnchoredMenuItem[] = [
