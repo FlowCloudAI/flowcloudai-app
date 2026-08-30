@@ -94,10 +94,11 @@
     --mobile-topbar-bg-filter: blur(1px) saturate(1);
     --mobile-topbar-bg-box-shadow: none;
     --mobile-topbar-pill-tint: var(--fc-color-bg-elevated);
+    /* 可见度整体抬 10 个百分点（60→70 / 25→35）；角度与 tint 不变。 */
     --mobile-topbar-pill-background: linear-gradient(
         180deg,
-        color-mix(in srgb, var(--mobile-topbar-pill-tint) 60%, transparent) 0%,
-        color-mix(in srgb, var(--mobile-topbar-pill-tint) 25%, transparent) 100%
+        color-mix(in srgb, var(--mobile-topbar-pill-tint) 70%, transparent) 0%,
+        color-mix(in srgb, var(--mobile-topbar-pill-tint) 35%, transparent) 100%
     );
     --mobile-topbar-pill-filter: blur(2px) saturate(1);
     --mobile-topbar-pill-border-source: color-mix(
@@ -181,10 +182,11 @@
         var(--fc-color-bg-elevated) 99%,
         var(--fc-color-text)
     );
+    /* 暗色抬 5 个百分点（80→85 / 25→30）；角度与 tint 不变。 */
     --mobile-topbar-pill-background: linear-gradient(
         0deg,
-        color-mix(in srgb, var(--mobile-topbar-pill-tint) 80%, transparent) 0%,
-        color-mix(in srgb, var(--mobile-topbar-pill-tint) 25%, transparent) 100%
+        color-mix(in srgb, var(--mobile-topbar-pill-tint) 85%, transparent) 0%,
+        color-mix(in srgb, var(--mobile-topbar-pill-tint) 30%, transparent) 100%
     );
     --mobile-topbar-pill-border: 0.6px solid color-mix(
         in srgb,
