@@ -1,3 +1,4 @@
+import {type ReactNode, useState} from 'react'
 import {Input, Select, Slider} from 'flowcloudai-ui'
 import type {AppSettings, LlmCompactDetail, PluginInfo} from '../../../api'
 import {CONVERSATION_TEMPERATURE_MAX} from '../../../features/ai-chat/model/AiControllerTypes'
@@ -31,6 +32,50 @@ function modelOptions(plugin: PluginInfo | null) {
     return (plugin?.models ?? []).map(model => ({value: model, label: model}))
 }
 
+/** 收起时靠这行认出当前配置，不用展开就能看出哪一类还没设。 */
+function groupSummary(plugin: PluginInfo | null, model: string | null): string {
+    if (!plugin) return '未设置'
+    return model ? `${plugin.name} · ${model}` : plugin.name
+}
+
+/**
+ * 可折叠的默认模型分组。
+ *
+ * 三类默认模型摊开是 8 个下拉，占掉整屏还看不到下面的文本模型配置；默认收起，
+ * 标题行直接给出当前选择。折叠态不渲染内容（不是 display: none）——里面是
+ * 一堆 Select，留在 DOM 里只会让 Tab 顺序和无障碍焦点穿到看不见的地方。
+ */
+function ModelGroup({label, summary, expanded, onToggle, children}: {
+    label: string
+    summary: string
+    expanded: boolean
+    onToggle: () => void
+    children: ReactNode
+}) {
+    return (
+        <div className="mobile-settings-model-group">
+            <button
+                type="button"
+                className="mobile-settings-model-group__toggle"
+                aria-expanded={expanded}
+                onClick={onToggle}
+            >
+                <span className="mobile-settings-model-group__label">{label}</span>
+                <span className="mobile-settings-model-group__summary">{summary}</span>
+                <svg
+                    className={`mobile-settings-model-group__icon${expanded ? ' is-expanded' : ''}`}
+                    viewBox="0 0 20 20"
+                    focusable="false"
+                    aria-hidden="true"
+                >
+                    <path d="M6 8 10 12l4-4"/>
+                </svg>
+            </button>
+            {expanded && <div className="mobile-settings-model-group__body">{children}</div>}
+        </div>
+    )
+}
+
 /** 移动端模型管理：与桌面端保持同一领域分组，但使用单列触控布局。 */
 export default function MobileSettingsModelsSection({
     settings,
@@ -39,6 +84,8 @@ export default function MobileSettingsModelsSection({
     ttsPlugins,
     onChange,
 }: Props) {
+    const [expanded, setExpanded] = useState<Record<ModelKind, boolean>>({llm: false, image: false, tts: false})
+    const toggle = (kind: ModelKind) => setExpanded(current => ({...current, [kind]: !current[kind]}))
     const pluginsByKind: Record<ModelKind, PluginInfo[]> = {
         llm: llmPlugins,
         image: imagePlugins,
@@ -78,8 +125,12 @@ export default function MobileSettingsModelsSection({
             <section className="mobile-settings-panel">
                 <h2 className="mobile-settings-panel__title">默认模型</h2>
                 <div className="mobile-settings-form-stack">
-                    <div className="mobile-settings-model-group">
-                        <div className="mobile-settings-subtitle">AI 对话</div>
+                    <ModelGroup
+                        label="AI 对话"
+                        summary={groupSummary(selectedLlmPlugin, settings.llm.default_model)}
+                        expanded={expanded.llm}
+                        onToggle={() => toggle('llm')}
+                    >
                         <Select
                             value={settings.llm.plugin_id ?? ''}
                             options={pluginOptions(llmPlugins)}
@@ -95,9 +146,13 @@ export default function MobileSettingsModelsSection({
                             disabled={!selectedLlmPlugin}
                             onValueChange={value => updateLlm({default_model: value ? String(value) : null})}
                         />
-                    </div>
-                    <div className="mobile-settings-model-group">
-                        <div className="mobile-settings-subtitle">AI 绘图</div>
+                    </ModelGroup>
+                    <ModelGroup
+                        label="AI 绘图"
+                        summary={groupSummary(selectedImagePlugin, settings.image.default_model)}
+                        expanded={expanded.image}
+                        onToggle={() => toggle('image')}
+                    >
                         <Select
                             value={settings.image.plugin_id ?? ''}
                             options={pluginOptions(imagePlugins)}
@@ -116,9 +171,13 @@ export default function MobileSettingsModelsSection({
                                 image: {...settings.image, default_model: value ? String(value) : null},
                             })}
                         />
-                    </div>
-                    <div className="mobile-settings-model-group">
-                        <div className="mobile-settings-subtitle">AI 语音</div>
+                    </ModelGroup>
+                    <ModelGroup
+                        label="AI 语音"
+                        summary={groupSummary(selectedTtsPlugin, settings.tts.default_model)}
+                        expanded={expanded.tts}
+                        onToggle={() => toggle('tts')}
+                    >
                         <Select
                             value={settings.tts.plugin_id ?? ''}
                             options={pluginOptions(ttsPlugins)}
@@ -159,7 +218,7 @@ export default function MobileSettingsModelsSection({
                                 })}
                             />
                         </label>
-                    </div>
+                    </ModelGroup>
                 </div>
             </section>
 
