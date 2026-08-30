@@ -478,8 +478,9 @@ export default function MobileHome({
                 ) : (
                     <ProjectDefaultCover projectId={project.id} projectName={project.name}/>
                 )}
-                imageHeight="11.25rem"
-                contentAreaRatio={0.46}
+                /* 卡片高度由 aspect-ratio 决定，封面按整卡填满；0.38 保持文字块的原有高度。 */
+                imageHeight="100%"
+                contentAreaRatio={0.38}
                 overlayStartOpacity={0.06}
                 overlayEndOpacity={0.94}
                 /*

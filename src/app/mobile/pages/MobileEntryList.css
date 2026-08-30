@@ -94,10 +94,15 @@
     padding: var(--mobile-gap-item) var(--mobile-gap-group) var(--mobile-gap-section);
 }
 
+/*
+ * 宽高比对齐桌面 .pe-entry-card 的 3:4。封面仍是 4:3，正文占剩下的高度——正文块是
+ * flex:1，Card 会按实测可用高度重算 description 的行数，够不着两行时自动收成一行。
+ */
 .mobile-entry-card {
     --mobile-entry-card-color: var(--fc-color-primary);
 
     position: relative;
+    aspect-ratio: 3 / 4;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     overflow: hidden;

@@ -174,7 +174,12 @@
 }
 
 .mobile-home-worlds {
-    --mobile-home-world-card-height: 11.25rem;
+    /*
+     * 分页时给两行卡片预留的高度，防止最后一页卡片不足时网格塌陷。
+     * 卡片真正的高度由 .mobile-home-world-card 的 aspect-ratio 算出，这里只是个估算值：
+     * 375px 视口下两列各 165.23px，乘 4/3 恰好是 13.75rem。
+     */
+    --mobile-home-world-card-height: 13.75rem;
 
     display: flex;
     flex-direction: column;
@@ -238,18 +243,20 @@
     min-height: 19.65rem;
 }
 
+/*
+ * 宽高比对齐桌面的词条卡片 3:4——桌面那边写死在 .pe-entry-card 的 aspect-ratio 上，
+ * CategoryView 的虚拟网格也按 columnWidth * 4/3 排行高，两条路径一致。
+ *
+ * 没有照搬桌面项目卡片：它本身没有固定比例（27rem 定高 + 18rem 最小列宽，随窗口在
+ * 2:3 到接近 1:1 之间漂），拿不出一个可迁移的值，所以两端统一到词条卡片这一档。
+ */
 .mobile-home-world-card.fc-card {
-    height: var(--mobile-home-world-card-height);
-    min-height: var(--mobile-home-world-card-height);
+    aspect-ratio: 3 / 4;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--fc-color-bg-tertiary);
     box-shadow: none;
     overflow: hidden;
-}
-
-.mobile-home-world-card .fc-card__image-wrapper {
-    min-height: var(--mobile-home-world-card-height);
 }
 
 .mobile-home-world-card .fc-card__image {
