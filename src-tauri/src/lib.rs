@@ -330,6 +330,9 @@ pub fn run() {
                 .join("settings.json");
 
             let mut settings = AppSettings::load(&settings_path);
+            if let Err(error) = apply_native_window_theme_setting(&app_handle, &settings.theme) {
+                log::warn!("应用窗口原生主题失败: {}", error);
+            }
             if let Err(error) =
                 apply_shell_window_effect_setting(&app_handle, settings.shell_acrylic_enabled)
             {

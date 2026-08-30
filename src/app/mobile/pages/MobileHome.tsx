@@ -11,6 +11,7 @@ import {
     useState,
 } from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
+import MobilePagination from '../components/MobilePagination'
 import {
     db_count_entries,
     db_create_idea_note,
@@ -642,29 +643,12 @@ export default function MobileHome({
                             >
                                 {paginatedWorldProjects.map(renderWorldCard)}
                             </div>
-                            {worldPageCount > 1 ? (
-                                <nav className="mobile-home-worlds__pagination" aria-label="世界列表分页">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={currentWorldPage === 1}
-                                        onClick={() => setWorldPage(page => Math.max(1, page - 1))}
-                                    >
-                                        上一页
-                                    </Button>
-                                    <span aria-live="polite">{currentWorldPage} / {worldPageCount}</span>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={currentWorldPage === worldPageCount}
-                                        onClick={() => setWorldPage(page => Math.min(worldPageCount, page + 1))}
-                                    >
-                                        下一页
-                                    </Button>
-                                </nav>
-                            ) : null}
+                            <MobilePagination
+                                page={currentWorldPage}
+                                pageCount={worldPageCount}
+                                ariaLabel="世界列表分页"
+                                onPageChange={setWorldPage}
+                            />
                         </>
                     )}
                 </section>

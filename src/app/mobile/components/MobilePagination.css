@@ -1,0 +1,33 @@
+/*
+ * 移动端统一分页条。上一页 / 当前页 / 下一页三段等分，跟桌面 .project-list-pagination、
+ * .pe-entry-pagination 是同一套信息结构，只是按钮撑满以满足触摸命中基线。
+ */
+.mobile-pagination {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--mobile-gap-item);
+}
+
+.mobile-pagination .fc-btn {
+    width: 100%;
+    min-height: var(--mobile-tap-min);
+}
+
+.mobile-pagination__indicator {
+    min-width: 3.25rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+/*
+ * 固定视口布局（插件管理）翻到只剩一页时不能让分页条直接消失，
+ * 否则上面的卡片网格会整体下坠一格。
+ */
+.mobile-pagination.is-placeholder {
+    visibility: hidden;
+    pointer-events: none;
+}

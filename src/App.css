@@ -373,9 +373,39 @@ body {
         Win11 下 windowEffects 的 color 字段无效，毛玻璃着色统一由这层 CSS 控制。
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-backdrop] {
-    /* 外层画布磨砂底色：占比越高越实、越低越透出桌面，可按需调整 */
+    /* Windows Acrylic 保持既有着色强度；占比越高越实、越低越透出桌面。 */
     --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, transparent);
 }
+
+[data-backdrop="vibrancy"] {
+    /* macOS 系统材质自带着色，深色模式降低覆盖层后才能显出原生模糊层次。 */
+    --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 68%, transparent);
+}
+
+[data-theme="light"][data-backdrop] {
+    /* Shell 专用：预先提高色度，抵消透明合成造成的衰减。 */
+    --app-shell-light-tint: color-mix(
+            in oklab,
+            var(--fc-color-bg) 70%,
+            var(--fc-color-primary) 30%
+    );
+
+    --app-shell-bg: color-mix(
+            in srgb,
+            var(--app-shell-light-tint) 85%,
+            transparent
+    );
+}
+
+[data-theme="light"][data-backdrop="vibrancy"] {
+    /* macOS 继续使用更低的 74% 覆层强度，保留比 Windows 更明显的系统材质。 */
+    --app-shell-bg: color-mix(in srgb, var(--app-shell-light-tint) 40%, transparent);
+}
+[data-theme="dark"][data-backdrop="vibrancy"] {
+    /* macOS 继续使用更低的 74% 覆层强度，保留比 Windows 更明显的系统材质。 */
+    --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 50%, transparent);
+}
+
 
 [data-backdrop] body {
     background: transparent;

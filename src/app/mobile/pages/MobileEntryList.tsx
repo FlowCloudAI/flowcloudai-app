@@ -18,6 +18,7 @@ import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
 import {getMeaningfulCoverMark} from '../../../shared/lib/defaultCover'
+import MobilePagination from '../components/MobilePagination'
 import {MobileAddIcon, MobileBackIcon, MobileMenuIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import {formatMobileEntryListDate} from './MobileEntryDate'
@@ -33,28 +34,28 @@ interface Props {
     params: MobileEntryListPageParams
 }
 
-/** 首屏与每次「加载更多」的页大小。 */
-const PAGE_SIZE = 30
+/**
+ * 每页条数。网格是两列，10 条即 5 行；桌面的「列数 × 行数 - 1」在这里退化成定值，
+ * 减掉的那一格是给桌面的新建卡片留的，移动端新建入口在顶栏，不需要让位。
+ */
+const ENTRY_PAGE_SIZE = 10
 
 /**
- * 两个降级路径的一次性上限。它们**无法分页**，原因在后端能力而非前端：
- * - 搜索：`db_search_entries` 只有 limit、没有 offset（SQL 是 `ORDER BY updated_at DESC LIMIT ?`）。
+ * 两个降级路径的一次性上限。它们**后端不支持 offset**，只能取回上限后在客户端切片：
+ * - 搜索：`db_search_entries` 只有 limit（SQL 是 `ORDER BY updated_at DESC LIMIT ?`）。
  * - 未分类：`EntryFilter.category_id` 语义是「等于某分类」，没有「IS NULL」，
  *   所以只能全量取回来在客户端筛。
- * 要真正分页需要先改 core_world_data（给 search 加 offset、给 filter 加 uncategorized），
- * 属跨仓改动，不在移动端这轮范围内。
+ * 要让这两条也走后端分页需要先改 core_world_data（给 search 加 offset、
+ * 给 filter 加 uncategorized），属跨仓改动，不在移动端这轮范围内。
  */
 const SEARCH_RESULT_LIMIT = 100
 const UNCATEGORIZED_SCAN_LIMIT = 500
 
-/** 距底多少像素开始预取下一页。 */
-const LOAD_MORE_THRESHOLD_PX = 320
-
 /**
- * 记住每个列表页已加载多少条。pop 回来时一次取回同样多的内容，
- * 否则用户翻了 3 页再返回，只剩第 1 页，滚动记忆会因内容不够高而放弃恢复。
+ * 记住每个列表页停在第几页。pop 回来时回到同一页，
+ * 否则翻到第 5 页进词条再返回会被打回第 1 页。
  */
-const loadedCountMemory = new Map<string, number>()
+const pageMemory = new Map<string, number>()
 
 export default function MobileEntryList({push, pop, setAiFocus, pageKey, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
     const pageRef = useRef<HTMLDivElement>(null)
@@ -67,21 +68,34 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [total, setTotal] = useState<number | null>(null)
-    const [hasMore, setHasMore] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [loadingMore, setLoadingMore] = useState(false)
     const [loadError, setLoadError] = useState<string | null>(null)
     const [entryTypesError, setEntryTypesError] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
+    // 输入框的即时值与真正拿去查询的值分开：中间隔一层 300ms 防抖。
+    const [appliedQuery, setAppliedQuery] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    const load = useCallback(async (query: string, type: string | null) => {
+    /*
+     * 页码与它所属的过滤条件绑在一起存。分类抽屉切换走 navigation.replace：
+     * pageKey 不变、组件不重挂载，过滤条件变了必须回到第 1 页；用 effect 重置会先按
+     * 旧页码发一次请求再按新页码发一次，所以改成 render 期比对、失配即就地重置
+     * （React 官方的「上一次 render 的信息存进 state」写法）。
+     * 首次挂载时两者相等，不会覆盖 pageMemory 恢复出来的页码。
+     */
+    const filterKey = `${categoryId ?? ''}|${uncategorizedOnly ? 'u' : ''}|${typeFilter ?? ''}`
+    const [pageState, setPageState] = useState(() => ({filterKey, page: pageMemory.get(pageKey) ?? 1}))
+    if (pageState.filterKey !== filterKey) setPageState({filterKey, page: 1})
+    const currentPage = pageState.filterKey === filterKey ? pageState.page : 1
+
+    const load = useCallback(async (query: string, type: string | null, targetPage: number) => {
         setLoading(true)
         setLoadError(null)
+        const start = (targetPage - 1) * ENTRY_PAGE_SIZE
         try {
-            // ── 搜索：后端无 offset，一次取上限，不分页 ────────────────────────
+            // ── 搜索：后端无 offset，取回上限后在客户端切页 ────────────────────
             if (query.trim()) {
                 const result = await db_search_entries({
                     projectId,
@@ -91,13 +105,12 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                     limit: SEARCH_RESULT_LIMIT,
                 })
                 const visible = uncategorizedOnly ? result.filter(entry => !entry.category_id) : result
-                setEntries(visible)
                 setTotal(visible.length)
-                setHasMore(false)
+                setEntries(visible.slice(start, start + ENTRY_PAGE_SIZE))
                 return
             }
 
-            // ── 未分类：后端没有「category IS NULL」过滤，只能全取回来客户端筛 ──
+            // ── 未分类：后端没有「category IS NULL」过滤，同样先全取再客户端切页 ──
             if (uncategorizedOnly) {
                 const result = await db_list_entries({
                     projectId,
@@ -107,77 +120,54 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                     offset: 0,
                 })
                 const visible = result.filter(entry => !entry.category_id)
-                setEntries(visible)
                 setTotal(visible.length)
-                setHasMore(false)
+                setEntries(visible.slice(start, start + ENTRY_PAGE_SIZE))
                 return
             }
 
-            // ── 常规浏览：真正分页。返回本页时取回上次已加载的条数，别把人打回第一页 ──
-            const limit = Math.max(PAGE_SIZE, loadedCountMemory.get(pageKey) ?? 0)
+            // ── 常规浏览：offset 直接落到后端，只取当前页 ────────────────────
             const [result, count] = await Promise.all([
-                db_list_entries({projectId, categoryId, entryType: type, limit, offset: 0}),
+                db_list_entries({projectId, categoryId, entryType: type, limit: ENTRY_PAGE_SIZE, offset: start}),
                 db_count_entries({projectId, categoryId, entryType: type}),
             ])
             setEntries(result)
             setTotal(count)
-            setHasMore(result.length < count)
         } catch (e) {
             logger.error('加载词条失败', e)
             setLoadError(formatApiError(toApiError(e)))
         } finally {
             setLoading(false)
         }
-    }, [projectId, categoryId, pageKey, uncategorizedOnly])
+    }, [projectId, categoryId, uncategorizedOnly])
 
-    const loadMore = useCallback(async () => {
-        if (!hasMore || loading || loadingMore) return
-        setLoadingMore(true)
-        try {
-            const next = await db_list_entries({
-                projectId,
-                categoryId,
-                entryType: typeFilter,
-                limit: PAGE_SIZE,
-                offset: entries.length,
-            })
-            // 后端是 ORDER BY updated_at DESC + OFFSET：翻页途中若有词条被改动会重排，
-            // 可能带回已有的条目。按 id 去重，避免 React key 冲突和重复卡片。
-            const seen = new Set(entries.map(entry => entry.id))
-            const merged = [...entries, ...next.filter(entry => !seen.has(entry.id))]
-            setEntries(merged)
-            setHasMore(next.length > 0 && (total === null || merged.length < total))
-        } catch (e) {
-            logger.error('加载更多词条失败', e)
-            setLoadError(formatApiError(toApiError(e)))
-            setHasMore(false)
-        } finally {
-            setLoadingMore(false)
+    // 与桌面 CategoryView 同一套：页数由总数推导，越界的页码由 effect 拉回。
+    const pageCount = Math.max(1, Math.ceil((total ?? 0) / ENTRY_PAGE_SIZE))
+
+    useEffect(() => {
+        void load(appliedQuery, typeFilter, currentPage)
+    }, [appliedQuery, currentPage, load, typeFilter])
+
+    // 总数回来之前不收敛页码，否则会把 pageMemory 恢复的页码在首帧压回第 1 页。
+    useEffect(() => {
+        if (total === null) return
+        setPageState(state => ({...state, page: Math.min(state.page, pageCount)}))
+    }, [pageCount, total])
+
+    // 记住停在第几页，供下次回到本页时恢复（见 pageMemory 注释）。
+    useEffect(() => {
+        if (!pageKey) return
+        pageMemory.set(pageKey, currentPage)
+    }, [currentPage, pageKey])
+
+    // 翻页后回到顶部；滚动记忆只在进入页面时生效，不会和这里打架。
+    const firstPageRenderRef = useRef(true)
+    useEffect(() => {
+        if (firstPageRenderRef.current) {
+            firstPageRenderRef.current = false
+            return
         }
-    }, [categoryId, entries, hasMore, loading, loadingMore, projectId, total, typeFilter])
-
-    useEffect(() => {
-        void load(searchText, typeFilter)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [categoryId, typeFilter])
-
-    // 记住已加载条数，供下次回到本页时一次取回（见 loadedCountMemory 注释）。
-    useEffect(() => {
-        if (!pageKey || entries.length === 0) return
-        loadedCountMemory.set(pageKey, entries.length)
-    }, [entries.length, pageKey])
-
-    // 滚到接近底部时预取下一页。
-    useEffect(() => {
-        const element = pageRef.current
-        if (!element || !hasMore) return
-        const handleScroll = () => {
-            const remaining = element.scrollHeight - element.scrollTop - element.clientHeight
-            if (remaining <= LOAD_MORE_THRESHOLD_PX) void loadMore()
-        }
-        element.addEventListener('scroll', handleScroll, {passive: true})
-        return () => element.removeEventListener('scroll', handleScroll)
-    }, [hasMore, loadMore])
+        pageRef.current?.scrollTo({top: 0})
+    }, [currentPage])
 
     const loadEntryTypes = useCallback(async () => {
         setEntryTypesError(null)
@@ -196,7 +186,10 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
     const handleSearch = (value: string) => {
         setSearchText(value)
         if (searchTimer.current) clearTimeout(searchTimer.current)
-        searchTimer.current = setTimeout(() => void load(value, typeFilter), 300)
+        searchTimer.current = setTimeout(() => {
+            setAppliedQuery(value)
+            setPageState(state => ({...state, page: 1}))
+        }, 300)
     }
 
     const handleCreateEntry = async () => {
@@ -212,9 +205,9 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
     }
 
     const retryLoad = useCallback(() => {
-        void load(searchText, typeFilter)
+        void load(appliedQuery, typeFilter, currentPage)
         void loadEntryTypes()
-    }, [load, loadEntryTypes, searchText, typeFilter])
+    }, [appliedQuery, currentPage, load, loadEntryTypes, typeFilter])
 
     const handleOpenEntry = (entry: EntryBrief) => {
         setAiFocus({projectId, entryId: entry.id})
@@ -280,14 +273,14 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
 
             <div className="mobile-entry-list__hero">
                 {/*
-                  * 显示后端 count 的真实总数，而不是已加载条数——分页后两者不再相等，
-                  * 拿 entries.length 当总数会在大项目里直接谎报（原先固定 limit:200 时同理）。
+                  * 显示后端 count 的真实总数，而不是本页条数——分页后两者不相等，
+                  * 拿 entries.length 当总数会在大项目里直接谎报。
                   */}
                 <span className="mobile-page__eyebrow mobile-entry-list__eyebrow">
                     {loading
                         ? '正在同步'
-                        : total !== null && total > entries.length
-                            ? `${total} 个词条 · 已加载 ${entries.length}`
+                        : pageCount > 1
+                            ? `${total ?? entries.length} 个词条 · 第 ${currentPage} / ${pageCount} 页`
                             : `${total ?? entries.length} 个词条`}
                 </span>
                 <h2 className="mobile-page__hero-title">{listTitle}</h2>
@@ -402,20 +395,13 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                 </div>
             )}
 
-            {/* 手势是加速器、按钮是基线：滚到底自动预取，同时给一个可点的兜底入口。 */}
-            {hasMore && !loading && (
-                <div className="mobile-entry-list__more">
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={loadingMore}
-                        onClick={() => void loadMore()}
-                    >
-                        {loadingMore ? '加载中…' : '加载更多'}
-                    </Button>
-                </div>
-            )}
+            <MobilePagination
+                className="mobile-entry-list__pagination"
+                page={currentPage}
+                pageCount={pageCount}
+                ariaLabel="词条列表分页"
+                onPageChange={next => setPageState({filterKey, page: next})}
+            />
         </div>
     )
 }

@@ -87,11 +87,9 @@
     gap: var(--mobile-gap-group) var(--mobile-gap-item);
 }
 
-/* 列表底部的「加载更多」兜底按钮（滚到底会自动预取，这里是可发现的按钮通道）。 */
-.mobile-entry-list__more {
-    display: flex;
-    justify-content: center;
-    padding: var(--mobile-gap-item) var(--mobile-gap-group) var(--mobile-gap-section);
+/* 列表底部分页条；基础版式在 components/MobilePagination.css，这里只补外围留白。 */
+.mobile-entry-list__pagination {
+    padding: var(--mobile-gap-group) 0 var(--mobile-gap-section);
 }
 
 /*

@@ -330,26 +330,6 @@
     margin: 0;
 }
 
-.mobile-home-worlds__pagination {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: var(--mobile-gap-item);
-}
-
-.mobile-home-worlds__pagination .fc-btn {
-    width: 100%;
-    min-height: var(--mobile-tap-min);
-}
-
-.mobile-home-worlds__pagination span {
-    min-width: 3.25rem;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-}
-
 .mobile-home__tip {
     display: flex;
     align-items: center;

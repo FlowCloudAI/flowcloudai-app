@@ -142,11 +142,18 @@ pub async fn setting_update_settings(
     let mut s = state.settings.lock().await;
     let old_db = s.db_path.clone();
     let old_plugins = s.plugins_path.clone();
+    let old_theme = s.theme.clone();
     let old_shell_acrylic_enabled = s.shell_acrylic_enabled;
 
     *s = new_settings.clone();
     s.save(&state.path).map_err(|e| e.to_string())?;
     drop(s);
+
+    if old_theme != new_settings.theme {
+        if let Err(error) = apply_native_window_theme_setting(&app, &new_settings.theme) {
+            log::warn!("应用窗口原生主题失败: {}", error);
+        }
+    }
 
     if old_shell_acrylic_enabled != new_settings.shell_acrylic_enabled {
         if let Err(error) =
@@ -196,6 +203,40 @@ pub async fn setting_update_settings(
     }
 
     Ok(messages.join("；"))
+}
+
+/// 将应用主题设置映射到桌面原生窗口主题。
+///
+/// macOS 的 NSVisualEffectView 根据窗口的 effectiveAppearance 决定材质明暗；Windows 的
+/// Acrylic 及系统标题栏也需要相同映射。`system` 与未知旧配置均交还给操作系统解析。
+fn resolve_native_window_theme(theme: &str) -> Option<tauri::utils::Theme> {
+    match theme {
+        "light" => Some(tauri::utils::Theme::Light),
+        "dark" => Some(tauri::utils::Theme::Dark),
+        _ => None,
+    }
+}
+
+pub(crate) fn apply_native_window_theme_setting(
+    app: &AppHandle,
+    theme: &str,
+) -> Result<(), String> {
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        let Some(window) = app.get_webview_window("main") else {
+            return Ok(());
+        };
+
+        window
+            .set_theme(resolve_native_window_theme(theme))
+            .map_err(|e| e.to_string())
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = (app, theme);
+        Ok(())
+    }
 }
 
 pub(crate) fn apply_shell_window_effect_setting(
@@ -432,6 +473,20 @@ pub fn setting_delete_api_key(plugin_id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_window_theme_matches_app_theme_setting() {
+        assert_eq!(
+            resolve_native_window_theme("light"),
+            Some(tauri::utils::Theme::Light)
+        );
+        assert_eq!(
+            resolve_native_window_theme("dark"),
+            Some(tauri::utils::Theme::Dark)
+        );
+        assert_eq!(resolve_native_window_theme("system"), None);
+        assert_eq!(resolve_native_window_theme("legacy-invalid-value"), None);
+    }
 
     #[test]
     fn mobile_storage_policy_clears_all_path_overrides() {

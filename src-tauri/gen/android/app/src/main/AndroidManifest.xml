@@ -47,7 +47,7 @@
             <data android:mimeType="application/x-fcworld" />
             <data android:pathPattern=".*\\.fcworld" />
         </intent-filter>
-
+        
         <!-- tauri-file-associations. AUTO-GENERATED. DO NOT REMOVE. -->
     </activity>
 

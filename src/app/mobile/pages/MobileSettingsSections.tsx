@@ -9,6 +9,7 @@ import {
 import {usePluginPageCapacity} from '../../../features/plugins/usePluginPageCapacity'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {MobileSearchIcon} from '../components/MobileTopControls'
+import MobilePagination from '../components/MobilePagination'
 import {type MobileSettingsPageType} from '../usePageStack'
 import MobilePluginIcon from './MobilePluginIcon'
 
@@ -199,47 +200,6 @@ export function MobileSettingsMenuSection({
     )
 }
 
-function MobilePluginPagination({
-    page,
-    pageCount,
-    ariaLabel,
-    onPageChange,
-}: {
-    page: number
-    pageCount: number
-    ariaLabel: string
-    onPageChange: (page: number) => void
-}) {
-    return (
-        <nav
-            className={`mobile-settings-plugin-pagination${pageCount <= 1 ? ' is-placeholder' : ''}`}
-            aria-label={ariaLabel}
-            aria-hidden={pageCount <= 1}
-        >
-            <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                radius="full"
-                disabled={page === 1}
-                onClick={() => onPageChange(page - 1)}
-            >
-                上一页
-            </Button>
-            <span aria-live="polite">{page} / {pageCount}</span>
-            <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                radius="full"
-                disabled={page === pageCount}
-                onClick={() => onPageChange(page + 1)}
-            >
-                下一页
-            </Button>
-        </nav>
-    )
-}
 
 export function MobileSettingsPluginsSection({
     localPluginCount,
@@ -380,11 +340,14 @@ export function MobileSettingsPluginsSection({
                         )}
                     </div>
                 </div>
-                <MobilePluginPagination
+                <MobilePagination
                     page={currentInstalledPage}
                     pageCount={installedPageCount}
                     ariaLabel="已安装插件分页"
                     onPageChange={setInstalledPage}
+                    keepPlaceholder
+                    round
+                    className="mobile-settings-plugin-pagination"
                 />
             </div>
 
@@ -566,11 +529,14 @@ export function MobileSettingsPluginsSection({
                             )}
                         </div>
                     </div>
-                    <MobilePluginPagination
+                    <MobilePagination
                         page={currentMarketPage}
                         pageCount={marketPageCount}
                         ariaLabel="插件库分页"
                         onPageChange={setMarketPage}
+                        keepPlaceholder
+                        round
+                        className="mobile-settings-plugin-pagination"
                     />
                 </div>
             </FloatingPanel>

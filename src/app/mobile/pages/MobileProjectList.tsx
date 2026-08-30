@@ -22,9 +22,16 @@ import {invalidateProjectList, useProjectListStore} from '../../../features/proj
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {formatProjectDate} from '../../../features/projects/projectDisplay'
+import MobilePagination from '../components/MobilePagination'
 import {MobileAddIcon} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileProjectList.css'
+
+/**
+ * 每页条数。桌面是「列数 × 行数 - 1」（减的那格留给新建卡片），移动端固定单列、
+ * 新建入口在顶栏，所以直接给一个定值，不做「每页 N 行」选择器。
+ */
+const PROJECT_PAGE_SIZE = 6
 
 interface Props {
     push: (page: MobilePage) => void
@@ -42,6 +49,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
     const [countsError, setCountsError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [projectPage, setProjectPage] = useState(1)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
@@ -96,6 +104,24 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
             const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
             return tb - ta
         })
+
+    // 与桌面 ProjectList 同一套：页数由结果条数推导，当前页取 min 收敛，越界由 effect 拉回。
+    const projectPageCount = Math.max(1, Math.ceil(filtered.length / PROJECT_PAGE_SIZE))
+    const currentProjectPage = Math.min(projectPage, projectPageCount)
+    // filtered 本来就每次 render 重算，再包一层 memo 没有意义；切片本身是 O(页大小)。
+    const paginatedProjects = filtered.slice(
+        (currentProjectPage - 1) * PROJECT_PAGE_SIZE,
+        currentProjectPage * PROJECT_PAGE_SIZE,
+    )
+
+    useEffect(() => {
+        setProjectPage(page => Math.min(page, projectPageCount))
+    }, [projectPageCount])
+
+    // 翻页后回到列表顶部，否则停在上一页的滚动位置，看起来像没翻动。
+    useEffect(() => {
+        pageRef.current?.scrollTo({top: 0})
+    }, [currentProjectPage])
 
     const handleOpenProject = useCallback((project: Project) => {
         setAiFocus({projectId: project.id, entryId: null})
@@ -253,7 +279,10 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                     placeholder="搜索项目…"
                     aria-label="搜索项目"
                     value={searchText}
-                    onValueChange={setSearchText}
+                    onValueChange={value => {
+                        setSearchText(value)
+                        setProjectPage(1)
+                    }}
                     className="mobile-page__search"
                     radius="full"
                     size="lg"
@@ -288,7 +317,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                     {filtered.length === 0 ? (
                         <div className="mobile-page__empty">没有匹配的项目</div>
                     ) : (
-                        filtered.map(project => {
+                        paginatedProjects.map(project => {
                             return (
                                 <Card
                                     key={project.id}
@@ -326,6 +355,12 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                             )
                         })
                     )}
+                    <MobilePagination
+                        page={currentProjectPage}
+                        pageCount={projectPageCount}
+                        ariaLabel="项目列表分页"
+                        onPageChange={setProjectPage}
+                    />
                 </div>
             )}
         </div>

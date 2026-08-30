@@ -33,3 +33,33 @@ test('macOS 平台配置启用透明窗口与系统材质', async () => {
         state: 'followsWindowActiveState',
     })
 })
+
+test('桌面原生窗口主题在启动与设置切换时跟随应用主题', async () => {
+    const [settingsApiSource, startupSource] = await Promise.all([
+        readFile(new URL('../../src-tauri/src/apis/app_settings.rs', import.meta.url), 'utf8'),
+        readFile(new URL('../../src-tauri/src/lib.rs', import.meta.url), 'utf8'),
+    ])
+
+    assert.match(settingsApiSource, /window\s*\.set_theme\(resolve_native_window_theme\(theme\)\)/s)
+    assert.match(settingsApiSource, /old_theme\s*!=\s*new_settings\.theme[\s\S]*apply_native_window_theme_setting/)
+    assert.match(startupSource, /AppSettings::load[\s\S]*apply_native_window_theme_setting/)
+})
+
+test('浅色原生背景共用明亮 tint 且不改写共享主题令牌', async () => {
+    const appCss = await readFile(new URL('../App.css', import.meta.url), 'utf8')
+    const lightBackdropRule = appCss.match(
+        /\[data-theme="light"\]\[data-backdrop\]\s*\{[^}]*\}/s,
+    )?.[0]
+    const lightVibrancyRule = appCss.match(
+        /\[data-theme="light"\]\[data-backdrop="vibrancy"\]\s*\{[^}]*\}/s,
+    )?.[0]
+
+    assert.match(appCss, /\[data-backdrop\]\s*\{[^}]*85%/s)
+    assert.match(appCss, /\[data-backdrop="vibrancy"\]\s*\{[^}]*68%/s)
+    assert.ok(lightBackdropRule)
+    assert.ok(lightVibrancyRule)
+    assert.match(lightBackdropRule, /--app-shell-light-tint:[^;]*35%[^;]*65%/s)
+    assert.match(lightBackdropRule, /--app-shell-bg:[^;]*--app-shell-light-tint[^;]*85%/s)
+    assert.match(lightVibrancyRule, /--app-shell-bg:[^;]*--app-shell-light-tint[^;]*74%/s)
+    assert.doesNotMatch(`${lightBackdropRule}\n${lightVibrancyRule}`, /--fc-color-bg-secondary\s*:/)
+})

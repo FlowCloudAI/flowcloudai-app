@@ -975,30 +975,10 @@
     margin-top: auto;
 }
 
+/* 只保留与共用分页条（components/MobilePagination.css）不同的密度。 */
 .mobile-settings-plugin-pagination {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    flex: 0 0 auto;
-    align-items: center;
     gap: var(--mobile-gap-inline);
     padding-top: var(--mobile-gap-inline);
-}
-
-.mobile-settings-plugin-pagination span {
-    min-width: 3rem;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--mobile-text-meta);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-}
-
-.mobile-settings-plugin-pagination .fc-btn {
-    width: 100%;
-}
-
-.mobile-settings-plugin-pagination.is-placeholder {
-    visibility: hidden;
-    pointer-events: none;
 }
 
 .mobile-settings-plugin-library-panel {
