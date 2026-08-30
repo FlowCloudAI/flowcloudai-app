@@ -3,6 +3,7 @@ import type {ReactNode, RefObject} from 'react'
 import type {DocumentContextItem, PluginInfo} from '../../../api'
 import type {AiToolAccessMode, Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
 import type {AiContextUsage} from '../../../features/ai-chat/hooks/useAiContextUsage'
+import {formatTokenCount} from '../../../features/ai-chat/lib/contextUsage'
 import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import MobileBottomSheet from '../components/MobileBottomSheet'
 import {
@@ -33,7 +34,7 @@ interface Props {
     onAttachDocuments: () => void; webSearchEnabled: boolean; onToggleWebSearch: () => void
     documentContextItems: DocumentContextItem[]
     contextUsage: AiContextUsage | null; contextUsageOpen: boolean
-    contextUsageRef: RefObject<HTMLButtonElement | null>; onToggleContextUsage: () => void
+    onToggleContextUsage: () => void
     onCloseContextUsage: () => void
     onRetryDocument: (itemId: string) => void; onRemoveDocument: (itemId: string) => void
     /** 「更多」面板里描述本次请求注入了什么的一行文本。 */
@@ -110,7 +111,6 @@ export default function MobileAiComposer(p: Props) {
                   */}
                 {p.contextUsage ? (
                     <button
-                        ref={p.contextUsageRef}
                         type="button"
                         className={`mobile-ai-context-ring${p.contextUsageOpen ? ' is-open' : ''}`}
                         aria-haspopup="dialog"
@@ -138,22 +138,32 @@ export default function MobileAiComposer(p: Props) {
         </footer>
 
         {/*
-          * 用量浮窗：复用锚点菜单，从环上向上长出。默认只画环，具体数值放这里，
-          * 这样小屏上不用为一串百分比数字腾位置。
+          * 用量浮窗：挂在顶栏右侧动作胶囊下面，不再从右下角那颗环上往上长。
+          * 环在输入卡里、贴着屏幕底，从它往上弹出的浮窗会压住最后几条消息，
+          * 而这只是一条读完就走的数值。挪到顶部后正文一行不挡。
           */}
         <MobileAnchoredMenu
             open={p.contextUsageOpen}
             onClose={p.onCloseContextUsage}
-            anchorRef={p.contextUsageRef}
+            anchorRef={p.topActionsRef}
             containerRef={p.pageRef}
             ariaLabel="对话记忆用量"
             className="mobile-ai-context-usage-popover"
             align="right"
-            placement="top"
+            clearAnchor
         >
             <div className="mobile-ai-context-usage-popover__body">
+                {/*
+                  * 百分比已经在左边的 strong 里，右边只补绝对值与来源。
+                  * contextUsage.title 是给 aria-label 的完整句子，直接铺在这一行会把
+                  * 百分比说两遍，挤掉真正有信息量的 token 数。
+                  */}
                 <strong>{p.contextUsage?.label ?? '0%'}</strong>
-                <span>{p.contextUsage?.title ?? ''}</span>
+                <span>{p.contextUsage
+                    ? p.contextUsage.contextWindowTokens != null
+                        ? `${p.contextUsage.source} ${formatTokenCount(p.contextUsage.usedTokens)} / ${formatTokenCount(p.contextUsage.contextWindowTokens)}`
+                        : `${p.contextUsage.source} ${formatTokenCount(p.contextUsage.usedTokens)}，上限未知`
+                    : ''}</span>
             </div>
         </MobileAnchoredMenu>
 

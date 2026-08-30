@@ -822,24 +822,41 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     transition: stroke-dashoffset var(--mobile-duration-base) var(--mobile-ease-standard);
 }
 
+/*
+ * 用量浮窗：一行读完就走的数值，按内容收宽，不占锚点菜单的默认宽度。
+ * 挂在顶栏右侧胶囊下面（见 MobileAiComposer），不再从输入卡里的环往上长。
+ */
+.mobile-ai-context-usage-popover {
+    width: max-content;
+    max-width: min(15rem, calc(100vw - var(--mobile-page-x) * 2));
+    /* 只有一行内容，不需要锚点菜单为多行分组预留的上下留白。 */
+    padding: 0;
+}
+
 .mobile-ai-context-usage-popover .mobile-ai-context-usage-popover__body {
     display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-text);
+    align-items: baseline;
+    gap: var(--mobile-gap-inline);
     padding: var(--mobile-gap-inline) var(--mobile-gap-item);
 }
 
 .mobile-ai-context-usage-popover__body strong {
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-title);
+    flex: 0 0 auto;
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-strong);
+    font-variant-numeric: tabular-nums;
     line-height: var(--mobile-leading-tight) ;
 }
 
 .mobile-ai-context-usage-popover__body span {
+    min-width: 0;
+    overflow: hidden;
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-meta);
     line-height: var(--mobile-leading-snug);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /*

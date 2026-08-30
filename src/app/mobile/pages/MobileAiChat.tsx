@@ -121,7 +121,6 @@ export default function MobileAiChat({
     const suppressConversationClickRef = useRef(false)
     const modelMenuRef = useRef<HTMLButtonElement>(null)
     const toolModeMenuRef = useRef<HTMLButtonElement>(null)
-    const contextUsageRef = useRef<HTMLButtonElement>(null)
 
     const activeConversation = controllerActiveConversation ?? null
     const isCharacterConversation = activeConversation?.mode === 'character'
@@ -769,7 +768,6 @@ export default function MobileAiChat({
                 documentContextItems={documentContextItems}
                 contextUsage={contextUsageAvailable ? contextUsage : null}
                 contextUsageOpen={contextUsageOpen}
-                contextUsageRef={contextUsageRef}
                 onToggleContextUsage={() => setContextUsageOpen(open => !open)}
                 onCloseContextUsage={() => setContextUsageOpen(false)}
                 onRetryDocument={itemId => void retryDocumentContextItem(itemId)}
