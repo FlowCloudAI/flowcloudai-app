@@ -39,10 +39,14 @@
      *   320ms + y1=0.45                          约 127ms，肉眼分辨不出差别
      *   450ms + y1=0.25                          约 245ms
      *
+     * 注意上面这三组是在进场还走过渡时量的，那会儿真实触摸下过渡整个没启动
+     * （见下方 fc-overlay-sheet-rise 的说明），所以它们只反映曲线形状，
+     * 不代表当时手上真看得见。现值 250ms 是进场修好之后按实际观感定的。
+     *
      * y1 决定起手速度，是这里最敏感的一位；调这两个值请重新量，别凭感觉。
      * JS 侧的 SHEET_TRANSITION_MS 必须跟着改，它决定何时卸载。
      */
-    --fc-overlay-transition-duration: 450ms;
+    --fc-overlay-transition-duration: 250ms;
     --fc-overlay-transition-easing: cubic-bezier(0.33, 0.25, 0.25, 1);
     align-items: flex-end;
     justify-content: stretch;
