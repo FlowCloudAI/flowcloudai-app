@@ -6,7 +6,7 @@
  * 见 designs/mobile-ui-baseline.md 对浮层用途的约束。
  */
 import {logger} from '../../../shared/logger'
-import {useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {db_update_project, formatApiError, toApiError} from '../../../api'
 import {patchProjectDetail, useProjectDetailStore} from '../../../features/projects/projectDetailStore'
@@ -43,14 +43,24 @@ export default function MobileProjectDescription({pop, setBeforeLeave, params}: 
 
     const dirty = draft !== initial
 
+    /*
+     * 返回键、边缘手势、切 Tab 走 setBeforeLeave；顶栏返回按钮不经过那条路
+     * （全应用的顶栏返回都是直接 pop），所以两边共用同一个确认。
+     */
+    const confirmLeave = useCallback(async () => {
+        if (!dirty) return true
+        const result = await showAlert('未保存的描述将丢失，是否继续？', 'warning', 'confirm')
+        return result === 'yes'
+    }, [dirty, showAlert])
+
+    const handleBack = useCallback(async () => {
+        if (await confirmLeave()) pop()
+    }, [confirmLeave, pop])
+
     useEffect(() => {
-        setBeforeLeave(async () => {
-            if (!dirty) return true
-            const result = await showAlert('未保存的描述将丢失，是否继续？', 'warning', 'confirm')
-            return result === 'yes'
-        })
+        setBeforeLeave(confirmLeave)
         return () => setBeforeLeave(null)
-    }, [dirty, setBeforeLeave, showAlert])
+    }, [confirmLeave, setBeforeLeave])
 
     const handleSave = async () => {
         setSaving(true)
@@ -83,7 +93,7 @@ export default function MobileProjectDescription({pop, setBeforeLeave, params}: 
                         label: '返回',
                         icon: <MobileBackIcon/>,
                         disabled: saving,
-                        onClick: pop,
+                        onClick: () => void handleBack(),
                     }]}
                 />}
                 right={(
