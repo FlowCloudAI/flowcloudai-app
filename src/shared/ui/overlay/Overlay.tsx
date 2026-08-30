@@ -5,7 +5,7 @@ import './Overlay.css'
 
 /** 退场动画时长，需与传给 Overlay.css 的浮层过渡时长一致。 */
 const FLOATING_TRANSITION_MS = 100
-const SHEET_TRANSITION_MS = 280
+const SHEET_TRANSITION_MS = 320
 
 type OverlayStyle = CSSProperties & {'--fc-overlay-transition-duration': string}
 
