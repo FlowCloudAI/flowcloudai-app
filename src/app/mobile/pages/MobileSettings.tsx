@@ -130,6 +130,12 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
     }
 }
 
+/*
+ * 固定视口的分节：卡片网格按可用高度分页（usePluginPageCapacity），
+ * 页面必须是撑满高度的 flex 列，不能走默认的块级滚动。
+ */
+const FIXED_VIEWPORT_SECTIONS = new Set<SettingsSection>(['plugins', 'pluginLibrary'])
+
 function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'storage') return '存储与备份'
     if (section === 'plugins') return '插件管理'
@@ -556,7 +562,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     return (
         <div
             key={section}
-            className={`mobile-page mobile-settings-page${section === 'plugins' ? ' mobile-settings-page--plugins' : ''}`}
+            className={`mobile-page mobile-settings-page${FIXED_VIEWPORT_SECTIONS.has(section) ? ' mobile-settings-page--plugins' : ''}`}
         >
             {topBar}
             {section === 'storage' && (

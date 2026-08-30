@@ -28,8 +28,15 @@ export function usePluginPageCapacity(active: boolean, contentSize: number, colu
             })
         }
 
+        /*
+         * 视口和列表都要观察。只观察视口时，首帧卡片还没排开（行高被量成很小的值），
+         * 算出的每页条数偏大；之后卡片长高，视口尺寸没变，就再也不会重算——
+         * 真机实测出现过 384px 的视口里塞 12 张、列表高 1231px 的情况。
+         * 行高稳定后两边算出同一个值，setPageSize 的相等判断会让它收敛。
+         */
         const observer = new ResizeObserver(measure)
         observer.observe(viewport)
+        observer.observe(list)
         measure()
 
         return () => {

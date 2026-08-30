@@ -975,6 +975,12 @@
     margin-top: auto;
 }
 
+/* 插件库页与插件管理页同为固定视口，内容块也要参与撑满。 */
+.mobile-settings-page--plugins > .mobile-settings-plugin-library-content {
+    flex: 1;
+    min-height: 0;
+}
+
 /* 只保留与共用分页条（components/MobilePagination.css）不同的密度。 */
 .mobile-settings-plugin-pagination {
     gap: var(--mobile-gap-inline);
