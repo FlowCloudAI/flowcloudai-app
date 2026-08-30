@@ -997,7 +997,15 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     position: relative;
     align-items: center;
     gap: var(--mobile-gap-text);
-    padding: var(--mobile-gap-inline) var(--mobile-gap-item);
+    /*
+     * 高度对齐发送按钮直径（--mobile-ai-composer-send-size，实测 32px），
+     * 让胶囊行和右侧两颗圆钮在同一条视觉基线上。
+     * 这里写死高度不违反下面的紧凑原则：32px 仍小于 48px 命中基线，
+     * 命中区照旧由透明的 ::after 外扩补足——不要改成 min-height: tap-min。
+     */
+    height: var(--mobile-ai-composer-send-size);
+    box-sizing: border-box;
+    padding: 0 var(--mobile-gap-item);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: transparent;

@@ -108,10 +108,15 @@ test('可选择状态同时提供非颜色视觉提示与 ARIA 状态', () => {
 
 test('AI 输入区使用紧凑 capsule，同时保留独立的透明命中层', () => {
     const capsuleRule = mobileAiChatCss.match(/\.mobile-ai-composer-card__chip\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    assert.match(capsuleRule, /padding:\s*var\(--mobile-gap-inline\) var\(--mobile-gap-item\)/)
+    assert.match(capsuleRule, /padding:\s*0 var\(--mobile-gap-item\)/)
     assert.match(capsuleRule, /border-radius:\s*var\(--fc-radius-full\)/)
     assert.match(capsuleRule, /line-height:\s*var\(--mobile-leading-snug\)/)
-    assert.doesNotMatch(capsuleRule, /(?:^|\n)\s*(?:min-)?height:/)
+    /*
+     * 视觉高度对齐发送按钮直径即可，关键是**不能**被撑到 48px 命中基线——
+     * 那样就退回「视觉尺寸=命中尺寸」，输入区会整体变高。
+     */
+    assert.match(capsuleRule, /height:\s*var\(--mobile-ai-composer-send-size\)/)
+    assert.doesNotMatch(capsuleRule, /(?:min-)?height:\s*var\(--mobile-tap-min\)/)
     assert.match(mobileAiChatCss, /--mobile-ai-composer-icon-size:\s*calc\([\s\S]*?var\(--mobile-tap-min\) - var\(--mobile-gap-item\) - var\(--mobile-gap-inline\)[\s\S]*?\)/)
     assert.match(mobileAiChatCss, /--mobile-ai-composer-more-size:\s*calc\([\s\S]*?var\(--mobile-ai-composer-icon-size\) - var\(--mobile-ai-composer-outline-width\)/)
     assert.match(mobileAiChatCss, /--mobile-ai-composer-send-size:\s*calc\([\s\S]*?var\(--mobile-ai-composer-icon-size\) \+ var\(--mobile-gap-text\)/)
