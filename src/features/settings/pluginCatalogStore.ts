@@ -9,8 +9,10 @@ import {
     type LocalPluginInfo,
     type RemotePluginInfo,
 } from '../../api'
+import {normalizeVoiceIdWithPlugin} from '../plugins/ttsVoice'
 import {refreshAiPluginStore} from '../ai-chat/stores/aiPluginStore'
-import {refreshAppSettings} from './appSettingsStore'
+import {getAppSettingsSnapshot, refreshAppSettings, saveAppSettings} from './appSettingsStore'
+import {adoptInstalledPluginDefaults} from './pluginDefaultAdoption'
 
 interface PluginCatalogSnapshot {
     localPlugins: LocalPluginInfo[]
@@ -95,8 +97,28 @@ export function refreshMarketPlugins() {
     return marketLoad
 }
 
-async function finishPluginMutation() {
+/**
+ * 把接管结果落盘。判定本身是纯函数（pluginDefaultAdoption），这里只负责取快照与写盘。
+ * 返回是否写了盘 —— 写了就说明 saveAppSettings 已经顺带刷过设置与 AI 插件 store。
+ */
+async function adoptFirstPluginAsDefault(pluginId: string): Promise<boolean> {
+    const {settings, llmPlugins, imagePlugins, ttsPlugins} = getAppSettingsSnapshot()
+    if (!settings) return false
+    const next = adoptInstalledPluginDefaults(
+        settings,
+        {llmPlugins, imagePlugins, ttsPlugins},
+        pluginId,
+        normalizeVoiceIdWithPlugin,
+    )
+    if (!next) return false
+    await saveAppSettings(next)
+    return true
+}
+
+async function finishPluginMutation(installedPluginId?: string) {
     await Promise.all([refreshLocalPlugins(), refreshAppSettings()])
+    // 接管默认值会走 saveAppSettings，它自己就带上了 AI 插件 store 的刷新。
+    if (installedPluginId && await adoptFirstPluginAsDefault(installedPluginId)) return
     await refreshAiPluginStore()
 }
 
@@ -105,7 +127,7 @@ export async function installLocalPlugin(filePath: string) {
     try {
         await ai_close_all_sessions()
         const plugin = await plugin_install_from_file(filePath)
-        await finishPluginMutation()
+        await finishPluginMutation(plugin.id)
         return plugin
     } finally {
         setSnapshot({installingLocalFile: false})
@@ -117,7 +139,7 @@ export async function installMarketPlugin(pluginId: string) {
     try {
         await ai_close_all_sessions()
         const plugin = await plugin_market_install(pluginId)
-        await finishPluginMutation()
+        await finishPluginMutation(plugin.id)
         return plugin
     } finally {
         const installingIds = new Set(snapshot.installingIds)
