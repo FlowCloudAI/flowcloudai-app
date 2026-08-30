@@ -185,7 +185,9 @@ test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
     assert.match(overlaySource, /mountedFrame = window\.requestAnimationFrame\(\(\) => \{[\s\S]*?activeFrame = window\.requestAnimationFrame/)
     assert.match(overlaySource, /closedFrame = window\.requestAnimationFrame\(\(\) => \{\s*unmountFrame = window\.requestAnimationFrame/)
     assert.match(overlaySource, /data-state=\{active \? 'open' : 'closed'\}/)
-    assert.match(overlayCss, /\.fc-overlay--sheet \.fc-overlay__panel\s*\{\s*transform:\s*translateY\(100%\)/)
+    // 起手位置压到屏幕外再多 2rem，让加速段走完在视野外；时长与 SHEET_TRANSITION_MS 对齐。
+    assert.match(overlayCss, /\.fc-overlay--sheet \.fc-overlay__panel\s*\{\s*transform:\s*translateY\(calc\(100% \+ 2rem\)\)/)
+    assert.match(overlayCss, /\.fc-overlay--sheet\s*\{[\s\S]*?--fc-overlay-transition-duration:\s*280ms/)
     assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
 })
 
