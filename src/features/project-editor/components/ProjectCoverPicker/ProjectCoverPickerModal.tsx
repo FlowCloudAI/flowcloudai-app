@@ -34,7 +34,8 @@ interface CoverLibraryItem {
     src: string
 }
 
-interface ProjectCoverPickerModalProps {
+export interface ProjectCoverPickerFormProps {
+    /** 浮层用它做打开时重置；独立页面每次挂载都是新的，固定传 true。 */
     open: boolean
     projectId: string
     projectName?: string | null
@@ -45,6 +46,8 @@ interface ProjectCoverPickerModalProps {
     onSelectCover: (coverPath: string | null) => Promise<void> | void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     onOpenAiSettings?: (pluginId: string) => void
+    /** 应用中状态回传给外壳：浮层据此禁用点背板关闭，页面据此禁用返回。 */
+    onBusyChange?: (busy: boolean) => void
 }
 
 function extractEntryCoverImage(entry: EntryBrief): CoverLibraryItem | null {
@@ -65,7 +68,12 @@ function extractEntryCoverImage(entry: EntryBrief): CoverLibraryItem | null {
     }
 }
 
-export default function ProjectCoverPickerModal({
+/**
+ * 项目封面选择的表单本体，不含浮层/页面外壳。
+ * 桌面端包在 FloatingPanel 里（本文件默认导出），移动端包在独立页面里
+ * （见 app/mobile/pages/MobileProjectCoverPicker）——AI 提示词是输入型重操作。
+ */
+export function ProjectCoverPickerForm({
                                                     open,
                                                     projectId,
                                                     projectName = null,
@@ -76,7 +84,8 @@ export default function ProjectCoverPickerModal({
                                                     onSelectCover,
                                                     onOpenPluginManagement,
                                                     onOpenAiSettings,
-                                                }: ProjectCoverPickerModalProps) {
+                                                    onBusyChange,
+                                                }: ProjectCoverPickerFormProps) {
     const [activeTab, setActiveTab] = useState<Tab>('existing')
     const [loadingLibrary, setLoadingLibrary] = useState(false)
     const [libraryItems, setLibraryItems] = useState<CoverLibraryItem[]>([])
@@ -95,6 +104,10 @@ export default function ProjectCoverPickerModal({
     const [errorMessage, setErrorMessage] = useState('')
     const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
     const [applying, setApplying] = useState(false)
+
+    useEffect(() => {
+        onBusyChange?.(applying)
+    }, [applying, onBusyChange])
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -342,18 +355,7 @@ export default function ProjectCoverPickerModal({
     }
 
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            dismissible={!applying}
-            title={(
-                <div className="pe-cover-picker__heading">
-                    <span className="pe-cover-picker__title fc-section-title">设置项目封面</span>
-                    <span className="pe-cover-picker__desc">可以从已有词条图片中选择，也可以上传或 AI 生成。</span>
-                </div>
-            )}
-            className="pe-cover-picker-dialog"
-        >
+        <>
                 <div className="pe-cover-picker__tabs">
                     {([
                         {key: 'existing', label: '词条图片'},
@@ -587,6 +589,27 @@ export default function ProjectCoverPickerModal({
                         </div>
                     )}
                 </div>
+        </>
+    )
+}
+
+/** 桌面端的浮层外壳。表单本体见 ProjectCoverPickerForm。 */
+export default function ProjectCoverPickerModal(props: ProjectCoverPickerFormProps) {
+    const [busy, setBusy] = useState(false)
+    return (
+        <FloatingPanel
+            open={props.open}
+            onClose={props.onClose}
+            dismissible={!busy}
+            title={(
+                <div className="pe-cover-picker__heading">
+                    <span className="pe-cover-picker__title fc-section-title">设置项目封面</span>
+                    <span className="pe-cover-picker__desc">可以从已有词条图片中选择，也可以上传或 AI 生成。</span>
+                </div>
+            )}
+            className="pe-cover-picker-dialog"
+        >
+            <ProjectCoverPickerForm {...props} onBusyChange={setBusy}/>
         </FloatingPanel>
     )
 }

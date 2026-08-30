@@ -23,7 +23,8 @@ type Tab = 'existing' | 'local' | 'ai'
 type GenerateState = 'idle' | 'generating' | 'success' | 'error'
 type ModalMode = 'add' | 'insert'
 
-interface EntryImageAddModalProps {
+export interface EntryImageAddFormProps {
+    /** 浮层用它做打开时重置；独立页面每次挂载都是新的，固定传 true。 */
     open: boolean
     projectId: string
     projectName?: string | null
@@ -41,9 +42,16 @@ interface EntryImageAddModalProps {
     onInsertImage?: (image: EntryImage) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     onOpenAiSettings?: (pluginId: string) => void
+    /** 提交中状态回传给外壳：浮层据此禁用点背板关闭，页面据此禁用返回。 */
+    onBusyChange?: (busy: boolean) => void
 }
 
-export default function EntryImageAddModal({
+/**
+ * 添加图片的表单本体，不含浮层/页面外壳。
+ * 桌面端包在 FloatingPanel 里（本文件默认导出），移动端包在独立页面里
+ * （见 app/mobile/pages/MobileEntryImageAdd）——AI 提示词是输入型重操作。
+ */
+export function EntryImageAddForm({
                                                open,
                                                projectId,
                                                projectName = null,
@@ -61,7 +69,8 @@ export default function EntryImageAddModal({
                                                onInsertImage,
                                                onOpenPluginManagement,
                                                onOpenAiSettings,
-                                           }: EntryImageAddModalProps) {
+                                               onBusyChange,
+                                           }: EntryImageAddFormProps) {
     const insertMode = mode === 'insert'
     const [activeTab, setActiveTab] = useState<Tab>(insertMode ? 'existing' : 'local')
 
@@ -79,8 +88,13 @@ export default function EntryImageAddModal({
     const [errorMessage, setErrorMessage] = useState('')
     const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
     const [submitting, setSubmitting] = useState(false)
+
     const [submitSource, setSubmitSource] = useState<'local' | 'camera' | null>(null)
     const submittingRef = useRef(false)
+
+    useEffect(() => {
+        onBusyChange?.(submitting)
+    }, [onBusyChange, submitting])
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -328,14 +342,7 @@ export default function EntryImageAddModal({
     }
 
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            dismissible={!submitting}
-            title={insertMode ? '插入图片' : '添加图片'}
-            ariaLabel="添加图片"
-            className="entry-image-add-dialog"
-        >
+        <>
             <div className="entry-image-add-tabs">
                     {insertMode && (
                         <button
@@ -573,6 +580,23 @@ export default function EntryImageAddModal({
                         </div>
                     )}
                 </div>
+        </>
+    )
+}
+
+/** 桌面端的浮层外壳。表单本体见 EntryImageAddForm。 */
+export default function EntryImageAddModal(props: EntryImageAddFormProps) {
+    const [busy, setBusy] = useState(false)
+    return (
+        <FloatingPanel
+            open={props.open}
+            onClose={props.onClose}
+            dismissible={!busy}
+            title={props.mode === 'insert' ? '插入图片' : '添加图片'}
+            ariaLabel="添加图片"
+            className="entry-image-add-dialog"
+        >
+            <EntryImageAddForm {...props} onBusyChange={setBusy}/>
         </FloatingPanel>
     )
 }

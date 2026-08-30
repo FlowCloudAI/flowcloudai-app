@@ -26,7 +26,6 @@ import {
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPicker/ProjectCoverPickerModal'
 import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {patchProjectDetail, useProjectDetailStore} from '../../../features/projects/projectDetailStore'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
@@ -34,6 +33,9 @@ import FcworldProgressDialog from '../../../features/projects/components/Fcworld
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {buildProjectExportFileName, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import MobileEntryBrowser from './MobileEntryBrowser'
+import {type MobileProjectCoverPickerBridgedProps} from './MobileProjectCoverPicker'
+import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useProvideMobilePageProps} from './useMobilePageProps'
 import {useMobileEntryBrowser} from './useMobileEntryBrowser'
 import {
     ProjectHomeHealthScore,
@@ -130,7 +132,8 @@ export default function MobileProjectHome({
     const [menuOpen, setMenuOpen] = useState(false)
     const [renameOpen, setRenameOpen] = useState(false)
     const [renaming, setRenaming] = useState(false)
-    const [coverOpen, setCoverOpen] = useState(false)
+    /* 封面选择走独立页面（AI 提示词是输入型重操作），props 走桥。 */
+    const [coverPropsToken] = useState(() => createMobileEditorToken('projectCover'))
     const [actionError, setActionError] = useState<string | null>(null)
     const [exporting, setExporting] = useState(false)
     const projectDetail = useProjectDetailStore(projectId)
@@ -219,11 +222,18 @@ export default function MobileProjectHome({
             await db_update_project({id: projectId, coverPath})
             patchProjectDetail(projectId, {cover_path: coverPath})
             invalidateProjectList()
-            setCoverOpen(false)
         } catch (e) {
             await showAlert(`更换封面失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [projectId, showAlert])
+
+    useProvideMobilePageProps<MobileProjectCoverPickerBridgedProps>(coverPropsToken, {
+        projectId,
+        projectName: project?.name ?? null,
+        currentCoverPath: project?.cover_path,
+        onSelectCover: coverPath => handleChangeCover(coverPath),
+        onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
+    })
 
     const handleOpenDescription = useCallback(() => {
         push({type: 'projectDescription', params: {projectId, displayName: '项目描述'}})
@@ -325,7 +335,7 @@ export default function MobileProjectHome({
             label: '换封面',
             description: '设置顶部封面',
             icon: <ProjectMenuIcon type="cover"/>,
-            onSelect: () => setCoverOpen(true),
+            onSelect: () => push({type: 'projectCoverPicker', params: {propsToken: coverPropsToken, displayName: '设置项目封面'}}),
         },
         {
             key: 'export',
@@ -481,15 +491,6 @@ export default function MobileProjectHome({
             />
 
 
-            <ProjectCoverPickerModal
-                open={coverOpen}
-                projectId={projectId}
-                projectName={project.name}
-                currentCoverPath={project.cover_path}
-                onClose={() => setCoverOpen(false)}
-                onSelectCover={(coverPath) => handleChangeCover(coverPath)}
-                onOpenAiSettings={(pluginId) => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}
-            />
             <FcworldProgressDialog progress={fcworldProgress} />
         </div>
     )

@@ -2,7 +2,6 @@
 import {type ComponentProps, type MouseEvent as ReactMouseEvent, type RefObject, useState} from 'react'
 import {Input} from 'flowcloudai-ui'
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
-import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import {type EntryImage} from '../../../features/entries/lib/entryImage'
 import {
     MobileBackIcon,
@@ -61,10 +60,9 @@ interface Props {
     onWikiCommit: (option: MobileWikiOption) => void
     immersiveProps: Omit<ComponentProps<typeof MobileEntryImmersiveEditor>, 'wikiPanel'>
     imageViewerProps: ComponentProps<typeof MobileImageViewer>
-    imageAddProps: ComponentProps<typeof EntryImageAddModal>
 }
 
-export default function MobileEntryDetailEditView({editorRef, immersiveProps, imageViewerProps, imageAddProps, ...p}: Props) {
+export default function MobileEntryDetailEditView({editorRef, immersiveProps, imageViewerProps, ...p}: Props) {
     const [bodyMode, setBodyMode] = useState<'edit' | 'preview'>('edit')
     const [bodyFocused, setBodyFocused] = useState(false)
     const bodyKeyboardVisible = bodyFocused && p.keyboardVisible
@@ -248,7 +246,6 @@ export default function MobileEntryDetailEditView({editorRef, immersiveProps, im
 
             {p.immersiveOpen && <MobileEntryImmersiveEditor {...immersiveProps} wikiPanel={wikiPanel}/>}
             <MobileImageViewer {...imageViewerProps}/>
-            <EntryImageAddModal {...imageAddProps}/>
         </div>
     )
 }

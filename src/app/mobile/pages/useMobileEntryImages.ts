@@ -19,11 +19,15 @@ interface Options {
     projectId: string
     images: EntryImage[]
     setImages: Dispatch<SetStateAction<EntryImage[]>>
+    /**
+     * 打开「添加图片」。以前是本 hook 里的一个布尔开关配浮层，
+     * 现在图片添加是独立页面（输入型重操作不进浮层），由调用方决定怎么推。
+     */
+    onOpenImageAdd: () => void
 }
 
-export default function useMobileEntryImages({projectId, images, setImages}: Options) {
+export default function useMobileEntryImages({projectId, images, setImages, onOpenImageAdd}: Options) {
     const {showAlert} = useAlert()
-    const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -107,8 +111,7 @@ export default function useMobileEntryImages({projectId, images, setImages}: Opt
     }, [])
 
     return {
-        imageAddModalOpen,
-        setImageAddModalOpen,
+        openImageAdd: onOpenImageAdd,
         lightboxOpen,
         setLightboxOpen,
         lightboxIndex,

@@ -10,3 +10,10 @@
 .mobile-sub-editor__heading {
     margin-bottom: var(--mobile-gap-group);
 }
+
+.mobile-sub-editor__desc {
+    margin: var(--mobile-gap-text) 0 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-body-sm);
+    line-height: var(--mobile-leading-snug);
+}

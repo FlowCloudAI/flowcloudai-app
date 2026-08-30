@@ -51,3 +51,30 @@ export function createMobileEditorToken(prefix: string): string {
     tokenSeed += 1
     return `${prefix}:${tokenSeed}`
 }
+
+/*
+ * 子页 props 桥。
+ *
+ * 图片添加、封面选择这类子页要用的不只是几个 id：上传、拍照、写回草稿都是打开方
+ * 手上的闭包，序列化不进页面参数。打开方把一个「始终指向最新 props」的容器登记进来，
+ * 子页在事件发生时按 token 取用。
+ *
+ * 之所以安全：子页永远压在打开方上面，打开方在栈里不会被卸载；容器由打开方在
+ * 每次 commit 后刷新，子页读的是事件发生那一刻的值，不是 render 期的快照。
+ */
+export interface MobilePagePropsHolder<T> {
+    current: T
+}
+
+const propsHolders = new Map<string, MobilePagePropsHolder<unknown>>()
+
+export function registerMobilePageProps<T>(token: string, holder: MobilePagePropsHolder<T>): () => void {
+    propsHolders.set(token, holder as MobilePagePropsHolder<unknown>)
+    return () => {
+        if (propsHolders.get(token) === (holder as MobilePagePropsHolder<unknown>)) propsHolders.delete(token)
+    }
+}
+
+export function readMobilePageProps<T>(token: string): T | undefined {
+    return propsHolders.get(token)?.current as T | undefined
+}

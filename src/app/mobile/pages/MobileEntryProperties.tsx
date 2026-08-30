@@ -14,8 +14,9 @@ import {
     entryTypeKey,
     type TagSchema,
 } from '../../../api'
-import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
+import {type MobileEntryImageAddBridgedProps} from './MobileEntryImageAdd'
 import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useProvideMobilePageProps} from './useMobilePageProps'
 import {useMobileEditorResult} from './useMobileEditorResult'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import type {EntryImage} from '../../../features/entries/lib/entryImage'
@@ -69,6 +70,11 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
      */
     const [typeResultToken] = useState(() => createMobileEditorToken('entryProperties:type'))
     const [tagResultToken] = useState(() => createMobileEditorToken('entryProperties:tag'))
+    const [imageAddPropsToken] = useState(() => createMobileEditorToken('entryProperties:imageAdd'))
+
+    const openImageAdd = useCallback(() => {
+        push({type: 'entryImageAdd', params: {propsToken: imageAddPropsToken, displayName: '添加图片'}})
+    }, [imageAddPropsToken, push])
 
     useMobileEntryEditLeaveGuard({projectId, entryId, isPlaceholder, setBeforeLeave})
 
@@ -103,7 +109,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         }))
     }, [updateDraft])
 
-    const imageActions = useMobileEntryImages({projectId, images: draft?.images ?? [], setImages})
+    const imageActions = useMobileEntryImages({projectId, images: draft?.images ?? [], setImages, onOpenImageAdd: openImageAdd})
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
         updateDraft({tagDraft: nextTags})
     }, [updateDraft])
@@ -129,6 +135,18 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
     const handleTagSchemaSaved = useCallback((schema: TagSchema) => {
         setTagSchemas(entryTags.handleTagSchemaSaved(schema))
     }, [entryTags])
+
+    useProvideMobilePageProps<MobileEntryImageAddBridgedProps>(imageAddPropsToken, {
+        projectId,
+        entryTitle: draft?.title || null,
+        entrySummary: draft?.summary || null,
+        entryType: draft?.entryType ?? null,
+        existingImages: draft?.images ?? [],
+        onUploadLocal: imageActions.handleUploadImages,
+        onCapturePhoto: imageActions.handleCaptureImage,
+        onAddAiImages: imageActions.handleAddAiImages,
+        onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
+    })
 
     useMobileEditorResult<CustomEntryType>(typeResultToken, created => void handleTypeCreated(created))
     useMobileEditorResult<TagSchema>(tagResultToken, handleTagSchemaSaved)
@@ -163,7 +181,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
 
                     <section className="mobile-entry-properties__group mobile-entry-properties__group--images">
                         <div className="mobile-entry-properties__label"><span>图片</span><small>{draft.images.length} 张</small></div>
-                        <MobileEntryImagesSection images={draft.images} onAddImage={() => imageActions.setImageAddModalOpen(true)} onOpenImage={imageActions.openImage}/>
+                        <MobileEntryImagesSection images={draft.images} onAddImage={imageActions.openImageAdd} onOpenImage={imageActions.openImage}/>
                     </section>
 
                     <section className="mobile-entry-properties__group mobile-entry-properties__group--tags">
@@ -195,8 +213,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
                 </div>
             )}
 
-            <MobileImageViewer open={imageActions.lightboxOpen} images={draft.images} currentIndex={imageActions.lightboxIndex} title={draft.title || '未命名词条'} mode="manage" onClose={() => imageActions.setLightboxOpen(false)} onIndexChange={imageActions.setLightboxIndex} onSetCover={imageActions.handleSetCover} onRemove={imageActions.handleRemoveImage} onRemoveMany={imageActions.handleRemoveImages} onAddImage={() => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }}/>
-            <EntryImageAddModal open={imageActions.imageAddModalOpen} projectId={projectId} entryTitle={draft.title || null} entrySummary={draft.summary || null} entryType={draft.entryType} existingImages={draft.images} onClose={() => imageActions.setImageAddModalOpen(false)} onUploadLocal={imageActions.handleUploadImages} onCapturePhoto={imageActions.handleCaptureImage} onAddAiImages={imageActions.handleAddAiImages} onOpenAiSettings={pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}/>
+            <MobileImageViewer open={imageActions.lightboxOpen} images={draft.images} currentIndex={imageActions.lightboxIndex} title={draft.title || '未命名词条'} mode="manage" onClose={() => imageActions.setLightboxOpen(false)} onIndexChange={imageActions.setLightboxIndex} onSetCover={imageActions.handleSetCover} onRemove={imageActions.handleRemoveImage} onRemoveMany={imageActions.handleRemoveImages} onAddImage={() => { imageActions.setLightboxOpen(false); imageActions.openImageAdd() }}/>
         </div>
     )
 }

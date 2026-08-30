@@ -76,6 +76,9 @@ import MobileEntryDetailEditView from './MobileEntryDetailEditView'
 import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import useMobileEntryWikiEditor from './useMobileEntryWikiEditor'
 import useMobileEntryImages from './useMobileEntryImages'
+import {type MobileEntryImageAddBridgedProps} from './MobileEntryImageAdd'
+import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
+import {useProvideMobilePageProps} from './useMobilePageProps'
 import {formatMobileEntryUpdatedDate} from './MobileEntryDate'
 import {
     clearMobileEntryEditDraft,
@@ -171,7 +174,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const setImages = useCallback((next: EntryImage[] | ((current: EntryImage[]) => EntryImage[])) => {
         updateDraft(current => ({...current, images: typeof next === 'function' ? next(current.images) : next}))
     }, [updateDraft])
-    const imageActions = useMobileEntryImages({projectId, images, setImages})
+    /* 添加图片是独立页面（AI 提示词属输入型重操作），props 走桥。 */
+    const [imageAddPropsToken] = useState(() => createMobileEditorToken('entryDetail:imageAdd'))
+    const openImageAdd = useCallback(() => {
+        push({type: 'entryImageAdd', params: {propsToken: imageAddPropsToken, displayName: '添加图片'}})
+    }, [imageAddPropsToken, push])
+    const imageActions = useMobileEntryImages({projectId, images, setImages, onOpenImageAdd: openImageAdd})
 
     const {
         wikiDraft,
@@ -198,7 +206,23 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         immersiveEditorOpen,
         inlineContentEditorRef,
         immersiveContentEditorRef,
-        setImageAddModalOpen: imageActions.setImageAddModalOpen,
+        openImageAdd: imageActions.openImageAdd,
+    })
+
+    useProvideMobilePageProps<MobileEntryImageAddBridgedProps>(imageAddPropsToken, {
+        projectId,
+        entryTitle: title || entry?.title || null,
+        entrySummary: summary || entry?.summary || null,
+        entryType: entryType || entry?.type || null,
+        existingImages: images,
+        onUploadLocal: imageActions.handleUploadImages,
+        onCapturePhoto: imageActions.handleCaptureImage,
+        onAddAiImages: imageActions.handleAddAiImages,
+        onInsertImage: image => {
+            const index = images.findIndex(item => item.path === image.path && item.url === image.url)
+            handleInsertImageMarkdown(index >= 0 ? index : images.length)
+        },
+        onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
     })
 
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
@@ -648,15 +672,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             editorRef={inlineContentEditorRef} textareaProps={textareaProps} onMarkdownTool={handleMarkdownTool}
             onPreviewMarkdownClick={handleEditPreviewMarkdownClick}
             tagCount={entryTags.visibleTagSchemas.length} imageCount={images.length} relationCount={relationDrafts.length}
-            images={images} onAddImage={() => imageActions.setImageAddModalOpen(true)} onOpenImage={imageActions.openImage}
+            images={images} onAddImage={imageActions.openImageAdd} onOpenImage={imageActions.openImage}
             onOpenProperties={() => push({type: 'entryProperties', params: {projectId, entryId, displayName: title || entry.title, isPlaceholder: params.isPlaceholder}})}
             immersiveOpen={immersiveEditorOpen} onOpenImmersive={() => setImmersiveEditorOpen(true)}
             wikiDraft={wikiDraft} wikiOptions={wikiLinkOptions} activeWikiIndex={activeWikiOptionIndex}
             categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
             onWikiIndex={setActiveWikiOptionIndex} onWikiCommit={handleWikiOptionCommit}
             immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
-            imageViewerProps={{open: imageActions.lightboxOpen, images, currentIndex: imageActions.lightboxIndex, title: title || entry.title || '未命名词条', mode: 'manage', onClose: () => imageActions.setLightboxOpen(false), onIndexChange: imageActions.setLightboxIndex, onSetCover: imageActions.handleSetCover, onRemove: imageActions.handleRemoveImage, onRemoveMany: imageActions.handleRemoveImages, onAddImage: () => { imageActions.setLightboxOpen(false); imageActions.setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
-            imageAddProps={{open: imageActions.imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => imageActions.setImageAddModalOpen(false), onUploadLocal: imageActions.handleUploadImages, onCapturePhoto: imageActions.handleCaptureImage, onAddAiImages: imageActions.handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }, onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}}
+            imageViewerProps={{open: imageActions.lightboxOpen, images, currentIndex: imageActions.lightboxIndex, title: title || entry.title || '未命名词条', mode: 'manage', onClose: () => imageActions.setLightboxOpen(false), onIndexChange: imageActions.setLightboxIndex, onSetCover: imageActions.handleSetCover, onRemove: imageActions.handleRemoveImage, onRemoveMany: imageActions.handleRemoveImages, onAddImage: () => { imageActions.setLightboxOpen(false); imageActions.openImageAdd() }, onInsertMarkdown: handleInsertImageMarkdown}}
         />
     }
 

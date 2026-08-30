@@ -34,6 +34,7 @@ import MobileNav, {type MobileTab} from './MobileNav'
 import MobilePageTransitionHost from './MobilePageTransitionHost'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
+import MobileEntryImageAdd from './pages/MobileEntryImageAdd'
 import MobileEntryTypeEditor from './pages/MobileEntryTypeEditor'
 import MobileEntryTypeManager from './pages/MobileEntryTypeManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
@@ -42,6 +43,7 @@ import MobileEntryRelationEditor from './pages/MobileEntryRelationEditor'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
+import MobileProjectCoverPicker from './pages/MobileProjectCoverPicker'
 import MobileProjectCreator from './pages/MobileProjectCreator'
 import MobileProjectDescription from './pages/MobileProjectDescription'
 import MobileProjectHome from './pages/MobileProjectHome'
@@ -615,6 +617,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 {page?.type === 'entryDetail' && <MobileEntryDetail {...layerProps} params={page.params}/>}
                 {page?.type === 'entryProperties' && <MobileEntryProperties {...layerProps} params={page.params}/>}
                 {page?.type === 'entryRelation' && <MobileEntryRelationEditor {...layerProps} params={page.params}/>}
+                {page?.type === 'entryImageAdd' && <MobileEntryImageAdd {...layerProps} params={page.params}/>}
+                {page?.type === 'projectCoverPicker' && <MobileProjectCoverPicker {...layerProps} params={page.params}/>}
                 {page?.type === 'typeManager' && <MobileEntryTypeManager {...layerProps} params={page.params}/>}
                 {page?.type === 'typeEditor' && <MobileEntryTypeEditor {...layerProps} params={page.params}/>}
                 {page?.type === 'tagManager' && <MobileTagManager {...layerProps} params={page.params}/>}

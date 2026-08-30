@@ -28,6 +28,12 @@ export interface MobileEntryRelationPageParams extends MobileEntryEditChildPageP
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
 
+/** props 走桥、不进页面参数的子页（见 stores/mobileEditorHandoff 末尾）。 */
+export interface MobileBridgedPageParams {
+    propsToken: string
+    displayName?: string
+}
+
 export interface MobileProjectCreatorPageParams {
     displayName?: string
     /** 用于重名校验；调用方已有项目列表，避免子页再取一次。 */
@@ -66,6 +72,8 @@ export interface MobilePageParamsMap {
     entryDetail: MobileEntryDetailPageParams
     entryProperties: MobileEntryEditChildPageParams
     entryRelation: MobileEntryRelationPageParams
+    entryImageAdd: MobileBridgedPageParams
+    projectCoverPicker: MobileBridgedPageParams
     typeManager: MobileProjectScopedPageParams
     typeEditor: MobileEntryTypeEditorPageParams
     tagManager: MobileProjectScopedPageParams

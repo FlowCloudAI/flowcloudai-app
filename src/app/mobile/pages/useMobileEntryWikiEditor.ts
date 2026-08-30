@@ -40,7 +40,7 @@ interface UseMobileEntryWikiEditorOptions {
     immersiveEditorOpen: boolean
     inlineContentEditorRef: RefObject<MarkdownEditorRef | null>
     immersiveContentEditorRef: RefObject<MarkdownEditorRef | null>
-    setImageAddModalOpen: Dispatch<SetStateAction<boolean>>
+    openImageAdd: () => void
 }
 
 export default function useMobileEntryWikiEditor({
@@ -54,7 +54,7 @@ export default function useMobileEntryWikiEditor({
     immersiveEditorOpen,
     inlineContentEditorRef,
     immersiveContentEditorRef,
-    setImageAddModalOpen,
+    openImageAdd,
 }: UseMobileEntryWikiEditorOptions) {
     const {showAlert} = useAlert()
     const wikiDraftRetainTimerRef = useRef<number | null>(null)
@@ -259,7 +259,7 @@ export default function useMobileEntryWikiEditor({
 
     const handleMarkdownTool = useCallback((tool: MobileMarkdownTool) => {
         if (tool === 'image') {
-            setImageAddModalOpen(true)
+            openImageAdd()
             return
         }
         const textarea = getContentTextarea()
@@ -273,7 +273,7 @@ export default function useMobileEntryWikiEditor({
             nextTextarea?.setSelectionRange(result.selectionStart, result.selectionEnd)
             syncWikiDraftFromTextarea(nextTextarea ?? null, result.value)
         })
-    }, [content, getContentTextarea, setContent, setImageAddModalOpen, syncWikiDraftFromTextarea])
+    }, [content, getContentTextarea, openImageAdd, setContent, syncWikiDraftFromTextarea])
 
     useEffect(() => {
         if (!immersiveEditorOpen) return
