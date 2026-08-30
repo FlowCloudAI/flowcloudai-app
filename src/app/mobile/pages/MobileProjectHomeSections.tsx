@@ -1,13 +1,22 @@
-import {type CSSProperties} from 'react'
+import {type CSSProperties, type ReactNode} from 'react'
 import {Button} from 'flowcloudai-ui'
 import {formatProjectDate} from '../../../features/projects/projectDisplay'
 import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
+import {ConflictIcon, RelationGraphIcon, TimelineIcon, WorldMapIcon} from '../../../features/project-editor/components/ProjectOverview/ProjectToolIcons'
 import {MobileAddIcon} from '../components/MobileTopControls'
 
 export interface ProjectHomeStatItem {
     key: string
     label: string
     value: string
+}
+
+/* 键名与 advancedTools 一致；设定检测在移动端叫 check，桌面叫 contradiction。 */
+const TOOL_ICONS: Record<string, ReactNode> = {
+    relation: <RelationGraphIcon/>,
+    timeline: <TimelineIcon/>,
+    map: <WorldMapIcon/>,
+    check: <ConflictIcon/>,
 }
 
 export interface ProjectHomeTool {
@@ -217,7 +226,13 @@ export function ProjectHomeToolGrid({tools, onSelectTool}: ProjectHomeToolGridPr
                         disabled={tool.disabled}
                         onClick={() => onSelectTool(tool)}
                     >
-                        <span>{tool.label}</span>
+                        <span className="mobile-project-home__tool-label">
+                            {/* 图标与桌面同源；放在标题行内联，按钮高度仍由 min-height 决定，不变。 */}
+                            <span className="mobile-project-home__tool-icon" aria-hidden="true">
+                                {TOOL_ICONS[tool.key]}
+                            </span>
+                            {tool.label}
+                        </span>
                         <small>{tool.unavailableReason ?? tool.meta}</small>
                     </button>
                 ))}
