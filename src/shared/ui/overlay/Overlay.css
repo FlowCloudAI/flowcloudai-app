@@ -31,6 +31,12 @@
 
 /* 上滑：贴底铺满，底部留安全区。变体组件后续接入。 */
 .fc-overlay--sheet {
+    /*
+     * 上滑要看得见「升起」这个过程，不能用浮动层那档 100ms——
+     * 那个时长下面板几乎是一帧就位。280ms 与 Overlay.tsx 的 SHEET_TRANSITION_MS
+     * 对齐：在此之前 JS 等 280ms 卸载、CSS 只动 100ms，两边本来就对不上。
+     */
+    --fc-overlay-transition-duration: 280ms;
     --fc-overlay-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
     align-items: flex-end;
     justify-content: stretch;
@@ -113,8 +119,9 @@
     opacity: 0.4;
 }
 
+/* 起手位置略低于屏幕外，让加速段也在视野外走完，升起过程读起来更完整。 */
 .fc-overlay--sheet .fc-overlay__panel {
-    transform: translateY(100%);
+    transform: translateY(calc(100% + 2rem));
 }
 
 .fc-overlay[data-state='open'] .fc-overlay__panel {
