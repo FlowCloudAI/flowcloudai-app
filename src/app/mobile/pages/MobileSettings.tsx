@@ -537,7 +537,9 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
      */
     const refreshPill = section === 'pluginLibrary'
         ? <MobileTopRefreshPill busy={pluginSourcesRefreshing} onRefresh={() => void refreshPluginInstallSources()}/>
-        : null
+        : section === 'usage'
+            ? <MobileTopRefreshPill busy={usageLoading} onRefresh={() => void loadUsageStats()}/>
+            : null
     const topBar = (
         <MobilePageTopBar
             sticky
@@ -682,7 +684,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     byModel={usageByModel}
                     loading={usageLoading}
                     error={usageError}
-                    onRefresh={loadUsageStats}
                 />
             )}
 

@@ -59,7 +59,6 @@ interface UsageSectionProps {
     byModel: ApiUsageByModel[]
     loading: boolean
     error: string
-    onRefresh: () => void | Promise<void>
 }
 
 function getUsageModalityLabel(modality: string): string {
@@ -357,16 +356,11 @@ export function MobileSettingsUsageSection({
     byModel,
     loading,
     error,
-    onRefresh,
 }: UsageSectionProps) {
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
-            <div className="mobile-settings-section__header">
-                <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
-                <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()} disabled={loading}>
-                    {loading ? '刷新中…' : '刷新'}
-                </Button>
-            </div>
+            {/* 刷新在顶栏（见 MobileSettings 的 refreshPill），这里只留说明。 */}
+            <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
             {loading && !summary && <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>}
             {error && <div className="mobile-settings-plugin-error">加载失败：{error}</div>}
             {summary && (
