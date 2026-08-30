@@ -479,27 +479,14 @@ export default function MobileHome({
                     <ProjectDefaultCover projectId={project.id} projectName={project.name}/>
                 )}
                 imageHeight="11.25rem"
-                contentAreaRatio={0.58}
+                contentAreaRatio={0.46}
                 overlayStartOpacity={0.06}
                 overlayEndOpacity={0.94}
-                extraInfo={recentEntry ? (
-                    /*
-                     * 卡片里嵌的第二个入口：点卡片进世界，点这里进最近词条。两者必须一眼分得开，
-                     * 所以它画成胶囊而不是一行米色小字（不可点的那支仍是纯文本，见下面的 span）。
-                     */
-                    <button
-                        type="button"
-                        className="mobile-home-world-card__recent"
-                        aria-label={`打开最近词条：${recentEntry.title}`}
-                        onClick={event => {
-                            event.stopPropagation()
-                            openDashboardTarget(recentEntry)
-                        }}
-                        onKeyDown={event => event.stopPropagation()}
-                    >
-                        <span className="mobile-home-world-card__recent-label">{recentLabel}</span>
-                    </button>
-                ) : <span className="mobile-home-world-card__recent">{recentLabel}</span>}
+                /*
+                 * 只放一行更新时间，不再嵌「进入最近词条」的按钮：整张卡片就一个去向——进世界。
+                 * 卡片这么小，第二个入口无论做成隐形热区还是胶囊，观感和误触都收不住。
+                 */
+                extraInfo={<span className="mobile-home-world-card__meta">{updatedLabel}</span>}
                 variant="shadow"
                 hoverable
                 role="button"
