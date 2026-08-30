@@ -378,20 +378,6 @@
     transform: scale(0.98);
 }
 
-.mobile-project-home__description-input {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 7.5rem;
-    padding: var(--mobile-gap-inline);
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-field);
-    background: var(--mobile-surface-muted);
-    color: var(--fc-color-text);
-    font: inherit;
-    line-height: var(--mobile-leading-normal);
-    resize: vertical;
-}
-
 @media (max-height: 44rem) {
     .mobile-project-home {
         gap: var(--mobile-gap-item);

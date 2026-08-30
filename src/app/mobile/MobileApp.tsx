@@ -41,6 +41,7 @@ import MobileEntryRelationEditor from './pages/MobileEntryRelationEditor'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
+import MobileProjectDescription from './pages/MobileProjectDescription'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileRelationGraph from './pages/MobileRelationGraph'
@@ -605,6 +606,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         onOpenCategoryDrawer={interactive ? openCategoryDrawer : undefined}
                     />
                 )}
+                {page?.type === 'projectDescription' && <MobileProjectDescription {...layerProps} params={page.params}/>}
                 {page?.type === 'entryDetail' && <MobileEntryDetail {...layerProps} params={page.params}/>}
                 {page?.type === 'entryProperties' && <MobileEntryProperties {...layerProps} params={page.params}/>}
                 {page?.type === 'entryRelation' && <MobileEntryRelationEditor {...layerProps} params={page.params}/>}

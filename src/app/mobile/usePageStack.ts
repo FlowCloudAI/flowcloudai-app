@@ -34,6 +34,7 @@ export interface MobileAiSettingsPageParams {
 export interface MobilePageParamsMap {
     projectList: undefined
     projectHome: MobileProjectPageParams
+    projectDescription: MobileProjectScopedPageParams
     entryList: MobileEntryListPageParams
     entryDetail: MobileEntryDetailPageParams
     entryProperties: MobileEntryEditChildPageParams

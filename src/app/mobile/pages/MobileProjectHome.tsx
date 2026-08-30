@@ -15,7 +15,7 @@ import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {RenameDialog} from '../../../shared/ui/overlay'
 import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
@@ -131,10 +131,6 @@ export default function MobileProjectHome({
     const [renameOpen, setRenameOpen] = useState(false)
     const [renaming, setRenaming] = useState(false)
     const [coverOpen, setCoverOpen] = useState(false)
-    const [descriptionOpen, setDescriptionOpen] = useState(false)
-    const [descriptionDraft, setDescriptionDraft] = useState('')
-    const [descriptionSaving, setDescriptionSaving] = useState(false)
-    const [descriptionError, setDescriptionError] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
     const [exporting, setExporting] = useState(false)
     const projectDetail = useProjectDetailStore(projectId)
@@ -230,26 +226,8 @@ export default function MobileProjectHome({
     }, [projectId, showAlert])
 
     const handleOpenDescription = useCallback(() => {
-        setDescriptionDraft(project?.description ?? '')
-        setDescriptionError(null)
-        setDescriptionOpen(true)
-    }, [project?.description])
-
-    const handleSaveDescription = useCallback(async () => {
-        setDescriptionSaving(true)
-        setDescriptionError(null)
-        try {
-            const description = descriptionDraft.trim() || null
-            const updated = await db_update_project({id: projectId, description})
-            patchProjectDetail(projectId, {description: updated.description ?? null})
-            invalidateProjectList()
-            setDescriptionOpen(false)
-        } catch (e) {
-            setDescriptionError(`保存描述失败：${formatApiError(toApiError(e))}`)
-        } finally {
-            setDescriptionSaving(false)
-        }
-    }, [descriptionDraft, projectId])
+        push({type: 'projectDescription', params: {projectId, displayName: '项目描述'}})
+    }, [projectId, push])
 
     const handleExportProject = useCallback(async () => {
         if (!project || exporting) return
@@ -502,33 +480,6 @@ export default function MobileProjectHome({
                 onConfirm={(name) => void handleRename(name)}
             />
 
-            <FloatingPanel
-                open={descriptionOpen}
-                onClose={() => setDescriptionOpen(false)}
-                dismissible={!descriptionSaving}
-                title="编辑项目描述"
-                ariaLabel="编辑项目描述"
-                className="fc-rename-dialog"
-            >
-                <textarea
-                    value={descriptionDraft}
-                    aria-label="项目描述"
-                    onChange={(event) => setDescriptionDraft(event.currentTarget.value)}
-                    disabled={descriptionSaving}
-                    placeholder="项目描述"
-                    rows={5}
-                    className="mobile-project-home__description-input"
-                />
-                {descriptionError && (
-                    <div className="mobile-page__error-banner" role="alert">{descriptionError}</div>
-                )}
-                <div className="fc-rename-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" radius="full" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>
-                    <Button type="button" size="sm" radius="full" onClick={() => void handleSaveDescription()} disabled={descriptionSaving}>
-                        {descriptionSaving ? '保存中…' : '保存'}
-                    </Button>
-                </div>
-            </FloatingPanel>
 
             <ProjectCoverPickerModal
                 open={coverOpen}

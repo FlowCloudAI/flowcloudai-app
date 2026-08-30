@@ -1,0 +1,40 @@
+.mobile-project-description {
+    display: flex;
+    flex-direction: column;
+    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
+    background: var(--fc-color-bg);
+}
+
+.mobile-project-description__heading {
+    margin-bottom: var(--mobile-gap-group);
+}
+
+.mobile-project-description__heading .mobile-page__eyebrow {
+    display: block;
+    margin-bottom: var(--mobile-gap-text);
+}
+
+/*
+ * 输入区吃掉页面剩余高度：这是一整页只做一件事的编辑面，不需要在小框里滚。
+ * 键盘遮挡由外壳统一处理（--fc-kb / --mobile-nav-reserved-height），此处不做几何补偿。
+ */
+.mobile-project-description__input {
+    flex: 1;
+    width: 100%;
+    min-height: 12rem;
+    box-sizing: border-box;
+    padding: var(--mobile-gap-item);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent-strong);
+    color: var(--fc-color-text);
+    font: inherit;
+    font-size: var(--mobile-text-body);
+    line-height: var(--mobile-leading-normal);
+    resize: none;
+}
+
+.mobile-project-description__input:focus {
+    outline: var(--mobile-focus-ring);
+    outline-offset: -2px;
+}
