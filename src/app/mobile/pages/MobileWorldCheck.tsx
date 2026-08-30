@@ -4,7 +4,7 @@
  * 业务状态与桌面端共用 useWorldCheckController；本文件只负责手机上的报告列表、独立详情和浮层布局。
  */
 import {useCallback, useEffect, useState} from 'react'
-import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
+import {Button, useAlert} from 'flowcloudai-ui'
 import type {WorldCheckKind, WorldCheckReportHistoryItem} from '../../../api'
 import {
     WORLD_CHECK_KIND_DESCRIPTIONS,
@@ -107,21 +107,6 @@ export default function MobileWorldCheck({params, pop, push, setBeforeLeave, sta
         onStartDiscussion: handleStartDiscussion,
     })
     const {
-        checkKind,
-        setCheckKind,
-        targetEntryId,
-        targetEntryQuery,
-        targetEntryOptions,
-        selectedTargetEntry,
-        entriesLoading,
-        updateTargetEntryQuery,
-        selectTargetEntry,
-        plugins,
-        selectedPluginInfo,
-        effectivePluginId,
-        effectiveModel,
-        selectPlugin,
-        selectModel,
         historyItems,
         selectedReportId,
         setSelectedReportId,
@@ -129,13 +114,9 @@ export default function MobileWorldCheck({params, pop, push, setBeforeLeave, sta
         historyLoading,
         detailLoading,
         loadHistory,
-        generateDialogOpen,
-        closeGenerate,
-        generate,
         deleteReport,
         task,
         taskRunning,
-        openGenerate,
         openTaskMonitor,
         closeTaskMonitor,
         cancelTask,
@@ -146,6 +127,18 @@ export default function MobileWorldCheck({params, pop, push, setBeforeLeave, sta
         entryTitleMap,
         summary,
     } = controller
+
+    /*
+     * 生成表单是独立页面（重操作不进浮层）。任务进行中时仍然直接看进度，
+     * 保留原 openGenerate 的这一分支语义。
+     */
+    const openGenerate = useCallback((kind?: WorldCheckKind) => {
+        if (taskRunning) {
+            openTaskMonitor()
+            return
+        }
+        push({type: 'worldCheckGenerate', params: {projectId, displayName: '生成新报告', checkKind: kind}})
+    }, [openTaskMonitor, projectId, push, taskRunning])
 
     const latestReport = historyItems[0] ?? null
     const earlierReports = historyItems.slice(1)
@@ -517,83 +510,6 @@ export default function MobileWorldCheck({params, pop, push, setBeforeLeave, sta
                 }] : []}
             />
 
-            {generateDialogOpen && (
-                <FloatingPanel
-                    open
-                    onClose={closeGenerate}
-                    dismissible
-                    title="生成新报告"
-                    className="mobile-world-check-generate"
-                >
-                    <div className="mobile-world-check-generate__body">
-                        <label>
-                            <span>检测类型</span>
-                            <Select
-                                options={WORLD_CHECK_KIND_OPTIONS}
-                                value={checkKind}
-                                onValueChange={(value) => setCheckKind(String(value) as WorldCheckKind)}
-                                placeholder="检测类型"
-                                radius="md"
-                            />
-                            <small>{WORLD_CHECK_KIND_DESCRIPTIONS[checkKind]}</small>
-                        </label>
-                        {checkKind === 'entry_alignment' && (
-                            <div className="mobile-world-check-generate__field">
-                                <span>目标词条</span>
-                                <Input
-                                    value={targetEntryQuery}
-                                    aria-label="目标词条"
-                                    onValueChange={updateTargetEntryQuery}
-                                    placeholder="输入词条名前缀搜索"
-                                    radius="md"
-                                />
-                                {selectedTargetEntry && <small>已选择：{selectedTargetEntry.title}</small>}
-                                <div className="mobile-world-check-generate__entries" role="listbox" aria-label="目标词条候选">
-                                    {entriesLoading ? (
-                                        <span>正在加载词条…</span>
-                                    ) : targetEntryOptions.length > 0 ? targetEntryOptions.map((entry) => (
-                                        <button
-                                            key={entry.id}
-                                            type="button"
-                                            role="option"
-                                            aria-selected={entry.id === targetEntryId}
-                                            className={entry.id === targetEntryId ? 'is-active' : ''}
-                                            onClick={() => selectTargetEntry(entry)}
-                                        >
-                                            <strong>{entry.title}</strong>
-                                            {entry.summary && <small>{entry.summary}</small>}
-                                        </button>
-                                    )) : <span>{targetEntryQuery.trim() ? '没有匹配的词条' : '输入前缀开始搜索'}</span>}
-                                </div>
-                            </div>
-                        )}
-                        <label>
-                            <span>AI 插件</span>
-                            <Select
-                                options={plugins.map((plugin) => ({value: plugin.id, label: plugin.name}))}
-                                value={effectivePluginId ?? ''}
-                                onValueChange={(value) => selectPlugin(String(value))}
-                                placeholder="选择插件"
-                                radius="md"
-                            />
-                        </label>
-                        <label>
-                            <span>模型</span>
-                            <Select
-                                options={(selectedPluginInfo?.models ?? []).map((model) => ({value: model, label: model}))}
-                                value={effectiveModel ?? ''}
-                                onValueChange={(value) => selectModel(String(value))}
-                                placeholder="选择模型"
-                                radius="md"
-                            />
-                        </label>
-                    </div>
-                    <div className="mobile-world-check-generate__actions">
-                        <Button type="button" variant="outline" onClick={closeGenerate}>取消</Button>
-                        <Button type="button" variant="primary" onClick={() => void generate()}>开始检测</Button>
-                    </div>
-                </FloatingPanel>
-            )}
         </div>
     )
 }

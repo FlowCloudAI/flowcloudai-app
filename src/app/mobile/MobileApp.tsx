@@ -49,6 +49,7 @@ import MobileSettings from './pages/MobileSettings'
 import MobileTagManager from './pages/MobileTagManager'
 import MobileTimeline from './pages/MobileTimeline'
 import MobileWorldCheck from './pages/MobileWorldCheck'
+import MobileWorldCheckGenerate from './pages/MobileWorldCheckGenerate'
 import {
     type MobileBeforeLeave,
     type MobileBackTarget,
@@ -614,6 +615,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 {page?.type === 'tagManager' && <MobileTagManager {...layerProps} params={page.params}/>}
                 {page?.type === 'categoryManager' && <MobileCategoryManager {...layerProps} params={page.params}/>}
                 {page?.type === 'worldCheck' && <MobileWorldCheck {...layerProps} params={page.params}/>}
+                {page?.type === 'worldCheckGenerate' && <MobileWorldCheckGenerate {...layerProps} params={page.params}/>}
                 {page?.type === 'timeline' && <MobileTimeline {...layerProps} params={page.params}/>}
                 {page?.type === 'relationGraph' && <MobileRelationGraph {...layerProps} params={page.params}/>}
             </>

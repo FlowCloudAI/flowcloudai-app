@@ -1,4 +1,5 @@
 import {useCallback, useMemo, useRef, useState} from 'react'
+import type {WorldCheckKind} from '../../api'
 
 export interface MobileProjectPageParams {
     projectId: string
@@ -27,6 +28,11 @@ export interface MobileEntryRelationPageParams extends MobileEntryEditChildPageP
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
 
+export interface MobileWorldCheckGeneratePageParams extends MobileProjectPageParams {
+    /** 从「选择检测方式」直接进来时带上的初始类型。 */
+    checkKind?: WorldCheckKind
+}
+
 export interface MobileAiSettingsPageParams {
     pluginId?: string
 }
@@ -43,6 +49,7 @@ export interface MobilePageParamsMap {
     tagManager: MobileProjectScopedPageParams
     categoryManager: MobileProjectScopedPageParams
     worldCheck: MobileProjectScopedPageParams
+    worldCheckGenerate: MobileWorldCheckGeneratePageParams
     timeline: MobileProjectScopedPageParams
     relationGraph: MobileProjectScopedPageParams
     settingsStorage: undefined

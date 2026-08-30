@@ -76,13 +76,6 @@
 .mobile-world-check__report-meta,
 .mobile-world-check__report-actions,
 .mobile-world-check-task-panel__actions,
-.mobile-world-check-generate__actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--mobile-gap-inline);
-}
-
 .mobile-world-check__task-head > span {
     color: var(--fc-color-primary);
     font-size: var(--mobile-text-meta);
@@ -272,8 +265,7 @@
 }
 
 .mobile-world-check__report-actions .fc-btn,
-.mobile-world-check-task-panel__actions .fc-btn,
-.mobile-world-check-generate__actions .fc-btn {
+.mobile-world-check-task-panel__actions .fc-btn {
     min-height: var(--fc-control-tap-min);
     border-radius: var(--fc-radius-full);
 }
@@ -429,8 +421,7 @@
     line-height: var(--mobile-leading-normal);
 }
 
-.mobile-world-check-task-panel,
-.mobile-world-check-generate {
+.mobile-world-check-task-panel {
     width: 100%;
     max-height: calc(100dvh - (var(--mobile-gap-group) * 2));
     box-sizing: border-box;
@@ -441,9 +432,7 @@
 .mobile-world-check-task-panel__phases,
 .mobile-world-check-task-panel__metrics,
 .mobile-world-check-task-panel__events,
-.mobile-world-check-task-panel__actions,
-.mobile-world-check-generate__body,
-.mobile-world-check-generate__actions {
+.mobile-world-check-task-panel__actions {
     margin: 0 var(--mobile-gap-group) var(--mobile-gap-group);
 }
 
@@ -549,8 +538,7 @@
     background: var(--mobile-surface-muted-soft);
 }
 
-.mobile-world-check-task-panel__actions,
-.mobile-world-check-generate__actions {
+.mobile-world-check-task-panel__actions {
     justify-content: flex-end;
     flex-wrap: wrap;
 }
@@ -914,4 +902,26 @@
 
 .mobile-world-check__plain-list {
     margin-top: var(--mobile-gap-inline);
+}
+
+/*
+ * 生成新报告已经是独立页面（重操作不进浮层），表单块沿用原来的类名，
+ * 只是外层从浮层换成了页面：留白由页面负责，表单块自身不再带浮层的外边距。
+ */
+.mobile-world-check-generate-page {
+    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
+    background: var(--fc-color-bg);
+}
+
+.mobile-world-check-generate-page__heading {
+    margin-bottom: var(--mobile-gap-group);
+}
+
+.mobile-world-check-generate-page__heading .mobile-page__eyebrow {
+    display: block;
+    margin-bottom: var(--mobile-gap-text);
+}
+
+.mobile-world-check-generate-page .mobile-world-check-generate__body {
+    gap: var(--mobile-gap-group);
 }

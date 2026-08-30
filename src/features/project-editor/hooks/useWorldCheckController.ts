@@ -137,6 +137,13 @@ interface UseWorldCheckControllerOptions {
     activeEntryId?: string | null
     activeEntryTitle?: string | null
     onStartDiscussion?: (params: WorldCheckDiscussionParams) => void | Promise<void>
+    /**
+     * 只使用生成表单：跳过历史列表与报告详情的拉取，生成表单直接处于打开态。
+     * 移动端把「生成新报告」拆成了独立页面，那一页不需要历史数据。
+     */
+    formOnly?: boolean
+    /** formOnly 下的初始检测类型。 */
+    initialCheckKind?: WorldCheckKind
 }
 
 export function useWorldCheckController({
@@ -147,9 +154,11 @@ export function useWorldCheckController({
     activeEntryId = null,
     activeEntryTitle = null,
     onStartDiscussion,
+    formOnly = false,
+    initialCheckKind,
 }: UseWorldCheckControllerOptions) {
     const {showAlert} = useAlert()
-    const [checkKind, setCheckKind] = useState<WorldCheckKind>('contradiction')
+    const [checkKind, setCheckKind] = useState<WorldCheckKind>(initialCheckKind ?? 'contradiction')
     const [targetEntryId, setTargetEntryId] = useState('')
     const [targetEntryQuery, setTargetEntryQuery] = useState(activeEntryTitle ?? '')
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
@@ -161,7 +170,7 @@ export function useWorldCheckController({
     const [activeRecord, setActiveRecord] = useState<StoredWorldCheckReport | null>(null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
-    const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
+    const [generateDialogOpen, setGenerateDialogOpen] = useState(formOnly)
     const [entryTitleMap, setEntryTitleMap] = useState<Record<string, string>>({})
     const pluginState = useAiPluginStore()
     const {tasks: worldCheckTasks} = useWorldCheckTaskStore()
@@ -240,18 +249,19 @@ export function useWorldCheckController({
     }, [projectId, showAlert])
 
     useEffect(() => {
+        if (formOnly) return
         void loadHistory()
-    }, [loadHistory])
+    }, [formOnly, loadHistory])
 
     useEffect(() => {
-        if (task?.status !== 'success' || !task.record) return
+        if (formOnly || task?.status !== 'success' || !task.record) return
         setSelectedReportId(task.record.reportId)
         setActiveRecord(task.record)
         void loadHistory()
-    }, [loadHistory, task?.record, task?.status])
+    }, [formOnly, loadHistory, task?.record, task?.status])
 
     useEffect(() => {
-        if (!selectedReportId) return
+        if (formOnly || !selectedReportId) return
         let cancelled = false
         setDetailLoading(true)
         ai_get_world_check_report_entry(selectedReportId)
@@ -269,7 +279,7 @@ export function useWorldCheckController({
         return () => {
             cancelled = true
         }
-    }, [selectedReportId, showAlert])
+    }, [formOnly, selectedReportId, showAlert])
 
     const selectPlugin = useCallback((pluginId: string) => {
         setLocalPluginId(pluginId)
@@ -287,15 +297,16 @@ export function useWorldCheckController({
         if (selected?.title !== value) setTargetEntryId('')
     }, [projectEntries, targetEntryId])
 
-    const generate = useCallback(async () => {
+    /** 返回是否真的把任务发出去了；调用方据此决定要不要关闭表单/返回上一页。 */
+    const generate = useCallback(async (): Promise<boolean> => {
         if (!effectivePluginId || !effectiveModel) {
             await showAlert('请先选择 AI 插件和模型。', 'warning', 'nonInvasive', 2200)
-            return
+            return false
         }
         const resolvedTargetEntryId = targetEntryId.trim()
         if (checkKind === 'entry_alignment' && !resolvedTargetEntryId) {
             await showAlert('单词条契合度检测需要先选择目标词条。', 'warning', 'nonInvasive', 2400)
-            return
+            return false
         }
         const request = {
             sessionId: `world_check_${checkKind}_${Date.now()}`,
@@ -309,9 +320,11 @@ export function useWorldCheckController({
         setGenerateDialogOpen(false)
         try {
             await startWorldCheckTask({request, projectName})
+            return true
         } catch (error) {
             logger.error('[WorldCheck] 启动检测失败', error)
             await showAlert(`启动设定检测失败：${String(error)}`, 'error', 'nonInvasive', 2600)
+            return false
         }
     }, [checkKind, effectiveModel, effectivePluginId, projectId, projectName, showAlert, targetEntryId])
 
