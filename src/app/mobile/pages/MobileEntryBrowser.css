@@ -27,6 +27,12 @@
 
 .mobile-entry-list__filter {
     display: inline-flex;
+    /*
+     * 不许压缩。整条是横向滚动区，chips 总宽超出容器是常态；
+     * 允许压缩时会被 mobileAccessibility.css 的 min-inline-size: 48px 兜到
+     * 48px 见方，「人物」被折成两行。48px 那条是命中下限，不是列宽。
+     */
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
     gap: var(--mobile-gap-text);
