@@ -13,8 +13,11 @@
      * 消息列表底部渐隐带的起点位置（相对输入卡上沿再往上一段）。替代原来铺在输入卡
      * 后面的实色渐变——角色对话背后是一张照片，实色渐变会在照片上压出一条与页面同色
      * 的横带。做法与桌面端 .ai-messages-container 的 mask-image 一致。
+     *
+     * 它同时决定滚到底时正文离输入卡有多远：正文底 = 渐隐起点，
+     * 可见间距 = --mobile-gap-group + 本值。原来取 3rem，实测间距 76px，太空。
      */
-    --mobile-ai-messages-fade-space: 3rem;
+    --mobile-ai-messages-fade-space: var(--mobile-gap-item);
     /*
      * 渐隐带的终点：离容器底还有多远就完全透明。
      *
