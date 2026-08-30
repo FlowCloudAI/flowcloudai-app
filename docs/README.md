@@ -35,6 +35,7 @@
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |
 | [prompt_README.md](prompt_README.md) | 现行 | 2026-05-07 | Prompt & Tools 模块结构：`context_builders` / Tera 模板 / `senses` |
 | [agent-runtime-hardening.md](agent-runtime-hardening.md) | 现行 | 2026-08-01 | AI Agent 运行时加固：自动精简对话记忆，阈值 75% → 65% |
+| [mobile_desktop_shared_audit.md](mobile_desktop_shared_audit.md) | 现行 | 2026-08-30 | **移动端与桌面端的复用/解耦审计**：8 项问题，每项先答「该不该做」。建议现在动的只有前三项（时间解析器四份拷贝、灵感域文案已分叉、插件安装错误处理不等价）；设置自动保存、Markdown 命令、错误横幅明确建议暂不合并并写明理由。附「已经做对、别改」清单与复核触发条件 |
 
 ## 3. 地图与渲染
 
