@@ -233,23 +233,46 @@
 .mobile-settings-plugin-filter__segments {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: var(--mobile-gap-text);
+    gap: var(--mobile-gap-inline);
 }
 
+/*
+ * 四段筛选是次级控件，画满 48px 命中基线时整行比它下面的插件卡片还重。
+ * 视觉高度降到 sm 控件档（触控密度 40px），命中区由下面的透明 ::after 补回 48px——
+ * 与 .mobile-ai-composer-card__chip、本文件的 capsule 规则同一套做法：
+ * --fc-control-tap-min 置零同时解除 mobileAccessibility.css 的 min-block-size 与
+ * min-inline-size 两条下限（都读这个变量），height 才谈得上生效。
+ *
+ * 原来的 overflow: hidden + text-overflow 一起去掉了：溢出裁剪会连 ::after 一起裁，
+ * 命中区就补不回来。四个标签是本文件写死的两字中文，40px 药丸里放得下 6 个字，
+ * 这条省略号兜底本来也不会命中；换成更长的标签时要重新想命中区怎么给。
+ */
 .mobile-settings-plugin-filter__segment {
+    --fc-control-tap-min: 0;
+
+    position: relative;
     min-width: 0;
-    height: var(--mobile-tap-min);
+    height: var(--fc-control-height-sm);
     padding: 0 var(--mobile-gap-text);
-    overflow: hidden;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text-secondary);
     font: inherit;
     font-size: var(--mobile-text-meta);
-    text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
+}
+
+.mobile-settings-plugin-filter__segment::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* 与 capsule 同款：居中定尺，不写 inset —— 那样量出来会少掉两条边框的厚度。 */
+    width: max(100%, var(--mobile-tap-min));
+    height: var(--mobile-tap-min);
+    transform: translate(-50%, -50%);
+    content: '';
 }
 
 .mobile-settings-plugin-filter__segment.is-active {
