@@ -36,14 +36,14 @@
      * 那个时长下面板几乎是一帧就位。280ms 与 Overlay.tsx 的 SHEET_TRANSITION_MS
      * 对齐：在此之前 JS 等 280ms 卸载、CSS 只动 100ms，两边本来就对不上。
      */
-    --fc-overlay-transition-duration: 320ms;
+    --fc-overlay-transition-duration: 450ms;
     /*
      * 缓动不能太前倾。原来的 easeOutQuint（0.22, 1, 0.36, 1）y1=1，起手就是满速：
      * 真机逐帧采样显示前 60ms 已经走完 75% 行程，剩下 220ms 在挪最后几十像素，
      * 看上去就是「闪一下然后不动」。把 y1 压到 0.45 并把时长提到 320ms，
      * 行程摊到整段时长上；JS 侧的 SHEET_TRANSITION_MS 同步跟到 320。
      */
-    --fc-overlay-transition-easing: cubic-bezier(0.3, 0.45, 0.2, 1);
+    --fc-overlay-transition-easing: cubic-bezier(0.33, 0.25, 0.25, 1);
     align-items: flex-end;
     justify-content: stretch;
     padding-bottom: env(safe-area-inset-bottom, 0px);

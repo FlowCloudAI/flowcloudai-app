@@ -187,10 +187,11 @@ test('AI 更多面板通过公共 Overlay 完整绘制进退场', () => {
     assert.match(overlaySource, /data-state=\{active \? 'open' : 'closed'\}/)
     // 起手位置压到屏幕外再多 2rem，让加速段走完在视野外；时长与 SHEET_TRANSITION_MS 对齐。
     assert.match(overlayCss, /\.fc-overlay--sheet \.fc-overlay__panel\s*\{\s*transform:\s*translateY\(calc\(100% \+ 2rem\)\)/)
-    assert.match(overlayCss, /\.fc-overlay--sheet\s*\{[\s\S]*?--fc-overlay-transition-duration:\s*320ms/)
-    // 缓动的 y1 不能再回到 1：那条曲线前 60ms 就走完 75% 行程，读起来是闪现不是升起。
-    assert.match(overlayCss, /--fc-overlay-transition-easing:\s*cubic-bezier\(0\.3, 0\.45, 0\.2, 1\)/)
-    assert.match(overlaySource, /SHEET_TRANSITION_MS = 320/)
+    assert.match(overlayCss, /\.fc-overlay--sheet\s*\{[\s\S]*?--fc-overlay-transition-duration:\s*450ms/)
+    // y1 决定起手速度。真机 screencast 实测：y1=1 时 83% 行程 95ms 走完、y1=0.45 时 127ms，
+    // 都读作闪现；现值 y1=0.25 + 450ms 摊到约 245ms。改这两个值要重新量。
+    assert.match(overlayCss, /--fc-overlay-transition-easing:\s*cubic-bezier\(0\.33, 0\.25, 0\.25, 1\)/)
+    assert.match(overlaySource, /SHEET_TRANSITION_MS = 450/)
     assert.match(overlayCss, /\.fc-overlay\[data-state='open'\] \.fc-overlay__panel\s*\{\s*transform:\s*none/)
 })
 
