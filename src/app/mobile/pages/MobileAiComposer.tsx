@@ -17,7 +17,8 @@ import {AI_TOOL_ACCESS_LABELS, MobileAiIcon} from './MobileAiChatUi'
 interface ModelOption { id: string; label: string; description: string }
 interface ToolModeOption { mode: AiToolAccessMode; label: string; description: string }
 interface Props {
-    pageRef: RefObject<HTMLDivElement | null>; topActionsRef: RefObject<HTMLDivElement | null>
+    pageRef: RefObject<HTMLDivElement | null>; composerRef: RefObject<HTMLElement | null>
+    topActionsRef: RefObject<HTMLDivElement | null>
     toolModeMenuRef: RefObject<HTMLButtonElement | null>; modelMenuRef: RefObject<HTMLButtonElement | null>
     inputValue: string; onInput: (value: string) => void; onSend: () => void; inputPlaceholder: string; inputDisabled: boolean
     isStreaming: boolean; isCompacting: boolean; onStop: () => void; thinking: boolean; onToggleThinking: () => void
@@ -53,7 +54,7 @@ const DOCUMENT_STATUS_LABELS: Record<string, string> = {
 
 export default function MobileAiComposer(p: Props) {
     return <>
-        <footer className="mobile-ai-chat__composer">
+        <footer ref={p.composerRef} className="mobile-ai-chat__composer">
             {/*
               * 已引用文档必须看得见：移动端此前只能「添加」，加进去之后既看不到列表、
               * 解析失败也没有重试入口，加错了也删不掉，只能弃用整个会话。

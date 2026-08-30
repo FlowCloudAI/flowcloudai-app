@@ -1,6 +1,28 @@
 .mobile-ai-chat {
     --mobile-ai-topbar-space: 4.25rem;
-    --mobile-ai-composer-space: 8.25rem;
+    /*
+     * 输入卡占位高度。--mobile-ai-composer-height 由 useMobileAiComposerClearance 实测写入
+     * （同桌面端 --ai-messages-bottom-space 的做法）：输入卡会因已引用文档栏、编辑横幅和
+     * 多行输入长高，写死常量时最后一条消息会被压在输入卡后面。
+     * 兜底 7.25rem 是无附加行时的自然高度，加上一档 group 间距就是原来的 8.25rem。
+     */
+    --mobile-ai-composer-space: calc(
+        var(--mobile-ai-composer-height, 7.25rem) + var(--mobile-gap-group)
+    );
+    /*
+     * 消息列表底部渐隐带的宽度。正文在输入卡上沿之前就淡完，替代原来铺在输入卡后面的
+     * 实色渐变——角色对话背后是一张照片，实色渐变会在照片上压出一条与页面同色的横带。
+     * 做法与桌面端 .ai-messages-container 的 mask-image 一致。
+     */
+    --mobile-ai-messages-fade-space: 3rem;
+    /*
+     * 消息列表底部留白 = 输入卡占位 + 渐隐带。渐隐带必须算进留白：只留输入卡高度的话，
+     * 滚到底时最后一条消息的操作栏正好落在渐隐里，复制 / 重说按钮会一直是半透明的
+     * （真机复现过）。桌面端的 --ai-messages-bottom-space 同样兼任留白与遮罩实色端。
+     */
+    --mobile-ai-messages-bottom-space: calc(
+        var(--mobile-ai-composer-space) + var(--mobile-ai-messages-fade-space)
+    );
     /*
      * 输入卡与键盘上沿之间的额外呼吸位，只在键盘展开时生效：--fc-kb 为 0 时整项取 0，
      * 收起态（输入卡贴 Tab）的几何一行都不变。
@@ -512,15 +534,27 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     overflow-y: auto;
     overscroll-behavior: contain;
     /*
-     * 父级 mobile-nav-safe-fixed 已按键盘高度缩短消息区；这里仅预留输入区自身高度。
-     * 再叠加键盘额外高度会重复避让，键盘展开后连空态都会产生伪滚动距离。
+     * 父级 mobile-nav-safe-fixed 已按键盘高度缩短消息区；这里仅预留输入区自身高度
+     * （加渐隐带）。再叠加键盘额外高度会重复避让，键盘展开后连空态都会产生伪滚动距离。
      */
     padding: var(--mobile-ai-topbar-space) var(--mobile-page-x)
-        var(--mobile-ai-composer-space);
+        var(--mobile-ai-messages-bottom-space);
+    /*
+     * 底部渐隐。遮罩只取 alpha，实色一端随便挑个色号 token 即可（同 --ai-document-context-mask
+     * 的写法）：实色端落在底部留白的上沿，完全透明的位置落在输入卡占位的上沿。
+     */
+    --mobile-ai-messages-mask: linear-gradient(
+        to bottom,
+        var(--fc-color-text) 0,
+        var(--fc-color-text) calc(100% - var(--mobile-ai-messages-bottom-space)),
+        transparent calc(100% - var(--mobile-ai-composer-space))
+    );
+    -webkit-mask-image: var(--mobile-ai-messages-mask);
+    mask-image: var(--mobile-ai-messages-mask);
     background: var(--fc-color-bg);
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);
-    scroll-padding-bottom: var(--mobile-ai-composer-space);
+    scroll-padding-bottom: var(--mobile-ai-messages-bottom-space);
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
@@ -579,12 +613,11 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     z-index: var(--mobile-z-sticky);
     flex: 0 0 auto;
     padding: var(--mobile-gap-text) var(--mobile-page-x) var(--mobile-gap-text);
-    background: linear-gradient(
-        180deg,
-        transparent 0%,
-        color-mix(in srgb, var(--fc-color-bg) 72%, transparent) 24%,
-        var(--fc-color-bg) 72%
-    );
+    /*
+     * 不铺底色：正文与输入区的分隔改由消息列表自己的底部渐隐负责（见
+     * --mobile-ai-messages-mask）。原来这里是一条渐变到 --fc-color-bg 的实色带，
+     * 角色对话下会盖住背景照片。
+     */
     transition: bottom var(--fc-kb-transition, 0s);
 }
 
@@ -681,7 +714,7 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 /*
  * 有背景时，页面与消息区的实色底都要让位——消息区自己也刷了一层 --fc-color-bg，
  * 只把页面改成 transparent 的话，背景图会被消息区整块盖住，只在输入卡下方露一条
- * （真机复现过）。输入卡的渐变保留：它负责把正文和输入区分开，不能一起透明。
+ * （真机复现过）。输入卡本身已经不铺底色，不需要额外处理。
  */
 .mobile-ai-chat.is-character,
 .mobile-ai-chat.is-character .mobile-ai-chat__messages {

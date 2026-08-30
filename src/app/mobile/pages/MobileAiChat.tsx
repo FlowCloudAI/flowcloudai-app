@@ -51,6 +51,7 @@ import {useMobileAiMessageScroll} from './useMobileAiMessageScroll'
 import {useMobileAiMessageLinks} from './useMobileAiMessageLinks'
 import {useMobileAiMessageActions} from './useMobileAiMessageActions'
 import {useMobileAiConversationFiles} from './useMobileAiConversationFiles'
+import {useMobileAiComposerClearance} from './useMobileAiComposerClearance'
 import {useAiContextUsage} from '../../../features/ai-chat/hooks/useAiContextUsage'
 import './MobileAiChat.css'
 
@@ -69,7 +70,9 @@ export default function MobileAiChat({
     const appSettings = useAppSettingsStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
+    const composerRef = useRef<HTMLElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
+    useMobileAiComposerClearance(pageRef, composerRef)
 
     const controller = useAiController(aiFocus)
     const {
@@ -731,7 +734,7 @@ export default function MobileAiChat({
             />
 
             <MobileAiComposer
-                pageRef={pageRef} topActionsRef={topActionsRef} toolModeMenuRef={toolModeMenuRef} modelMenuRef={modelMenuRef}
+                pageRef={pageRef} composerRef={composerRef} topActionsRef={topActionsRef} toolModeMenuRef={toolModeMenuRef} modelMenuRef={modelMenuRef}
                 inputValue={inputValue} onInput={setInputValue} onSend={() => void handleSend()} inputPlaceholder={inputPlaceholder} inputDisabled={inputDisabled}
                 isStreaming={isStreaming} isCompacting={isCompacting} onStop={stopStreaming} thinking={sessionParams.thinking}
                 onToggleThinking={() => setSessionParams(current => ({...current, thinking: !current.thinking}))}

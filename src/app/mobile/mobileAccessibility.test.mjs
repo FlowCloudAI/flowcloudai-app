@@ -200,8 +200,8 @@ test('AI 空消息态不重复避让键盘且不会把拖动升级成视觉视�
     assert.match(mobileAiMessageListSource, /const showEmptyState = messages\.length === 0 && !isStreaming/)
     assert.match(mobileAiMessageListSource, /mobile-ai-chat__messages--empty/)
     const messagesRule = mobileAiChatCss.match(/\.mobile-ai-chat__messages\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    assert.match(messagesRule, /padding:[\s\S]*?var\(--mobile-ai-composer-space\)/)
-    assert.match(messagesRule, /scroll-padding-bottom:\s*var\(--mobile-ai-composer-space\)/)
+    assert.match(messagesRule, /padding:[\s\S]*?var\(--mobile-ai-messages-bottom-space\)/)
+    assert.match(messagesRule, /scroll-padding-bottom:\s*var\(--mobile-ai-messages-bottom-space\)/)
     assert.doesNotMatch(messagesRule, /--mobile-keyboard-extra/)
     assert.match(mobileAiChatCss, /\.mobile-ai-chat__messages--empty\s*\{[\s\S]*?gap:\s*0;[\s\S]*?overflow-y:\s*hidden;[\s\S]*?overscroll-behavior:\s*none;[\s\S]*?touch-action:\s*none;/)
     assert.match(mobileAiMessageScrollSource, /container\.scrollTop = messageListEmpty \? 0 : container\.scrollHeight/)
