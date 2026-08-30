@@ -8,6 +8,8 @@
 
 以下 JSON 是公共顶栏材质实验室在 2026-08-26 确认的亮暗模式基线，也是后续调整与回归对比的权威参数。交互实验入口为 `designs/mobile-topbar-material-lab.html`。
 
+> **2026-08-30 修订**：胶囊渐变可见度整体抬高——亮色 `pillStartOpacity` 0.6→0.7、`pillEndOpacity` 0.25→0.35（各 +10 个百分点），暗色 0.8→0.85、0.25→0.3（各 +5）。角度与 tint 未动。AI 模型选择胶囊此前是独立实色底，2026-08-30 起共用 `--mobile-topbar-pill-*`，随本次一并变化。下方 JSON 已是修订后的值。
+
 ```json
 {
   "light": {
@@ -39,8 +41,8 @@
     "buttonSize": 38,
     "glassTint": "#ffffff",
     "pillGradientAngle": 180,
-    "pillStartOpacity": 0.6,
-    "pillEndOpacity": 0.25,
+    "pillStartOpacity": 0.7,
+    "pillEndOpacity": 0.35,
     "pillBlur": 2,
     "pillSaturation": 100,
     "borderColor": "#919191",
@@ -84,8 +86,8 @@
     "buttonSize": 38,
     "glassTint": "#2a2a2a",
     "pillGradientAngle": 0,
-    "pillStartOpacity": 0.8,
-    "pillEndOpacity": 0.25,
+    "pillStartOpacity": 0.85,
+    "pillEndOpacity": 0.3,
     "pillBlur": 2,
     "pillSaturation": 100,
     "borderColor": "#ffffff",

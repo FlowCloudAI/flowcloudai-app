@@ -215,8 +215,8 @@ test('本轮视觉优化收紧属性层级、保存语言、主动作和单项�
 test('公共顶栏固化亮暗材质参数，且顶栏与胶囊使用独立 blur 层', () => {
     assert.match(mobileTokensSource, /--mobile-topbar-bg-filter:\s*blur\(1px\) saturate\(1\)/)
     assert.match(mobileTokensSource, /data-theme="dark"[\s\S]*?--mobile-topbar-bg-filter:\s*blur\(2px\) saturate\(1\)/)
-    assert.match(mobileTokensSource, /--mobile-topbar-pill-background:\s*linear-gradient\([\s\S]*?180deg,[\s\S]*?60%[\s\S]*?25%/)
-    assert.match(mobileTokensSource, /data-theme="dark"[\s\S]*?--mobile-topbar-pill-background:\s*linear-gradient\([\s\S]*?0deg,[\s\S]*?80%[\s\S]*?25%/)
+    assert.match(mobileTokensSource, /--mobile-topbar-pill-background:\s*linear-gradient\([\s\S]*?180deg,[\s\S]*?70%[\s\S]*?35%/)
+    assert.match(mobileTokensSource, /data-theme="dark"[\s\S]*?--mobile-topbar-pill-background:\s*linear-gradient\([\s\S]*?0deg,[\s\S]*?85%[\s\S]*?30%/)
     assert.match(mobileTokensSource, /--mobile-topbar-pill-border:\s*0\.6px solid/)
     assert.match(mobileTokensSource, /--mobile-topbar-primary-visual-size:\s*2\.375rem/)
     assert.match(topControlsCssSource, /\.mobile-page-topbar::before\s*\{[\s\S]*?linear-gradient/)
