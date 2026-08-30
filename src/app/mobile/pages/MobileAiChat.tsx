@@ -119,6 +119,7 @@ export default function MobileAiChat({
     const [renaming, setRenaming] = useState(false)
     const conversationLongPressRef = useRef<ConversationLongPressState | null>(null)
     const suppressConversationClickRef = useRef(false)
+    const contextUsageRef = useRef<HTMLButtonElement>(null)
     const modelMenuRef = useRef<HTMLButtonElement>(null)
     const toolModeMenuRef = useRef<HTMLButtonElement>(null)
 
@@ -631,15 +632,15 @@ export default function MobileAiChat({
      * 正好是「改了什么」到「结果如何」的中间环节。
      */
     const contextScopeText = useMemo(() => {
-        const parts: string[] = []
-        if (focusContext.projectId) parts.push(`项目「${focusContext.projectName ?? '加载中'}」`)
-        if (focusContext.entryId) parts.push(`词条「${focusContext.entryTitle ?? '加载中'}」`)
-        if (documentContextItems.length > 0) parts.push(`${documentContextItems.length} 个文件`)
-        if (webSearchEnabled) parts.push('联网搜索')
-        return parts.length > 0
-            ? `本次注入：${parts.join(' · ')}`
-            : '本次不注入项目或词条，模型只看得到当前对话'
-    }, [documentContextItems.length, focusContext, webSearchEnabled])
+        // 文案沿用桌面焦点 chip 的写法（项目：X / 词条：Y），两端说同一件事就别换句式。
+        const parts: string[] = [
+            focusContext.projectId ? `项目：${focusContext.projectName ?? '加载中'}` : '项目：未引用',
+        ]
+        if (focusContext.entryId) parts.push(`词条：${focusContext.entryTitle ?? '加载中'}`)
+        // 联网搜索不进来：它就在上面那排里，按钮本身已经是开关态，写进来是同一条信息说两遍。
+        if (documentContextItems.length > 0) parts.push(`文件：${documentContextItems.length} 个`)
+        return parts.join(' · ')
+    }, [documentContextItems.length, focusContext])
 
     const conversationControls = <MobileAiConversationControls
         disabled={!activeConversation}
@@ -768,6 +769,7 @@ export default function MobileAiChat({
                 documentContextItems={documentContextItems}
                 contextUsage={contextUsageAvailable ? contextUsage : null}
                 contextUsageOpen={contextUsageOpen}
+                contextUsageRef={contextUsageRef}
                 onToggleContextUsage={() => setContextUsageOpen(open => !open)}
                 onCloseContextUsage={() => setContextUsageOpen(false)}
                 onRetryDocument={itemId => void retryDocumentContextItem(itemId)}

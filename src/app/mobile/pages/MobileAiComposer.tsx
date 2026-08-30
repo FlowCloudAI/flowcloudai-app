@@ -34,7 +34,7 @@ interface Props {
     onAttachDocuments: () => void; webSearchEnabled: boolean; onToggleWebSearch: () => void
     documentContextItems: DocumentContextItem[]
     contextUsage: AiContextUsage | null; contextUsageOpen: boolean
-    onToggleContextUsage: () => void
+    contextUsageRef: RefObject<HTMLButtonElement | null>; onToggleContextUsage: () => void
     onCloseContextUsage: () => void
     onRetryDocument: (itemId: string) => void; onRemoveDocument: (itemId: string) => void
     /** 「更多」面板里描述本次请求注入了什么的一行文本。 */
@@ -111,6 +111,7 @@ export default function MobileAiComposer(p: Props) {
                   */}
                 {p.contextUsage ? (
                     <button
+                        ref={p.contextUsageRef}
                         type="button"
                         className={`mobile-ai-context-ring${p.contextUsageOpen ? ' is-open' : ''}`}
                         aria-haspopup="dialog"
@@ -138,18 +139,18 @@ export default function MobileAiComposer(p: Props) {
         </footer>
 
         {/*
-          * 用量浮窗：挂在顶栏右侧动作胶囊下面，不再从右下角那颗环上往上长。
-          * 环在输入卡里、贴着屏幕底，从它往上弹出的浮窗会压住最后几条消息，
-          * 而这只是一条读完就走的数值。挪到顶部后正文一行不挡。
+          * 用量浮窗：就长在用量环正上方——挪去顶栏试过，读数和它的入口离得太远，
+          * 点完还得满屏找。clearAnchor 让它落在环外侧而不是盖住环本身。
           */}
         <MobileAnchoredMenu
             open={p.contextUsageOpen}
             onClose={p.onCloseContextUsage}
-            anchorRef={p.topActionsRef}
+            anchorRef={p.contextUsageRef}
             containerRef={p.pageRef}
             ariaLabel="对话记忆用量"
             className="mobile-ai-context-usage-popover"
             align="right"
+            placement="top"
             clearAnchor
         >
             <div className="mobile-ai-context-usage-popover__body">
