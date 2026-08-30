@@ -36,7 +36,6 @@
     --mobile-surface-glass: var(--fc-color-bg-elevated);
     --mobile-surface-panel: var(--fc-color-bg-elevated);
     --mobile-surface-dialog: var(--fc-color-bg-elevated);
-    --mobile-surface-control: var(--fc-color-bg-elevated);
     --mobile-surface-menu: var(--fc-color-bg-elevated);
     --mobile-nav-surface: var(--fc-color-bg);
     --mobile-topbar-bg-filter: none;
@@ -136,10 +135,8 @@
 }
 
 /*
- * 用 --mobile-surface-menu（80%）而不是 --mobile-surface-control（60%）。
- * control 那一档是给 AI 模型胶囊这类控件用的，菜单挂在上面偏透，底下的树行会透过来
- * 干扰正文；menu 档本来就是为菜单定义的，只是一直空置着没人用。
- * 关闭毛玻璃时两档都回退到实色，无差别。
+ * menu 档是 80% 底色，比通用控件层厚：菜单太透时底下的树行会透过来干扰正文。
+ * 关闭毛玻璃时所有档位都回退到实色，无差别。
  */
 :root .mobile-anchored-menu::before {
     background: var(--mobile-surface-menu);
@@ -168,9 +165,14 @@
 }
 
 :root .mobile-ai-model-pill {
-    background: var(--mobile-surface-control);
-    -webkit-backdrop-filter: var(--mobile-glass-filter-soft);
-    backdrop-filter: var(--mobile-glass-filter-soft);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+:root .mobile-ai-model-pill::before {
+    background: var(--mobile-topbar-pill-background);
+    -webkit-backdrop-filter: var(--mobile-topbar-pill-filter);
+    backdrop-filter: var(--mobile-topbar-pill-filter);
 }
 
 :root .mobile-ai-composer-card {

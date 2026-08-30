@@ -296,6 +296,7 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 
     display: inline-flex;
     position: relative;
+    isolation: isolate;
     width: fit-content;
     max-width: 100%;
     min-width: 0;
@@ -305,9 +306,11 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     justify-content: flex-start;
     gap: var(--mobile-gap-inline);
     padding: 0 var(--mobile-gap-item);
-    border: var(--mobile-border);
+    /* 描边、渐变与阴影与顶栏胶囊同源，token 定义见 mobileTokens.css。 */
+    border: var(--mobile-topbar-pill-border);
     border-radius: var(--fc-radius-full);
-    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
+    background: transparent;
+    box-shadow: var(--mobile-topbar-pill-box-shadow);
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--mobile-text-body-sm);
@@ -328,7 +331,22 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     content: '';
 }
 
+/*
+ * 渐变底色单独占一层：backdrop-filter 写在按钮自身会把文字和箭头一起采样进去。
+ * 与 .mobile-top-action-pill::before 是同一套做法；实际底色见 src/glassEffect.css。
+ */
+.mobile-ai-model-pill::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    content: '';
+    pointer-events: none;
+}
+
 .mobile-ai-model-pill span {
+    position: relative;
+    z-index: 1;
     min-width: 0;
     flex: 0 1 auto;
     overflow: hidden;
@@ -347,6 +365,8 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
 }
 
 .mobile-ai-model-pill svg {
+    position: relative;
+    z-index: 1;
     display: block;
     width: 0.75rem;
     height: 0.75rem;

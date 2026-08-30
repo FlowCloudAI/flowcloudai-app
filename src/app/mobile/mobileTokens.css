@@ -66,7 +66,6 @@
     --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
 
     --mobile-surface-raised: var(--fc-color-bg-elevated);
-    --mobile-surface-control: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     --mobile-surface-menu: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
     --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
     --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
@@ -204,7 +203,6 @@
 
 /* iOS Reduce Transparency 与 Android 高对比度都降级为不透明 surface。 */
 :root[data-fc-density="touch"][data-mobile-high-contrast="true"] {
-    --mobile-surface-control: var(--fc-color-bg-elevated);
     --mobile-surface-menu: var(--fc-color-bg-elevated);
     --mobile-surface-muted: var(--fc-color-bg-secondary);
     --mobile-surface-muted-soft: var(--fc-color-bg-secondary);
