@@ -33,7 +33,12 @@ import {
     uninstallPlugin,
     usePluginCatalogStore,
 } from '../../../features/settings/pluginCatalogStore'
-import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {
+    MobileBackIcon,
+    MobilePageTopBar,
+    MobileTopActionPill,
+    MobileTopRefreshPill,
+} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
 import {
@@ -525,6 +530,14 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
         {value: 'zh-CN', label: '简体中文'},
         {value: 'en-US', label: 'English'},
     ]
+    /*
+     * 刷新是页面级动作，不是列表内的一项，所以放顶栏右侧而不是内容区。
+     * 各页只提供「在忙吗 / 刷什么」，图标、忙碌态与自转都由公共的
+     * createMobileRefreshAction 给，避免每页各画一个刷新按钮。
+     */
+    const refreshPill = section === 'pluginLibrary'
+        ? <MobileTopRefreshPill busy={pluginSourcesRefreshing} onRefresh={() => void refreshPluginInstallSources()}/>
+        : null
     const topBar = (
         <MobilePageTopBar
             sticky
@@ -537,6 +550,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                 onClick: () => pop?.(),
             }]}/>}
             center={<h1 className="mobile-settings-topbar-title">{getSettingsSectionTitle(section)}</h1>}
+            right={refreshPill ?? undefined}
         />
     )
 
@@ -632,7 +646,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
 
             {section === 'pluginLibrary' && (
                 <MobileSettingsPluginLibrarySection
-                    pluginSourcesRefreshing={pluginSourcesRefreshing}
                     installingLocalFile={installingLocalFile}
                     pluginSearch={pluginSearch}
                     pluginKindFilter={pluginKindFilter}
@@ -643,7 +656,6 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                     onPluginSearchChange={setPluginSearch}
                     onPluginKindFilterChange={setPluginKindFilter}
                     getInstalledPlugin={getInstalledPlugin}
-                    onRefreshPluginSources={refreshPluginInstallSources}
                     onInstallFromFile={handleInstallFromFile}
                     onInstallMarketPlugin={handleInstallMarketPlugin}
                 />

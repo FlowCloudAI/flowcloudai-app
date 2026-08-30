@@ -105,7 +105,6 @@ export function MobileSettingsApiKeySection({
 }
 
 interface PluginLibrarySectionProps {
-    pluginSourcesRefreshing: boolean
     installingLocalFile: boolean
     pluginSearch: string
     pluginKindFilter: PluginKindFilter
@@ -116,13 +115,11 @@ interface PluginLibrarySectionProps {
     onPluginSearchChange: (value: string) => void
     onPluginKindFilterChange: (value: PluginKindFilter) => void
     getInstalledPlugin: (pluginId: string) => LocalPluginInfo | undefined
-    onRefreshPluginSources: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
     onInstallMarketPlugin: (pluginId: string) => void | Promise<void>
 }
 
 export function MobileSettingsPluginLibrarySection({
-    pluginSourcesRefreshing,
     installingLocalFile,
     pluginSearch,
     pluginKindFilter,
@@ -133,7 +130,6 @@ export function MobileSettingsPluginLibrarySection({
     onPluginSearchChange,
     onPluginKindFilterChange,
     getInstalledPlugin,
-    onRefreshPluginSources,
     onInstallFromFile,
     onInstallMarketPlugin,
 }: PluginLibrarySectionProps) {
@@ -156,6 +152,7 @@ export function MobileSettingsPluginLibrarySection({
 
     return (
         <div className="mobile-settings-section mobile-settings-plugin-library-content">
+            {/* 刷新已上移到顶栏（见 MobileSettings 的 refreshAction），这里只剩本地安装。 */}
             <div className="mobile-settings-plugin-library-actions">
                 <Button
                     type="button"
@@ -165,16 +162,6 @@ export function MobileSettingsPluginLibrarySection({
                     disabled={installingLocalFile}
                 >
                     {installingLocalFile ? '安装中…' : '安装本地插件'}
-                </Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    radius="full"
-                    onClick={() => void onRefreshPluginSources()}
-                    disabled={pluginSourcesRefreshing}
-                >
-                    {pluginSourcesRefreshing ? '刷新中…' : '刷新'}
                 </Button>
             </div>
             <div className="mobile-settings-plugin-search-row">

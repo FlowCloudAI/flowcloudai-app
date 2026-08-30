@@ -503,6 +503,95 @@ export function MobileAddIcon({className = ''}: {className?: string} = {}) {
     )
 }
 
+/**
+ * 旋转刷新图标：静止时是一枚缺口圆箭头，`spinning` 期间整枚图标匀速自转。
+ * 动画写在 MobileTopControls.css 的 .mobile-refresh-icon 上，转速由
+ * --mobile-duration-spin 决定（reduce-motion 下该 token 归零，自动不转）。
+ */
+export const MobileRefreshIcon = forwardRef<SVGSVGElement, {spinning?: boolean; className?: string}>(
+    function MobileRefreshIcon({spinning = false, className = 'mobile-top-control-svg'}, ref) {
+        return (
+            <svg
+                ref={ref}
+                className={`${className} mobile-refresh-icon${spinning ? ' is-spinning' : ''}`}
+                viewBox="0 0 24 24"
+                focusable="false"
+                aria-hidden="true"
+            >
+                {/* 312° 圆弧 + 折角箭头：留缺口才看得出在转，整圈的环转起来是静止的。 */}
+                <path d="M19.5 12A7.5 7.5 0 1 1 17 6.4"/>
+                <path d="M17 2.6V6.4h-3.8"/>
+            </svg>
+        )
+    }
+)
+
+/**
+ * 让转圈至少走完当前这一整圈再停。
+ *
+ * 真机实测（Xiaomi / Android 16）插件源刷新常常 40ms 内就回来了，照 busy 直接摘掉
+ * 动画的话图标只转了约 15° 就弹回 0°——读起来是抖了一下，不是转了一圈。这里在 busy
+ * 落下后按 Web Animations 的剩余时间续到本圈末尾，图标停在 0°，没有回弹。
+ *
+ * 时长从正在跑的动画上取，不去解析 --mobile-duration-spin：自定义属性回读的是
+ * 声明原样（`calc(320ms * 3)`），而 animation-duration 已经算好了。
+ * reduce-motion 下该 token 归零、动画不存在，直接走「立即停」的分支。
+ */
+function useWholeTurnSpin(busy: boolean, iconRef: RefObject<SVGSVGElement | null>): boolean {
+    const [spinning, setSpinning] = useState(busy)
+
+    useEffect(() => {
+        if (busy) {
+            setSpinning(true)
+            return undefined
+        }
+        const animation = iconRef.current?.getAnimations()[0]
+        const duration = animation?.effect?.getTiming().duration
+        const elapsed = animation?.currentTime
+        if (typeof duration !== 'number' || duration <= 0 || typeof elapsed !== 'number') {
+            setSpinning(false)
+            return undefined
+        }
+        const timer = window.setTimeout(() => setSpinning(false), duration - (elapsed % duration))
+        return () => window.clearTimeout(timer)
+    }, [busy, iconRef])
+
+    return spinning
+}
+
+/**
+ * 顶栏刷新胶囊。刷新在多个页面是同一件事（同一枚图标、同一套忙碌态与禁用规则），
+ * 各页自己拼一遍迟早各写各的，统一在这里出整颗按钮。
+ * 需要和别的动作拼进同一颗胶囊时，直接用上面的 MobileRefreshIcon 自行组装。
+ *
+ * 禁用只看 busy：补转那一小段属于视觉收尾，不该继续挡着用户再点一次。
+ */
+export function MobileTopRefreshPill({
+    busy,
+    onRefresh,
+    label = '刷新',
+    busyLabel = '刷新中',
+}: {
+    busy: boolean
+    onRefresh: () => void
+    label?: string
+    busyLabel?: string
+}) {
+    const iconRef = useRef<SVGSVGElement | null>(null)
+    const spinning = useWholeTurnSpin(busy, iconRef)
+    return (
+        <MobileTopActionPill
+            actions={[{
+                key: 'refresh',
+                label: busy ? busyLabel : label,
+                icon: <MobileRefreshIcon ref={iconRef} spinning={spinning}/>,
+                disabled: busy,
+                onClick: onRefresh,
+            }]}
+        />
+    )
+}
+
 export function MobileMoreIcon() {
     return (
         <svg className="mobile-top-control-svg mobile-top-control-svg--more" viewBox="0 0 24 24" focusable="false">

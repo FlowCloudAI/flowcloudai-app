@@ -155,6 +155,25 @@
     stroke-width: 2.35;
 }
 
+/*
+ * 刷新图标：转的是整枚 svg，不是里面某条 path —— 缺口圆箭头绕自身中心匀速转，
+ * 停下时回到静止姿态。overflow: visible 下 transform-box 默认按 border-box 取中心，
+ * 与 .mobile-top-control-svg 的 1.6rem 方框一致，不会转出椭圆轨迹。
+ */
+.mobile-refresh-icon.is-spinning {
+    animation: mobile-refresh-spin var(--mobile-duration-spin) linear infinite;
+}
+
+@keyframes mobile-refresh-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .mobile-top-control-svg--inline {
     width: 1em;
     height: 1em;
