@@ -700,8 +700,15 @@ html[data-mobile-keyboard-owner='ios'] .mobile-ai-chat {
     background: transparent;
 }
 
-.mobile-ai-chat.is-character .mobile-ai-chat__messages,
-.mobile-ai-chat.is-character .mobile-ai-chat__composer {
+/*
+ * 消息区是普通流内的 flex 项（z-index auto），会被定位过的背景层（z-index 0）盖住，
+ * 所以单独抬一层。
+ *
+ * 输入卡不要一起写：它本来就是 position:absolute + --mobile-z-sticky，已经在背景之上。
+ * 给它写 position:relative 会让同一条 `bottom` 从「离页面底的绝对偏移」变成「相对流内
+ * 位置上移」，输入卡整体上浮一个 Tab 栏的高度——真机实测 bottom 从 726 掉到 618。
+ */
+.mobile-ai-chat.is-character .mobile-ai-chat__messages {
     position: relative;
     z-index: 1;
 }
