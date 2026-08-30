@@ -256,8 +256,12 @@
     object-fit: cover;
 }
 
+/*
+ * 标题和「最近词条」胶囊是卡片里两个不同去向的目标，中间按基线留一档 inline
+ * （4px 时胶囊几乎贴着标题，正好是最容易点错的距离）。
+ */
 .mobile-home-world-card .fc-card__content {
-    gap: var(--mobile-gap-text);
+    gap: var(--mobile-gap-inline);
     padding: var(--mobile-gap-item) var(--mobile-gap-item) var(--mobile-gap-item);
 }
 
@@ -301,8 +305,42 @@
     white-space: nowrap;
 }
 
+/*
+ * 「最近词条」是世界卡片里嵌的第二个入口：点卡片进世界，点它进词条。
+ *
+ * 原来它和不可点的 span 长得完全一样：内边距归零、无边框、透明底、色值继承，
+ * 唯一差别是 cursor:pointer——触屏上等于没有差别。而公共 48px 控件下限又把它的命中区
+ * 撑到 121x48（真机实测），正好盖住卡片底部一整条；用户以为那里还是「卡片」，一点就
+ * 进了词条。所以这里把它画成胶囊，并让视觉高度等于命中高度，看得见的就是点得到的。
+ *
+ * 底色和描边都取 currentColor：卡片正文压在封面遮罩上，文字色本身就是跟着主题走的，
+ * 用它调出来的半透明面在明暗两套主题下都和周围保持同一方向的对比。
+ */
 button.mobile-home-world-card__recent {
+    display: inline-flex;
+    min-height: var(--mobile-tap-min);
+    align-items: center;
+    /*
+     * 横向内边距只给一档 inline：卡片就 165px 宽，而「N 小时前 · 词条名」这行今天已经
+     * 正好占满可用宽度（真机实测 121.3 / 139.4）。再宽的内边距或者补个箭头图标，
+     * 先被挤掉的就是末尾的词条名——而那正是这颗按钮的主语。
+     */
+    padding: 0 var(--mobile-gap-inline);
+    border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, currentColor 16%, transparent);
     cursor: pointer;
+}
+
+button.mobile-home-world-card__recent:active {
+    background: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.mobile-home-world-card__recent-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-home-world-card.fc-card--hoverable:hover,
