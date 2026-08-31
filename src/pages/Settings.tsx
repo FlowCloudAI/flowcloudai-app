@@ -66,6 +66,11 @@ import {
     uninstallPlugin,
     usePluginCatalogStore,
 } from '../features/settings/pluginCatalogStore'
+import {
+    buildUsageActivityDays,
+    buildUsageMonthLabels,
+    USAGE_ACTIVITY_COLUMNS,
+} from '../features/settings/usageActivity'
 import {SidebarResizeHandle} from '../shared/ui/layout/SidebarResizeHandle'
 import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
 import {FloatingPanel} from '../shared/ui/overlay'
@@ -182,104 +187,10 @@ const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: 
     },
 ]
 
-const USAGE_ACTIVITY_COLUMNS = 52
-const USAGE_ACTIVITY_CELL_COUNT = USAGE_ACTIVITY_COLUMNS * 7
-const DAY_MS = 24 * 60 * 60 * 1000
-
-interface UsageActivityDay {
-    date: string
-    label: string
-    totalTokens: number
-    callCount: number
-    intensity: number
-}
-
-interface UsageMonthLabel {
-    label: string
-    column: number
-}
-
 function normalizeThemeSelectValue(value: SelectValue): Theme {
     const theme = String(Array.isArray(value) ? value[0] ?? 'system' : value)
     if (theme === 'light' || theme === 'dark' || theme === 'system') return theme
     return 'system'
-}
-
-function padDatePart(value: number): string {
-    return String(value).padStart(2, '0')
-}
-
-function toLocalDateKey(date: Date): string {
-    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`
-}
-
-function toLocalDateLabel(dateKey: string): string {
-    const date = new Date(`${dateKey}T00:00:00`)
-    return `${date.getMonth() + 1}月${date.getDate()}日`
-}
-
-function getLocalDayNumber(date: Date): number {
-    return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS)
-}
-
-function buildUsageMonthLabels(): UsageMonthLabel[] {
-    const today = new Date()
-    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const trailingEmptyDays = 6 - end.getDay()
-    const actualDayCount = USAGE_ACTIVITY_CELL_COUNT - trailingEmptyDays
-    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (actualDayCount - 1))
-    const labels: UsageMonthLabel[] = []
-
-    for (
-        let month = new Date(start.getFullYear(), start.getMonth(), 1);
-        month <= end;
-        month = new Date(month.getFullYear(), month.getMonth() + 1, 1)
-    ) {
-        const labelDate = month < start ? start : month
-        const offsetDays = getLocalDayNumber(labelDate) - getLocalDayNumber(start)
-        labels.push({
-            label: `${month.getMonth() + 1}月`,
-            column: Math.floor(offsetDays / 7) + 1,
-        })
-    }
-
-    return labels
-}
-
-function buildUsageActivityDays(rows: ApiUsageDaily[]): Array<UsageActivityDay | null> {
-    const today = new Date()
-    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const trailingEmptyDays = 6 - end.getDay()
-    const actualDayCount = USAGE_ACTIVITY_CELL_COUNT - trailingEmptyDays
-    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (actualDayCount - 1))
-    const byDate = new Map(rows.map(row => [row.date, row]))
-    const rawDays: Array<{ dateKey: string; row?: ApiUsageDaily; totalTokens: number }> = []
-
-    for (let index = 0; index < actualDayCount; index += 1) {
-        const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
-        const dateKey = toLocalDateKey(date)
-        const row = byDate.get(dateKey)
-        const totalTokens = row?.total_tokens ?? 0
-        rawDays.push({dateKey, row, totalTokens})
-    }
-
-    const maxTokens = Math.max(0, ...rawDays.map(day => day.totalTokens))
-    const days: Array<UsageActivityDay | null> = rawDays.map(({dateKey, row, totalTokens}) => {
-        const intensity = totalTokens === 0 || maxTokens === 0
-            ? 0
-            : Math.min(4, Math.max(1, Math.ceil((totalTokens / maxTokens) * 4)))
-        return {
-            date: dateKey,
-            label: toLocalDateLabel(dateKey),
-            totalTokens,
-            callCount: row?.call_count ?? 0,
-            intensity,
-        }
-    })
-
-    days.push(...Array.from({length: trailingEmptyDays}, () => null))
-
-    return days
 }
 
 function clampNumberValue(value: string, fallback: number, min: number, max: number): number {
