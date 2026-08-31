@@ -184,6 +184,14 @@
     /** 返回滑出实际使用的时长；JS 侧的提交定时器读同样这两个档自行取 max。 */
     --mobile-duration-back: max(var(--mobile-duration-back-floor), var(--mobile-duration-base));
     --mobile-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+    /*
+     * 返回滑出专用曲线。不能沿用 standard：它是 ease-out-quint，前 15% 的时间就走完 65% 的路程，
+     * 那是给「从零进场」调的——进场时人眼跟的是终点，冲得快反而利落。
+     * 返回是反过来的：手指已经把页面拖到一半再松手，剩下的路程本来就短，
+     * 再用 quint 就只剩三四帧可看，观感是页面凭空消失而不是滑走。
+     * 换成 ease-out-quad 量级，同样时长下把位移摊开到整段。
+     */
+    --mobile-ease-back: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     --mobile-ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 

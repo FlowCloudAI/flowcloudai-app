@@ -72,8 +72,15 @@ test('返回滑出有 50ms 硬下限，CSS 与提交定时器读同一组 token'
     )
     assert.match(
         mobileAppCss,
-        /\.mobile-page-transition-host__layer\.is-edge-back-foreground[\s\S]*?transition:\s*transform var\(--mobile-duration-back\)/,
+        /\.mobile-page-transition-host__layer\.is-edge-back-foreground[\s\S]*?transition:\s*transform var\(--mobile-duration-back\) var\(--mobile-ease-back\)/,
     )
+    /*
+     * 返回不能复用 --mobile-ease-standard：它是 ease-out-quint，前 15% 的时间走完 65% 的路程。
+     * 手势拖到一半再松手时剩下的路程本来就短，用 quint 只剩两三帧可看，观感是页面凭空消失。
+     * 真机 A/B（松手位置同为 202px）：quint 走完 90% 用 2ms，quad 用 48ms。
+     */
+    assert.match(mobileTokensCss, /--mobile-ease-back:\s*cubic-bezier\(0\.25, 0\.46, 0\.45, 0\.94\)/)
+    assert.doesNotMatch(mobileAppCss, /is-edge-back-foreground[\s\S]*?transition:\s*transform[^;]*--mobile-ease-standard/)
     /*
      * 定时器与 CSS 必须算出同一个数：短了会在动画没走完时就出栈，
      * 长了会让旧页停在屏幕右缘干等。两边都只依赖这两个 token，所以不会各自漂。
