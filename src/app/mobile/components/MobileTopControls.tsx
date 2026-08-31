@@ -518,9 +518,15 @@ export const MobileRefreshIcon = forwardRef<SVGSVGElement, {spinning?: boolean; 
                 focusable="false"
                 aria-hidden="true"
             >
-                {/* 312° 圆弧 + 折角箭头：留缺口才看得出在转，整圈的环转起来是静止的。 */}
-                <path d="M19.5 12A7.5 7.5 0 1 1 17 6.4"/>
-                <path d="M17 2.6V6.4h-3.8"/>
+                {/*
+                  * 312° 圆弧 + 折角箭头：留缺口才看得出在转，整圈的环转起来是静止的。
+                  * 整组逆时针 20°，缺口与箭头一起从 1 点半挪到 12 点半；
+                  * 圆环本身旋转对称，转的只是缺口和箭头的落点。
+                  */}
+                <g transform="rotate(-20 12 12)">
+                    <path d="M19.5 12A7.5 7.5 0 1 1 17 6.4"/>
+                    <path d="M17 2.6V6.4h-3.8"/>
+                </g>
             </svg>
         )
     }
