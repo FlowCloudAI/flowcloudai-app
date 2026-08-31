@@ -459,6 +459,101 @@
     font-size: var(--mobile-text-meta);
 }
 
+/*
+ * 用量热力图：7 行 × 52 列，横向滚动。
+ * 格子尺寸单列一份变量，网格与月份标签两处都读它——两边不一致标签就会和列错位。
+ */
+.mobile-settings-usage-heatmap {
+    --mobile-usage-heatmap-cell: 0.75rem;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-settings-usage-heatmap__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-settings-usage-heatmap__header .mobile-settings-subtitle {
+    margin: 0;
+}
+
+.mobile-settings-usage-heatmap__total {
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--mobile-text-meta);
+}
+
+/* 横滑必须让侧边抽屉手势放行，标记见 tsx 里的 data-mobile-horizontal-scroll。 */
+.mobile-settings-usage-heatmap__scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+}
+
+.mobile-settings-usage-heatmap__scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-settings-usage-heatmap__track {
+    display: flex;
+    flex-direction: column;
+    width: max-content;
+}
+
+.mobile-settings-usage-heatmap__grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, var(--mobile-usage-heatmap-cell));
+    grid-auto-columns: var(--mobile-usage-heatmap-cell);
+    gap: var(--mobile-gap-text);
+    width: max-content;
+}
+
+.mobile-settings-usage-heatmap__cell {
+    border-radius: var(--mobile-radius-cell);
+    background: color-mix(in srgb, var(--fc-color-text) 7%, transparent);
+}
+
+.mobile-settings-usage-heatmap__cell--empty {
+    visibility: hidden;
+}
+
+.mobile-settings-usage-heatmap__cell--1 {
+    background: color-mix(in srgb, var(--fc-color-primary) 28%, var(--fc-color-bg) 72%);
+}
+
+.mobile-settings-usage-heatmap__cell--2 {
+    background: color-mix(in srgb, var(--fc-color-primary) 45%, var(--fc-color-bg) 55%);
+}
+
+.mobile-settings-usage-heatmap__cell--3 {
+    background: color-mix(in srgb, var(--fc-color-primary) 68%, var(--fc-color-bg) 32%);
+}
+
+.mobile-settings-usage-heatmap__cell--4 {
+    background: var(--fc-color-primary);
+}
+
+.mobile-settings-usage-heatmap__months {
+    display: grid;
+    grid-template-columns: repeat(var(--mobile-usage-heatmap-columns), var(--mobile-usage-heatmap-cell));
+    column-gap: var(--mobile-gap-text);
+    width: max-content;
+    margin-top: var(--mobile-gap-inline);
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--mobile-text-meta);
+}
+
+.mobile-settings-usage-heatmap__months span {
+    white-space: nowrap;
+}
+
 .mobile-settings-usage-model-list {
     display: flex;
     flex-direction: column;

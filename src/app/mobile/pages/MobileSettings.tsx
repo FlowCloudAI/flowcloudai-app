@@ -4,6 +4,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_get_usage_by_model,
+    ai_get_usage_daily,
     ai_get_usage_summary,
     exit_app,
     formatApiError,
@@ -12,6 +13,7 @@ import {
     type AppLogSnapshot,
     type AppSettings,
     type ApiUsageByModel,
+    type ApiUsageDaily,
     type ApiUsageSummary,
     type PlatformOs,
     toApiError,
@@ -192,6 +194,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
     const [logError, setLogError] = useState('')
     const [usageSummary, setUsageSummary] = useState<ApiUsageSummary | null>(null)
     const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
+    const [usageDaily, setUsageDaily] = useState<ApiUsageDaily[]>([])
     const [usageLoading, setUsageLoading] = useState(false)
     const [usageError, setUsageError] = useState('')
 
@@ -475,12 +478,14 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
         setUsageLoading(true)
         setUsageError('')
         try {
-            const [summary, byModel] = await Promise.all([
+            const [summary, byModel, daily] = await Promise.all([
                 ai_get_usage_summary(),
                 ai_get_usage_by_model(),
+                ai_get_usage_daily(),
             ])
             setUsageSummary(summary)
             setUsageByModel(byModel)
+            setUsageDaily(daily)
         } catch (error) {
             const message = formatApiError(toApiError(error))
             logger.error('[MobileSettings] 加载用量统计失败', error)
@@ -684,6 +689,7 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                 <MobileSettingsUsageSection
                     summary={usageSummary}
                     byModel={usageByModel}
+                    daily={usageDaily}
                     loading={usageLoading}
                     error={usageError}
                 />

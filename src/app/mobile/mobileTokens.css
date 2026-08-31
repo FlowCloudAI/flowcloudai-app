@@ -122,6 +122,8 @@
     --mobile-topbar-pill-padding-x: 0.125rem;
     --mobile-topbar-primary-visual-size: 2.375rem;
 
+    /* 小色块（热力图格子）用的圆角档；卡片档在这个尺寸上会圆成一颗药丸。 */
+    --mobile-radius-cell: var(--fc-radius-sm);
     --mobile-radius-card: var(--fc-radius-xl);
     --mobile-radius-field: var(--fc-radius-xl);
     --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--mobile-gap-inline));

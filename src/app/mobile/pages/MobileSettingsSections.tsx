@@ -1,11 +1,17 @@
-import {useEffect, useState} from 'react'
+import {type CSSProperties, useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {Button, Select, Slider} from 'flowcloudai-ui'
 import {
     type ApiUsageByModel,
+    type ApiUsageDaily,
     type ApiUsageSummary,
     type LocalPluginInfo,
 } from '../../../api'
 import {usePluginPageCapacity} from '../../../features/plugins/usePluginPageCapacity'
+import {
+    buildUsageActivityDays,
+    buildUsageMonthLabels,
+    USAGE_ACTIVITY_COLUMNS,
+} from '../../../features/settings/usageActivity'
 import MobilePagination from '../components/MobilePagination'
 import {type MobileSettingsPageType} from '../usePageStack'
 import MobilePluginIcon from './MobilePluginIcon'
@@ -55,6 +61,7 @@ interface AppearanceSectionProps {
 interface UsageSectionProps {
     summary: ApiUsageSummary | null
     byModel: ApiUsageByModel[]
+    daily: ApiUsageDaily[]
     loading: boolean
     error: string
 }
@@ -67,6 +74,70 @@ function getUsageModalityLabel(modality: string): string {
 
 function formatUsageNumber(value: number): string {
     return value.toLocaleString('zh-CN')
+}
+
+/**
+ * 用量热力图（与桌面同一份取数，见 features/settings/usageActivity）。
+ *
+ * 52 周在手机上放不下，横向滚动是必然选择；容器必须带 data-mobile-horizontal-scroll，
+ * 否则侧边抽屉手势会把横滑吃掉（见 AGENTS.md §5.1）。
+ * 初始滚到最右：不这么做的话，用户一进来看到的是一年前那片空白。
+ */
+function UsageHeatmap({daily, totalTokens}: {daily: ApiUsageDaily[]; totalTokens: number | null}) {
+    const scrollRef = useRef<HTMLDivElement | null>(null)
+    const days = buildUsageActivityDays(daily)
+    const monthLabels = buildUsageMonthLabels()
+
+    // 用 layout effect：滚动位置要在首次绘制前就位，不能让用户看见从左边滑过去。
+    useLayoutEffect(() => {
+        const element = scrollRef.current
+        if (element) element.scrollLeft = element.scrollWidth
+    }, [daily])
+
+    return (
+        <section className="mobile-settings-usage-heatmap">
+            <div className="mobile-settings-usage-heatmap__header">
+                <div className="mobile-settings-subtitle">AI 使用热力图</div>
+                <div className="mobile-settings-usage-heatmap__total">
+                    {totalTokens === null ? '暂无数据' : `${formatUsageNumber(totalTokens)} 消耗`}
+                </div>
+            </div>
+            <div
+                ref={scrollRef}
+                className="mobile-settings-usage-heatmap__scroll"
+                data-mobile-horizontal-scroll
+                role="img"
+                aria-label={`最近 ${USAGE_ACTIVITY_COLUMNS} 周 AI 使用热力图`}
+            >
+                <div
+                    className="mobile-settings-usage-heatmap__track"
+                    style={{'--mobile-usage-heatmap-columns': USAGE_ACTIVITY_COLUMNS} as CSSProperties}
+                >
+                    <div className="mobile-settings-usage-heatmap__grid">
+                        {days.map((day, index) => day ? (
+                            <span
+                                key={day.date}
+                                className={`mobile-settings-usage-heatmap__cell mobile-settings-usage-heatmap__cell--${day.intensity}`}
+                                title={`${day.label}：${formatUsageNumber(day.totalTokens)} 消耗，${formatUsageNumber(day.callCount)} 次调用`}
+                            />
+                        ) : (
+                            <span
+                                key={`empty-${index}`}
+                                className="mobile-settings-usage-heatmap__cell mobile-settings-usage-heatmap__cell--empty"
+                            />
+                        ))}
+                    </div>
+                    <div className="mobile-settings-usage-heatmap__months">
+                        {monthLabels.map(item => (
+                            <span key={`${item.label}-${item.column}`} style={{gridColumn: item.column}}>
+                                {item.label}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+    )
 }
 
 function readSliderNumber(value: number | [number, number]): number {
@@ -341,6 +412,7 @@ export function MobileSettingsAppearanceSection({
 export function MobileSettingsUsageSection({
     summary,
     byModel,
+    daily,
     loading,
     error,
 }: UsageSectionProps) {
@@ -370,6 +442,7 @@ export function MobileSettingsUsageSection({
                     </div>
                 </div>
             )}
+            {summary && <UsageHeatmap daily={daily} totalTokens={summary.total_tokens}/>}
             <div className="mobile-settings-subtitle">按模型统计</div>
             <div className="mobile-settings-usage-model-list">
                 {byModel.length === 0 ? (
