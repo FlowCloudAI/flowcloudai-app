@@ -7,6 +7,7 @@
 
 import {useEffect, useRef, useState} from 'react'
 import type {MobileEdgeBackPhase} from './useMobileSideDrawerGesture'
+import {getMobileBackSettleDurationMs} from './useMobilePagePopTransition'
 
 const FALLBACK_EVENT = 'flowcloudai:android-back-fallback'
 
@@ -33,17 +34,6 @@ function clampProgress(value: unknown): number {
     return typeof value === 'number' && Number.isFinite(value)
         ? Math.min(1, Math.max(0, value))
         : 0
-}
-
-function getSettleDuration(): number {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0
-    const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--mobile-duration-base')
-        .trim()
-    if (!value) return 220
-    const amount = Number.parseFloat(value)
-    if (!Number.isFinite(amount)) return 220
-    return value.endsWith('s') && !value.endsWith('ms') ? amount * 1000 : amount
 }
 
 export function useAndroidPredictiveBack({
@@ -89,7 +79,7 @@ export function useAndroidPredictiveBack({
                 settleTimerRef.current = null
                 done?.()
                 reset(true)
-            }, getSettleDuration())
+            }, getMobileBackSettleDurationMs())
         }
         const handleStart = (event: Event) => {
             const attempt = ++attemptRef.current

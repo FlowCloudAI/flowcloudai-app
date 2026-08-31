@@ -9,6 +9,7 @@ const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), '
 const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const transitionHostSource = readFileSync(new URL('./MobilePageTransitionHost.tsx', import.meta.url), 'utf8')
 const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
+const pagePopTransitionSource = readFileSync(new URL('./useMobilePagePopTransition.ts', import.meta.url), 'utf8')
 
 test('双层转场在空栈中只保留根页', () => {
     assert.deepEqual(getMobilePageTransitionLayers([], 'home-root'), [
@@ -44,6 +45,28 @@ test('边缘返回以 transform transitionend 完成结算并原子清理页面�
     assert.match(mobileAppSource, /onEdgeBackFinish:\s*pointerEdgeBackEnabled \? handleEdgeBackFinish/)
     assert.match(mobileAppSource, /onFinish:\s*handleEdgeBackFinish/)
     assert.doesNotMatch(mobileAppSource, /if \(activeEdgeBackPhase === 'idle'\) setEdgeBackOrigin\(null\)/)
+})
+
+test('无手势的返回也走滑出转场，顶栏按钮与三键返回和边缘手势同一个视觉', () => {
+    // 顶栏返回、三键导航返回都没有手势输入，改由定时器把同一段位移跑完再出栈。
+    assert.match(mobileAppSource, /runPagePopTransition\(\(\) => activeStack\.popWithoutAnimation\(\)\)/)
+    assert.match(mobileAppSource, /runPagePopTransition\(\(\) => stack\.popWithoutAnimation\(\)\)/)
+    // 出栈用 popWithoutAnimation：pop 会让新栈顶再叠一段 enter-pop 淡入，和滑出打架。
+    assert.doesNotMatch(mobileAppSource, /pop: \(\) => stacks\[activeTab\]\.pop\(\)/)
+    // 空栈没有可滑出的前景层，保持原来的直接调用。
+    assert.match(mobileAppSource, /if \(!stack\.canGoBack\)\s*\{\s*stack\.pop\(\)/)
+})
+
+test('滑出转场空转两帧再给终点，且动画途中不再受理返回', () => {
+    // 类名与终点位移落在同一次 commit 里时起始值就是终点值，transform 过渡不会启动。
+    assert.match(pagePopTransitionSource, /requestAnimationFrame\([\s\S]*?requestAnimationFrame\([\s\S]*?setProgress\(1\)/)
+    // 减少动态效果时直接提交，不排一次空动画。
+    assert.match(pagePopTransitionSource, /if \(duration <= 0\)\s*\{\s*commit\(\)/)
+    assert.match(pagePopTransitionSource, /if \(runningRef\.current\) return/)
+    // 提交与复位同批，旧层在这次 commit 里卸载，不会有弹回原位的中间帧。
+    assert.match(pagePopTransitionSource, /commit\(\)\s*\n\s*setProgress\(0\)\s*\n\s*setPhase\('idle'\)/)
+    // 三条返回路径合流后，handleBack 的闸门必须认合流后的相位。
+    assert.match(mobileAppSource, /const handleBack = useCallback\(\(\) => \{[\s\S]*?if \(activeEdgeBackPhase !== 'idle'\) return/)
 })
 
 test('边缘返回与侧边抽屉使用独立拖动态，返回手势不会改变整页外壳圆角', () => {

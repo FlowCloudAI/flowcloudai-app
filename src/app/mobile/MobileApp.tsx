@@ -73,6 +73,7 @@ import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 import {useMobileInputMode} from './useMobileInputMode'
 import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
+import {useMobilePagePopTransition} from './useMobilePagePopTransition'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -204,10 +205,29 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         return await beforeLeave(intent)
     }, [])
 
+    const handleEdgeBackStart = useCallback(() => {
+        setEdgeBackOrigin({
+            tab: activeTab,
+            pageKey: activeStack.currentPageKey || `${activeTab}-root`,
+        })
+    }, [activeStack.currentPageKey, activeTab])
+    const handleEdgeBackFinish = useCallback(() => {
+        setEdgeBackOrigin(null)
+    }, [])
+    /*
+     * 顶栏返回按钮与三键导航的返回键没有手势输入，此前直接 pop。
+     * 这里让它们复用边缘返回的滑出位移，两条返回路径落在同一个视觉上。
+     */
+    const {runPop: runPagePopTransition, ...pagePopTransition} = useMobilePagePopTransition({
+        onStart: handleEdgeBackStart,
+        onFinish: handleEdgeBackFinish,
+    })
+
     const commitBackTarget = useCallback(async (target: MobileBackTarget): Promise<boolean> => {
         if (target === 'page') {
             if (!activeStack.canGoBack) return false
-            activeStack.pop()
+            // 滑出播完才真正出栈；popWithoutAnimation 避免新栈顶再叠一段入场淡入。
+            runPagePopTransition(() => activeStack.popWithoutAnimation())
             return true
         }
         if (target === 'home') {
@@ -225,7 +245,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             logger.error('关闭移动端窗口失败', error)
             return false
         }
-    }, [activeStack])
+    }, [activeStack, runPagePopTransition])
 
     const confirmExit = useCallback(async (): Promise<boolean> => {
         const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
@@ -264,15 +284,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
      * 走 state 会在每次拖拽起止时重渲染整个移动端外壳，白白掉帧。
      */
     const categoryDragActiveRef = useRef(false)
-    const handleEdgeBackStart = useCallback(() => {
-        setEdgeBackOrigin({
-            tab: activeTab,
-            pageKey: activeStack.currentPageKey || `${activeTab}-root`,
-        })
-    }, [activeStack.currentPageKey, activeTab])
-    const handleEdgeBackFinish = useCallback(() => {
-        setEdgeBackOrigin(null)
-    }, [])
     const pointerEdgeBackEnabled = platformInfo.os === 'ios'
         || (platformInfo.os === 'android' && androidNavigationMode === 'buttons')
     const {
@@ -317,15 +328,19 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         onStart: handleEdgeBackStart,
         onFinish: handleEdgeBackFinish,
     })
+    // 三个来源互斥：指针边缘手势 > Android 预测式返回 > 无手势的按钮返回转场。
+    const fallbackEdgeBack = androidPredictiveBack.phase !== 'idle'
+        ? androidPredictiveBack
+        : pagePopTransition
     const activeEdgeBackPhase = edgeBackPhase !== 'idle'
         ? edgeBackPhase
-        : androidPredictiveBack.phase
+        : fallbackEdgeBack.phase
     const activeEdgeBackProgress = edgeBackPhase !== 'idle'
         ? edgeBackProgress
-        : androidPredictiveBack.progress
+        : fallbackEdgeBack.progress
     const activeEdgeBackOffset = edgeBackPhase !== 'idle'
         ? edgeBackOffset
-        : androidPredictiveBack.offset
+        : fallbackEdgeBack.offset
     /*
      * surface 自己的 transform 吸附动画结束才允许拆运动几何。只认本节点的 transform：
      * 子树里任意按钮的 transition 都会冒泡到这里，误接会让圆角提前塌回直角。
@@ -406,7 +421,15 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey' | 'startReportDiscussion' | 'startCharacterConversation'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
-        pop: () => stacks[activeTab].pop(),
+        pop: () => {
+            const stack = stacks[activeTab]
+            // 栈已空时没有可滑出的前景层，保持原样直接调用。
+            if (!stack.canGoBack) {
+                stack.pop()
+                return
+            }
+            runPagePopTransition(() => stack.popWithoutAnimation())
+        },
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
         navigateToTab: (tab: MobileTab, page?: MobilePage) => {
             void (async () => {
@@ -420,7 +443,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 }
             })()
         },
-    }), [activeTab, runLeaveGuard, stacks])
+    }), [activeTab, runLeaveGuard, runPagePopTransition, stacks])
 
     const registerReportDiscussion = useCallback((
         handler: ((params: WorldCheckDiscussionParams) => Promise<void>) | null,
@@ -550,7 +573,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [])
 
     const handleBack = useCallback(() => {
-        if (edgeBackPhase !== 'idle') return
+        // 任一路返回正在播动画都不再受理：页面栈只允许提交一次。
+        if (activeEdgeBackPhase !== 'idle') return
         // 输入期间第一次返回只收起键盘；退出输入模式后才允许关闭浮层或回退页面。
         if (dismissFocusedInput()) return
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
@@ -560,7 +584,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             return
         }
         void runBackNavigation()
-    }, [closeCategoryDrawer, dismissFocusedInput, edgeBackPhase, runBackNavigation, sideDrawerOpen])
+    }, [activeEdgeBackPhase, closeCategoryDrawer, dismissFocusedInput, runBackNavigation, sideDrawerOpen])
 
     useEffect(() => {
         const handleAndroidBackFallback = () => {
