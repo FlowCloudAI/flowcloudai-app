@@ -986,8 +986,7 @@
     gap: var(--mobile-gap-inline);
 }
 
-.mobile-settings-plugin-header-actions,
-.mobile-settings-plugin-library-actions {
+.mobile-settings-plugin-header-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1091,12 +1090,8 @@
     background: transparent;
 }
 
-.mobile-settings-plugin-library-actions {
-    margin-bottom: 0;
-}
-
+/* 插件库这一行是「搜索框 + 安装本地」，保留通用的两列（内容列 + 自适应动作列）。 */
 .mobile-settings-plugin-library-content .mobile-settings-plugin-search-row {
-    grid-template-columns: minmax(0, 1fr);
     margin-bottom: 0;
 }
 

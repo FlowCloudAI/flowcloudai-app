@@ -152,18 +152,11 @@ export function MobileSettingsPluginLibrarySection({
 
     return (
         <div className="mobile-settings-section mobile-settings-plugin-library-content">
-            {/* 刷新已上移到顶栏（见 MobileSettings 的 refreshAction），这里只剩本地安装。 */}
-            <div className="mobile-settings-plugin-library-actions">
-                <Button
-                    type="button"
-                    size="sm"
-                    radius="full"
-                    onClick={() => void onInstallFromFile()}
-                    disabled={installingLocalFile}
-                >
-                    {installingLocalFile ? '安装中…' : '安装本地插件'}
-                </Button>
-            </div>
+            {/*
+              * 搜索框与「安装本地插件」同一行：刷新已上移到顶栏后，本地安装是这页唯一的
+              * 常驻动作，单独占一行只是把列表往下推。两者高度都由 search-row 的
+              * --fc-control-height-lg 统一，不各写各的。
+              */}
             <div className="mobile-settings-plugin-search-row">
                 <Input
                     value={pluginSearch}
@@ -179,6 +172,15 @@ export function MobileSettingsPluginLibrarySection({
                     allowClear
                     className="mobile-settings-plugin-search"
                 />
+                <Button
+                    type="button"
+                    size="sm"
+                    radius="full"
+                    onClick={() => void onInstallFromFile()}
+                    disabled={installingLocalFile}
+                >
+                    {installingLocalFile ? '安装中…' : '安装本地插件'}
+                </Button>
             </div>
             <div className="mobile-settings-plugin-filter">
                 <div className="mobile-settings-plugin-filter__segments" role="group" aria-label="插件类型筛选">
