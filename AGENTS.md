@@ -220,7 +220,7 @@ app_main/
 - **2026-08-20 的双端原生键盘架构仍保持回退**：`a781f94` 撤销了 iOS/Android 共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 通用键盘布局；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。2026-08-23 重新引入的是范围更窄的 **Android-only** 路径，只服务 AI composer 与灵感正文，不恢复共享 store、不改变 Tab 位置、不写 iOS 布局。iOS 仍按未解决问题独立设计与真机验收。
 
 - **Android 键盘布局的唯一高度来源是原生 `WindowInsetsCompat.Type.ime()`**：
-  Activity 使用 `adjustResize` 兼容旧 Android/WebView 的 Insets 派发，但不缩短、不 padding、不平移 WebView；读取原始 IME 后，在传给 WebView 前把 IME 类型归零，避免新版 WebView 再次处理。动画期间只发布 `WindowInsetsAnimationCompat.Callback.onProgress` 的实际帧，禁止把 `onApplyWindowInsets` 提前到达的终点与中间帧混写，也禁止前端历史高度预测、250ms 自演过渡和整壳 transform。前端唯一落地点是 `--fc-kb`，只由 AI/灵感页通过 `--mobile-nav-reserved-height` 消费；`visualViewport` 只保留给 iOS/旧桥的输入态检测，不得写 Android 布局。
+  Activity 使用 `adjustResize` 兼容旧 Android/WebView 的 Insets 派发，但不缩短、不 padding、不平移 WebView；读取原始 IME 后，在传给 WebView 前把 IME 类型归零，避免新版 WebView 再次处理。动画期间只发布 `WindowInsetsAnimationCompat.Callback.onProgress` 的实际帧，禁止把 `onApplyWindowInsets` 提前到达的终点与中间帧混写，也禁止前端历史高度预测、250ms 自演过渡和整壳 transform。前端唯一落地点是 `--fc-kb`，页面侧只允许按同一组公式重定义 `--mobile-nav-reserved-height` 来消费它（`--mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px)`），不得另写根高度、整壳平移或高度预测——写清「怎么消费」而不是「谁在消费」：AI、灵感、词条编辑/属性/关系、项目描述都已走这条路，列名单只会过期；`visualViewport` 只保留给 iOS/旧桥的输入态检测，不得写 Android 布局。
 
   2026-08-23 真机实测（Xiaomi / Android 16 / WebView 143）还确认：
   `navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——`overlaysContent = true` 写入被接受且

@@ -1,7 +1,22 @@
+/*
+ * 整页不滚动，只有输入框自己占满剩余高度——和灵感页同一个形状。
+ *
+ * 底部预留交给外壳的 `.mobile-nav-safe-fixed` + `--mobile-nav-reserved-height`，
+ * 这里只重定义那两个变量把原生键盘遮挡量算进去，输入框是 flex 项，父级 padding 变大它自然缩短。
+ * 不写 padding 简写：`.mobile-page:not(.mobile-nav-safe-fixed)` 与 `.mobile-nav-safe-fixed`
+ * 都在管 padding-bottom，页面再写一遍就是跟它们抢特异度（词条属性页 2026-08-24 已经栽过一次）。
+ */
 .mobile-project-description {
+    --mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px);
+    --mobile-nav-reserved-height: calc(var(--mobile-nav-height) + var(--mobile-keyboard-extra));
+
     display: flex;
+    height: 100%;
+    min-height: 0;
     flex-direction: column;
-    padding: 0 var(--mobile-page-x) calc(var(--mobile-page-bottom) + var(--mobile-safe-bottom));
+    padding-inline: var(--mobile-page-x);
+    padding-top: 0;
+    overflow: hidden;
     background: var(--fc-color-bg);
 }
 
@@ -17,11 +32,12 @@
 /*
  * 输入区吃掉页面剩余高度：这是一整页只做一件事的编辑面，不需要在小框里滚。
  * 键盘遮挡由外壳统一处理（--fc-kb / --mobile-nav-reserved-height），此处不做几何补偿。
+ * min-height 必须是 0：键盘展开时外壳只剩一半高，留着下限会把输入框顶出可视区。
  */
 .mobile-project-description__input {
     flex: 1;
     width: 100%;
-    min-height: 12rem;
+    min-height: 0;
     box-sizing: border-box;
     padding: var(--mobile-gap-item);
     border: var(--mobile-border);

@@ -82,7 +82,7 @@ export default function MobileProjectDescription({pop, setBeforeLeave, params}: 
     }
 
     return (
-        <div className="mobile-page mobile-project-description">
+        <div className="mobile-page mobile-nav-safe-fixed mobile-project-description">
             <MobilePageTopBar
                 sticky
                 edgeToEdge
