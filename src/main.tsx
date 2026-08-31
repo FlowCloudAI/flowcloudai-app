@@ -3,7 +3,7 @@ import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
 import AppShell from './app/index/AppShell'
-import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
+import {type AppSettings, get_platform_info, type PlatformInfo, setting_get_settings} from './api'
 import {getAppSettingsSnapshot, subscribeAppSettings} from './features/settings/appSettingsStore'
 import {getFormFactorOverride, isDevPreviewBackendEnabled, isTauriRuntime} from './shared/devPreview'
 import {resolveDensity} from './shared/formFactor'
@@ -106,14 +106,12 @@ const initApp = async () => {
         setting_get_settings(),
         get_platform_info(),
     ])
+    let themeColorConfig: AppSettings['theme_color_config'] = null
     if (settingsResult.status === 'fulfilled' && settingsResult.value.theme) {
         initialTheme = settingsResult.value.theme
         shellAcrylicEnabled = settingsResult.value.shell_acrylic_enabled
-        const colorThemeApplied = applyPersistedThemeColorConfig(settingsResult.value.theme_color_config)
-        logger.info('[Bootstrap] 启动时应用颜色主题配置', {
-            recipeId: settingsResult.value.theme_color_config?.recipeId ?? null,
-            applied: colorThemeApplied,
-        })
+        // 先留着，等 data-fc-density 写完再应用——原因见下面应用处的注释。
+        themeColorConfig = settingsResult.value.theme_color_config
     } else if (settingsResult.status === 'rejected') {
         logger.warn('Failed to load settings, using default theme:', settingsResult.reason)
     }
@@ -157,6 +155,20 @@ const initApp = async () => {
     if (resolveDensity(platformInfo) === 'touch') {
         document.documentElement.setAttribute('data-fc-density', 'touch')
     }
+
+    /*
+     * 颜色主题覆盖必须排在 data-fc-density 之后。
+     *
+     * 覆盖 CSS 里的四个背景令牌挂在 `:not([data-fc-density="touch"])` 下（只给桌面端），
+     * 属性还没写上去的那一刻该选择器是命中的；先应用就会在移动端短暂拿到桌面底色。
+     * 当前 render 在这之后，理论上看不见，但这个顺序不该靠「后面碰巧没绘制」维持。
+     */
+    const colorThemeApplied = applyPersistedThemeColorConfig(themeColorConfig)
+    logger.info('[Bootstrap] 启动时应用颜色主题配置', {
+        recipeId: themeColorConfig?.recipeId ?? null,
+        applied: colorThemeApplied,
+        density: document.documentElement.getAttribute('data-fc-density'),
+    })
 
     createRoot(document.getElementById('root')!).render(
         <StrictMode>

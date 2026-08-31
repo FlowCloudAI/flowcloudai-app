@@ -323,23 +323,46 @@ export function createFcThemePreview(
     }
 }
 
+/**
+ * 桌面端页面底色的作用域。
+ *
+ * 配方的四个背景令牌只在桌面端生效：移动端整屏几乎只有底色，同一份配方铺满全屏后
+ * 读起来是「换了个应用」，而不是「换了套配色」；桌面端有面板分区，那点色偏才是配方本身。
+ * 用 `:not([data-fc-density="touch"])` 而不是给移动端另发一份 CSS：密度是 ThemeProvider
+ * 在运行时写/删的属性（comfortable 不写属性），选择器跟着它自动切换，不需要生成侧知道自己在哪个壳里。
+ */
+const FC_THEME_DESKTOP_SCOPE = 'html:root:not([data-fc-density="touch"])'
+
+function isBackgroundToken(item: FcThemeTokenPreview): boolean {
+    return item.group === '背景'
+}
+
 export function createFcThemeOverrideCss(
     preview: FcThemePreview,
     tokenColors?: FcThemeTokenColorValues,
 ): string {
+    const lightCssOf = (item: FcThemeTokenPreview) =>
+        tokenColors?.[item.token]?.light.css ?? item.light.css
+    const darkCssOf = (item: FcThemeTokenPreview) => (
+        item.modeInvariant
+            ? lightCssOf(item)
+            : tokenColors?.[item.token]?.dark.css ?? item.dark.css
+    )
+    const block = (selector: string, tokens: FcThemeTokenPreview[], css: (item: FcThemeTokenPreview) => string) => (
+        tokens.length === 0
+            ? []
+            : [`${selector} {`, ...tokens.map((item) => `  ${item.token}: ${css(item)} !important;`), '}', '']
+    )
+
+    const shared = preview.tokens.filter((item) => !isBackgroundToken(item))
+    const background = preview.tokens.filter(isBackgroundToken)
+
     return [
-        'html:root {',
-        ...preview.tokens.map((item) => `  ${item.token}: ${tokenColors?.[item.token]?.light.css ?? item.light.css} !important;`),
-        '}',
-        '',
-        'html:root[data-theme="dark"] {',
-        ...preview.tokens.map((item) => {
-            const lightCss = tokenColors?.[item.token]?.light.css ?? item.light.css
-            const darkCss = item.modeInvariant ? lightCss : tokenColors?.[item.token]?.dark.css ?? item.dark.css
-            return `  ${item.token}: ${darkCss} !important;`
-        }),
-        '}',
-    ].join('\n')
+        ...block('html:root', shared, lightCssOf),
+        ...block('html:root[data-theme="dark"]', shared, darkCssOf),
+        ...block(FC_THEME_DESKTOP_SCOPE, background, lightCssOf),
+        ...block(`${FC_THEME_DESKTOP_SCOPE}[data-theme="dark"]`, background, darkCssOf),
+    ].join('\n').trimEnd()
 }
 
 export function createFcThemeTokenColorValues(preview: FcThemePreview): FcThemeTokenColorValues {

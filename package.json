@@ -27,7 +27,7 @@
     "test:entry-markdown-outline": "node --experimental-strip-types ./scripts/entry-markdown-outline.test.mjs",
     "test:entry-draft-recovery": "node --experimental-strip-types ./scripts/entry-draft-recovery.test.mjs",
     "test:mobile-edge-back": "node --test --experimental-strip-types ./src/app/mobile/mobileEdgeBackGesture.test.mjs ./src/app/mobile/mobilePageTransition.test.mjs",
-    "test:mobile-shell": "node --test --experimental-strip-types ./src/app/mobile/mobileInputMode.test.mjs ./src/app/mobile/mobileAccessibility.test.mjs ./src/app/mobile/mobileTypography.test.mjs ./src/app/mobile/mobileUiBaseline.test.mjs ./src/app/mobile/mobileEntryEditor.test.mjs",
+    "test:mobile-shell": "node --test --experimental-strip-types ./src/app/mobile/mobileInputMode.test.mjs ./src/app/mobile/mobileAccessibility.test.mjs ./src/app/mobile/mobileTypography.test.mjs ./src/app/mobile/mobileUiBaseline.test.mjs ./src/app/mobile/mobileEntryEditor.test.mjs ./src/app/mobile/mobileThemeColorScope.test.mjs",
     "test:mobile-typography": "node --test ./src/app/mobile/mobileTypography.test.mjs",
     "test:desktop-window-effects": "node --test --experimental-strip-types ./src/shared/nativeShellBackdrop.test.mjs",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
