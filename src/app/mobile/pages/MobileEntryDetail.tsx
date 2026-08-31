@@ -222,6 +222,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             const index = images.findIndex(item => item.path === image.path && item.url === image.url)
             handleInsertImageMarkdown(index >= 0 ? index : images.length)
         },
+        onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
     })
 

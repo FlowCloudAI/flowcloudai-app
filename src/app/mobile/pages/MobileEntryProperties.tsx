@@ -145,6 +145,7 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         onUploadLocal: imageActions.handleUploadImages,
         onCapturePhoto: imageActions.handleCaptureImage,
         onAddAiImages: imageActions.handleAddAiImages,
+        onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
     })
 
