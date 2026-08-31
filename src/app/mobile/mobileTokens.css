@@ -171,7 +171,7 @@
      * 持续自转一圈的时长（刷新图标）。刻意由 slow 推导而不是另写一个数：
      * 下面 reduce-motion 把 slow 归零，这一档跟着归零，转圈自动停掉。
      */
-    --mobile-duration-spin: calc(var(--mobile-duration-slow) * 3);
+    --mobile-duration-spin: calc(var(--mobile-duration-slow) * 1.5);
     --mobile-ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
     --mobile-ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
