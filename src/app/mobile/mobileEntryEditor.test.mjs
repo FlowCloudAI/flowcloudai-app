@@ -23,6 +23,8 @@ const storeSource = read('./stores/mobileEntryEditDraftStore.ts')
 const detailSource = read('./pages/MobileEntryDetail.tsx')
 const imageAddSource = read('./pages/MobileEntryImageAdd.tsx')
 const wikiEditorSource = read('./pages/useMobileEntryWikiEditor.ts')
+const pagePropsSource = read('./pages/useMobilePageProps.ts')
+const coverPickerSource = read('./pages/MobileProjectCoverPicker.tsx')
 const projectHomeSource = read('./pages/MobileProjectHome.tsx')
 const entryListSource = read('./pages/MobileEntryList.tsx')
 const navGuardSource = read('../../shared/hooks/useTopLevelNavigationGuard.ts')
@@ -174,6 +176,20 @@ test('正文工具栏的图片按插入语义开加图页，mode 走页面参数
     // 图片区与灯箱仍是纯添加语义，不能顺手改成插入。
     assert.match(detailSource, /openImageAdd = useCallback\(\(\) => pushImageAdd\('add'\)/)
     assert.doesNotMatch(propertiesSource, /mode: 'insert'/)
+})
+
+test('从共享表单 Omit 出来的桥接类型必须包 RequireExplicitProps', () => {
+    // Omit 只挡显式列出的字段，剩下的可选字段打开方不传，TypeScript 一声不吭：
+    // 同一座加图/封面桥已经漏了三次（onOpenPluginManagement 两次、mode 一次），每次都只能靠真机点出来。
+    assert.match(pagePropsSource, /export type RequireExplicitProps<T> = Record<keyof T, unknown> & T/)
+    assert.match(imageAddSource, /MobileEntryImageAddBridgedProps = RequireExplicitProps<\s*Omit</)
+    assert.match(coverPickerSource, /MobileProjectCoverPickerBridgedProps = RequireExplicitProps<\s*Omit</)
+    // 不能改写成 Required / [K in keyof T]-?：那会连带把 undefined 从值类型里删掉，
+    // 逼着打开方为用不上的字段编一个假值，而「明确不要」正是要能表达的那个决定。
+    // 去掉块注释再断言——那段写法正是注释里点名不要用的反例。
+    assert.doesNotMatch(pagePropsSource.replace(/\/\*[\s\S]*?\*\//g, ''), /\[K in keyof T\]-\?/)
+    // 用不上的字段写 undefined，不是省略。
+    assert.match(propertiesSource, /onInsertImage: undefined/)
 })
 
 test('插入正文按图片对象走，不按 render 期捕获的 images 回查下标', () => {

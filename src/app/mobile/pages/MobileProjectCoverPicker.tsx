@@ -9,12 +9,13 @@ import {
     type ProjectCoverPickerFormProps,
 } from '../../../features/project-editor/components/ProjectCoverPicker/ProjectCoverPickerModal'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
-import {readProvidedMobilePageProps} from './useMobilePageProps'
+import {readProvidedMobilePageProps, type RequireExplicitProps} from './useMobilePageProps'
 import {type MobileBridgedPageParams} from '../usePageStack'
 import './MobileSubEditor.css'
 
-export type MobileProjectCoverPickerBridgedProps =
+export type MobileProjectCoverPickerBridgedProps = RequireExplicitProps<
     Omit<ProjectCoverPickerFormProps, 'open' | 'onClose' | 'onBusyChange'>
+>
 
 interface Props {
     pop: () => void

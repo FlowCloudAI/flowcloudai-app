@@ -12,7 +12,7 @@ import {
     type EntryImageAddFormProps,
 } from '../../../features/entries/components/EntryImageAddModal'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
-import {readProvidedMobilePageProps} from './useMobilePageProps'
+import {readProvidedMobilePageProps, type RequireExplicitProps} from './useMobilePageProps'
 import {type MobileEntryImageAddPageParams} from '../usePageStack'
 import './MobileSubEditor.css'
 
@@ -20,8 +20,9 @@ import './MobileSubEditor.css'
  * 外壳自己决定的部分不从桥上取。mode 也不走桥：它是打开那一刻才定的，
  * 而桥要等打开方下一次 commit 后的 effect 才刷新（见 usePageStack 的 MobileEntryImageAddPageParams）。
  */
-export type MobileEntryImageAddBridgedProps =
+export type MobileEntryImageAddBridgedProps = RequireExplicitProps<
     Omit<EntryImageAddFormProps, 'open' | 'onClose' | 'onBusyChange' | 'mode'>
+>
 
 interface Props {
     pop: () => void

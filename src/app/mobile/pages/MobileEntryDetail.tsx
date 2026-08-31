@@ -225,6 +225,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     useProvideMobilePageProps<MobileEntryImageAddBridgedProps>(imageAddPropsToken, {
         projectId,
+        // 词条页手上只有 projectId，补项目名要另订 projectDetailStore；它只进「AI 帮写提示词」的上下文。
+        projectName: undefined,
         entryTitle: title || entry?.title || null,
         entrySummary: summary || entry?.summary || null,
         entryType: entryType || entry?.type || null,

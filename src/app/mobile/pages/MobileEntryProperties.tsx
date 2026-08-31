@@ -141,6 +141,8 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
 
     useProvideMobilePageProps<MobileEntryImageAddBridgedProps>(imageAddPropsToken, {
         projectId,
+        // 同 MobileEntryDetail：属性页也拿不到项目名。
+        projectName: undefined,
         entryTitle: draft?.title || null,
         entrySummary: draft?.summary || null,
         entryType: draft?.entryType ?? null,
@@ -150,6 +152,8 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         onUploadLocal: imageActions.handleUploadImages,
         onCapturePhoto: imageActions.handleCaptureImage,
         onAddAiImages: imageActions.handleAddAiImages,
+        // 属性页的图片区是纯添加语义：这里没有正文，插入无处可去（正文工具栏走 MobileEntryDetail）。
+        onInsertImage: undefined,
         onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
     })
