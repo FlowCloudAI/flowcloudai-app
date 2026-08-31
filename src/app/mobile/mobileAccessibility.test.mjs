@@ -7,6 +7,7 @@ const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url)
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileNavSource = readFileSync(new URL('./MobileNav.tsx', import.meta.url), 'utf8')
 const mobileNavCss = readFileSync(new URL('./MobileNav.css', import.meta.url), 'utf8')
+const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
 const mobileAiComposerSource = readFileSync(new URL('./pages/MobileAiComposer.tsx', import.meta.url), 'utf8')
 const mobileAiChatUiSource = readFileSync(new URL('./pages/MobileAiChatUi.tsx', import.meta.url), 'utf8')
 const mobileAiMessageListSource = readFileSync(new URL('./pages/MobileAiMessageList.tsx', import.meta.url), 'utf8')
@@ -255,17 +256,22 @@ test('iOS 与 Android 系统栏跟随应用解析后的主题', () => {
     assert.match(iosBridge, /setNeedsStatusBarAppearanceUpdate/)
 })
 
-test('两端原生桥实现 success、warning、selection 三种触觉语义', () => {
+test('两端原生桥实现 success、warning、impact、selection 四种触觉语义', () => {
     assert.match(androidManifest, /android\.permission\.VIBRATE/)
     assert.match(androidBridge, /VibrationEffect\.EFFECT_DOUBLE_CLICK/)
     assert.match(androidBridge, /VibrationEffect\.EFFECT_HEAVY_CLICK/)
+    assert.match(androidBridge, /VibrationEffect\.EFFECT_CLICK/)
     assert.match(androidBridge, /VibrationEffect\.EFFECT_TICK/)
     assert.match(iosBridge, /UINotificationFeedbackTypeSuccess/)
     assert.match(iosBridge, /UINotificationFeedbackTypeWarning/)
+    assert.match(iosBridge, /UIImpactFeedbackStyleMedium/)
     assert.match(iosBridge, /UISelectionFeedbackGenerator/)
-    assert.match(mobileUiApi, /'success' \| 'warning' \| 'selection'/)
+    assert.match(mobileUiApi, /'success' \| 'warning' \| 'impact' \| 'selection'/)
     // 底部 Tab 不再震动：高频连点场景下触觉是噪音，不是反馈。
     assert.doesNotMatch(mobileNavSource, /mobile_haptic/)
+    // 侧栏开合到位才震，且只在状态真的翻转时（半途松手弹回不算）。
+    assert.match(sideDrawerGestureSource, /mobile_haptic\('impact'\)/)
+    assert.match(sideDrawerGestureSource, /drawerSettleHapticRef\.current = stateChanged/)
 })
 
 test('Android 按系统导航模式选择预测式返回或应用内边缘手势', () => {

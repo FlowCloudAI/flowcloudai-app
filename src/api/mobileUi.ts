@@ -5,7 +5,13 @@
  * 语义化触觉反馈与键盘遮挡快照，不感知原生 API，也不会影响桌面浏览器。
  */
 
-export type MobileHapticKind = 'success' | 'warning' | 'selection'
+/*
+ * 四种触觉语义：
+ * - success / warning 是「结果通知」，两端都用系统的通知型反馈（双段，明显）。
+ * - impact 是「界面动到位了」，比 selection 重、比 warning 轻，用于侧栏这类状态切换。
+ * - selection 最轻，用于连续选择中越过一档。
+ */
+export type MobileHapticKind = 'success' | 'warning' | 'impact' | 'selection'
 export type AndroidNavigationMode = 'buttons' | 'gesture' | 'unknown'
 
 export interface MobileKeyboardInsetSnapshot {

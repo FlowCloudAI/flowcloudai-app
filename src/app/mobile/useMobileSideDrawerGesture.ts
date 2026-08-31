@@ -9,6 +9,7 @@ import {
     useRef,
     useState,
 } from 'react'
+import {mobile_haptic} from '../../api'
 import {logger} from '../../shared/logger'
 import {
     getMobileEdgeBackCommitDistance,
@@ -257,6 +258,8 @@ export function useMobileSideDrawerGesture({
     const drawerSettleTimerRef = useRef<number | null>(null)
     const drawerSettleFrameRef = useRef<number | null>(null)
     const drawerSettlePendingRef = useRef(false)
+    /** 这一次吸附结束后是否要震一下——只有开合状态真的翻转了才置位。 */
+    const drawerSettleHapticRef = useRef(false)
     // setOpen 只在 settleDrawer 里发生，用 ref 同步一份即时值，判断这一次结算是否真的有位移。
     const openRef = useRef(false)
     const pendingDrawerVisualRef = useRef<{
@@ -315,6 +318,17 @@ export function useMobileSideDrawerGesture({
     const finishDrawerSettle = useCallback((attemptId: number) => {
         clearDrawerSettleTimers()
         drawerSettlePendingRef.current = false
+        /*
+         * 开合到位才震一次，两端都走原生 impact（Android EFFECT_CLICK / iOS medium impact）。
+         *
+         * 放在这里而不是手指抬起时：用户要的是「完成」的回执，抬手那一刻面板还在飞。
+         * 只在状态真的翻转时震——半途拖了一下又松手弹回原位也会走完整个吸附流程，
+         * 那种情况什么都没发生，震了只会让人以为误触生效了。
+         */
+        if (drawerSettleHapticRef.current) {
+            drawerSettleHapticRef.current = false
+            mobile_haptic('impact')
+        }
         // 先放开玻璃：此刻 surface 已静止、圆角还在，重建离屏通道有一整帧可用。
         setDrawerMoving(false)
         drawerSettleFrameRef.current = window.requestAnimationFrame(() => {
@@ -326,8 +340,9 @@ export function useMobileSideDrawerGesture({
         })
     }, [clearDrawerSettleTimers])
 
-    const beginDrawerSettle = useCallback(() => {
+    const beginDrawerSettle = useCallback((stateChanged: boolean) => {
         clearDrawerSettleTimers()
+        drawerSettleHapticRef.current = stateChanged
         const attemptId = drawerSettleAttemptRef.current + 1
         drawerSettleAttemptRef.current = attemptId
         drawerSettlePendingRef.current = true
@@ -448,9 +463,10 @@ export function useMobileSideDrawerGesture({
     const settleDrawer = useCallback((nextOpen: boolean) => {
         // 关闭页面时的空结算（本来就是关的、也没拖过）不该进吸附阶段，否则每次挂载都白排一次定时器。
         const hadMotion = openRef.current || nextOpen || dragRuntimeRef.current?.started === true
+        const stateChanged = openRef.current !== nextOpen
         openRef.current = nextOpen
         resetPointerTracking()
-        if (hadMotion) beginDrawerSettle()
+        if (hadMotion) beginDrawerSettle(stateChanged)
         setOpen(nextOpen)
         // 等 React 移除拖动态后再写终点，让现有 CSS transition 接管吸附动画。
         scheduleDrawerVisual(nextOpen ? width : 0)

@@ -65,6 +65,16 @@ static void FCAPerformHaptic(NSString *kind) {
         return;
     }
 
+    if ([kind isEqualToString:@"impact"]) {
+        // impact：界面动到位。medium 对应 Android 的 EFFECT_CLICK，
+        // 比 selectionChanged 明显，又不会像通知型反馈那样读成「出错了」。
+        UIImpactFeedbackGenerator *generator =
+            [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+        [generator prepare];
+        [generator impactOccurred];
+        return;
+    }
+
     UISelectionFeedbackGenerator *generator = [[UISelectionFeedbackGenerator alloc] init];
     [generator prepare];
     [generator selectionChanged];

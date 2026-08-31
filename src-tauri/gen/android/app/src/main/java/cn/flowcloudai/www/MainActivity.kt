@@ -289,6 +289,8 @@ class MainActivity : TauriActivity() {
           val effect = when (kind) {
             "success" -> VibrationEffect.EFFECT_DOUBLE_CLICK
             "warning" -> VibrationEffect.EFFECT_HEAVY_CLICK
+            // impact：界面动到位。比 TICK 明显、又不像 HEAVY_CLICK 那样像报错。
+            "impact" -> VibrationEffect.EFFECT_CLICK
             else -> VibrationEffect.EFFECT_TICK
           }
           vibrator.vibrate(VibrationEffect.createPredefined(effect))
@@ -297,6 +299,7 @@ class MainActivity : TauriActivity() {
           vibrator.vibrate(when (kind) {
             "warning" -> 35L
             "success" -> 24L
+            "impact" -> 18L
             else -> 12L
           })
         }

@@ -95,7 +95,7 @@ test('抽屉吸附阶段保留运动几何，圆角不与 transform 收尾同帧
 
 test('吸附结束靠 transitionend 加静止帧，并对丢事件与 0ms 动效兜底', () => {
     assert.match(sideDrawerGestureSource, /const \[drawerSettling, setDrawerSettling\] = useState\(false\)/)
-    assert.match(sideDrawerGestureSource, /if \(hadMotion\) beginDrawerSettle\(\)/)
+    assert.match(sideDrawerGestureSource, /if \(hadMotion\) beginDrawerSettle\(stateChanged\)/)
     // transitionend 之后再空转两帧，保证静止画面已经真正绘制过才拆几何。
     assert.match(
         sideDrawerGestureSource,
@@ -138,6 +138,6 @@ test('降级态覆盖展开态，一个开合周期只在收起端切换一次',
     // 关闭结算时 is-open 先摘、is-drawer-moving 同批补上，中间不能出现「已恢复」的空档。
     assert.match(
         sideDrawerGestureSource,
-        /if \(hadMotion\) beginDrawerSettle\(\)\n\s*setOpen\(nextOpen\)/,
+        /if \(hadMotion\) beginDrawerSettle\(stateChanged\)\n\s*setOpen\(nextOpen\)/,
     )
 })
