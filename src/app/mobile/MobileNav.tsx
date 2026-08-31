@@ -1,5 +1,4 @@
 import './MobileNav.css'
-import {mobile_haptic} from '../../api'
 
 export type MobileTab = 'home' | 'ai' | 'ideas' | 'settings'
 
@@ -64,10 +63,11 @@ export default function MobileNav({activeTab, onTabChange}: MobileNavProps) {
                     key={key}
                     className={`mobile-nav__item${activeTab === key ? ' active' : ''}`}
                     aria-current={activeTab === key ? 'page' : undefined}
-                    onClick={() => {
-                        mobile_haptic('selection')
-                        onTabChange(key)
-                    }}
+                    /*
+                     * 切 Tab 不震：Tab 是随手连点的高频操作，每次都振反而变成噪音。
+                     * 触觉留给状态真正发生变化、且没有其他反馈的场合（如侧栏开合到位）。
+                     */
+                    onClick={() => onTabChange(key)}
                 >
                     <span className="mobile-nav__icon"><TabIcon tab={key}/></span>
                     <span className="mobile-nav__label">{label}</span>

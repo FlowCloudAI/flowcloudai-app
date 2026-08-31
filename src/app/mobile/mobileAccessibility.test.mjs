@@ -264,7 +264,8 @@ test('两端原生桥实现 success、warning、selection 三种触觉语义', (
     assert.match(iosBridge, /UINotificationFeedbackTypeWarning/)
     assert.match(iosBridge, /UISelectionFeedbackGenerator/)
     assert.match(mobileUiApi, /'success' \| 'warning' \| 'selection'/)
-    assert.match(mobileNavSource, /mobile_haptic\('selection'\)/)
+    // 底部 Tab 不再震动：高频连点场景下触觉是噪音，不是反馈。
+    assert.doesNotMatch(mobileNavSource, /mobile_haptic/)
 })
 
 test('Android 按系统导航模式选择预测式返回或应用内边缘手势', () => {
