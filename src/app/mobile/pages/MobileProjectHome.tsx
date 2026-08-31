@@ -15,6 +15,7 @@ import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {useAiPluginStore} from '../../../features/ai-chat/stores/aiPluginStore'
 import {RenameDialog} from '../../../shared/ui/overlay'
 import {
     MobileAnchoredActionMenu,
@@ -136,6 +137,8 @@ export default function MobileProjectHome({
     const [coverPropsToken] = useState(() => createMobileEditorToken('projectCover'))
     const [actionError, setActionError] = useState<string | null>(null)
     const [exporting, setExporting] = useState(false)
+    // 封面页的「AI 帮写提示词」要用对话插件，来源与桌面端一致（DesktopApp 传 aiController.selectedPlugin）。
+    const {selectedPlugin: aiPluginId, selectedModel: aiModel} = useAiPluginStore()
     const projectDetail = useProjectDetailStore(projectId)
     const project = projectDetail.project
     const entryTypes = projectDetail.entryTypes
@@ -231,6 +234,8 @@ export default function MobileProjectHome({
         projectId,
         projectName: project?.name ?? null,
         currentCoverPath: project?.cover_path,
+        aiPluginId: aiPluginId || null,
+        aiModel: aiModel || null,
         onSelectCover: coverPath => handleChangeCover(coverPath),
         onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),

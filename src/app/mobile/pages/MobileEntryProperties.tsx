@@ -33,6 +33,7 @@ import {
     updateMobileEntryEditDraft,
     useMobileEntryEditDraft,
 } from '../stores/mobileEntryEditDraftStore'
+import {useAiPluginStore} from '../../../features/ai-chat/stores/aiPluginStore'
 import type {MobileEntryEditChildPageParams, MobilePage} from '../usePageStack'
 import {MobileEntryImagesSection} from './MobileEntryImagesSection'
 import type {TagValueMap} from './MobileEntryDetailUtils'
@@ -71,6 +72,8 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
     const [typeResultToken] = useState(() => createMobileEditorToken('entryProperties:type'))
     const [tagResultToken] = useState(() => createMobileEditorToken('entryProperties:tag'))
     const [imageAddPropsToken] = useState(() => createMobileEditorToken('entryProperties:imageAdd'))
+    // 加图页的「AI 帮写提示词」要用对话插件，来源与桌面端一致（DesktopApp 传 aiController.selectedPlugin）。
+    const {selectedPlugin: aiPluginId, selectedModel: aiModel} = useAiPluginStore()
 
     const openImageAdd = useCallback(() => {
         push({type: 'entryImageAdd', params: {propsToken: imageAddPropsToken, displayName: '添加图片'}})
@@ -142,6 +145,8 @@ export default function MobileEntryProperties({push, pop, navigateToTab, setBefo
         entrySummary: draft?.summary || null,
         entryType: draft?.entryType ?? null,
         existingImages: draft?.images ?? [],
+        aiPluginId: aiPluginId || null,
+        aiModel: aiModel || null,
         onUploadLocal: imageActions.handleUploadImages,
         onCapturePhoto: imageActions.handleCaptureImage,
         onAddAiImages: imageActions.handleAddAiImages,

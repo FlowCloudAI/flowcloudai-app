@@ -88,6 +88,7 @@ import {
     useMobileEntryEditDraft,
     type MobileEntryEditDraft,
 } from '../stores/mobileEntryEditDraftStore'
+import {useAiPluginStore} from '../../../features/ai-chat/stores/aiPluginStore'
 import {discardMobileEntryPlaceholder} from '../mobileEntryPlaceholder'
 import {
     mobileKeyboardInsetState,
@@ -174,6 +175,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const setImages = useCallback((next: EntryImage[] | ((current: EntryImage[]) => EntryImage[])) => {
         updateDraft(current => ({...current, images: typeof next === 'function' ? next(current.images) : next}))
     }, [updateDraft])
+    // 加图页的「AI 帮写提示词」要用对话插件，来源与桌面端一致（DesktopApp 传 aiController.selectedPlugin）。
+    const {selectedPlugin: aiPluginId, selectedModel: aiModel} = useAiPluginStore()
     /* 添加图片是独立页面（AI 提示词属输入型重操作），props 走桥。 */
     const [imageAddPropsToken] = useState(() => createMobileEditorToken('entryDetail:imageAdd'))
     const openImageAdd = useCallback(() => {
@@ -215,6 +218,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         entrySummary: summary || entry?.summary || null,
         entryType: entryType || entry?.type || null,
         existingImages: images,
+        aiPluginId: aiPluginId || null,
+        aiModel: aiModel || null,
         onUploadLocal: imageActions.handleUploadImages,
         onCapturePhoto: imageActions.handleCaptureImage,
         onAddAiImages: imageActions.handleAddAiImages,
