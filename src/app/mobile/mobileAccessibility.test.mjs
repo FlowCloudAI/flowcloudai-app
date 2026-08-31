@@ -88,7 +88,18 @@ test('键盘输入模式不再隐藏或禁用底部导航', () => {
 
 test('可读三级文字和统一 48px 命中区只覆盖 touch density', () => {
     assert.match(accessibilityCss, /:root\[data-fc-density="touch"\]/)
-    assert.match(accessibilityCss, /--fc-color-text-tertiary:\s*var\(--mobile-color-text-readable-tertiary\)/)
+    /*
+     * important 是用来压颜色主题覆盖的：那份运行时样式按 `html:root { … !important }`
+     * 写死全部 fc 令牌，不带 important 的本条会被盖掉，三级文字掉回配方的 T60/T50
+     * （真机实测浅色 3.13:1、深色 4.22:1，都低于正文 4.5:1 门槛）。
+     * 两边都 important 时按特异性决出：(0,2,0) 胜 (0,1,1)。
+     */
+    assert.match(
+        accessibilityCss,
+        /--fc-color-text-tertiary:\s*var\(--mobile-color-text-readable-tertiary\)\s*!important/,
+    )
+    // 指向次级色而不是写死的灰：换配方后三级文字仍跟着主题走，只是走到读得清的那一档。
+    assert.match(accessibilityCss, /--mobile-color-text-readable-tertiary:\s*var\(--fc-color-text-secondary\)/)
     assert.match(accessibilityCss, /::placeholder[\s\S]*opacity:\s*1/)
     assert.match(accessibilityCss, /min-inline-size:\s*var\(--fc-control-tap-min\)/)
     assert.match(accessibilityCss, /min-block-size:\s*var\(--fc-control-tap-min\)/)

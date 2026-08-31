@@ -5,9 +5,20 @@
  * 输入框内部的清除/数字步进按钮是一个组合控件，不能被公共 48px 规则强行撑开。
  */
 
+/*
+ * 三级文字在移动端一律借用次级色。
+ *
+ * `!important` 是为了压住颜色主题覆盖：那份运行时样式把全部 fc 令牌按
+ * `html:root { … !important }` 写死，不带 important 的本条会被直接盖掉，
+ * 三级文字掉回配方的 T60/T50——实测浅色 3.13:1、深色 4.22:1，两个都低于正文 4.5:1 门槛。
+ * 两边都是 important 时由特异性决出：`:root[data-fc-density="touch"]` (0,2,0)
+ * 高于 `html:root` (0,1,1)，本条赢。
+ * 注意这里保留的是「跟随次级色」这条规则本身，不是某个固定灰度值——
+ * 换了配方之后三级文字仍然跟着主题走，只是走到读得清的那一档。
+ */
 :root[data-fc-density="touch"] {
     --mobile-color-text-readable-tertiary: var(--fc-color-text-secondary);
-    --fc-color-text-tertiary: var(--mobile-color-text-readable-tertiary);
+    --fc-color-text-tertiary: var(--mobile-color-text-readable-tertiary) !important;
 }
 
 :root[data-fc-density="touch"] body :where(input, textarea)::placeholder {
