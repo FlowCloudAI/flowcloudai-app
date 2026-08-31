@@ -66,6 +66,11 @@ interface UseMobileSideDrawerGestureOptions {
      * 树跟着卸载、拖拽中断。
      */
     shouldSuppress?: () => boolean
+    /**
+     * 左边缘返回能否起手。返回 false 时手势整段不介入：不预热、不跟手、不结算。
+     * 用于挡掉「返回等于退出应用」的场景——那种确认不该由一个应用内的滑动手势发起。
+     */
+    canStartEdgeBack?: () => boolean
 }
 
 interface MobileSideDrawerDragRuntime {
@@ -221,6 +226,7 @@ export function useMobileSideDrawerGesture({
     onEdgeBackStart,
     onEdgeBackFinish,
     shouldSuppress,
+    canStartEdgeBack,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
     // 抽屉不在的页面（词条详情、世界观列表、各管理页、设置…）仍然要能边缘右划返回，
     // 所以整个手势的开关是「有抽屉」或「有返回」，不能只看 enabled。
@@ -243,6 +249,10 @@ export function useMobileSideDrawerGesture({
     useEffect(() => {
         shouldSuppressRef.current = shouldSuppress
     }, [shouldSuppress])
+    const canStartEdgeBackRef = useRef(canStartEdgeBack)
+    useEffect(() => {
+        canStartEdgeBackRef.current = canStartEdgeBack
+    }, [canStartEdgeBack])
     const suppressClickRef = useRef(false)
     const suppressClickTimerRef = useRef<number | null>(null)
     const edgeBackSettleTimerRef = useRef<number | null>(null)
@@ -490,6 +500,8 @@ export function useMobileSideDrawerGesture({
         ) return
         if (!allowTextEditingTargetGestures && isTextEditingTarget(event.target)) return
         if (isInternalGestureTarget(event.target)) return
+        // 放在便宜的坐标/目标判定之后：这个谓词每次贴边按下都会被问一次。
+        if (canStartEdgeBackRef.current?.() === false) return
         edgeBackPreparedRef.current = true
         onEdgeBackStart?.()
     }, [allowTextEditingTargetGestures, edgeBackEnabled, onEdgeBackStart, open])
@@ -564,10 +576,16 @@ export function useMobileSideDrawerGesture({
             setEdgeBackOffset(0)
             setEdgeBackProgress(0)
             setEdgeBackPhase('idle')
+            /*
+             * 这里是「这一划算不算边缘返回」的唯一判定点，谓词必须落在这儿：
+             * 下面的移动分支在 runtime.edgeBackCandidate 为真时会自己补 edgeBackPreparedRef
+             * 并调 onEdgeBackStart，只挡 preparePointerEdgeBack（按下预热）拦不住它。
+             */
             const edgeBackCandidate = Boolean(
                 !open
                 && onEdgeBackGesture
-                && startX <= MOBILE_EDGE_BACK_GESTURE_TUNING.startWidth,
+                && startX <= MOBILE_EDGE_BACK_GESTURE_TUNING.startWidth
+                && canStartEdgeBackRef.current?.() !== false,
             )
 
             // 本页没有抽屉、这一划又不是边缘返回：不归我们管，静默放过。

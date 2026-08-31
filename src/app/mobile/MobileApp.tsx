@@ -311,6 +311,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         onEdgeBackGesture: pointerEdgeBackEnabled ? commitPreparedEdgeBackNavigation : undefined,
         onEdgeBackStart: pointerEdgeBackEnabled ? handleEdgeBackStart : undefined,
         onEdgeBackFinish: pointerEdgeBackEnabled ? handleEdgeBackFinish : undefined,
+        /*
+         * 首页根部的返回目标是「退出应用」，那种确认不该由应用内的边缘滑动发起：
+         * 手一滑就弹退出框，而且确认期间页面会停在拖到一半的位置等你回答。
+         * 系统返回键仍然可以退出（带确认），那是平台约定，不动。
+         */
+        canStartEdgeBack: () => edgeBackTarget !== 'exit',
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })

@@ -58,6 +58,23 @@ test('无手势的返回也走滑出转场，顶栏按钮与三键返回和边�
     assert.match(mobileAppSource, /if \(!stack\.canGoBack\)\s*\{\s*stack\.pop\(\)/)
 })
 
+test('首页根部的边缘右划不发起退出应用，谓词落在唯一的候选判定点上', () => {
+    // 返回目标是 exit 时手势整段不介入：不预热、不跟手、不结算，也就不会弹退出确认。
+    assert.match(mobileAppSource, /canStartEdgeBack: \(\) => edgeBackTarget !== 'exit'/)
+    /*
+     * 必须落在 edgeBackCandidate 上。移动分支在 runtime.edgeBackCandidate 为真时会自己
+     * 补 edgeBackPreparedRef 并调 onEdgeBackStart——只挡按下预热那一处拦不住它，
+     * 真机上表现为退出确认没了、外壳的 is-edge-back-* 三个类照旧挂上。
+     */
+    assert.match(
+        sideDrawerGestureSource,
+        /const edgeBackCandidate = Boolean\([\s\S]*?canStartEdgeBackRef\.current\?\.\(\) !== false,\s*\)/,
+    )
+    assert.match(sideDrawerGestureSource, /if \(canStartEdgeBackRef\.current\?\.\(\) === false\) return/)
+    // 系统返回键仍可退出（带确认），那是平台约定，不能一起挡掉。
+    assert.match(mobileAppSource, /if \(target === 'exit' && !await confirmExit\(\)\) return false/)
+})
+
 test('返回滑出有 50ms 硬下限，CSS 与提交定时器读同一组 token', () => {
     // 再短整页横移就不是「退回上一页」而是跳切：位移是整个视口宽，起止之间没有中间态可看。
     assert.match(mobileTokensCss, /--mobile-duration-back-floor:\s*50ms/)
