@@ -98,8 +98,13 @@
     font-weight: var(--mobile-weight-medium);
 }
 
+/*
+ * 三条文本行的高度都写死成固定行数，卡片高度才不随内容变。
+ * 换算写成 em × 行高倍数，跟着各自字号走，不另抄绝对值。
+ */
 .mobile-home__continue-title {
     margin: 0;
+    min-height: calc(1em * var(--mobile-leading-tight));
     overflow: hidden;
     color: inherit;
     font-size: var(--mobile-text-title);
@@ -119,14 +124,24 @@
 
 .mobile-home__continue-meta {
     margin-top: 0;
+    min-height: calc(1em * var(--mobile-leading-snug));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-home__continue-desc {
     display: -webkit-box;
+    min-height: calc(2em * var(--mobile-leading-snug));
     overflow: hidden;
     font-size: var(--mobile-text-body-sm);
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+}
+
+/* 骨架只占位，不参与阅读；文字行为空，按钮禁用。 */
+.mobile-home__continue--placeholder {
+    pointer-events: none;
 }
 
 .mobile-home__continue .fc-btn {

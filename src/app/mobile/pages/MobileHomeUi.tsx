@@ -35,10 +35,33 @@ export function MobileHomeContinueCard({
             <p className="mobile-home__continue-meta">
                 {meta}{lastOpenedAt ? ` · ${formatRelativeTime(lastOpenedAt)}` : ''}
             </p>
-            {continueItem.description ? (
-                <p className="mobile-home__continue-desc">{continueItem.description}</p>
-            ) : null}
+            {/*
+              * 描述行无条件渲染，空了也留着：每一行的高度都由 CSS 的 min-height 固定，
+              * 卡片高度才恒定。有没有描述都不该改变卡片大小，更不能等数据回来再撑高。
+              */}
+            <p className="mobile-home__continue-desc">{continueItem.description ?? ''}</p>
             <Button type="button" onClick={() => onOpenTarget(continueItem)}>继续写作</Button>
+        </article>
+    )
+}
+
+/**
+ * 继续创作卡片的占位骨架。
+ *
+ * 卡片要等词条校验（db_get_entry）回来才知道该显示哪一条，真机实测这段有约 400ms；
+ * 期间整块不渲染，回来时首页内容高度从 431 跳到 653，读起来就是「突然变大」。
+ * 这里用同一套 DOM 结构先把位置占住 —— 结构相同，高度必然相同，不需要另抄一个数字；
+ * 之后只剩封面图自己淡入，布局不再动。
+ */
+export function MobileHomeContinuePlaceholder() {
+    return (
+        <article className="mobile-home__continue mobile-home__continue--placeholder" aria-hidden="true">
+            <span className="mobile-home__eyebrow">继续创作</span>
+            <h2 className="mobile-home__continue-title"/>
+            <p className="mobile-home__continue-meta"/>
+            <p className="mobile-home__continue-desc"/>
+            {/* 用真按钮而不是画一个同尺寸的方块：尺寸永远跟着组件走，disabled 不可聚焦。 */}
+            <Button type="button" disabled>继续写作</Button>
         </article>
     )
 }

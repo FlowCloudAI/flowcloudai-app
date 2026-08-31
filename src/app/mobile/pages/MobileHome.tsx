@@ -63,6 +63,7 @@ import {
     FilterImportIcon,
     formatRelativeTime,
     MobileHomeContinueCard,
+    MobileHomeContinuePlaceholder,
     renderDisplayIcon,
     WORLD_DISPLAY_OPTIONS,
     WORLD_SORT_DETAILS,
@@ -239,6 +240,24 @@ export default function MobileHome({
         }
         return visibleRecentItems.find(item => item.type === 'entry') ?? null
     }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
+
+    /*
+     * 词条目标要等 db_get_entry 校验完才敢显示（isVisibleHomeTarget），真机实测约 400ms。
+     * 这期间如果整块不渲染，回来时首页内容高度会从 431 跳到 653——就是「突然从小变大」。
+     * 只要还有没判完的 entry 候选，就先用骨架把位置占住。
+     * 已判定无效的不算：那种情况卡片本来就不该出现，占着位置只会留一块空白。
+     */
+    const continuePending = useMemo(() => {
+        if (continueItem) return false
+        const candidates = dashboard.continueItem
+            ? [dashboard.continueItem, ...dashboard.recentItems]
+            : dashboard.recentItems
+        return candidates.some(item => {
+            if (item.type !== 'entry') return false
+            const key = getHomeActivityTargetKey(item)
+            return !invalidHomeTargetKeys.has(key) && !entryByTargetKey.has(key)
+        })
+    }, [continueItem, dashboard.continueItem, dashboard.recentItems, entryByTargetKey, invalidHomeTargetKeys])
 
     const continueProject = useMemo(() => {
         if (!continueItem) return null
@@ -563,9 +582,9 @@ export default function MobileHome({
             />
 
             <main className="mobile-home__content">
-                {continueItem ? (
-                    <section aria-label="继续创作">
-                        <MobileHomeContinueCard
+                {continueItem || continuePending ? (
+                    <section aria-label="继续创作" aria-busy={!continueItem || undefined}>
+                        {!continueItem ? <MobileHomeContinuePlaceholder/> : <MobileHomeContinueCard
                             continueItem={continueItem}
                             projectName={continueProject?.name ?? continueItem.subtitle ?? null}
                             lastOpenedAt={continueLastOpenedAt}
@@ -578,7 +597,7 @@ export default function MobileHome({
                                 />
                             )}
                             onOpenTarget={openDashboardTarget}
-                        />
+                        />}
                     </section>
                 ) : null}
 
