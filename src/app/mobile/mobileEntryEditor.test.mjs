@@ -21,6 +21,8 @@ const propertiesSource = read('./pages/MobileEntryProperties.tsx')
 const relationSource = read('./pages/MobileEntryRelationEditor.tsx')
 const storeSource = read('./stores/mobileEntryEditDraftStore.ts')
 const detailSource = read('./pages/MobileEntryDetail.tsx')
+const imageAddSource = read('./pages/MobileEntryImageAdd.tsx')
+const wikiEditorSource = read('./pages/useMobileEntryWikiEditor.ts')
 const projectHomeSource = read('./pages/MobileProjectHome.tsx')
 const entryListSource = read('./pages/MobileEntryList.tsx')
 const navGuardSource = read('../../shared/hooks/useTopLevelNavigationGuard.ts')
@@ -156,6 +158,32 @@ test('移动图片浏览器使用公共全屏 Overlay 和标准顶栏，并支�
     assert.match(detailSource, /<MobileImageViewer/)
     assert.match(propertiesSource, /<MobileImageViewer/)
     assert.doesNotMatch(`${detailSource}\n${propertiesSource}`, /EntryImageLightbox/)
+})
+
+test('正文工具栏的图片按插入语义开加图页，mode 走页面参数而非 props 桥', () => {
+    // mode 是打开那一刻才定的，桥要等打开方下一次 commit 后的 effect 才刷新，
+    // 子页在同一次 commit 里就挂载读走了——放桥上永远慢一拍，只会读到上一次的 mode。
+    assert.match(stackSource, /entryImageAdd:\s*MobileEntryImageAddPageParams/)
+    assert.match(stackSource, /mode\?:\s*MobileEntryImageAddMode/)
+    assert.match(imageAddSource, /'onBusyChange' \| 'mode'>/)
+    assert.match(imageAddSource, /const mode = params\.mode \?\? 'add'/)
+    assert.match(imageAddSource, /<EntryImageAddForm \{\.\.\.bridged\} mode=\{mode\}/)
+    assert.match(detailSource, /displayName: mode === 'insert' \? '插入图片' : '添加图片'/)
+    assert.match(detailSource, /openImageInsert = useCallback\(\(\) => pushImageAdd\('insert'\)/)
+    assert.match(wikiEditorSource, /tool === 'image'\)\s*\{\s*openImageInsert\(\)/)
+    // 图片区与灯箱仍是纯添加语义，不能顺手改成插入。
+    assert.match(detailSource, /openImageAdd = useCallback\(\(\) => pushImageAdd\('add'\)/)
+    assert.doesNotMatch(propertiesSource, /mode: 'insert'/)
+})
+
+test('插入正文按图片对象走，不按 render 期捕获的 images 回查下标', () => {
+    // 加图页刚上传/生成的图不在桥上闭包捕获的 images 里，按下标回查会落到旧数组上，
+    // 结果是「添加并插入」只弹一句缺 uuid 的告警，正文什么都没写。
+    assert.match(detailSource, /onInsertImage: image => \{[\s\S]*?getMobileEntryEditDraft\(projectId, entryId\)\?\.images/)
+    assert.match(detailSource, /insertImageMarkdown\(image, index >= 0 \? index : currentImages\.length, false\)/)
+    assert.match(detailSource, /const currentContent = getMobileEntryEditDraft\(projectId, entryId\)\?\.content/)
+    // 跨页返回时不抢焦点，避免在转场途中弹起软键盘；同页灯箱仍然聚焦。
+    assert.match(detailSource, /insertImageMarkdown\(images\[targetIndex\], targetIndex, true\)/)
 })
 
 test('长正文滚动由编辑器 area 单独持有，工具栏与主图不再被重复压缩', () => {

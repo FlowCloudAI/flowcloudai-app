@@ -77,12 +77,14 @@ import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import useMobileEntryWikiEditor from './useMobileEntryWikiEditor'
 import useMobileEntryImages from './useMobileEntryImages'
 import {type MobileEntryImageAddBridgedProps} from './MobileEntryImageAdd'
+import {type MobileEntryImageAddMode} from '../usePageStack'
 import {createMobileEditorToken} from '../stores/mobileEditorHandoff'
 import {useProvideMobilePageProps} from './useMobilePageProps'
 import {formatMobileEntryUpdatedDate} from './MobileEntryDate'
 import {
     clearMobileEntryEditDraft,
     ensureMobileEntryEditDraft,
+    getMobileEntryEditDraft,
     replaceMobileEntryEditDraft,
     updateMobileEntryEditDraft,
     useMobileEntryEditDraft,
@@ -177,11 +179,20 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }, [updateDraft])
     // 加图页的「AI 帮写提示词」要用对话插件，来源与桌面端一致（DesktopApp 传 aiController.selectedPlugin）。
     const {selectedPlugin: aiPluginId, selectedModel: aiModel} = useAiPluginStore()
-    /* 添加图片是独立页面（AI 提示词属输入型重操作），props 走桥。 */
+    /* 添加图片是独立页面（AI 提示词属输入型重操作），props 走桥；mode 走页面参数（桥这一拍还没刷新）。 */
     const [imageAddPropsToken] = useState(() => createMobileEditorToken('entryDetail:imageAdd'))
-    const openImageAdd = useCallback(() => {
-        push({type: 'entryImageAdd', params: {propsToken: imageAddPropsToken, displayName: '添加图片'}})
+    const pushImageAdd = useCallback((mode: MobileEntryImageAddMode) => {
+        push({
+            type: 'entryImageAdd',
+            params: {
+                propsToken: imageAddPropsToken,
+                mode,
+                displayName: mode === 'insert' ? '插入图片' : '添加图片',
+            },
+        })
     }, [imageAddPropsToken, push])
+    const openImageAdd = useCallback(() => pushImageAdd('add'), [pushImageAdd])
+    const openImageInsert = useCallback(() => pushImageAdd('insert'), [pushImageAdd])
     const imageActions = useMobileEntryImages({projectId, images, setImages, onOpenImageAdd: openImageAdd})
 
     const {
@@ -209,7 +220,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         immersiveEditorOpen,
         inlineContentEditorRef,
         immersiveContentEditorRef,
-        openImageAdd: imageActions.openImageAdd,
+        openImageInsert,
     })
 
     useProvideMobilePageProps<MobileEntryImageAddBridgedProps>(imageAddPropsToken, {
@@ -224,8 +235,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         onCapturePhoto: imageActions.handleCaptureImage,
         onAddAiImages: imageActions.handleAddAiImages,
         onInsertImage: image => {
-            const index = images.findIndex(item => item.path === image.path && item.url === image.url)
-            handleInsertImageMarkdown(index >= 0 ? index : images.length)
+            const currentImages = getMobileEntryEditDraft(projectId, entryId)?.images ?? images
+            const index = currentImages.findIndex(item => item.path === image.path && item.url === image.url)
+            insertImageMarkdown(image, index >= 0 ? index : currentImages.length, false)
         },
         onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
@@ -627,31 +639,43 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         [categories],
     )
 
-    const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
-        const image = images[targetIndex]
+    /**
+     * 把一张图片的 Markdown 引用写进正文。
+     *
+     * 图片对象由调用方直接给出、正文从草稿 store 现取：props 桥上的 onInsertImage 是加图页挂载那一刻
+     * 的闭包，它 render 期捕获的 images 里没有刚上传/刚生成的新图，按下标回查必然落空
+     * （见 useMobilePageProps 的快照约束）。
+     * focusAfter 只给同页浮层用——跨页返回时抢焦点会在转场途中弹起软键盘。
+     */
+    const insertImageMarkdown = useCallback((image: EntryImage | undefined, indexHint: number, focusAfter: boolean) => {
         const imageRef = buildEntryImageMarkdownRef(image, projectId)
         if (!image || !imageRef) {
             void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return
         }
+        const currentContent = getMobileEntryEditDraft(projectId, entryId)?.content ?? content
         const textarea = getContentTextarea()
-        const fallbackAlt = getImageLabel(image, targetIndex) || title || entry?.title || `图片 ${targetIndex + 1}`
+        const fallbackAlt = getImageLabel(image, indexHint) || title || entry?.title || `图片 ${indexHint + 1}`
         const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
-        const start = textarea?.selectionStart ?? content.length
+        const start = textarea?.selectionStart ?? currentContent.length
         const end = textarea?.selectionEnd ?? start
-        const prefix = content.slice(0, start)
-        const suffix = content.slice(end)
+        const prefix = currentContent.slice(0, start)
+        const suffix = currentContent.slice(end)
         const before = prefix && !prefix.endsWith('\n') ? '\n\n' : ''
         const after = suffix && !suffix.startsWith('\n') ? '\n\n' : ''
-        const nextContent = `${prefix}${before}${markdown}${after}${suffix}`
+        setContent(`${prefix}${before}${markdown}${after}${suffix}`)
+        if (!focusAfter) return
         const nextCursor = prefix.length + before.length + markdown.length
-        setContent(nextContent)
         window.requestAnimationFrame(() => {
             const nextTextarea = getContentTextarea()
             nextTextarea?.focus()
             nextTextarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, entry?.title, getContentTextarea, images, projectId, setContent, showAlert, title])
+    }, [content, entry?.title, entryId, getContentTextarea, projectId, setContent, showAlert, title])
+
+    const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
+        insertImageMarkdown(images[targetIndex], targetIndex, true)
+    }, [images, insertImageMarkdown])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry && loadError) return <div className="mobile-page__error" role="alert"><span>词条加载失败：{loadError}</span><Button type="button" size="sm" variant="outline" onClick={() => void loadEntry()}>重试</Button></div>

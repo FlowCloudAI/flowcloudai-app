@@ -34,6 +34,17 @@ export interface MobileBridgedPageParams {
     displayName?: string
 }
 
+/** 加图页的两种语义：`add` 只把图片加进词条，`insert` 还要把 Markdown 引用写回正文。 */
+export type MobileEntryImageAddMode = 'add' | 'insert'
+
+export interface MobileEntryImageAddPageParams extends MobileBridgedPageParams {
+    /**
+     * mode 放页面参数、不放 props 桥：桥上的值要等打开方下一次 commit 后的 effect 才刷新，
+     * 而子页在同一次 commit 里就挂载并读走了，按入口切换 mode 只会读到上一次的值。
+     */
+    mode?: MobileEntryImageAddMode
+}
+
 export interface MobileProjectCreatorPageParams {
     displayName?: string
     /** 用于重名校验；调用方已有项目列表，避免子页再取一次。 */
@@ -72,7 +83,7 @@ export interface MobilePageParamsMap {
     entryDetail: MobileEntryDetailPageParams
     entryProperties: MobileEntryEditChildPageParams
     entryRelation: MobileEntryRelationPageParams
-    entryImageAdd: MobileBridgedPageParams
+    entryImageAdd: MobileEntryImageAddPageParams
     projectCoverPicker: MobileBridgedPageParams
     typeManager: MobileProjectScopedPageParams
     typeEditor: MobileEntryTypeEditorPageParams

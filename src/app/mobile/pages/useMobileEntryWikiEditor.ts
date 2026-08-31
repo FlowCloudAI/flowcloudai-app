@@ -40,7 +40,8 @@ interface UseMobileEntryWikiEditorOptions {
     immersiveEditorOpen: boolean
     inlineContentEditorRef: RefObject<MarkdownEditorRef | null>
     immersiveContentEditorRef: RefObject<MarkdownEditorRef | null>
-    openImageAdd: () => void
+    /** 正文工具栏的「图片」是插入语义：进加图页的 insert 模式，添加完把引用写回正文。 */
+    openImageInsert: () => void
 }
 
 export default function useMobileEntryWikiEditor({
@@ -54,7 +55,7 @@ export default function useMobileEntryWikiEditor({
     immersiveEditorOpen,
     inlineContentEditorRef,
     immersiveContentEditorRef,
-    openImageAdd,
+    openImageInsert,
 }: UseMobileEntryWikiEditorOptions) {
     const {showAlert} = useAlert()
     const wikiDraftRetainTimerRef = useRef<number | null>(null)
@@ -259,7 +260,7 @@ export default function useMobileEntryWikiEditor({
 
     const handleMarkdownTool = useCallback((tool: MobileMarkdownTool) => {
         if (tool === 'image') {
-            openImageAdd()
+            openImageInsert()
             return
         }
         const textarea = getContentTextarea()
@@ -273,7 +274,7 @@ export default function useMobileEntryWikiEditor({
             nextTextarea?.setSelectionRange(result.selectionStart, result.selectionEnd)
             syncWikiDraftFromTextarea(nextTextarea ?? null, result.value)
         })
-    }, [content, getContentTextarea, openImageAdd, setContent, syncWikiDraftFromTextarea])
+    }, [content, getContentTextarea, openImageInsert, setContent, syncWikiDraftFromTextarea])
 
     useEffect(() => {
         if (!immersiveEditorOpen) return

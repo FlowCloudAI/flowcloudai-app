@@ -13,20 +13,26 @@ import {
 } from '../../../features/entries/components/EntryImageAddModal'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {readProvidedMobilePageProps} from './useMobilePageProps'
-import {type MobileBridgedPageParams} from '../usePageStack'
+import {type MobileEntryImageAddPageParams} from '../usePageStack'
 import './MobileSubEditor.css'
 
-/** 外壳自己决定的部分不从桥上取。 */
-export type MobileEntryImageAddBridgedProps = Omit<EntryImageAddFormProps, 'open' | 'onClose' | 'onBusyChange'>
+/**
+ * 外壳自己决定的部分不从桥上取。mode 也不走桥：它是打开那一刻才定的，
+ * 而桥要等打开方下一次 commit 后的 effect 才刷新（见 usePageStack 的 MobileEntryImageAddPageParams）。
+ */
+export type MobileEntryImageAddBridgedProps =
+    Omit<EntryImageAddFormProps, 'open' | 'onClose' | 'onBusyChange' | 'mode'>
 
 interface Props {
     pop: () => void
-    params: MobileBridgedPageParams
+    params: MobileEntryImageAddPageParams
 }
 
 export default function MobileEntryImageAdd({pop, params}: Props) {
     const [busy, setBusy] = useState(false)
     const bridged = readProvidedMobilePageProps<MobileEntryImageAddBridgedProps>(params.propsToken)
+    const mode = params.mode ?? 'add'
+    const pageTitle = mode === 'insert' ? '插入图片' : '添加图片'
 
     if (!bridged) {
         return (
@@ -42,7 +48,7 @@ export default function MobileEntryImageAdd({pop, params}: Props) {
             <MobilePageTopBar
                 sticky
                 edgeToEdge
-                ariaLabel={bridged.mode === 'insert' ? '插入图片' : '添加图片'}
+                ariaLabel={pageTitle}
                 left={<MobileTopActionPill
                     actions={[{
                         key: 'back',
@@ -54,9 +60,9 @@ export default function MobileEntryImageAdd({pop, params}: Props) {
                 />}
             />
             <div className="mobile-sub-editor__heading">
-                <h2 className="mobile-page__hero-title">{bridged.mode === 'insert' ? '插入图片' : '添加图片'}</h2>
+                <h2 className="mobile-page__hero-title">{pageTitle}</h2>
             </div>
-            <EntryImageAddForm {...bridged} open onClose={pop} onBusyChange={setBusy}/>
+            <EntryImageAddForm {...bridged} mode={mode} open onClose={pop} onBusyChange={setBusy}/>
         </div>
     )
 }
