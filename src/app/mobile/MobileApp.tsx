@@ -49,6 +49,10 @@ import MobileProjectDescription from './pages/MobileProjectDescription'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileRelationGraph from './pages/MobileRelationGraph'
+import {
+    MobileRelationIndexPage,
+    MobileRelationLayoutPage,
+} from './pages/MobileRelationGraphPanels'
 import MobileSettings from './pages/MobileSettings'
 import MobileTagEditor from './pages/MobileTagEditor'
 import MobileTagManager from './pages/MobileTagManager'
@@ -645,6 +649,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 {page?.type === 'worldCheckGenerate' && <MobileWorldCheckGenerate {...layerProps} params={page.params}/>}
                 {page?.type === 'timeline' && <MobileTimeline {...layerProps} params={page.params}/>}
                 {page?.type === 'relationGraph' && <MobileRelationGraph {...layerProps} params={page.params}/>}
+                {page?.type === 'relationIndex' && <MobileRelationIndexPage {...layerProps} params={page.params}/>}
+                {page?.type === 'relationLayout' && <MobileRelationLayoutPage {...layerProps} params={page.params}/>}
             </>
         )
     }, [createLayerPageProps, openCategoryDrawer, sideDrawerOpen])

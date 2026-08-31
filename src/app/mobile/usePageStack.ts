@@ -83,6 +83,8 @@ export interface MobilePageParamsMap {
     worldCheckGenerate: MobileWorldCheckGeneratePageParams
     timeline: MobileProjectScopedPageParams
     relationGraph: MobileProjectScopedPageParams
+    relationIndex: MobileBridgedPageParams
+    relationLayout: MobileBridgedPageParams
     settingsStorage: undefined
     settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined

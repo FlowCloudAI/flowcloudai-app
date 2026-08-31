@@ -34,50 +34,65 @@
     flex: 1;
 }
 
-.mobile-relation-graph-page .project-relation-graph > .fc-op-header {
-    justify-content: flex-end;
-    padding: var(--mobile-gap-inline);
-    background: var(--fc-color-bg);
-}
-
-.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-op-header__title-block {
-    display: none;
-}
-
-.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-op-header__actions {
-    width: 100%;
-    justify-content: flex-end;
-}
-
-.mobile-relation-graph-page .project-relation-graph > .fc-op-header .fc-button {
-    min-height: var(--mobile-tap-min);
-}
-
 .mobile-relation-graph-page .project-relation-graph .fc-op-viewport {
     margin: 0;
 }
 
-.mobile-relation-graph-page__sheet-title {
-    margin: 0 0 var(--mobile-gap-item);
-    color: var(--fc-color-text);
-    font-size: var(--mobile-text-body);
-    font-weight: var(--mobile-weight-strong);
+/*
+ * 关系索引 / 布局参数两个子页：本身不持有内容，只提供撑满高度的承接容器，
+ * 内容由仍挂在下层的 ProjectRelationGraph portal 过来。
+ */
+.mobile-relation-graph-panel {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-.mobile-relation-graph-page__relations-host {
-    height: min(28rem, 48dvh);
+.mobile-relation-graph-panel__heading {
+    padding: 0 var(--mobile-page-x);
+}
+
+.mobile-relation-graph-panel__desc {
+    margin: 0 0 var(--mobile-gap-item);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
+}
+
+.mobile-relation-graph-panel__host {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    margin: 0 var(--mobile-page-x) var(--mobile-gap-item);
     overflow: hidden;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--fc-color-bg);
 }
 
-.mobile-relation-graph-page__relations-host .rg-sidebar__relation {
+.mobile-relation-graph-panel__host .rg-sidebar__relation {
     min-height: 3.25rem;
 }
 
-.mobile-relation-graph-page__sheet {
-    overflow: hidden;
+/* portal 进来的两块内容都要跟着容器撑满，并各自内部滚动。 */
+.mobile-relation-graph-panel__host > * {
+    min-height: 0;
+    flex: 1;
+}
+
+.mobile-relation-graph-panel--layout .mobile-relation-graph-panel__host {
+    display: block;
+    overflow-y: auto;
+    padding: var(--mobile-gap-item);
+}
+
+.mobile-relation-graph-panel--layout .rg-layout-dialog__footer {
+    position: sticky;
+    bottom: 0;
+    padding-top: var(--mobile-gap-item);
+    background: var(--fc-color-bg);
 }
 
 @media (max-width: 720px) {
@@ -94,8 +109,4 @@
         height: var(--mobile-tap-min);
     }
 
-    .mobile-relation-graph-page .rg-layout-dialog {
-        width: calc(100vw - 1.5rem);
-        max-height: calc(100dvh - 1.5rem);
-    }
 }

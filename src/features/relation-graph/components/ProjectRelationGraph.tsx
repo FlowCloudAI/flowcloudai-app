@@ -31,6 +31,15 @@ import './ProjectRelationGraph.css'
 interface ProjectRelationGraphProps {
     projectId: string
     sidebarContainer?: HTMLElement | null
+    /*
+     * 移动端把「布局参数」搬到了独立页面：给了容器就把面板正文 portal 过去，
+     * 不再自己弹 FloatingPanel（重操作不进浮层，见移动端页面约定）。
+     */
+    layoutContainer?: HTMLElement | null
+    /** 移动端在自己的顶栏里放这些动作，组件不再画一遍标题栏。 */
+    hideHeader?: boolean
+    /** 布局参数在独立页面时，「取消 / 应用」要把那一页关掉。 */
+    onLayoutClose?: () => void
     onRelationSelect?: (relationId: string) => void
 }
 
@@ -350,6 +359,9 @@ function parsePersistedLayoutConfig(raw: string | null): PersistedLayoutConfig |
 export default function ProjectRelationGraph({
     projectId,
     sidebarContainer,
+    layoutContainer,
+    hideHeader = false,
+    onLayoutClose,
     onRelationSelect,
 }: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
@@ -481,6 +493,7 @@ export default function ProjectRelationGraph({
         setLayoutState(INITIAL_LAYOUT_STATE)
         setGraphKey((prev) => prev + 1)
         setLayoutPanelOpen(false)
+        onLayoutClose?.()
 
         // 持久化到项目级设置（失败不阻塞布局）。
         const persisted: PersistedLayoutConfig = {
@@ -495,7 +508,7 @@ export default function ProjectRelationGraph({
         ).catch(() => {
             // 忽略持久化错误，避免影响交互。
         })
-    }, [advancedLayoutParams, layoutLooseness, layoutParamMode, projectId])
+    }, [advancedLayoutParams, layoutLooseness, layoutParamMode, onLayoutClose, projectId])
 
     const nodeTitleById = useMemo(() => {
         const map = new Map<string, string>()
@@ -548,109 +561,17 @@ export default function ProjectRelationGraph({
         )
     }, [entryTypeByKey])
 
-    const relationSidebar = (
-        <div className="rg-sidebar">
-            <div className="rg-sidebar__stats">
-                <div className="rg-sidebar__stat">
-                    <span>词条</span>
-                    <strong>{nodes.length}</strong>
-                </div>
-                <div className="rg-sidebar__stat">
-                    <span>关系</span>
-                    <strong>{edges.length}</strong>
-                </div>
-            </div>
-            <div className="rg-sidebar__section">
-                <div className="rg-sidebar__section-title">已有关系</div>
-                <div className="rg-sidebar__list">
-                    {edges.length === 0 ? (
-                        <div className="rg-sidebar__empty">暂无关系</div>
-                    ) : (
-                        edges.map((edge) => (
-                            <button
-                                key={edge.id}
-                                type="button"
-                                className={`rg-sidebar__relation${edge.id === selectedEdgeId ? ' is-selected' : ''}`}
-                                aria-pressed={edge.id === selectedEdgeId}
-                                onClick={() => {
-                                    setSelectedEdgeId(edge.id)
-                                    onRelationSelect?.(edge.id)
-                                }}
-                            >
-                                <div className="rg-sidebar__relation-main">
-                                    <span title={nodeTitleById.get(edge.source) ?? edge.source}>
-                                        {nodeTitleById.get(edge.source) ?? edge.source}
-                                    </span>
-                                    <span className="rg-sidebar__relation-arrow">→</span>
-                                    <span title={nodeTitleById.get(edge.target) ?? edge.target}>
-                                        {nodeTitleById.get(edge.target) ?? edge.target}
-                                    </span>
-                                </div>
-                                <div className="rg-sidebar__relation-label" title={edge.label}>
-                                    {edge.label || edge.kind}
-                                </div>
-                            </button>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>
-    )
+    /*
+     * 布局参数正文单独拿出来：桌面仍旧塞进 FloatingPanel，移动端 portal 到独立页面。
+     * 两条路径共用同一份表单，避免各写一套控件之后参数慢慢对不上。
+     */
+    const closeLayoutPanel = useCallback(() => {
+        setLayoutPanelOpen(false)
+        onLayoutClose?.()
+    }, [onLayoutClose])
 
-    return (
-        <div className="project-relation-graph fc-op-panel">
-            {sidebarContainer ? createPortal(relationSidebar, sidebarContainer) : null}
-
-            {/* ── 顶部 ── */}
-            <div className="fc-op-header">
-                <div className="fc-op-header__title-block">
-                    <h2 className="fc-op-header__title">关系图谱</h2>
-                </div>
-                <div className="fc-op-header__actions">
-                    <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(true)}>
-                        布局参数
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
-                        {dataLoading ? '刷新中' : '刷新'}
-                    </Button>
-                </div>
-            </div>
-
-            {/* ── 工具栏（状态） ── */}
-            {statusItems.length > 0 && (
-                <div className="fc-op-toolbar">
-                    {statusItems.map((item, index) => (
-                        <span
-                            key={index}
-                            className={`fc-op-status${dataError || layoutState.layoutError ? ' fc-op-status--error' : ''}`}
-                        >
-                            {item}
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            {/* ── 错误提示 ── */}
-            {dataError && (
-                <div className="fc-status-banner fc-status-banner--error">
-                    数据加载失败：{dataError.message}
-                </div>
-            )}
-
-            {layoutState.layoutError && (
-                <div className="fc-status-banner fc-status-banner--error">
-                    布局失败：{layoutState.layoutError.message}
-                </div>
-            )}
-
-            {layoutPanelOpen && (
-                <FloatingPanel
-            open
-            onClose={() => setLayoutPanelOpen(false)}
-            title="布局参数"
-            className="rg-layout-dialog"
-            ariaLabel="布局参数"
-        >
+    const layoutPanelBody = (
+        <>
             <div className="rg-layout-dialog__body">
                         <ButtonGroup className="rg-layout-mode">
                             <Button
@@ -724,15 +645,128 @@ export default function ProjectRelationGraph({
                         <Button type="button" size="sm" radius="full" variant="outline" onClick={handleResetLayoutParams}>
                             恢复默认
                         </Button>
-                        <Button type="button" size="sm" radius="full" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
+                        <Button type="button" size="sm" radius="full" variant="outline" onClick={closeLayoutPanel}>
                             取消
                         </Button>
                         <Button type="button" size="sm" radius="full" onClick={handleApplyLayoutParams}>
                             应用并重新布局
                         </Button>
                     </ButtonToolbar>
-                </FloatingPanel>
+        </>
+    )
+
+    const layoutPanel = layoutContainer
+        ? createPortal(layoutPanelBody, layoutContainer)
+        : layoutPanelOpen && (
+            <FloatingPanel
+                open
+                onClose={closeLayoutPanel}
+                title="布局参数"
+                className="rg-layout-dialog"
+                ariaLabel="布局参数"
+            >
+                {layoutPanelBody}
+            </FloatingPanel>
+        )
+
+    const relationSidebar = (
+        <div className="rg-sidebar">
+            <div className="rg-sidebar__stats">
+                <div className="rg-sidebar__stat">
+                    <span>词条</span>
+                    <strong>{nodes.length}</strong>
+                </div>
+                <div className="rg-sidebar__stat">
+                    <span>关系</span>
+                    <strong>{edges.length}</strong>
+                </div>
+            </div>
+            <div className="rg-sidebar__section">
+                <div className="rg-sidebar__section-title">已有关系</div>
+                <div className="rg-sidebar__list">
+                    {edges.length === 0 ? (
+                        <div className="rg-sidebar__empty">暂无关系</div>
+                    ) : (
+                        edges.map((edge) => (
+                            <button
+                                key={edge.id}
+                                type="button"
+                                className={`rg-sidebar__relation${edge.id === selectedEdgeId ? ' is-selected' : ''}`}
+                                aria-pressed={edge.id === selectedEdgeId}
+                                onClick={() => {
+                                    setSelectedEdgeId(edge.id)
+                                    onRelationSelect?.(edge.id)
+                                }}
+                            >
+                                <div className="rg-sidebar__relation-main">
+                                    <span title={nodeTitleById.get(edge.source) ?? edge.source}>
+                                        {nodeTitleById.get(edge.source) ?? edge.source}
+                                    </span>
+                                    <span className="rg-sidebar__relation-arrow">→</span>
+                                    <span title={nodeTitleById.get(edge.target) ?? edge.target}>
+                                        {nodeTitleById.get(edge.target) ?? edge.target}
+                                    </span>
+                                </div>
+                                <div className="rg-sidebar__relation-label" title={edge.label}>
+                                    {edge.label || edge.kind}
+                                </div>
+                            </button>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+
+    return (
+        <div className="project-relation-graph fc-op-panel">
+            {sidebarContainer ? createPortal(relationSidebar, sidebarContainer) : null}
+
+            {/* ── 顶部 ── */}
+            {!hideHeader && (
+                <div className="fc-op-header">
+                    <div className="fc-op-header__title-block">
+                        <h2 className="fc-op-header__title">关系图谱</h2>
+                    </div>
+                    <div className="fc-op-header__actions">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(true)}>
+                            布局参数
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
+                            {dataLoading ? '刷新中' : '刷新'}
+                        </Button>
+                    </div>
+                </div>
             )}
+
+            {/* ── 工具栏（状态） ── */}
+            {statusItems.length > 0 && (
+                <div className="fc-op-toolbar">
+                    {statusItems.map((item, index) => (
+                        <span
+                            key={index}
+                            className={`fc-op-status${dataError || layoutState.layoutError ? ' fc-op-status--error' : ''}`}
+                        >
+                            {item}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {/* ── 错误提示 ── */}
+            {dataError && (
+                <div className="fc-status-banner fc-status-banner--error">
+                    数据加载失败：{dataError.message}
+                </div>
+            )}
+
+            {layoutState.layoutError && (
+                <div className="fc-status-banner fc-status-banner--error">
+                    布局失败：{layoutState.layoutError.message}
+                </div>
+            )}
+
+            {layoutPanel}
 
             {/* ── 视口 ── */}
             <div className="fc-op-viewport">
