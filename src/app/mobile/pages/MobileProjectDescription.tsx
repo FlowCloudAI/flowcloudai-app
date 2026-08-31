@@ -7,7 +7,7 @@
  */
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
-import {Button, useAlert} from 'flowcloudai-ui'
+import {useAlert} from 'flowcloudai-ui'
 import {db_update_project, formatApiError, toApiError} from '../../../api'
 import {patchProjectDetail, useProjectDetailStore} from '../../../features/projects/projectDetailStore'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
@@ -96,17 +96,17 @@ export default function MobileProjectDescription({pop, setBeforeLeave, params}: 
                         onClick: () => void handleBack(),
                     }]}
                 />}
-                right={(
-                    <Button
-                        type="button"
-                        size="sm"
-                        radius="full"
-                        disabled={saving || !dirty}
-                        onClick={() => void handleSave()}
-                    >
-                        {saving ? '保存中…' : '保存'}
-                    </Button>
-                )}
+                right={<MobileTopActionPill
+                    actions={[{
+                        key: 'save',
+                        label: saving ? '保存中' : '保存项目描述',
+                        icon: <span className="mobile-top-action-pill__text">{saving ? '保存中…' : '保存'}</span>,
+                        kind: 'text',
+                        // 无改动也禁用：这一页只有保存一个出口，亮着会让人以为没存上。
+                        disabled: saving || !dirty,
+                        onClick: () => void handleSave(),
+                    }]}
+                />}
             />
 
             <div className="mobile-project-description__heading">
