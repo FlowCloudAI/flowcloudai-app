@@ -535,11 +535,15 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
      * 各页只提供「在忙吗 / 刷什么」，图标、忙碌态与自转都由公共的
      * createMobileRefreshAction 给，避免每页各画一个刷新按钮。
      */
+    /*
+     * 只有插件库给刷新按钮：它拉的是远端插件清单，会过期。
+     * 已安装插件和用量统计都是本地数据，且只在应用自己动过之后才会变
+     * （装卸插件走 pluginCatalogStore 自动刷新，用量在进页面时加载），
+     * 摆一颗刷新按钮既不解决问题也在暗示这两处会不同步。
+     */
     const refreshPill = section === 'pluginLibrary'
         ? <MobileTopRefreshPill busy={pluginSourcesRefreshing} onRefresh={() => void refreshPluginInstallSources()}/>
-        : section === 'usage'
-            ? <MobileTopRefreshPill busy={usageLoading} onRefresh={() => void loadUsageStats()}/>
-            : null
+        : null
     const topBar = (
         <MobilePageTopBar
             sticky
@@ -616,11 +620,9 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
             {section === 'plugins' && (
                 <MobileSettingsPluginsSection
                     localPluginCount={localPlugins.length}
-                    pluginSourcesRefreshing={pluginSourcesRefreshing}
                     localPluginError={localPluginError}
                     localPlugins={sortedLocalPlugins}
                     uninstallingPluginId={uninstallingPluginId}
-                    onRefreshPluginSources={refreshPluginInstallSources}
                     onUninstallPlugin={handleUninstallPlugin}
                     onOpenApiKeys={pluginId => {
                         setSelectedApiKeyPlugin(pluginId)

@@ -30,11 +30,9 @@ interface MenuSectionProps {
 
 interface PluginsSectionProps {
     localPluginCount: number
-    pluginSourcesRefreshing: boolean
     localPluginError: string | null
     localPlugins: LocalPluginInfo[]
     uninstallingPluginId: string | null
-    onRefreshPluginSources: () => void | Promise<void>
     onUninstallPlugin: (pluginId: string) => void | Promise<void>
     /** 打开访问密钥页，同时把该插件设为待配置对象。 */
     onOpenApiKeys: (pluginId: string) => void
@@ -172,11 +170,9 @@ export function MobileSettingsMenuSection({
 
 export function MobileSettingsPluginsSection({
     localPluginCount,
-    pluginSourcesRefreshing,
     localPluginError,
     localPlugins,
     uninstallingPluginId,
-    onRefreshPluginSources,
     onUninstallPlugin,
     onOpenApiKeys,
     onOpenPluginLibrary,
@@ -206,18 +202,9 @@ export function MobileSettingsPluginsSection({
                     <div className="mobile-settings-plugin-count">已安装 {localPluginCount} 个</div>
                 </div>
                 <div className="mobile-settings-plugin-header-actions">
+                    {/* 已安装列表只在应用自己装卸插件后变化，那条路径自带刷新，不再放刷新按钮。 */}
                     <Button type="button" size="sm" radius="full" onClick={onOpenPluginLibrary}>
                         安装插件
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        radius="full"
-                        onClick={() => void onRefreshPluginSources()}
-                        disabled={pluginSourcesRefreshing}
-                    >
-                        {pluginSourcesRefreshing ? '刷新中…' : '刷新'}
                     </Button>
                 </div>
             </div>
