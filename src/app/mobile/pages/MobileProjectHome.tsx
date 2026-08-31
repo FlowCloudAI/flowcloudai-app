@@ -232,6 +232,7 @@ export default function MobileProjectHome({
         projectName: project?.name ?? null,
         currentCoverPath: project?.cover_path,
         onSelectCover: coverPath => handleChangeCover(coverPath),
+        onOpenPluginManagement: () => navigateToTab('settings', {type: 'settingsPlugins'}),
         onOpenAiSettings: pluginId => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}}),
     })
 
