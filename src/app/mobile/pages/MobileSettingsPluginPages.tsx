@@ -154,8 +154,8 @@ export function MobileSettingsPluginLibrarySection({
         <div className="mobile-settings-section mobile-settings-plugin-library-content">
             {/*
               * 搜索框与「安装本地插件」同一行：刷新已上移到顶栏后，本地安装是这页唯一的
-              * 常驻动作，单独占一行只是把列表往下推。两者高度都由 search-row 的
-              * --fc-control-height-lg 统一，不各写各的。
+              * 常驻动作，单独占一行只是把列表往下推。
+              * 行高由按钮的胶囊高度定，搜索框跟随（见 MobileSettings.css 的 search-row）。
               */}
             <div className="mobile-settings-plugin-search-row">
                 <Input
@@ -168,7 +168,7 @@ export function MobileSettingsPluginLibrarySection({
                     placeholder="搜索插件…"
                     prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>}
                     radius="full"
-                    size="lg"
+                    size="sm"
                     allowClear
                     className="mobile-settings-plugin-search"
                 />

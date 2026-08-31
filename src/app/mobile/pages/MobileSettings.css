@@ -197,10 +197,16 @@
     white-space: nowrap;
 }
 
+/*
+ * 行高由同排那颗胶囊按钮定，搜索框跟着它——不是反过来把按钮撑到 48。
+ * 按钮走本文件下面的 capsule 规则，高度是 padding + 行盒算出来的（真机 37px），
+ * 不是任何一档 --fc-control-height-*；所以这里用 stretch + height: 100% 让搜索框
+ * 去跟随，而不是把那个数字抄一份到 CSS 里——抄一份就等着 lib_ui 改 padding 时错位。
+ */
 .mobile-settings-plugin-search-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
+    align-items: stretch;
     gap: var(--mobile-gap-inline);
     margin-bottom: var(--mobile-gap-item);
 }
@@ -210,7 +216,8 @@
 }
 
 .mobile-settings-plugin-search .fc-input__wrapper {
-    height: var(--fc-control-height-lg);
+    height: 100%;
+    min-height: 0;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: var(--mobile-surface-translucent);
@@ -218,12 +225,8 @@
 }
 
 .mobile-settings-plugin-search .fc-input__field {
-    font-size: var(--mobile-text-body);
+    font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-medium);
-}
-
-.mobile-settings-plugin-search-row .fc-btn {
-    height: var(--fc-control-height-lg);
 }
 
 .mobile-settings-plugin-filter {
