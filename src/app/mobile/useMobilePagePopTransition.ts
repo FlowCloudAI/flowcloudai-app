@@ -13,19 +13,29 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import type {MobileEdgeBackPhase} from './useMobileSideDrawerGesture'
 
+/** 取一个时间 token 的毫秒值；读不到或读不动就用兜底值。 */
+function readTimeTokenMs(name: string, fallback: number): number {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    if (!value) return fallback
+    const amount = Number.parseFloat(value)
+    if (!Number.isFinite(amount)) return fallback
+    return value.endsWith('s') && !value.endsWith('ms') ? amount * 1000 : amount
+}
+
 /**
- * 返回结算时长，取自 `--mobile-duration-base`；系统开启减少动态效果时为 0。
- * 调用方据此决定是走转场还是直接提交。
+ * 返回结算时长：`--mobile-duration-base` 与下限 `--mobile-duration-back-floor` 取大。
+ * 系统开启减少动态效果时直接为 0，调用方据此跳过转场立即提交。
+ *
+ * 这里的 max 必须与 `--mobile-duration-back`（MobileApp.css 的过渡时长）算同一个数：
+ * 定时器比 CSS 短会在动画没走完时就出栈，比 CSS 长会让旧页停在屏幕右缘干等。
+ * 两边都只依赖那两个 token，所以不会各自漂。
  */
 export function getMobileBackSettleDurationMs(): number {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0
-    const value = getComputedStyle(document.documentElement)
-        .getPropertyValue('--mobile-duration-base')
-        .trim()
-    if (!value) return 220
-    const amount = Number.parseFloat(value)
-    if (!Number.isFinite(amount)) return 220
-    return value.endsWith('s') && !value.endsWith('ms') ? amount * 1000 : amount
+    return Math.max(
+        readTimeTokenMs('--mobile-duration-back-floor', 50),
+        readTimeTokenMs('--mobile-duration-base', 220),
+    )
 }
 
 interface UseMobilePagePopTransitionOptions {

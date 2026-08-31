@@ -10,6 +10,7 @@ const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url)
 const transitionHostSource = readFileSync(new URL('./MobilePageTransitionHost.tsx', import.meta.url), 'utf8')
 const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
 const pagePopTransitionSource = readFileSync(new URL('./useMobilePagePopTransition.ts', import.meta.url), 'utf8')
+const mobileTokensCss = readFileSync(new URL('./mobileTokens.css', import.meta.url), 'utf8')
 
 test('双层转场在空栈中只保留根页', () => {
     assert.deepEqual(getMobilePageTransitionLayers([], 'home-root'), [
@@ -55,6 +56,30 @@ test('无手势的返回也走滑出转场，顶栏按钮与三键返回和边�
     assert.doesNotMatch(mobileAppSource, /pop: \(\) => stacks\[activeTab\]\.pop\(\)/)
     // 空栈没有可滑出的前景层，保持原来的直接调用。
     assert.match(mobileAppSource, /if \(!stack\.canGoBack\)\s*\{\s*stack\.pop\(\)/)
+})
+
+test('返回滑出有 50ms 硬下限，CSS 与提交定时器读同一组 token', () => {
+    // 再短整页横移就不是「退回上一页」而是跳切：位移是整个视口宽，起止之间没有中间态可看。
+    assert.match(mobileTokensCss, /--mobile-duration-back-floor:\s*50ms/)
+    assert.match(
+        mobileTokensCss,
+        /--mobile-duration-back:\s*max\(var\(--mobile-duration-back-floor\), var\(--mobile-duration-base\)\)/,
+    )
+    // 减少动态效果要把下限一起归零，否则 max\(\) 会把归零后的 base 抬回 50ms。
+    assert.match(
+        mobileTokensCss,
+        /@media \(prefers-reduced-motion: reduce\)[\s\S]*?--mobile-duration-back-floor:\s*0ms/,
+    )
+    assert.match(
+        mobileAppCss,
+        /\.mobile-page-transition-host__layer\.is-edge-back-foreground[\s\S]*?transition:\s*transform var\(--mobile-duration-back\)/,
+    )
+    /*
+     * 定时器与 CSS 必须算出同一个数：短了会在动画没走完时就出栈，
+     * 长了会让旧页停在屏幕右缘干等。两边都只依赖这两个 token，所以不会各自漂。
+     */
+    assert.match(pagePopTransitionSource, /Math\.max\(\s*readTimeTokenMs\('--mobile-duration-back-floor', 50\),\s*readTimeTokenMs\('--mobile-duration-base', 220\),\s*\)/)
+    assert.match(pagePopTransitionSource, /prefers-reduced-motion: reduce\)'\)\.matches\) return 0/)
 })
 
 test('滑出转场空转两帧再给终点，且动画途中不再受理返回', () => {

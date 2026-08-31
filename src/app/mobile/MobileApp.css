@@ -299,7 +299,7 @@ html[data-mobile-keyboard-owner='ios'] :is(.fc-overlay--floating, .fc-overlay--s
     border-left: var(--mobile-border);
     box-shadow: none;
     transform: translate3d(var(--mobile-edge-back-shift, 0), 0, 0);
-    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
+    transition: transform var(--mobile-duration-back) var(--mobile-ease-standard);
 }
 
 .mobile-app-side-drawer-shell.is-edge-back-direct .mobile-page-transition-host__layer.is-edge-back-foreground,
