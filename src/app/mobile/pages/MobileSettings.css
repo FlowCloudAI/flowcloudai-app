@@ -118,6 +118,16 @@
     font-size: var(--mobile-text-body-sm);
 }
 
+/*
+ * 勾选框紧跟文字，而不是被推到行尾。
+ * 只有一个短标签时，把勾选框甩到屏幕另一头会让人先扫过一段空白才找到它，
+ * 也读不出这两者是一组。整行仍然可点——命中区由 label 元素本身撑开。
+ */
+.mobile-settings-switch-field--inline {
+    justify-content: flex-start;
+    gap: var(--mobile-gap-inline);
+}
+
 .mobile-settings-switch-field input {
     width: 1.15rem;
     height: 1.15rem;

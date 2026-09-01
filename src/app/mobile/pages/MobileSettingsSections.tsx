@@ -393,7 +393,7 @@ export function MobileSettingsAppearanceSection({
                         )}
                     </div>
                 </div>
-                <label className="mobile-settings-switch-field">
+                <label className="mobile-settings-switch-field mobile-settings-switch-field--inline">
                     <span>毛玻璃效果</span>
                     <input
                         type="checkbox"
