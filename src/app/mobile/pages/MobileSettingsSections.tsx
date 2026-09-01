@@ -1,5 +1,5 @@
 import {type CSSProperties, useEffect, useLayoutEffect, useRef, useState} from 'react'
-import {Button, Select, Slider} from 'flowcloudai-ui'
+import {Button, ButtonGroup, Select, Slider} from 'flowcloudai-ui'
 import {
     type ApiUsageByModel,
     type ApiUsageDaily,
@@ -359,20 +359,6 @@ export function MobileSettingsAppearanceSection({
         <div className="mobile-settings-section">
             <div className="mobile-settings-form-stack">
                 <div>
-                    <div className="mobile-settings-field-label">主题</div>
-                    <Select
-                        value={theme}
-                        onValueChange={v => onThemeChange(String(v ?? 'system') as 'system' | 'light' | 'dark')}
-                        options={themeOptions}
-                        placeholder="选择主题"
-                        radius="full"
-                    />
-                </div>
-                <MobileThemeColorSection
-                    value={themeColorConfig}
-                    onChange={onThemeColorConfigChange}
-                />
-                <div>
                     <div className="mobile-settings-field-label">语言</div>
                     <Select
                         value={language}
@@ -414,6 +400,31 @@ export function MobileSettingsAppearanceSection({
                         onChange={event => onGlassEffectChange(event.currentTarget.checked)}
                     />
                 </label>
+                {/*
+                  * 明暗主题与颜色主题放在最后：上面几项是「怎么排版」，这两项是「什么颜色」，
+                  * 而颜色改动会让整页当场重绘——摆在顶部会把用户正在读的内容顶走。
+                  */}
+                <div>
+                    <div className="mobile-settings-field-label">主题</div>
+                    <ButtonGroup className="mobile-theme-mode__group">
+                        {themeOptions.map(option => (
+                            <Button
+                                key={option.value}
+                                type="button"
+                                size="sm"
+                                variant={option.value === theme ? 'primary' : 'outline'}
+                                aria-pressed={option.value === theme}
+                                onClick={() => onThemeChange(option.value as 'system' | 'light' | 'dark')}
+                            >
+                                {option.label}
+                            </Button>
+                        ))}
+                    </ButtonGroup>
+                </div>
+                <MobileThemeColorSection
+                    value={themeColorConfig}
+                    onChange={onThemeColorConfigChange}
+                />
             </div>
         </div>
     )

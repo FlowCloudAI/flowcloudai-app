@@ -57,7 +57,8 @@ test('配方选中态由设置值推导，不在组件里另存一份', () => {
     // 本地再存一份就要写双向同步 effect，桌面端那段正是最难读的部分。
     assert.doesNotMatch(sectionSource, /useState/)
     assert.match(sectionSource, /resolveThemeColorState\(value, defaultRecipe, defaultValues\)/)
-    assert.match(sectionSource, /aria-pressed=\{recipe\.id === state\.recipeId\}/)
+    assert.match(sectionSource, /const active = recipe\.id === state\.recipeId/)
+    assert.match(sectionSource, /aria-pressed=\{active\}/)
 })
 
 test('覆盖不随设置页卸载而清除', () => {

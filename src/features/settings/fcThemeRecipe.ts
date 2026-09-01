@@ -180,17 +180,6 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         lightProfile: 'warm',
     },
     {
-        id: 'hupo',
-        label: '琥珀',
-        description: '更干净的橙金琥珀。',
-        primarySeed: '#C66A3A',
-        primarySurfaceChroma: 6,
-        neutralSeed: '#F8F1E9',
-        neutralChroma: 3,
-        neutralVariantChroma: 8,
-        lightProfile: 'soft',
-    },
-    {
         id: 'monlan',
         label: '墨蓝',
         description: '更专注的深蓝灰底色。',

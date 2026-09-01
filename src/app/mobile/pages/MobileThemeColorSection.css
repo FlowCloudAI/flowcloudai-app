@@ -1,8 +1,9 @@
 /*
  * 颜色主题配方卡片。
  *
- * 卡片自身的配色走通用 token，只有色点用配方的主色种子（由行内
- * --mobile-theme-color-seed 传入）——那是唯一必须来自数据的颜色。
+ * 版式跟着桌面端的预设卡走：名称行在上、整条色带在下。卡片自身的配色全部走通用
+ * token，只有色带的三格用配方算出的颜色（由行内 --mobile-theme-color-swatch 传入），
+ * 那是唯一必须来自数据的颜色。
  */
 
 .mobile-theme-color {
@@ -18,38 +19,32 @@
 }
 
 .mobile-theme-color__card {
-    position: relative;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: var(--mobile-gap-inline);
     padding: var(--mobile-pad-control);
-    /* 勾选标记绝对定位在右上，给它留出不与文字重叠的通道。 */
-    padding-inline-end: calc(var(--mobile-pad-control) + var(--mobile-gap-item));
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
     background: var(--mobile-surface-muted);
     color: var(--fc-color-text);
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-medium);
     text-align: start;
     transition:
         border-color var(--mobile-duration-fast) var(--mobile-ease-standard),
         background-color var(--mobile-duration-fast) var(--mobile-ease-standard);
 }
 
-.mobile-theme-color__card[aria-pressed="true"] {
+.mobile-theme-color__card--active {
     border-color: var(--fc-color-primary);
     background: var(--fc-color-primary-subtle);
 }
 
-.mobile-theme-color__dot {
-    flex: none;
-    inline-size: var(--mobile-gap-group);
-    block-size: var(--mobile-gap-group);
-    border-radius: var(--mobile-radius-card);
-    /* 浅色配方（如流云）在浅色底上几乎看不见边界，补一圈描边而不是加深色点本身。 */
-    border: var(--mobile-border);
-    background: var(--mobile-theme-color-seed);
+.mobile-theme-color__header {
+    display: flex;
+    align-items: center;
+    gap: var(--mobile-gap-text);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-theme-color__name {
@@ -70,16 +65,26 @@
 }
 
 .mobile-theme-color__check {
-    position: absolute;
-    inset-block-start: var(--mobile-gap-text);
-    inset-inline-end: var(--mobile-gap-text);
+    flex: none;
+    margin-inline-start: auto;
     color: var(--fc-color-primary);
     font-size: var(--mobile-text-meta);
-    opacity: 0;
 }
 
-.mobile-theme-color__card[aria-pressed="true"] .mobile-theme-color__check {
-    opacity: 1;
+.mobile-theme-color__swatches {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    /* 三格拼成一条连续色带，缝隙交给圆角与描边表达，不留 gap。 */
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-cell);
+    /* 浅色配方在浅色底上边界几乎看不见，靠这圈描边兜住，而不是加深色块本身。
+       用 border 而不是 inset box-shadow：移动端只登记了 raised / floating 两档阴影。 */
+    overflow: hidden;
+}
+
+.mobile-theme-color__swatch {
+    block-size: var(--mobile-gap-group);
+    background: var(--mobile-theme-color-swatch);
 }
 
 .mobile-theme-color__hint {
@@ -87,6 +92,17 @@
     color: var(--fc-color-text-secondary);
     font-size: var(--mobile-text-meta);
     line-height: var(--mobile-leading-snug);
+}
+
+/* 明暗主题三选一：撑满整行、三等分，而不是内容宽度的一小段。 */
+.mobile-theme-mode__group {
+    display: flex;
+    inline-size: 100%;
+}
+
+.mobile-theme-mode__group .fc-btn {
+    flex: 1;
+    min-inline-size: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
