@@ -190,6 +190,22 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         neutralVariantChroma: 9,
         lightProfile: 'soft',
     },
+    /*
+     * 中性种子与彩度由 generateFcThemeCustomValues 从主色推出，但 primarySurfaceChroma
+     * 与 neutralVariantChroma 从生成的 13 / 16 压到 12：那是现有配方的上限（晚霞），
+     * 不压的话绛梅会成为全套里边框最艳的一个，和「中性色跟着配方走但不喧宾夺主」相悖。
+     */
+    {
+        id: 'jiangmei',
+        label: '绛梅',
+        description: '清冷梅红，适合梳理人物关系。',
+        primarySeed: '#C24A78',
+        primarySurfaceChroma: 12,
+        neutralSeed: '#FFF4F5',
+        neutralChroma: 6,
+        neutralVariantChroma: 12,
+        lightProfile: 'soft',
+    },
 ]
 
 const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
