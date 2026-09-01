@@ -15,7 +15,7 @@ import {readFileSync} from 'node:fs'
 import test from 'node:test'
 import {URL} from 'node:url'
 
-const recipeSource = readFileSync(new URL('../../pages/settings/fcThemeRecipe.ts', import.meta.url), 'utf8')
+const recipeSource = readFileSync(new URL('../../features/settings/fcThemeRecipe.ts', import.meta.url), 'utf8')
 const bootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url), 'utf8')
 
 test('背景令牌只写进排除 touch density 的作用域', () => {

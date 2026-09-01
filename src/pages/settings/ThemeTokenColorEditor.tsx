@@ -2,8 +2,8 @@ import {useState} from 'react'
 import {
     type FcThemeTokenColorValues,
     type FcThemeTokenPreview,
-} from './fcThemeRecipe'
-import {normalizeHexColor} from './materialThemePreview'
+} from '../../features/settings/fcThemeRecipe'
+import {normalizeHexColor} from '../../features/settings/materialThemePreview'
 
 export type TokenColorMode = 'light' | 'dark' | 'both'
 

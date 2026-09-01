@@ -1,5 +1,5 @@
 import type {CSSProperties} from 'react'
-import type {FcThemeTokenPreview} from './fcThemeRecipe'
+import type {FcThemeTokenPreview} from '../../features/settings/fcThemeRecipe'
 import './FcPrimaryToneGuide.css'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
