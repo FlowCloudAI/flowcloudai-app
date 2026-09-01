@@ -1,0 +1,80 @@
+/*
+ * 明暗主题三选一。
+ *
+ * 三个按钮各自独立（不是连成一条的分段控件）：每个都带一张缩略图，连在一起会让
+ * 相邻两张图的边界糊成一片，看不出是三个候选项。
+ * 缩略图内部的配色写在 SVG 里——那是「候选项长什么样」，不能跟着当前主题走。
+ */
+
+.mobile-theme-mode {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-theme-mode__row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-theme-mode__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--mobile-gap-text);
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-normal);
+}
+
+.mobile-theme-mode__item--active {
+    color: var(--fc-color-primary);
+    font-weight: var(--mobile-weight-medium);
+}
+
+/*
+ * 描边画在预览外层而不是 SVG 上：选中时要加粗到 2px，画在 SVG 上会往内吃掉一圈
+ * 缩略图内容，三个按钮的图形尺寸就对不齐了。
+ */
+.mobile-theme-mode__preview {
+    display: block;
+    inline-size: 100%;
+    overflow: hidden;
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-cell);
+    transition: border-color var(--mobile-duration-fast) var(--mobile-ease-standard);
+}
+
+.mobile-theme-mode__item--active .mobile-theme-mode__preview {
+    border-color: var(--fc-color-primary);
+    box-shadow: var(--mobile-elevation-raised);
+}
+
+.mobile-theme-mode__svg {
+    display: block;
+    inline-size: 100%;
+    /* 缩略图按 64:44 的比例走，高度跟着列宽变，三列始终等高。 */
+    aspect-ratio: 64 / 44;
+}
+
+.mobile-theme-mode__split {
+    stroke: var(--fc-color-text-tertiary);
+    stroke-width: 1;
+}
+
+.mobile-theme-mode__label {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-theme-mode__preview {
+        transition: none;
+    }
+}

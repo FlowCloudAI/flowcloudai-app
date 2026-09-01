@@ -94,17 +94,6 @@
     line-height: var(--mobile-leading-snug);
 }
 
-/* 明暗主题三选一：撑满整行、三等分，而不是内容宽度的一小段。 */
-.mobile-theme-mode__group {
-    display: flex;
-    inline-size: 100%;
-}
-
-.mobile-theme-mode__group .fc-btn {
-    flex: 1;
-    min-inline-size: 0;
-}
-
 @media (prefers-reduced-motion: reduce) {
     .mobile-theme-color__card {
         transition: none;

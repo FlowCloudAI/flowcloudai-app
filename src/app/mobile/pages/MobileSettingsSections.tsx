@@ -1,5 +1,5 @@
 import {type CSSProperties, useEffect, useLayoutEffect, useRef, useState} from 'react'
-import {Button, ButtonGroup, Select, Slider} from 'flowcloudai-ui'
+import {Button, Select, Slider} from 'flowcloudai-ui'
 import {
     type ApiUsageByModel,
     type ApiUsageDaily,
@@ -17,6 +17,7 @@ import MobilePagination from '../components/MobilePagination'
 import {type MobileSettingsPageType} from '../usePageStack'
 import MobilePluginIcon from './MobilePluginIcon'
 import MobileThemeColorSection from './MobileThemeColorSection'
+import MobileThemeModeSection from './MobileThemeModeSection'
 import {getPluginKindLabel} from './mobilePluginLabels'
 
 
@@ -404,23 +405,11 @@ export function MobileSettingsAppearanceSection({
                   * 明暗主题与颜色主题放在最后：上面几项是「怎么排版」，这两项是「什么颜色」，
                   * 而颜色改动会让整页当场重绘——摆在顶部会把用户正在读的内容顶走。
                   */}
-                <div>
-                    <div className="mobile-settings-field-label">主题</div>
-                    <ButtonGroup className="mobile-theme-mode__group">
-                        {themeOptions.map(option => (
-                            <Button
-                                key={option.value}
-                                type="button"
-                                size="sm"
-                                variant={option.value === theme ? 'primary' : 'outline'}
-                                aria-pressed={option.value === theme}
-                                onClick={() => onThemeChange(option.value as 'system' | 'light' | 'dark')}
-                            >
-                                {option.label}
-                            </Button>
-                        ))}
-                    </ButtonGroup>
-                </div>
+                <MobileThemeModeSection
+                    value={theme}
+                    options={themeOptions}
+                    onChange={onThemeChange}
+                />
                 <MobileThemeColorSection
                     value={themeColorConfig}
                     onChange={onThemeColorConfigChange}
