@@ -17,6 +17,8 @@ import {URL} from 'node:url'
 
 const recipeSource = readFileSync(new URL('../../features/settings/fcThemeRecipe.ts', import.meta.url), 'utf8')
 const bootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url), 'utf8')
+const sectionSource = readFileSync(new URL('./pages/MobileThemeColorSection.tsx', import.meta.url), 'utf8')
+const appearanceSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
 
 test('背景令牌只写进排除 touch density 的作用域', () => {
     // 用 :not() 而不是给移动端另发一份 CSS：密度是 ThemeProvider 运行时写/删的属性。
@@ -41,4 +43,38 @@ test('启动时先写密度再应用颜色主题', () => {
     assert.ok(densityIndex > 0, '未找到密度写入')
     assert.ok(applyIndex > 0, '未找到颜色主题应用')
     assert.ok(densityIndex < applyIndex, '颜色主题必须在 data-fc-density 之后应用')
+})
+
+test('外观设置里的颜色主题只做配方切换', () => {
+    // 逐令牌编辑没有迁过来：46 个取色输入排不下，且系统取色器只有 8 个固定色块。
+    assert.doesNotMatch(sectionSource, /type="color"/)
+    assert.doesNotMatch(sectionSource, /type="file"/)
+    assert.doesNotMatch(sectionSource, /saveFileDialog|openFileDialog|setting_export_theme_config/)
+    assert.match(sectionSource, /FC_THEME_RECIPES\.map\(recipe =>/)
+})
+
+test('配方选中态由设置值推导，不在组件里另存一份', () => {
+    // 本地再存一份就要写双向同步 effect，桌面端那段正是最难读的部分。
+    assert.doesNotMatch(sectionSource, /useState/)
+    assert.match(sectionSource, /resolveThemeColorState\(value, defaultRecipe, defaultValues\)/)
+    assert.match(sectionSource, /aria-pressed=\{recipe\.id === state\.recipeId\}/)
+})
+
+test('覆盖不随设置页卸载而清除', () => {
+    /*
+     * 覆盖是文档级 <style>，离开设置页仍要留着；effect 里一旦 return 清理函数，
+     * 切走 Tab 颜色就会掉回默认。清除只发生在选回默认配方那一条分支。
+     */
+    const effect = sectionSource.slice(
+        sectionSource.indexOf('useEffect(() => {'),
+        sectionSource.indexOf('const selectRecipe'),
+    )
+    assert.match(effect, /clearFcThemeTokenOverride\(\)/)
+    assert.match(effect, /applyFcThemeTokenOverride\(preview, state\.tokenColors\)/)
+    assert.doesNotMatch(effect, /return \(\) =>/)
+})
+
+test('颜色主题挂在外观分区里', () => {
+    assert.match(appearanceSource, /<MobileThemeColorSection\s+value=\{themeColorConfig\}/)
+    assert.match(appearanceSource, /onChange=\{onThemeColorConfigChange\}/)
 })

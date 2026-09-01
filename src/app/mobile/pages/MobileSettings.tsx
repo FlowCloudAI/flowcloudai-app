@@ -674,11 +674,13 @@ export default function MobileSettings({push, pop, page, platformOs}: Props) {
                 <MobileSettingsAppearanceSection
                     theme={theme}
                     themeOptions={themeOptions}
+                    themeColorConfig={settings?.theme_color_config ?? null}
                     language={settings?.language ?? 'zh-CN'}
                     languageOptions={languageOptions}
                     editorFontSize={settings?.editor_font_size ?? 14}
                     glassEffectEnabled={settings?.shell_acrylic_enabled ?? true}
                     onThemeChange={handleThemeChange}
+                    onThemeColorConfigChange={theme_color_config => updateSettingsDraft({theme_color_config})}
                     onLanguageChange={language => updateSettingsDraft({language})}
                     onEditorFontSizeChange={fontSize => updateSettingsDraft({editor_font_size: clampEditorFontSize(fontSize)})}
                     onGlassEffectChange={enabled => updateSettingsDraft({shell_acrylic_enabled: enabled})}

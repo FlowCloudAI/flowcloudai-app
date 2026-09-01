@@ -1,0 +1,96 @@
+/*
+ * 颜色主题配方卡片。
+ *
+ * 卡片自身的配色走通用 token，只有色点用配方的主色种子（由行内
+ * --mobile-theme-color-seed 传入）——那是唯一必须来自数据的颜色。
+ */
+
+.mobile-theme-color {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-theme-color__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--mobile-gap-inline);
+}
+
+.mobile-theme-color__card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--mobile-gap-inline);
+    padding: var(--mobile-pad-control);
+    /* 勾选标记绝对定位在右上，给它留出不与文字重叠的通道。 */
+    padding-inline-end: calc(var(--mobile-pad-control) + var(--mobile-gap-item));
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted);
+    color: var(--fc-color-text);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
+    text-align: start;
+    transition:
+        border-color var(--mobile-duration-fast) var(--mobile-ease-standard),
+        background-color var(--mobile-duration-fast) var(--mobile-ease-standard);
+}
+
+.mobile-theme-color__card[aria-pressed="true"] {
+    border-color: var(--fc-color-primary);
+    background: var(--fc-color-primary-subtle);
+}
+
+.mobile-theme-color__dot {
+    flex: none;
+    inline-size: var(--mobile-gap-group);
+    block-size: var(--mobile-gap-group);
+    border-radius: var(--mobile-radius-card);
+    /* 浅色配方（如流云）在浅色底上几乎看不见边界，补一圈描边而不是加深色点本身。 */
+    border: var(--mobile-border);
+    background: var(--mobile-theme-color-seed);
+}
+
+.mobile-theme-color__name {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-theme-color__badge {
+    flex: none;
+    padding-inline: var(--mobile-gap-text);
+    border-radius: var(--mobile-radius-cell);
+    background: var(--fc-color-bg-tertiary);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    font-weight: var(--mobile-weight-normal);
+}
+
+.mobile-theme-color__check {
+    position: absolute;
+    inset-block-start: var(--mobile-gap-text);
+    inset-inline-end: var(--mobile-gap-text);
+    color: var(--fc-color-primary);
+    font-size: var(--mobile-text-meta);
+    opacity: 0;
+}
+
+.mobile-theme-color__card[aria-pressed="true"] .mobile-theme-color__check {
+    opacity: 1;
+}
+
+.mobile-theme-color__hint {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--mobile-text-meta);
+    line-height: var(--mobile-leading-snug);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-theme-color__card {
+        transition: none;
+    }
+}

@@ -12,9 +12,11 @@ import {
     buildUsageMonthLabels,
     USAGE_ACTIVITY_COLUMNS,
 } from '../../../features/settings/usageActivity'
+import type {ThemeColorConfig} from '../../../api'
 import MobilePagination from '../components/MobilePagination'
 import {type MobileSettingsPageType} from '../usePageStack'
 import MobilePluginIcon from './MobilePluginIcon'
+import MobileThemeColorSection from './MobileThemeColorSection'
 import {getPluginKindLabel} from './mobilePluginLabels'
 
 
@@ -48,11 +50,13 @@ interface PluginsSectionProps {
 interface AppearanceSectionProps {
     theme: string
     themeOptions: SelectOption[]
+    themeColorConfig: ThemeColorConfig | null
     language: string
     languageOptions: SelectOption[]
     editorFontSize: number
     glassEffectEnabled: boolean
     onThemeChange: (value: 'system' | 'light' | 'dark') => void
+    onThemeColorConfigChange: (config: ThemeColorConfig | null) => void
     onLanguageChange: (value: string) => void
     onEditorFontSizeChange: (value: number) => void
     onGlassEffectChange: (value: boolean) => void
@@ -340,11 +344,13 @@ export function MobileSettingsPluginsSection({
 export function MobileSettingsAppearanceSection({
     theme,
     themeOptions,
+    themeColorConfig,
     language,
     languageOptions,
     editorFontSize,
     glassEffectEnabled,
     onThemeChange,
+    onThemeColorConfigChange,
     onLanguageChange,
     onEditorFontSizeChange,
     onGlassEffectChange,
@@ -362,6 +368,10 @@ export function MobileSettingsAppearanceSection({
                         radius="full"
                     />
                 </div>
+                <MobileThemeColorSection
+                    value={themeColorConfig}
+                    onChange={onThemeColorConfigChange}
+                />
                 <div>
                     <div className="mobile-settings-field-label">语言</div>
                     <Select
