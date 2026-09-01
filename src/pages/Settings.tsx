@@ -20,6 +20,7 @@ import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '../api/events'
 import AboutSection, {FeedbackSection} from '../features/about/AboutSection'
 import UpdateSection from '../features/about/UpdateSection'
+import ThemeModePreview from '../shared/ui/ThemeModePreview'
 import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
     ai_get_usage_by_model,
@@ -2291,9 +2292,13 @@ export default function Settings({
                                                 key={option.value}
                                                 type="button"
                                                 className={`settings-theme-button${settings.theme === option.value ? ' active' : ''}`}
+                                                aria-pressed={settings.theme === option.value}
                                                 onClick={() => handleThemeChange(option.value)}
                                             >
-                                                {option.label}
+                                                <span className="settings-theme-button__preview">
+                                                    <ThemeModePreview mode={String(option.value)}/>
+                                                </span>
+                                                <span className="settings-theme-button__label">{option.label}</span>
                                             </button>
                                         ))}
                                     </div>

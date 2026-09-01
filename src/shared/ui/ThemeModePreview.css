@@ -1,0 +1,16 @@
+/*
+ * 缩略图自身的尺寸与那条斜线，双端共用。
+ * 外框、选中态、标签排布留给各壳的样式，这里只保证图形本身两端一致。
+ */
+
+.fc-theme-mode-preview {
+    display: block;
+    inline-size: 100%;
+    /* 按 64:32 走，高度跟着容器宽度变，同一行的几张始终等高。 */
+    aspect-ratio: 64 / 32;
+}
+
+.fc-theme-mode-preview__split {
+    stroke: var(--fc-color-text-tertiary);
+    stroke-width: 1;
+}

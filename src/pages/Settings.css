@@ -235,27 +235,68 @@
   min-width: 0;
 }
 
+/*
+ * 每项是「缩略图 + 名称」，与移动端同一套图形（shared/ui/ThemeModePreview）。
+ * 用 flex: 0 1 而不是 flex: 1：面板宽的时候不该把三张图拉成通栏，
+ * 窄的时候仍然可以一起收缩。
+ */
 .settings-theme-button {
-  flex: 1;
+  display: flex;
+  flex: 0 1 10rem;
   min-width: 0;
-  padding: 0.55rem 0.85rem;
-  border: 1px solid var(--fc-color-border);
-  border-radius: var(--fc-radius-md);
-  background: var(--fc-color-bg);
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
   color: var(--fc-color-text-secondary);
   font: inherit;
+  font-size: var(--fc-font-size-sm);
   cursor: pointer;
 }
 
+/*
+ * 描边画在预览外层而不是 SVG 上：选中时描边要变色加重，画在 SVG 上会往内吃掉
+ * 一圈缩略图内容，三张图的图形尺寸就对不齐了。
+ */
+.settings-theme-button__preview {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-md);
+  transition: border-color var(--fc-transition);
+}
+
+.settings-theme-button__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-theme-button:hover {
-  border-color: var(--fc-color-primary);
   color: var(--fc-color-primary);
 }
 
+.settings-theme-button:hover .settings-theme-button__preview {
+  border-color: var(--fc-color-border-hover);
+}
+
 .settings-theme-button.active {
+  color: var(--fc-color-primary);
+}
+
+.settings-theme-button.active .settings-theme-button__preview {
   border-color: var(--fc-color-primary);
-  background: var(--fc-color-primary);
-  color: var(--fc-color-text-on-primary);
+  box-shadow: 0 0 0 1px var(--fc-color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-theme-button__preview {
+    transition: none;
+  }
 }
 
 .settings-label {
