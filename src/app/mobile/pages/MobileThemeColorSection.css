@@ -22,8 +22,8 @@
     position: relative;
     /* 名称层是绝对定位的，卡片自身不再排版任何在流内容。 */
     display: block;
-    /* 比题图的 2:1 略宽，多出来的部分留给右侧名称。375px 视口下约 167×70。 */
-    aspect-ratio: 12 / 5;
+    /* 比题图的 2:1 更宽，多出来的部分留给右侧名称。375px 视口下约 167×60。 */
+    aspect-ratio: 14 / 5;
     padding: 0;
     overflow: hidden;
     border: var(--mobile-border);
@@ -110,7 +110,9 @@
     font-family: "FC XuanZongTi", var(--fc-font-family);
     font-size: var(--mobile-text-title);
     font-weight: var(--mobile-weight-normal);
-    transform: translate(0, 0);
+    /* 以右缘为原点缩放：放大只往左长，右边距在两个状态下都是同一个值。 */
+    transform-origin: right center;
+    transform: translate(0, 0) scale(1);
     transition:
         transform var(--mobile-duration-base) var(--mobile-ease-standard),
         font-size var(--mobile-duration-base) var(--mobile-ease-standard),
@@ -128,8 +130,13 @@
  * 真值由组件从配方自己的令牌里取，见 MobileThemeColorSection.tsx。
  */
 .mobile-theme-color__card--active .mobile-theme-color__name {
+    /*
+     * 字号已经顶到排版阶梯的最后一档，再大只能靠缩放——移动端只有五档正文字号，
+     * 为一处装饰性放大新开第六档不值当，`--mobile-decorative-mark-size` 又是 76px
+     * 的引号尺寸。缩放和位移写在同一条 transform 里，两者同一条过渡一起走完。
+     */
     font-size: var(--mobile-text-display);
-    transform: translate(calc(-1 * var(--mobile-gap-inline)), var(--mobile-gap-inline));
+    transform: translate(calc(-1 * var(--mobile-gap-inline)), var(--mobile-gap-inline)) scale(1.18);
     color: color-mix(
         in srgb,
         var(--mobile-theme-color-accent, var(--fc-color-primary)) 85%,

@@ -147,7 +147,7 @@ test('配方名的选中态是放大、变色与位移，且三者都有过渡',
     assert.ok(base && active, `没解析到字号：base=${base} active=${active}`)
     assert.notEqual(base, active, '选中态字号必须比常态大一档')
     assert.match(activeRule, /color: color-mix\([\s\S]*--mobile-theme-color-accent/)
-    assert.match(activeRule, /transform: translate\(calc\(-1 \* var\(--mobile-gap-inline\)\), var\(--mobile-gap-inline\)\);/)
+    assert.match(activeRule, /transform: translate\(calc\(-1 \* var\(--mobile-gap-inline\)\), var\(--mobile-gap-inline\)\) scale\(/)
 
     // 放大、位移、变色三条过渡缺一条动画就断一截。
     for (const property of ['transform', 'font-size', 'color']) {
