@@ -34,12 +34,16 @@
     background-image: var(--mobile-theme-color-art);
     background-repeat: no-repeat;
     /*
-     * cover 而不是 auto 100%：两列时卡片只有 167px，题图按原比例满高要占掉 140px，
-     * 右边剩 27px 写不下名字。cover 让题图铺满整张卡，上下各裁掉约 7px——
-     * 素材的主体在画面中段，这个幅度切不到它。
-     * 铺满之后遮罩收的始终是题图本身，不存在「遮罩盖在纯色上」的接缝问题。
+     * auto 100%：高度锁定卡片高度，宽度按 2:1 自然铺开（约卡宽的 83%），不做任何裁切。
+     * 靠左对齐，右侧多出来的一截由渐变收进 tint。
+     *
+     * 不用 cover：cover 按卡片宽度缩放，会把素材上下各裁掉 8.3%。这里宁可让题图
+     * 小一号也不裁——素材是完整构图，裁掉的是它自己留的呼吸空间。
+     *
+     * 题图右缘（83%）落在遮罩收口（50%）之后，那一段是纯色 tint 盖在题图上；
+     * 再往右是纯色 tint 盖在同色底上。两段颜色相同，交界处看不出来。
      */
-    background-size: cover;
+    background-size: auto 100%;
     background-position: left center;
     color: var(--mobile-theme-color-ink, var(--fc-color-text));
     transition:
