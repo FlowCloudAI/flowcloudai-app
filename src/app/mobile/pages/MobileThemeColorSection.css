@@ -108,11 +108,19 @@
     max-inline-size: 100%;
 }
 
+/*
+ * 配方名用玄宗体（手写体）。回落到正文字体而不是 sans：万一将来加的配方名
+ * 用到子集外的字，回落字形至少和周围文字同一族，不会突兀成另一种黑体。
+ * 手写体的视觉重心偏小，字号与字重都往上提一档才和右侧徽章配得起来。
+ */
 .mobile-theme-color__name {
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: "FC XuanZongTi", var(--fc-font-family);
+    font-size: var(--mobile-text-body);
+    font-weight: var(--mobile-weight-normal);
 }
 
 .mobile-theme-color__badge {

@@ -19,6 +19,8 @@ const recipeSource = readFileSync(new URL('../../features/settings/fcThemeRecipe
 const bootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url), 'utf8')
 const sectionSource = readFileSync(new URL('./pages/MobileThemeColorSection.tsx', import.meta.url), 'utf8')
 const appearanceSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
+const sectionCss = readFileSync(new URL('./pages/MobileThemeColorSection.css', import.meta.url), 'utf8')
+const fontsCss = readFileSync(new URL('../../assets/fonts/fonts.css', import.meta.url), 'utf8')
 
 test('桌面端专属令牌只写进排除 touch density 的作用域', () => {
     // 用 :not() 而不是给移动端另发一份 CSS：密度是 ThemeProvider 运行时写/删的属性。
@@ -90,4 +92,25 @@ test('覆盖不随设置页卸载而清除', () => {
 test('颜色主题挂在外观分区里', () => {
     assert.match(appearanceSource, /<MobileThemeColorSection\s+value=\{themeColorConfig\}/)
     assert.match(appearanceSource, /onChange=\{onThemeColorConfigChange\}/)
+})
+
+test('配方名用的字全在玄宗体子集里', () => {
+    /*
+     * 玄宗体原始 otf 38.6 MB，内嵌的是只含配方名那 12 个字的 27 KB 子集。
+     * 新增配方时若名称用到集外的字，浏览器会静默回落到正文字体——只有这条断言看得见。
+     * 修法是重新跑一次子集（把新字加进 --text）并同步 fonts.css 注释里的字表。
+     */
+    assert.match(sectionCss, /font-family: "FC XuanZongTi"/)
+    assert.match(fontsCss, /font-family: "FC XuanZongTi"/)
+
+    const covered = new Set(
+        (fontsCss.match(/只含颜色主题六个配方名用到的 \d+ 个字（([^）]+)）/) ?? [])[1] ?? '',
+    )
+    assert.ok(covered.size > 0, 'fonts.css 里没找到玄宗体子集的字表注释')
+
+    const labels = [...recipeSource.matchAll(/^\s{8}label: '([^']+)',$/gm)].map(m => m[1])
+    assert.ok(labels.length >= 5, `只解析到 ${labels.length} 个配方名，正则可能失配`)
+
+    const missing = [...new Set(labels.join(''))].filter(ch => !covered.has(ch))
+    assert.deepEqual(missing, [], `这些字不在子集里，需重新生成 woff2：${missing.join('')}`)
 })

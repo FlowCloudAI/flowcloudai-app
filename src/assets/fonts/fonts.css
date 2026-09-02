@@ -59,6 +59,23 @@
     font-display: swap;
 }
 
+/*
+ * 玄宗体子集：只含颜色主题六个配方名用到的 12 个字（流云紫藤青松晚霞墨蓝绛梅）。
+ * 原始 otf 38.6 MB，整份内嵌不现实；这份 27 KB。
+ * 新增配方时若名称用到集外的字，会静默回落到正文字体——
+ * mobileThemeColorScope.test.mjs 里有一条断言守着这件事。
+ *
+ * font-display: block 而不是 swap：只有 6 个 2 字标题，27 KB 几乎瞬时到位，
+ * 先用回落字体画一遍再换字反而是可见的跳动。
+ */
+@font-face {
+    font-family: "FC XuanZongTi";
+    src: url("./xuanzongti/XuanZongTi-ThemeNames.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400;
+    font-display: block;
+}
+
 :root {
     --fc-font-family-sans: "FC Noto Sans SC";
     --fc-font-family-serif: "FC Noto Serif SC", serif;
