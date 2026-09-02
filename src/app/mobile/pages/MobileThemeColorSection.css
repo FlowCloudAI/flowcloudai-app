@@ -14,9 +14,7 @@
 
 .mobile-theme-color__grid {
     display: grid;
-    /* 单列：题图按 2:1 原比例满高贴左，右边留出的宽度才够放名称。
-       两列时每张卡只有 167px，题图占掉 140 后剩不下能写字的地方。 */
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--mobile-gap-inline);
 }
 
@@ -25,8 +23,8 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    /* 固定高度而不是宽高比：题图按这个高度等比铺开占左侧 2 倍宽，剩下的都是名称区。 */
-    block-size: 4rem;
+    /* 比题图的 2:1 略宽，多出来的部分留给右侧名称。375px 视口下约 167×70。 */
+    aspect-ratio: 12 / 5;
     padding: 0;
     overflow: hidden;
     border: var(--mobile-border);
@@ -35,8 +33,13 @@
     background-color: var(--mobile-theme-color-tint, var(--mobile-surface-muted));
     background-image: var(--mobile-theme-color-art);
     background-repeat: no-repeat;
-    /* auto 100%：满高、不裁切，宽度按 2:1 自然铺到 2 倍高度，右侧空出来给名称。 */
-    background-size: auto 100%;
+    /*
+     * cover 而不是 auto 100%：两列时卡片只有 167px，题图按原比例满高要占掉 140px，
+     * 右边剩 27px 写不下名字。cover 让题图铺满整张卡，上下各裁掉约 7px——
+     * 素材的主体在画面中段，这个幅度切不到它。
+     * 铺满之后遮罩收的始终是题图本身，不存在「遮罩盖在纯色上」的接缝问题。
+     */
+    background-size: cover;
     background-position: left center;
     color: var(--mobile-theme-color-ink, var(--fc-color-text));
     transition:
@@ -48,9 +51,8 @@
  * 右侧渐变。用 ::before 而不是把渐变叠进 background-image：
  * 叠进去的话渐变会跟着背景一起被缩放，收口位置随卡片宽度乱跑。
  *
- * 收口停在 40%，略晚于题图右缘（满高时铺到 2 倍高度，在 342px 卡上是 37.4%）。
- * 因为遮罩收的就是题图自己的收边色，越过右缘那一小段是同色盖同色，看不出接缝；
- * 反过来若收口早于右缘，题图会被硬生生截断。
+ * 收口停在 50%，正好是名称区的左缘：文字整段都压在纯色 tint 上，
+ * 不会有一半字在渐变里、一半在纯色上。
  */
 .mobile-theme-color__card::before {
     content: "";
@@ -59,9 +61,9 @@
     background: linear-gradient(
         90deg,
         transparent 0%,
-        transparent 22%,
-        color-mix(in srgb, var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 72%, transparent) 31%,
-        var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 40%
+        transparent 28%,
+        color-mix(in srgb, var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 72%, transparent) 40%,
+        var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 50%
     );
 }
 
@@ -77,15 +79,29 @@
 
 .mobile-theme-color__caption {
     position: relative;
+    /*
+     * 名称区占右侧一半，与渐变收口对齐。名称与徽章竖排：
+     * 167px 的卡里这一半只有 84px，去掉内边距剩 68px，
+     * 「流云 ✓」加上「默认」徽章横着放必然挤掉一个。
+     */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: var(--mobile-gap-text);
+    inline-size: 50%;
+    padding-inline: var(--mobile-gap-inline);
+    font-size: var(--mobile-text-body-sm);
+    font-weight: var(--mobile-weight-medium);
+    line-height: var(--mobile-leading-tight);
+}
+
+/* 名称与勾选标记同一行，徽章另起一行。 */
+.mobile-theme-color__caption-row {
     display: flex;
     align-items: center;
     gap: var(--mobile-gap-text);
-    /* 名称区占右侧 48%，与渐变收口位置对齐，六张卡的文字起点一致。 */
-    inline-size: 48%;
-    padding-inline: var(--mobile-gap-item);
-    justify-content: flex-start;
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-medium);
+    max-inline-size: 100%;
 }
 
 .mobile-theme-color__name {

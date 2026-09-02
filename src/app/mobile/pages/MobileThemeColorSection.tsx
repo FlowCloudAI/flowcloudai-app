@@ -147,12 +147,14 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
                             onClick={() => selectRecipe(recipe.id)}
                         >
                             <span className="mobile-theme-color__caption">
-                                <span className="mobile-theme-color__name">{recipe.label}</span>
+                                <span className="mobile-theme-color__caption-row">
+                                    <span className="mobile-theme-color__name">{recipe.label}</span>
+                                    {/* 选中不能只靠描边颜色，勾选标记是给色觉障碍与强光下的非颜色提示。 */}
+                                    {active && <span className="mobile-theme-color__check" aria-hidden="true">✓</span>}
+                                </span>
                                 {recipe.id === DEFAULT_FC_THEME_RECIPE_ID && (
                                     <span className="mobile-theme-color__badge">默认</span>
                                 )}
-                                {/* 选中不能只靠描边颜色，勾选标记是给色觉障碍与强光下的非颜色提示。 */}
-                                {active && <span className="mobile-theme-color__check" aria-hidden="true">✓</span>}
                             </span>
                         </button>
                     )
