@@ -114,3 +114,33 @@ test('配方名用的字全在玄宗体子集里', () => {
     const missing = [...new Set(labels.join(''))].filter(ch => !covered.has(ch))
     assert.deepEqual(missing, [], `这些字不在子集里，需重新生成 woff2：${missing.join('')}`)
 })
+
+test('选中卡的主色取自配方自己的令牌，不读当前生效主题', () => {
+    /*
+     * --fc-color-primary 是「当前生效的主题色」，而卡片画的是「这个配方长什么样」。
+     * 默认配方不注入覆盖，深色模式下这个令牌是 lib_ui 的基线亮蓝，压在浅色题图上
+     * 只有 2.4:1（2026-09-02 真机实测）。所以名称与勾选标记都不能直接消费它。
+     */
+    assert.match(sectionSource, /getPrimaryTokenColor\(state\.tokenColors, selectedRecipe\.primarySeed\)/)
+    assert.match(sectionSource, /'--mobile-theme-color-accent': activeAccent/)
+    assert.doesNotMatch(sectionCss, /(?<![-a-z])color:\s*var\(--fc-color-primary\)\s*;/)
+})
+
+test('配方名的选中态是放大、变色与位移，且三者都有过渡', () => {
+    const declaredSize = block => {
+        const rule = sectionCss.match(new RegExp(`\\.mobile-theme-color__${block} \\{([^}]*)\\}`, 's'))
+        return rule?.[1].match(/font-size: (var\(--mobile-text-[a-z-]+\));/)?.[1] ?? null
+    }
+    const activeRule = sectionCss.match(/--active \.mobile-theme-color__name \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    const base = declaredSize('name')
+    const active = activeRule.match(/font-size: (var\(--mobile-text-[a-z-]+\));/)?.[1] ?? null
+    assert.ok(base && active, `没解析到字号：base=${base} active=${active}`)
+    assert.notEqual(base, active, '选中态字号必须比常态大一档')
+    assert.match(activeRule, /color: color-mix\([\s\S]*--mobile-theme-color-accent/)
+    assert.match(sectionCss, /--active \.mobile-theme-color__caption-row \{\s*transform: translate\(/)
+
+    // 位移与放大分别挂在两层上，各自的过渡缺一条动画就断一半。
+    assert.match(sectionCss, /\.mobile-theme-color__caption-row \{[^}]*transition: transform var\(--mobile-duration-base\)/s)
+    assert.match(sectionCss, /\.mobile-theme-color__name \{[^}]*transition:[\s\S]*?font-size var\(--mobile-duration-base\)/s)
+    assert.match(sectionCss, /\.mobile-theme-color__name \{[^}]*transition:[\s\S]*?color var\(--mobile-duration-base\)/s)
+})

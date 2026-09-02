@@ -30,6 +30,7 @@ import {
     buildThemeColorConfig,
     createPreviewForValues,
     createTokenColors,
+    getPrimaryTokenColor,
     resolveThemeColorState,
 } from '../../../features/settings/themeColorState'
 import liuyunArt from '../../../assets/theme-recipes/liuyun.webp'
@@ -90,6 +91,15 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
         () => (isDefaultTheme ? null : createPreviewForValues(selectedRecipe, state.themeValues)),
         [isDefaultTheme, selectedRecipe, state.themeValues],
     )
+    /*
+     * 选中卡的名称要用「这个配方自己的主色」，不能读 --fc-color-primary：
+     * 那是当前生效主题的主色，而默认配方压根不注入覆盖，深色模式下它是 lib_ui 的
+     * 基线亮蓝，压在浅色题图上读不清（2026-09-02 实测 2.4:1）。
+     *
+     * state.tokenColors 里已经有算好的值——默认配方走的是 resolveThemeColorState
+     * 的 fallback 分支，同样算过一遍，这里不额外跑 Material 色彩管线。
+     */
+    const activeAccent = getPrimaryTokenColor(state.tokenColors, selectedRecipe.primarySeed)
 
     /*
      * 覆盖是文档级 `<style>`，离开设置页也应当留着，所以没有清理函数——
@@ -134,7 +144,12 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
     return (
         <div className="mobile-theme-color">
             <div className="mobile-settings-field-label">颜色主题</div>
-            <div className="mobile-theme-color__grid" role="group" aria-label="颜色主题配方">
+            <div
+                className="mobile-theme-color__grid"
+                style={{'--mobile-theme-color-accent': activeAccent} as ColorVariableStyle}
+                role="group"
+                aria-label="颜色主题配方"
+            >
                 {FC_THEME_RECIPES.map(recipe => {
                     const active = recipe.id === state.recipeId
                     return (
@@ -147,14 +162,20 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
                             onClick={() => selectRecipe(recipe.id)}
                         >
                             <span className="mobile-theme-color__caption">
+                                {/*
+                                  * 徽章跟在名称后面、同一行，而不是竖排在名称下方：卡片高度由 12:5 锁死，
+                                  * 字号却跟随系统 --mobile-font-scale，竖排时放大的名称在 scale 1.05 就压到
+                                  * 徽章上（2026-09-02 实测常态只剩 0.6px 间隙）。
+                                  *
+                                  * 排在名称之后而不是之前：整行右对齐，跟在后面徽章就始终停在纯色收边上，
+                                  * 名称放大时只往左长；排在前面的话放大的名称会把徽章推到题图上去。
+                                  */}
                                 <span className="mobile-theme-color__caption-row">
                                     <span className="mobile-theme-color__name">{recipe.label}</span>
-                                    {/* 选中不能只靠描边颜色，勾选标记是给色觉障碍与强光下的非颜色提示。 */}
-                                    {active && <span className="mobile-theme-color__check" aria-hidden="true">✓</span>}
+                                    {recipe.id === DEFAULT_FC_THEME_RECIPE_ID && (
+                                        <span className="mobile-theme-color__badge">默认</span>
+                                    )}
                                 </span>
-                                {recipe.id === DEFAULT_FC_THEME_RECIPE_ID && (
-                                    <span className="mobile-theme-color__badge">默认</span>
-                                )}
                             </span>
                         </button>
                     )

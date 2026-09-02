@@ -3,7 +3,7 @@
  *
  * 每张卡是一幅 2:1 的配方题图，卡片比它更宽（12:5），右侧用一道渐变把画面收进卡片
  * 底色，名称压在渐变上。题图本身右半边就在向留白过渡，所以渐变接上去不会有硬缝。
- * 卡片配色全部走通用 token，只有题图由行内 --mobile-theme-color-art 传入。
+ * 卡片配色全部走通用 token，只有题图与选中态主色由行内自定义属性传入。
  */
 
 .mobile-theme-color {
@@ -20,9 +20,8 @@
 
 .mobile-theme-color__card {
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
+    /* 名称层是绝对定位的，卡片自身不再排版任何在流内容。 */
+    display: block;
     /* 比题图的 2:1 略宽，多出来的部分留给右侧名称。375px 视口下约 167×70。 */
     aspect-ratio: 12 / 5;
     padding: 0;
@@ -39,9 +38,6 @@
      *
      * 不用 cover：cover 按卡片宽度缩放，会把素材上下各裁掉 8.3%。这里宁可让题图
      * 小一号也不裁——素材是完整构图，裁掉的是它自己留的呼吸空间。
-     *
-     * 题图右缘（83%）落在遮罩收口（50%）之后，那一段是纯色 tint 盖在题图上；
-     * 再往右是纯色 tint 盖在同色底上。两段颜色相同，交界处看不出来。
      */
     background-size: auto 100%;
     background-position: left center;
@@ -55,8 +51,9 @@
  * 右侧渐变。用 ::before 而不是把渐变叠进 background-image：
  * 叠进去的话渐变会跟着背景一起被缩放，收口位置随卡片宽度乱跑。
  *
- * 收口停在 50%，正好是名称区的左缘：文字整段都压在纯色 tint 上，
- * 不会有一半字在渐变里、一半在纯色上。
+ * 收口停在 64%，题图右缘在 83%——最右那一截仍被纯色盖住，接缝依旧看不见，
+ * 但画面能露出到卡宽的六成半，而不是原来的一半。名称因此会压到题图上，
+ * 素材右半边本就是浅色留白，深墨字压上去仍然读得清。
  */
 .mobile-theme-color__card::before {
     content: "";
@@ -65,9 +62,9 @@
     background: linear-gradient(
         90deg,
         transparent 0%,
-        transparent 28%,
-        color-mix(in srgb, var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 72%, transparent) 40%,
-        var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 50%
+        transparent 42%,
+        color-mix(in srgb, var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 72%, transparent) 54%,
+        var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 64%
     );
 }
 
@@ -81,37 +78,49 @@
     outline-offset: -2px;
 }
 
+/*
+ * 名称层铺满整张卡，内容贴右上。不再限制成右侧一半——名称放大后压到题图上是有意的，
+ * 宽度限制只会提前出省略号。
+ */
 .mobile-theme-color__caption {
-    position: relative;
-    /*
-     * 名称区占右侧一半，与渐变收口对齐。名称与徽章竖排：
-     * 167px 的卡里这一半只有 84px，去掉内边距剩 68px，
-     * 「流云 ✓」加上「默认」徽章横着放必然挤掉一个。
-     */
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-direction: column;
     align-items: flex-start;
-    justify-content: center;
-    gap: var(--mobile-gap-text);
-    inline-size: 50%;
-    padding-inline: var(--mobile-gap-inline);
-    font-size: var(--mobile-text-body-sm);
-    font-weight: var(--mobile-weight-medium);
+    justify-content: flex-end;
+    padding: var(--mobile-gap-text) var(--mobile-gap-inline);
     line-height: var(--mobile-leading-tight);
 }
 
-/* 名称与勾选标记同一行，徽章另起一行。 */
+/*
+ * 徽章与名称同在一行，基线对齐。
+ *
+ * 卡片高度由 12:5 锁死，字号却跟随系统 --mobile-font-scale——竖排时放大的名称会撞上
+ * 底部的徽章（实测 scale 1.05 就开始重叠），横排则只是往左挤，挤不下时名称出省略号。
+ * 徽章排在名称之后，整行右对齐，它就始终停在右侧纯色收边上，不会被推到题图上。
+ *
+ * 选中时整行往卡片中心挪一点，配合放大做出「被拿起来」的感觉；位移放在这一行而不是
+ * 名称上，徽章才会跟着一起走。
+ *
+ * 选中态没有勾选标记：放大与位移本身就是非颜色提示，色觉障碍下同样分得出，
+ * 再加一个勾在放大的手写名旁边只是噪声。
+ */
 .mobile-theme-color__caption-row {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--mobile-gap-text);
     max-inline-size: 100%;
+    transform: translate(0, 0);
+    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+.mobile-theme-color__card--active .mobile-theme-color__caption-row {
+    transform: translate(calc(-1 * var(--mobile-gap-inline)), var(--mobile-gap-inline));
 }
 
 /*
  * 配方名用玄宗体（手写体）。回落到正文字体而不是 sans：万一将来加的配方名
  * 用到子集外的字，回落字形至少和周围文字同一族，不会突兀成另一种黑体。
- * 手写体的视觉重心偏小，字号与字重都往上提一档才和右侧徽章配得起来。
  */
 .mobile-theme-color__name {
     min-inline-size: 0;
@@ -119,8 +128,30 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: "FC XuanZongTi", var(--fc-font-family);
-    font-size: var(--mobile-text-body);
+    font-size: var(--mobile-text-title);
     font-weight: var(--mobile-weight-normal);
+    transition:
+        font-size var(--mobile-duration-base) var(--mobile-ease-standard),
+        color var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+/*
+ * 选中的名称换成该配方自己的主色。混 15% 深墨再上屏：主色原值压在题图收边色上
+ * 只有 3.8–4.1:1（六个配方实测），过得了大字号的 3:1 但过不了 4.5:1；
+ * 混到 85% 后是 4.68–5.00:1，色相仍然一眼认得出是这套配色。
+ *
+ * 不能直接用 var(--fc-color-primary)：卡片画的是「这个配方长什么样」，
+ * 而 --fc-color-primary 是「当前正在生效的主题」——默认配方根本不注入覆盖，
+ * 深色模式下它是 lib_ui 的基线亮蓝，压在浅色题图上只有 2.4:1。
+ * 真值由组件从配方自己的令牌里取，见 MobileThemeColorSection.tsx。
+ */
+.mobile-theme-color__card--active .mobile-theme-color__name {
+    font-size: var(--mobile-text-display);
+    color: color-mix(
+        in srgb,
+        var(--mobile-theme-color-accent, var(--fc-color-primary)) 85%,
+        var(--mobile-theme-color-ink, var(--fc-color-text))
+    );
 }
 
 .mobile-theme-color__badge {
@@ -133,12 +164,6 @@
     font-weight: var(--mobile-weight-normal);
 }
 
-.mobile-theme-color__check {
-    flex: none;
-    color: var(--fc-color-primary);
-    font-size: var(--mobile-text-meta);
-}
-
 .mobile-theme-color__hint {
     margin: 0;
     color: var(--fc-color-text-secondary);
@@ -147,7 +172,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .mobile-theme-color__card {
+    .mobile-theme-color__card,
+    .mobile-theme-color__caption-row,
+    .mobile-theme-color__name {
         transition: none;
     }
 }
