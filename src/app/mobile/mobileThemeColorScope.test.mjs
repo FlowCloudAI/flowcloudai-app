@@ -126,6 +126,16 @@ test('选中卡的主色取自配方自己的令牌，不读当前生效主题',
     assert.doesNotMatch(sectionCss, /(?<![-a-z])color:\s*var\(--fc-color-primary\)\s*;/)
 })
 
+test('卡片上除了名称没有别的标记', () => {
+    /*
+     * 卡片高度由 12:5 锁死，字号却跟随系统 --mobile-font-scale。
+     * 任何和名称抢位置的东西（「默认」徽章、勾选标记）在字号调大后都会被放大的名称撞上——
+     * 2026-09-02 实测徽章竖排在名称下方时，常态就只剩 0.6px 间隙。
+     */
+    assert.doesNotMatch(sectionSource, /mobile-theme-color__(?:badge|check|caption-row)/)
+    assert.doesNotMatch(sectionCss, /mobile-theme-color__(?:badge|check|caption-row)/)
+})
+
 test('配方名的选中态是放大、变色与位移，且三者都有过渡', () => {
     const declaredSize = block => {
         const rule = sectionCss.match(new RegExp(`\\.mobile-theme-color__${block} \\{([^}]*)\\}`, 's'))
@@ -137,10 +147,14 @@ test('配方名的选中态是放大、变色与位移，且三者都有过渡',
     assert.ok(base && active, `没解析到字号：base=${base} active=${active}`)
     assert.notEqual(base, active, '选中态字号必须比常态大一档')
     assert.match(activeRule, /color: color-mix\([\s\S]*--mobile-theme-color-accent/)
-    assert.match(sectionCss, /--active \.mobile-theme-color__caption-row \{\s*transform: translate\(/)
+    assert.match(activeRule, /transform: translate\(calc\(-1 \* var\(--mobile-gap-inline\)\), var\(--mobile-gap-inline\)\);/)
 
-    // 位移与放大分别挂在两层上，各自的过渡缺一条动画就断一半。
-    assert.match(sectionCss, /\.mobile-theme-color__caption-row \{[^}]*transition: transform var\(--mobile-duration-base\)/s)
-    assert.match(sectionCss, /\.mobile-theme-color__name \{[^}]*transition:[\s\S]*?font-size var\(--mobile-duration-base\)/s)
-    assert.match(sectionCss, /\.mobile-theme-color__name \{[^}]*transition:[\s\S]*?color var\(--mobile-duration-base\)/s)
+    // 放大、位移、变色三条过渡缺一条动画就断一截。
+    for (const property of ['transform', 'font-size', 'color']) {
+        assert.match(
+            sectionCss,
+            new RegExp(`\\.mobile-theme-color__name \\{[^}]*transition:[\\s\\S]*?${property} var\\(--mobile-duration-base\\)`, 's'),
+            `名称缺少 ${property} 过渡`,
+        )
+    }
 })

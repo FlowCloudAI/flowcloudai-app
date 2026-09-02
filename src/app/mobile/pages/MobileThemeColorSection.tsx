@@ -1,7 +1,8 @@
 /*
  * 移动端颜色主题（配方）选择。
  *
- * 每张卡是一幅配方题图 + 右侧渐变上的名称。不画色板：配方的背景令牌在移动端不生效
+ * 每张卡是一幅配方题图 + 右侧渐变上的名称，六张长得完全一样，默认配方不额外挂标记。
+ * 不画色板：配方的背景令牌在移动端不生效
  * （见 fcThemeRecipe 的 FC_THEME_DESKTOP_SCOPE），画底色等于承诺一个不会发生的变化，
  * 而只画主色又不足以说明这套配色的整体调性。题图直接把调性摆出来。
  *
@@ -64,12 +65,11 @@ const RECIPE_ART: Record<string, {url: string; tint: string}> = {
 }
 
 /*
- * 六种 tint 都很浅，文字统一用这一档深墨。写在这里而不是 CSS：
- * 移动端 CSS 基线禁止颜色字面量，而这两个值恰恰不能是随主题翻转的 token——
+ * 六种 tint 都很浅，名称统一用这一档深墨。写在这里而不是 CSS：
+ * 移动端 CSS 基线禁止颜色字面量，而这个值恰恰不能是随主题翻转的 token——
  * 底色永远是浅的，文字就永远得是深的。
  */
 const ART_INK = '#1A1A1A'
-const ART_INK_SOFT = '#5F5F5F'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
 
@@ -162,20 +162,7 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
                             onClick={() => selectRecipe(recipe.id)}
                         >
                             <span className="mobile-theme-color__caption">
-                                {/*
-                                  * 徽章跟在名称后面、同一行，而不是竖排在名称下方：卡片高度由 12:5 锁死，
-                                  * 字号却跟随系统 --mobile-font-scale，竖排时放大的名称在 scale 1.05 就压到
-                                  * 徽章上（2026-09-02 实测常态只剩 0.6px 间隙）。
-                                  *
-                                  * 排在名称之后而不是之前：整行右对齐，跟在后面徽章就始终停在纯色收边上，
-                                  * 名称放大时只往左长；排在前面的话放大的名称会把徽章推到题图上去。
-                                  */}
-                                <span className="mobile-theme-color__caption-row">
-                                    <span className="mobile-theme-color__name">{recipe.label}</span>
-                                    {recipe.id === DEFAULT_FC_THEME_RECIPE_ID && (
-                                        <span className="mobile-theme-color__badge">默认</span>
-                                    )}
-                                </span>
+                                <span className="mobile-theme-color__name">{recipe.label}</span>
                             </span>
                         </button>
                     )
@@ -195,6 +182,5 @@ function cardStyle(art: {url: string; tint: string} | undefined): ColorVariableS
         '--mobile-theme-color-art': `url("${art.url}")`,
         '--mobile-theme-color-tint': art.tint,
         '--mobile-theme-color-ink': ART_INK,
-        '--mobile-theme-color-ink-soft': ART_INK_SOFT,
     }
 }

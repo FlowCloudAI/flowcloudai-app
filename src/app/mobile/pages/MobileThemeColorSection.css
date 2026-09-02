@@ -79,7 +79,7 @@
 }
 
 /*
- * 名称层铺满整张卡，内容贴右上。不再限制成右侧一半——名称放大后压到题图上是有意的，
+ * 名称层铺满整张卡，名称贴右上。不再限制成右侧一半——名称放大后压到题图上是有意的，
  * 宽度限制只会提前出省略号。
  */
 .mobile-theme-color__caption {
@@ -93,44 +93,26 @@
 }
 
 /*
- * 徽章与名称同在一行，基线对齐。
- *
- * 卡片高度由 12:5 锁死，字号却跟随系统 --mobile-font-scale——竖排时放大的名称会撞上
- * 底部的徽章（实测 scale 1.05 就开始重叠），横排则只是往左挤，挤不下时名称出省略号。
- * 徽章排在名称之后，整行右对齐，它就始终停在右侧纯色收边上，不会被推到题图上。
- *
- * 选中时整行往卡片中心挪一点，配合放大做出「被拿起来」的感觉；位移放在这一行而不是
- * 名称上，徽章才会跟着一起走。
- *
- * 选中态没有勾选标记：放大与位移本身就是非颜色提示，色觉障碍下同样分得出，
- * 再加一个勾在放大的手写名旁边只是噪声。
- */
-.mobile-theme-color__caption-row {
-    display: flex;
-    align-items: baseline;
-    gap: var(--mobile-gap-text);
-    max-inline-size: 100%;
-    transform: translate(0, 0);
-    transition: transform var(--mobile-duration-base) var(--mobile-ease-standard);
-}
-
-.mobile-theme-color__card--active .mobile-theme-color__caption-row {
-    transform: translate(calc(-1 * var(--mobile-gap-inline)), var(--mobile-gap-inline));
-}
-
-/*
  * 配方名用玄宗体（手写体）。回落到正文字体而不是 sans：万一将来加的配方名
  * 用到子集外的字，回落字形至少和周围文字同一族，不会突兀成另一种黑体。
+ *
+ * 六张卡的名称长得完全一样，默认配方也不挂徽章：卡片高度由 12:5 锁死，字号却跟随
+ * 系统 --mobile-font-scale，任何和名称抢位置的东西在字号调大后都会被撞上。
+ *
+ * 选中态没有勾选标记：放大与位移本身就是非颜色提示，色觉障碍下同样分得出。
  */
 .mobile-theme-color__name {
     min-inline-size: 0;
+    max-inline-size: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: "FC XuanZongTi", var(--fc-font-family);
     font-size: var(--mobile-text-title);
     font-weight: var(--mobile-weight-normal);
+    transform: translate(0, 0);
     transition:
+        transform var(--mobile-duration-base) var(--mobile-ease-standard),
         font-size var(--mobile-duration-base) var(--mobile-ease-standard),
         color var(--mobile-duration-base) var(--mobile-ease-standard);
 }
@@ -147,21 +129,12 @@
  */
 .mobile-theme-color__card--active .mobile-theme-color__name {
     font-size: var(--mobile-text-display);
+    transform: translate(calc(-1 * var(--mobile-gap-inline)), var(--mobile-gap-inline));
     color: color-mix(
         in srgb,
         var(--mobile-theme-color-accent, var(--fc-color-primary)) 85%,
         var(--mobile-theme-color-ink, var(--fc-color-text))
     );
-}
-
-.mobile-theme-color__badge {
-    flex: none;
-    padding-inline: var(--mobile-gap-text);
-    border-radius: var(--mobile-radius-cell);
-    background: color-mix(in srgb, var(--mobile-theme-color-ink, var(--fc-color-text)) 8%, transparent);
-    color: var(--mobile-theme-color-ink-soft, var(--fc-color-text-secondary));
-    font-size: var(--mobile-text-meta);
-    font-weight: var(--mobile-weight-normal);
 }
 
 .mobile-theme-color__hint {
@@ -173,7 +146,6 @@
 
 @media (prefers-reduced-motion: reduce) {
     .mobile-theme-color__card,
-    .mobile-theme-color__caption-row,
     .mobile-theme-color__name {
         transition: none;
     }
