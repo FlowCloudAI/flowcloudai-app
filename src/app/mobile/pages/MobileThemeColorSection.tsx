@@ -1,10 +1,9 @@
 /*
  * 移动端颜色主题（配方）选择。
  *
- * 版式沿用桌面端的预设卡：上排名称与默认徽章，下排整条色带，选中用主色描边加
- * 主色弱底。区别在色带内容——桌面端画的是「底色 + 主色」，而配方的背景令牌在移动端
- * 不生效（见 fcThemeRecipe 的 FC_THEME_DESKTOP_SCOPE），画底色等于承诺一个不会发生的
- * 变化，所以这里换成移动端真正会变的三档：主色、边框、次级文字。
+ * 每张卡是一幅配方题图 + 右侧渐变上的名称。不画色板：配方的背景令牌在移动端不生效
+ * （见 fcThemeRecipe 的 FC_THEME_DESKTOP_SCOPE），画底色等于承诺一个不会发生的变化，
+ * 而只画主色又不足以说明这套配色的整体调性。题图直接把调性摆出来。
  *
  * 只做「换配方」，不含桌面端那套逐令牌编辑：46 个取色输入在 375px 上排不下，
  * 而且 Android WebView 自带的取色器只有 8 个固定色块 + 一个「自定义」二级入口
@@ -15,7 +14,6 @@
  */
 
 import {useEffect, useMemo, type CSSProperties} from 'react'
-import {useTheme} from 'flowcloudai-ui'
 import type {ThemeColorConfig} from '../../../api'
 import {logger} from '../../../shared/logger'
 import {
@@ -34,12 +32,45 @@ import {
     createTokenColors,
     resolveThemeColorState,
 } from '../../../features/settings/themeColorState'
+import liuyunArt from '../../../assets/theme-recipes/liuyun.webp'
+import zitengArt from '../../../assets/theme-recipes/ziteng.webp'
+import qingsongArt from '../../../assets/theme-recipes/qingsong.webp'
+import wanxiaArt from '../../../assets/theme-recipes/wanxia.webp'
+import monlanArt from '../../../assets/theme-recipes/monlan.webp'
+import jiangmeiArt from '../../../assets/theme-recipes/jiangmei.webp'
 import './MobileThemeColorSection.css'
 
-type ColorVariableStyle = CSSProperties & Record<string, string>
+/*
+ * 每个配方一张 2:1 的题图，卡片比它更宽，右侧用渐变收进 tint，名称压在 tint 上。
+ *
+ * tint 是各张题图最右侧 3% 的平均色（取自素材本身）。卡片底色用它而不是通用 surface：
+ * 题图收边处是浅色，衬在深色卡上会在交界处糊出一条灰带；用题图自己的收边色，
+ * 画面到色块之间根本不存在交界。
+ *
+ * 由此整张卡是按题图自己的浅色世界绘制的，不跟随应用明暗——它展示的是「这套配色
+ * 长什么样」，跟着当前主题走六张卡就成了一个样。只有选中描边仍用主色，那是界面状态。
+ *
+ * 显式列出而不是按 id 拼路径：拼出来的动态 import 打不进构建产物，
+ * 而且新增配方时漏配图会在编译期就报出来。
+ */
+const RECIPE_ART: Record<string, {url: string; tint: string}> = {
+    liuyun: {url: liuyunArt, tint: '#E9F2FB'},
+    ziteng: {url: zitengArt, tint: '#F2EBFB'},
+    qingsong: {url: qingsongArt, tint: '#ECF6EE'},
+    wanxia: {url: wanxiaArt, tint: '#FCE9DD'},
+    monlan: {url: monlanArt, tint: '#E5EDF7'},
+    jiangmei: {url: jiangmeiArt, tint: '#FCEBEC'},
+}
 
-/** 色带三档，顺序即从左到右：主色最显眼，后两档说明中性色跟着配方偏暖还是偏冷。 */
-const SWATCH_TOKENS = ['--fc-color-primary', '--fc-color-border', '--fc-color-text-secondary'] as const
+/*
+ * 六种 tint 都很浅，文字统一用这一档深墨。写在这里而不是 CSS：
+ * 移动端 CSS 基线禁止颜色字面量，而这两个值恰恰不能是随主题翻转的 token——
+ * 底色永远是浅的，文字就永远得是深的。
+ */
+const ART_INK = '#1A1A1A'
+const ART_INK_SOFT = '#5F5F5F'
+
+type ColorVariableStyle = CSSProperties & Record<string, string>
 
 interface MobileThemeColorSectionProps {
     value: ThemeColorConfig | null
@@ -47,7 +78,6 @@ interface MobileThemeColorSectionProps {
 }
 
 export default function MobileThemeColorSection({value, onChange}: MobileThemeColorSectionProps) {
-    const {resolvedTheme} = useTheme()
     const defaultRecipe = useMemo(() => getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID), [])
     const defaultValues = useMemo(() => getFcThemeCustomValues(defaultRecipe), [defaultRecipe])
     const state = useMemo(
@@ -112,26 +142,17 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
                             key={recipe.id}
                             type="button"
                             className={`mobile-theme-color__card${active ? ' mobile-theme-color__card--active' : ''}`}
+                            style={cardStyle(RECIPE_ART[recipe.id])}
                             aria-pressed={active}
                             onClick={() => selectRecipe(recipe.id)}
                         >
-                            <span className="mobile-theme-color__header">
+                            <span className="mobile-theme-color__caption">
                                 <span className="mobile-theme-color__name">{recipe.label}</span>
                                 {recipe.id === DEFAULT_FC_THEME_RECIPE_ID && (
                                     <span className="mobile-theme-color__badge">默认</span>
                                 )}
                                 {/* 选中不能只靠描边颜色，勾选标记是给色觉障碍与强光下的非颜色提示。 */}
                                 {active && <span className="mobile-theme-color__check" aria-hidden="true">✓</span>}
-                            </span>
-                            <span className="mobile-theme-color__swatches" aria-hidden="true">
-                                {getPresetSwatches(recipe.id, resolvedTheme === 'dark').map((color, index) => (
-                                    <span
-                                        /* 定长静态色带，位置即身份；排序发生在取值时，渲染期不会重排。 */
-                                        key={index}
-                                        className="mobile-theme-color__swatch"
-                                        style={swatchStyle(color)}
-                                    />
-                                ))}
                             </span>
                         </button>
                     )
@@ -144,48 +165,13 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
     )
 }
 
-function swatchStyle(color: string): ColorVariableStyle {
-    return {'--mobile-theme-color-swatch': color}
-}
-
-/*
- * 配方色带取自配方自己的预览，保证卡片画的就是点下去会得到的颜色。
- *
- * FC_THEME_RECIPES 是静态的，预览一次算完缓存住；每次渲染重算要跑 5 遍
- * Material 调色板推导，而这块在设置页每次滚动都会重绘。
- */
-let presetSwatchCache: Map<string, {light: string[]; dark: string[]}> | null = null
-
-function getPresetSwatches(recipeId: string, dark: boolean): string[] {
-    if (!presetSwatchCache) {
-        presetSwatchCache = new Map(FC_THEME_RECIPES.map(recipe => {
-            const preview = createPreviewForValues(recipe, getFcThemeCustomValues(recipe))
-            const pick = (mode: 'light' | 'dark') => {
-                const [primary, ...neutrals] = SWATCH_TOKENS.map(token => {
-                    const item = preview?.tokens.find(entry => entry.token === token)
-                    // 取不到就退回配方种子：宁可画一个近似色，也不要留一格透明的空白。
-                    return item?.[mode].hex ?? recipe.primarySeed
-                })
-                /*
-                 * 两格中性色按明度从亮到暗排，色带才是一条渐次收深的坡。
-                 * 不能按令牌固定顺序：边框在浅色下比次级文字浅、在深色下比它深，
-                 * 写死顺序会让其中一个模式的中间那格夹在两个更亮的格子之间，看着像断了一块。
-                 */
-                return [primary, ...neutrals.sort((a, b) => relativeLuminance(b) - relativeLuminance(a))]
-            }
-            return [recipe.id, {light: pick('light'), dark: pick('dark')}]
-        }))
+function cardStyle(art: {url: string; tint: string} | undefined): ColorVariableStyle {
+    // 缺图时留空，卡片退回通用 surface，不会画出一个坏掉的 url()。
+    if (!art) return {}
+    return {
+        '--mobile-theme-color-art': `url("${art.url}")`,
+        '--mobile-theme-color-tint': art.tint,
+        '--mobile-theme-color-ink': ART_INK,
+        '--mobile-theme-color-ink-soft': ART_INK_SOFT,
     }
-    const entry = presetSwatchCache.get(recipeId)
-    if (!entry) return []
-    return dark ? entry.dark : entry.light
-}
-
-/** 只用于色带排序，不参与对比度判定，所以不必处理 hex 以外的写法。 */
-function relativeLuminance(hex: string): number {
-    const channels = [1, 3, 5].map(offset => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255)
-    const [r, g, b] = channels.map(value => (
-        value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-    ))
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }

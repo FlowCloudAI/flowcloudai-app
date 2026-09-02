@@ -1,9 +1,9 @@
 /*
  * 颜色主题配方卡片。
  *
- * 版式跟着桌面端的预设卡走：名称行在上、整条色带在下。卡片自身的配色全部走通用
- * token，只有色带的三格用配方算出的颜色（由行内 --mobile-theme-color-swatch 传入），
- * 那是唯一必须来自数据的颜色。
+ * 每张卡是一幅 2:1 的配方题图，卡片比它更宽（12:5），右侧用一道渐变把画面收进卡片
+ * 底色，名称压在渐变上。题图本身右半边就在向留白过渡，所以渐变接上去不会有硬缝。
+ * 卡片配色全部走通用 token，只有题图由行内 --mobile-theme-color-art 传入。
  */
 
 .mobile-theme-color {
@@ -14,37 +14,78 @@
 
 .mobile-theme-color__grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 单列：题图按 2:1 原比例满高贴左，右边留出的宽度才够放名称。
+       两列时每张卡只有 167px，题图占掉 140 后剩不下能写字的地方。 */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--mobile-gap-inline);
 }
 
 .mobile-theme-color__card {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    gap: var(--mobile-gap-inline);
-    padding: var(--mobile-pad-control);
+    align-items: center;
+    justify-content: flex-end;
+    /* 固定高度而不是宽高比：题图按这个高度等比铺开占左侧 2 倍宽，剩下的都是名称区。 */
+    block-size: 4rem;
+    padding: 0;
+    overflow: hidden;
     border: var(--mobile-border);
     border-radius: var(--mobile-radius-card);
-    background: var(--mobile-surface-muted);
-    color: var(--fc-color-text);
-    text-align: start;
+    /* 题图收边色兜底到通用 surface：没配图的配方仍然是一张正常卡片。 */
+    background-color: var(--mobile-theme-color-tint, var(--mobile-surface-muted));
+    background-image: var(--mobile-theme-color-art);
+    background-repeat: no-repeat;
+    /* auto 100%：满高、不裁切，宽度按 2:1 自然铺到 2 倍高度，右侧空出来给名称。 */
+    background-size: auto 100%;
+    background-position: left center;
+    color: var(--mobile-theme-color-ink, var(--fc-color-text));
     transition:
         border-color var(--mobile-duration-fast) var(--mobile-ease-standard),
-        background-color var(--mobile-duration-fast) var(--mobile-ease-standard);
+        outline-color var(--mobile-duration-fast) var(--mobile-ease-standard);
 }
 
+/*
+ * 右侧渐变。用 ::before 而不是把渐变叠进 background-image：
+ * 叠进去的话渐变会跟着背景一起被缩放，收口位置随卡片宽度乱跑。
+ *
+ * 收口停在 40%，略晚于题图右缘（满高时铺到 2 倍高度，在 342px 卡上是 37.4%）。
+ * 因为遮罩收的就是题图自己的收边色，越过右缘那一小段是同色盖同色，看不出接缝；
+ * 反过来若收口早于右缘，题图会被硬生生截断。
+ */
+.mobile-theme-color__card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        transparent 22%,
+        color-mix(in srgb, var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 72%, transparent) 31%,
+        var(--mobile-theme-color-tint, var(--mobile-surface-muted)) 40%
+    );
+}
+
+/*
+ * 选中用 outline 而不是加粗 border：border 变宽会把内部的背景绘制区域一起缩小，
+ * 题图跟着位移；outline 画在盒子外沿，负 offset 收回边框位置，不参与布局。
+ */
 .mobile-theme-color__card--active {
     border-color: var(--fc-color-primary);
-    background: var(--fc-color-primary-subtle);
+    outline: 2px solid var(--fc-color-primary);
+    outline-offset: -2px;
 }
 
-.mobile-theme-color__header {
+.mobile-theme-color__caption {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--mobile-gap-text);
+    /* 名称区占右侧 48%，与渐变收口位置对齐，六张卡的文字起点一致。 */
+    inline-size: 48%;
+    padding-inline: var(--mobile-gap-item);
+    justify-content: flex-start;
     font-size: var(--mobile-text-body-sm);
     font-weight: var(--mobile-weight-medium);
-    line-height: var(--mobile-leading-tight);
 }
 
 .mobile-theme-color__name {
@@ -58,33 +99,16 @@
     flex: none;
     padding-inline: var(--mobile-gap-text);
     border-radius: var(--mobile-radius-cell);
-    background: var(--fc-color-bg-tertiary);
-    color: var(--fc-color-text-secondary);
+    background: color-mix(in srgb, var(--mobile-theme-color-ink, var(--fc-color-text)) 8%, transparent);
+    color: var(--mobile-theme-color-ink-soft, var(--fc-color-text-secondary));
     font-size: var(--mobile-text-meta);
     font-weight: var(--mobile-weight-normal);
 }
 
 .mobile-theme-color__check {
     flex: none;
-    margin-inline-start: auto;
     color: var(--fc-color-primary);
     font-size: var(--mobile-text-meta);
-}
-
-.mobile-theme-color__swatches {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    /* 三格拼成一条连续色带，缝隙交给圆角与描边表达，不留 gap。 */
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-cell);
-    /* 浅色配方在浅色底上边界几乎看不见，靠这圈描边兜住，而不是加深色块本身。
-       用 border 而不是 inset box-shadow：移动端只登记了 raised / floating 两档阴影。 */
-    overflow: hidden;
-}
-
-.mobile-theme-color__swatch {
-    block-size: var(--mobile-gap-group);
-    background: var(--mobile-theme-color-swatch);
 }
 
 .mobile-theme-color__hint {
