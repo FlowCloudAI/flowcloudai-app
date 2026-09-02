@@ -329,17 +329,35 @@ export function createFcThemePreview(
 }
 
 /**
- * 桌面端页面底色的作用域。
+ * 桌面端专属令牌的作用域。
  *
- * 配方的四个背景令牌只在桌面端生效：移动端整屏几乎只有底色，同一份配方铺满全屏后
- * 读起来是「换了个应用」，而不是「换了套配色」；桌面端有面板分区，那点色偏才是配方本身。
  * 用 `:not([data-fc-density="touch"])` 而不是给移动端另发一份 CSS：密度是 ThemeProvider
- * 在运行时写/删的属性（comfortable 不写属性），选择器跟着它自动切换，不需要生成侧知道自己在哪个壳里。
+ * 在运行时写/删的属性（comfortable 不写属性），选择器跟着它自动切换，
+ * 不需要生成侧知道自己在哪个壳里。哪些令牌进这个作用域见 DESKTOP_ONLY_TOKENS。
  */
 const FC_THEME_DESKTOP_SCOPE = 'html:root:not([data-fc-density="touch"])'
 
-function isBackgroundToken(item: FcThemeTokenPreview): boolean {
-    return item.group === '背景'
+/*
+ * 只在桌面端生效的令牌。
+ *
+ * 四个背景令牌：移动端整屏几乎只有底色，配方铺满全屏读起来像换了个应用。
+ *
+ * 三级文字：移动端由 mobileAccessibility.css 别名到次级色（触控密度下的可读性修正），
+ * 配方自己的 T60/T50 实测浅色 3.13:1、深色 4.22:1，都低于正文 4.5:1 门槛。
+ * 靠 !important 压不住——深色侧覆盖写在 `html:root[data-theme="dark"]`(0,2,1)，
+ * 比别名的 `:root[data-fc-density="touch"]`(0,2,0) 特异性更高，浅色能赢、深色赢不了。
+ * 干脆不往移动端发这个令牌：别名无人竞争，而它指向的次级色仍然跟着配方走。
+ */
+const DESKTOP_ONLY_TOKENS = new Set([
+    '--fc-color-bg',
+    '--fc-color-bg-secondary',
+    '--fc-color-bg-tertiary',
+    '--fc-color-bg-elevated',
+    '--fc-color-text-tertiary',
+])
+
+function isDesktopOnlyToken(item: FcThemeTokenPreview): boolean {
+    return DESKTOP_ONLY_TOKENS.has(item.token)
 }
 
 export function createFcThemeOverrideCss(
@@ -359,14 +377,14 @@ export function createFcThemeOverrideCss(
             : [`${selector} {`, ...tokens.map((item) => `  ${item.token}: ${css(item)} !important;`), '}', '']
     )
 
-    const shared = preview.tokens.filter((item) => !isBackgroundToken(item))
-    const background = preview.tokens.filter(isBackgroundToken)
+    const shared = preview.tokens.filter((item) => !isDesktopOnlyToken(item))
+    const desktopOnly = preview.tokens.filter(isDesktopOnlyToken)
 
     return [
         ...block('html:root', shared, lightCssOf),
         ...block('html:root[data-theme="dark"]', shared, darkCssOf),
-        ...block(FC_THEME_DESKTOP_SCOPE, background, lightCssOf),
-        ...block(`${FC_THEME_DESKTOP_SCOPE}[data-theme="dark"]`, background, darkCssOf),
+        ...block(FC_THEME_DESKTOP_SCOPE, desktopOnly, lightCssOf),
+        ...block(`${FC_THEME_DESKTOP_SCOPE}[data-theme="dark"]`, desktopOnly, darkCssOf),
     ].join('\n').trimEnd()
 }
 

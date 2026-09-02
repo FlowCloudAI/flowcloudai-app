@@ -20,20 +20,32 @@ const bootstrapSource = readFileSync(new URL('../../main.tsx', import.meta.url),
 const sectionSource = readFileSync(new URL('./pages/MobileThemeColorSection.tsx', import.meta.url), 'utf8')
 const appearanceSource = readFileSync(new URL('./pages/MobileSettingsSections.tsx', import.meta.url), 'utf8')
 
-test('背景令牌只写进排除 touch density 的作用域', () => {
+test('桌面端专属令牌只写进排除 touch density 的作用域', () => {
     // 用 :not() 而不是给移动端另发一份 CSS：密度是 ThemeProvider 运行时写/删的属性。
     assert.match(recipeSource, /FC_THEME_DESKTOP_SCOPE\s*=\s*'html:root:not\(\[data-fc-density="touch"\]\)'/)
-    assert.match(recipeSource, /block\(FC_THEME_DESKTOP_SCOPE, background, lightCssOf\)/)
-    assert.match(recipeSource, /block\(`\$\{FC_THEME_DESKTOP_SCOPE\}\[data-theme="dark"\]`, background, darkCssOf\)/)
+    assert.match(recipeSource, /block\(FC_THEME_DESKTOP_SCOPE, desktopOnly, lightCssOf\)/)
+    assert.match(recipeSource, /block\(`\$\{FC_THEME_DESKTOP_SCOPE\}\[data-theme="dark"\]`, desktopOnly, darkCssOf\)/)
+})
+
+test('三级文字不发给移动端，可读性别名才压得住', () => {
+    /*
+     * 深色侧覆盖写在 html:root[data-theme="dark"]（0,2,1），比别名所在的
+     * :root[data-fc-density="touch"]（0,2,0）特异性更高——只靠 !important
+     * 是浅色能赢、深色赢不了。所以这个令牌根本不往移动端发。
+     */
+    assert.match(recipeSource, /DESKTOP_ONLY_TOKENS = new Set\(\[[\s\S]*?'--fc-color-text-tertiary',[\s\S]*?\]\)/)
 })
 
 test('非背景令牌仍然双端生效', () => {
     assert.match(recipeSource, /block\('html:root', shared, lightCssOf\)/)
     assert.match(recipeSource, /block\('html:root\[data-theme="dark"\]', shared, darkCssOf\)/)
     // shared / background 必须是同一份 tokens 的互补切分，漏掉哪一边都会静默少发令牌。
-    assert.match(recipeSource, /const shared = preview\.tokens\.filter\(\(item\) => !isBackgroundToken\(item\)\)/)
-    assert.match(recipeSource, /const background = preview\.tokens\.filter\(isBackgroundToken\)/)
-    assert.match(recipeSource, /item\.group === '背景'/)
+    assert.match(recipeSource, /const shared = preview\.tokens\.filter\(\(item\) => !isDesktopOnlyToken\(item\)\)/)
+    assert.match(recipeSource, /const desktopOnly = preview\.tokens\.filter\(isDesktopOnlyToken\)/)
+    // 四个背景令牌仍在桌面专属集合里
+    for (const token of ['--fc-color-bg', '--fc-color-bg-secondary', '--fc-color-bg-tertiary', '--fc-color-bg-elevated']) {
+        assert.match(recipeSource, new RegExp(`'${token}',`))
+    }
 })
 
 test('启动时先写密度再应用颜色主题', () => {
