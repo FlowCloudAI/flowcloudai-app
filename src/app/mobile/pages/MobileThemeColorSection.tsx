@@ -68,8 +68,12 @@ const RECIPE_ART: Record<string, {url: string; tint: string}> = {
  * 六种 tint 都很浅，名称统一用这一档深墨。写在这里而不是 CSS：
  * 移动端 CSS 基线禁止颜色字面量，而这个值恰恰不能是随主题翻转的 token——
  * 底色永远是浅的，文字就永远得是深的。
+ *
+ * ART_SCRIM 是深色下压暗层的颜色，同样只能从这里传。取纯黑而不是复用 ART_INK：
+ * 压暗层要能把右端一直压到接近页面底色，而 ART_INK 是 #1A1A1A，会在那之前先触底。
  */
 const ART_INK = '#1A1A1A'
+const ART_SCRIM = '#000000'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
 
@@ -161,6 +165,8 @@ export default function MobileThemeColorSection({value, onChange}: MobileThemeCo
                             aria-pressed={active}
                             onClick={() => selectRecipe(recipe.id)}
                         >
+                            {/* 压暗层排在名称之前，因此画在名称之下：名称保持原色，只有背景变暗。 */}
+                            <span className="mobile-theme-color__dim" aria-hidden="true"/>
                             <span className="mobile-theme-color__caption">
                                 <span className="mobile-theme-color__name">{recipe.label}</span>
                             </span>
@@ -182,5 +188,6 @@ function cardStyle(art: {url: string; tint: string} | undefined): ColorVariableS
         '--mobile-theme-color-art': `url("${art.url}")`,
         '--mobile-theme-color-tint': art.tint,
         '--mobile-theme-color-ink': ART_INK,
+        '--mobile-theme-color-scrim': ART_SCRIM,
     }
 }

@@ -69,12 +69,51 @@
 }
 
 /*
+ * 深色下把未选中的卡压暗，右端更浓：整块区域是六张接近纯白的砖压在近黑的页面上，
+ * 不压暗时对页面 13.6–15.5:1，几乎顶到理论上限（21:1）的三分之二。
+ *
+ * 用一层黑色横向渐变而不是 filter: brightness()——filter 只能整卡等量压，做不出左右差；
+ * 叠一层黑在数学上等价于逐像素乘一个随 x 变化的系数。左端 10%、右端 64%，
+ * 也就是保留 90% → 36% 的亮度，题图那一侧几乎不动，留白那一侧沉下去。
+ *
+ * 渐变写在基础规则上、只有 opacity 受作用域控制：把渐变本身放进 :not(--active)
+ * 里的话，选中的一瞬间背景直接消失，opacity 的过渡就看不见了。
+ *
+ * 这一层排在名称之前（见 tsx），所以画在名称之下：名称保持原色，只有它的背景变暗。
+ * 盖在名称之上等价于 filter，字和底被同一系数乘掉，比值只会被压平。
+ */
+.mobile-theme-color__dim {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--mobile-theme-color-scrim, var(--fc-color-text)) 10%, transparent) 0%,
+        color-mix(in srgb, var(--mobile-theme-color-scrim, var(--fc-color-text)) 64%, transparent) 100%
+    );
+    opacity: 0;
+    transition: opacity var(--mobile-duration-base) var(--mobile-ease-standard);
+}
+
+/*
+ * 只压未选中的卡。选中那张必须保持原亮度：它的名称是配方主色混 15% 墨，是中间调，
+ * 只在浅底上成立——卡片一暗，名称和底一起往下走，比值垮到 1.x（2026-09-03 实测）。
+ * 于是「只有选中那张是亮的」本身就成了选中提示。
+ */
+:root[data-theme="dark"] .mobile-theme-color__card:not(.mobile-theme-color__card--active) .mobile-theme-color__dim {
+    opacity: 1;
+}
+
+/*
  * 选中用 outline 而不是加粗 border：border 变宽会把内部的背景绘制区域一起缩小，
  * 题图跟着位移；outline 画在盒子外沿，负 offset 收回边框位置，不参与布局。
+ *
+ * 描边取配方自己的主色，不用 --fc-color-primary：默认配方不注入覆盖，那个令牌在
+ * 深色下是 lib_ui 的基线亮蓝，压在浅色题图上只有 2.34:1，糊在卡面上。
  */
 .mobile-theme-color__card--active {
-    border-color: var(--fc-color-primary);
-    outline: 2px solid var(--fc-color-primary);
+    border-color: var(--mobile-theme-color-accent, var(--fc-color-primary));
+    outline: 2px solid var(--mobile-theme-color-accent, var(--fc-color-primary));
     outline-offset: -2px;
 }
 
@@ -153,6 +192,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .mobile-theme-color__card,
+    .mobile-theme-color__dim,
     .mobile-theme-color__name {
         transition: none;
     }

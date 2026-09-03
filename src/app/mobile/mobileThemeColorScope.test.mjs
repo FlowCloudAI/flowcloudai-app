@@ -158,3 +158,37 @@ test('配方名的选中态是放大、变色与位移，且三者都有过渡',
         )
     }
 })
+
+test('深色下只压未选中的卡，压暗层排在名称之下', () => {
+    /*
+     * 选中那张必须保持原亮度：它的名称是配方主色混 15% 墨，是中间调，只在浅底上成立，
+     * 卡片一暗名称和底一起往下走，比值垮到 1.x（2026-09-03 实测）。
+     */
+    assert.match(
+        sectionCss,
+        /:root\[data-theme="dark"\] \.mobile-theme-color__card:not\(\.mobile-theme-color__card--active\) \.mobile-theme-color__dim \{\s*opacity: 1;/,
+    )
+    // 压暗层在 tsx 里必须排在 caption 之前，否则它会盖住名称，退化成 filter 的语义。
+    const dimIndex = sectionSource.indexOf('mobile-theme-color__dim')
+    const captionIndex = sectionSource.indexOf('mobile-theme-color__caption')
+    assert.ok(dimIndex > 0 && captionIndex > 0, '未找到压暗层或名称层')
+    assert.ok(dimIndex < captionIndex, '压暗层必须排在名称之前，才画在名称之下')
+
+    // 渐变本身写在基础规则上：放进作用域里的话，选中的一瞬间背景直接消失，过渡就看不见了。
+    const base = sectionCss.match(/\.mobile-theme-color__dim \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    assert.match(base, /background: linear-gradient\(/)
+    assert.match(base, /opacity: 0;/)
+    assert.match(base, /transition: opacity var\(--mobile-duration-base\)/)
+
+    // 左淡右浓，方向反了就成了盖住题图、放过留白。
+    const stops = [...base.matchAll(/(\d+)%, transparent\)/g)].map(m => Number(m[1]))
+    assert.equal(stops.length, 2, `压暗渐变应有两个色标，实际 ${stops.length}`)
+    assert.ok(stops[0] < stops[1], `右端必须比左端浓，实际 ${stops[0]}% → ${stops[1]}%`)
+})
+
+test('选中描边取配方自己的主色', () => {
+    // 默认配方不注入覆盖，--fc-color-primary 在深色下是 lib_ui 基线亮蓝，对卡面只有 2.34:1。
+    const rule = sectionCss.match(/\.mobile-theme-color__card--active \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    assert.match(rule, /border-color: var\(--mobile-theme-color-accent, var\(--fc-color-primary\)\);/)
+    assert.match(rule, /outline: 2px solid var\(--mobile-theme-color-accent, var\(--fc-color-primary\)\);/)
+})
