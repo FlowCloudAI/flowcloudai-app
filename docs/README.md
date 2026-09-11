@@ -111,6 +111,7 @@
 
 | 审计包 | 日期 | 结论 |
 | --- | --- | --- |
+| [android-modal-back-2026-09-11](../designs/audits/android-modal-back-2026-09-11/README.md) | 2026-09-11 | Xiaomi 24129RT7CC / Android 16 真机核对确认框、三键返回与预测性返回；K2/K3/K4/K6/K8、G1/G2/G3 通过，K7 部分通过，K1 当前移动入口不适用，K5/G4/G5 未执行 |
 | [mobile-topbar-material-lab-2026-08-26](../designs/audits/mobile-topbar-material-lab-2026-08-26/README.md) | 2026-08-26 | 公共顶栏材质实验室初始版本的亮暗渲染、实时参数、三种滚动背景、导出与窄屏验证；含真实 Android 顶栏与模拟实现的同画面对照。后续默认参数、独立滤镜层与 JSON 导入按用户要求仅做静态检查 |
 | [mobile-entry-editor-followup-2026-08-26](../designs/audits/mobile-entry-editor-followup-2026-08-26/README.md) | 2026-08-26 | Android 真机复现并闭环词条正文工具栏间距、键盘收起占屏、长文光标错位、预览态蓝底、标准图片顶栏、取消按钮位置与长正文挤压主图；含前后截图、CSS 尺寸和临时草稿恢复证据 |
 | [mobile-entry-ui-2026-08-26](../designs/audits/mobile-entry-ui-2026-08-26/README.md) | 2026-08-26 | 词条查看、编辑、键盘、属性与关系流程的 Android 真机 UI/UX 审计与优化闭环；字段名称、关系无候选空态、属性层级、保存语言和顶栏重量已落地并经最终 APK 复测，图片浏览器仍缺真实图片手势证据 |
