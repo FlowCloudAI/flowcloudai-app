@@ -9,7 +9,32 @@ pub struct TaskContextDto {
     pub project_id: Option<String>,
     pub task_type: Option<String>,
     pub attributes: Option<HashMap<String, String>>,
+    pub instruction_attributes: Option<HashMap<String, String>>,
     pub flags: Option<HashMap<String, bool>>,
+}
+
+pub(super) async fn resolve_task_context(
+    settings_state: &SettingsState,
+    ctx: TaskContextDto,
+) -> TaskContext {
+    let mut flags = ctx.flags.unwrap_or_default();
+    if flags.get("auto_confirm_writes").copied().unwrap_or(false) {
+        let writer_mode_enabled = {
+            let settings = settings_state.settings.lock().await;
+            settings.llm.writer_mode_enabled
+        };
+        if !writer_mode_enabled {
+            flags.insert("auto_confirm_writes".to_string(), false);
+        }
+    }
+    TaskContext {
+        project_id: ctx.project_id,
+        task_type: ctx.task_type.unwrap_or_default(),
+        attributes: ctx.attributes.unwrap_or_default(),
+        instruction_attributes: ctx.instruction_attributes.unwrap_or_default(),
+        flags,
+        ..Default::default()
+    }
 }
 
 /// 更新指定会话的编排上下文（下一轮对话开始前生效）。
@@ -23,26 +48,15 @@ pub async fn ai_set_task_context(
     session_id: String,
     ctx: TaskContextDto,
 ) -> Result<(), ApiError> {
-    let project_id = ctx.project_id;
-    let task_type = ctx.task_type.unwrap_or_default();
-    let attributes = ctx.attributes.unwrap_or_default();
-    let mut flags = ctx.flags.unwrap_or_default();
-    if flags.get("auto_confirm_writes").copied().unwrap_or(false) {
-        let writer_mode_enabled = {
-            let settings = settings_state.settings.lock().await;
-            settings.llm.writer_mode_enabled
-        };
-        if !writer_mode_enabled {
-            flags.insert("auto_confirm_writes".to_string(), false);
-        }
-    }
+    let context = resolve_task_context(settings_state.inner(), ctx).await;
     log::info!(
-        "[ai_set_task_context][recv] session_id={} project_id={:?} task_type={} attributes={} flags={}",
+        "[ai_set_task_context][recv] session_id={} project_id={:?} task_type={} attributes={} instruction_attributes={} flags={}",
         session_id,
-        project_id,
-        task_type,
-        attributes.len(),
-        flags.len()
+        context.project_id,
+        context.task_type,
+        context.attributes.len(),
+        context.instruction_attributes.len(),
+        context.flags.len()
     );
     let handle = {
         let sessions = ai_state.sessions.lock().await;
@@ -58,15 +72,7 @@ pub async fn ai_set_task_context(
             })?
     };
 
-    let result = handle
-        .set_task_context(TaskContext {
-            project_id,
-            task_type,
-            attributes,
-            flags,
-            ..Default::default()
-        })
-        .await;
+    let result = handle.set_task_context(context).await;
     match &result {
         Ok(()) => log::info!("[ai_set_task_context][queued] session_id={}", session_id),
         Err(error) => log::warn!(

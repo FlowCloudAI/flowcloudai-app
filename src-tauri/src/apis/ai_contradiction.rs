@@ -6,9 +6,9 @@ use crate::ai_services::contradiction_loader::{
 };
 use crate::ai_services::world_check::world_check_definition;
 use crate::apis::ai_client::{
-    CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
-    EventTurnBegin, EventTurnEnd, build_llm_session_config, cleanup_session_state, save_api_usage,
-    save_token_calibration, turn_status_error, turn_status_str,
+    CreateLlmSessionResult, EventDelta, EventError, EventReady, EventRequestUsage, EventToolCall,
+    EventToolResult, EventTurnBegin, EventTurnEnd, build_llm_session_config, cleanup_session_state,
+    save_api_usage, save_token_calibration, turn_status_error, turn_status_str,
 };
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
@@ -566,6 +566,31 @@ fn spawn_contradiction_event_loop<S>(
                         )
                         .ok();
                 }
+                SessionEvent::RequestUsage {
+                    turn_id,
+                    request_id,
+                    attempt,
+                    usage,
+                } => {
+                    save_api_usage(
+                        &app_clone, &sid, &rid, turn_id, request_id, attempt, &plugin_id, &model,
+                        &usage,
+                    )
+                    .await;
+                    app_clone
+                        .emit(
+                            "ai:request_usage",
+                            EventRequestUsage {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                turn_id,
+                                request_id,
+                                attempt,
+                                usage,
+                            },
+                        )
+                        .ok();
+                }
                 SessionEvent::TurnEnd {
                     status,
                     node_id,
@@ -574,9 +599,6 @@ fn spawn_contradiction_event_loop<S>(
                     usage,
                     calibration_factor,
                 } => {
-                    if let Some(ref u) = usage {
-                        save_api_usage(&app_clone, &sid, &plugin_id, &model, u).await;
-                    }
                     if let Some(factor) = calibration_factor {
                         save_token_calibration(&app_clone, &calibration_key, factor).await;
                     }

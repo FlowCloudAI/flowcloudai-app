@@ -1,6 +1,7 @@
 //! AI Token 估算与已落库用量查询，前端估算统一复用核心库口径。
 
 use crate::{AiState, ApiError, AppState};
+use flowcloudai_client::RequestPreflight;
 use flowcloudai_client::llm::{
     token_estimate::{estimate_request_tokens, estimate_with_factor},
     types::{ChatRequest, Message, ToolCall, ToolFunctionCall},
@@ -86,6 +87,32 @@ fn estimate_token_request(request: AiTokenEstimateRequest, tools: Option<Vec<Val
         estimate_request_tokens(&chat_request),
         request.calibration_factor.unwrap_or(1.0),
     )
+}
+
+/// 使用活动会话的真实历史、上下文、模型与工具预检下一次有效请求。
+#[tauri::command]
+pub async fn ai_preflight_request(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    pending_user_message: String,
+) -> Result<RequestPreflight, ApiError> {
+    let handle = {
+        let sessions = ai_state.sessions.lock().await;
+        sessions
+            .get(&session_id)
+            .map(|entry| entry.handle.clone())
+            .ok_or_else(|| {
+                ApiError::new(
+                    flowcloudai_client::ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
+    };
+    handle
+        .preflight_request(pending_user_message)
+        .await
+        .map_err(ApiError::internal)
 }
 
 /// 查询 API 用量总览

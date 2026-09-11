@@ -29,6 +29,7 @@ import {
     type ConversationNode,
     type ApiError,
     type StoredConversationSettings,
+    type TaskContextPayload,
     toApiError,
 } from '../../../api'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
@@ -997,7 +998,13 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         await ai_cancel_session(target).catch(logger.error)
     }, [])
 
-    const sendMessage = useCallback(async (content: string, sid: string, rid: string, traceId: string) => {
+    const sendMessage = useCallback(async (
+        content: string,
+        sid: string,
+        rid: string,
+        traceId: string,
+        context?: TaskContextPayload,
+    ) => {
         expectUserTurnByRunRef.current[rid] = true
         continuationNodeIdByRunRef.current[rid] = null
         eventSeenAfterSendByRunRef.current[rid] = false
@@ -1033,7 +1040,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             }
         }, 8000)
         try {
-            await ai_send_message(sid, content, traceId)
+            await ai_send_message(sid, content, traceId, context)
             logger.log('[useAiSession][发送链路] 后端发送命令已返回成功', {
                 traceId,
                 sessionId: sid,

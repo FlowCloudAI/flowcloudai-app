@@ -123,7 +123,7 @@ function UsageHeatmap({daily, totalTokens}: {daily: ApiUsageDaily[]; totalTokens
                             <span
                                 key={day.date}
                                 className={`mobile-settings-usage-heatmap__cell mobile-settings-usage-heatmap__cell--${day.intensity}`}
-                                title={`${day.label}：${formatUsageNumber(day.totalTokens)} 消耗，${formatUsageNumber(day.callCount)} 次调用`}
+                                title={`${day.label}：${formatUsageNumber(day.totalTokens)} 消耗，${formatUsageNumber(day.callCount)} 条用量记录`}
                             />
                         ) : (
                             <span
@@ -429,27 +429,38 @@ export function MobileSettingsUsageSection({
     return (
         <div className="mobile-settings-section mobile-settings-form-stack">
             {/* 刷新在顶栏（见 MobileSettings 的 refreshPill），这里只留说明。 */}
-            <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
+            <div className="mobile-settings-plugin-count">查看实际 API 请求、缓存覆盖与消耗统计</div>
             {loading && !summary && <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>}
             {error && <div className="mobile-settings-plugin-error">加载失败：{error}</div>}
             {summary && (
                 <div className="mobile-settings-usage-grid">
                     <div className="mobile-settings-usage-card">
-                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.call_count)}</div>
-                        <div className="mobile-settings-usage-card__label">AI 使用</div>
+                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.request_count)}</div>
+                        <div className="mobile-settings-usage-card__label">API 请求</div>
                     </div>
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_tokens)}</div>
                         <div className="mobile-settings-usage-card__label">总消耗</div>
                     </div>
                     <div className="mobile-settings-usage-card">
-                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_prompt_tokens)}</div>
-                        <div className="mobile-settings-usage-card__label">提问消耗</div>
+                        <div className="mobile-settings-usage-card__value">
+                            {summary.cached_prompt_tokens == null
+                                ? '未知'
+                                : formatUsageNumber(summary.cached_prompt_tokens)}
+                        </div>
+                        <div className="mobile-settings-usage-card__label">
+                            缓存读取（{summary.cache_usage_known_count}/{summary.request_count}）
+                        </div>
                     </div>
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_completion_tokens)}</div>
                         <div className="mobile-settings-usage-card__label">应答消耗</div>
                     </div>
+                </div>
+            )}
+            {summary && summary.legacy_turn_count > 0 && (
+                <div className="mobile-settings-plugin-count">
+                    另有 {formatUsageNumber(summary.legacy_turn_count)} 条旧版回合记录，不计作实际 API 请求。
                 </div>
             )}
             {summary && <UsageHeatmap daily={daily} totalTokens={summary.total_tokens}/>}
@@ -465,7 +476,16 @@ export function MobileSettingsUsageSection({
                         </div>
                         <div className="mobile-settings-plugin-item__meta">
                             <span>{row.provider}</span>
-                            <span>{formatUsageNumber(row.call_count)} 次</span>
+                            <span>{formatUsageNumber(row.request_count)} 个请求</span>
+                            {row.legacy_turn_count > 0 && (
+                                <span>{formatUsageNumber(row.legacy_turn_count)} 条旧回合</span>
+                            )}
+                            <span>
+                                缓存 {row.cached_prompt_tokens == null
+                                    ? '未知'
+                                    : formatUsageNumber(row.cached_prompt_tokens)}
+                                （{row.cache_usage_known_count}/{row.request_count}）
+                            </span>
                             <span>{formatUsageNumber(row.total_tokens)} 消耗</span>
                         </div>
                     </div>

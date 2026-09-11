@@ -13,6 +13,7 @@ import {
     ai_get_conversation_ui_state,
     ai_list_conversations,
     ai_list_tools,
+    ai_preflight_request,
     ai_rename_conversation,
     ai_save_character_conversation_meta,
     ai_save_conversation_ui_state,
@@ -22,6 +23,7 @@ import {
     ai_update_message_attachments,
     ai_update_session,
     type AppSettings,
+    type AiRequestPreflight,
     type CharacterConversationMeta,
     type ConversationUiState,
     DOCCTX_UPDATED,
@@ -54,6 +56,11 @@ import {
     tokensToConservativeCharBudget,
 } from '../lib/contextUsage'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
+import {
+    buildTaskContextPayload,
+    DOCUMENT_CONTEXT_ATTRIBUTE,
+    withDocumentContext,
+} from '../lib/contextSubmission'
 import {
     getAiPluginSnapshot,
     refreshAiPluginStore,
@@ -132,8 +139,6 @@ const buildAiLogPreview = (content: string) => {
 
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
 const AUTO_COMPACT_RETRY_BACKOFF_MS = 5 * 60 * 1_000
-const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
-const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
 const DOCUMENT_CONTEXT_CHAR_BUDGET = 24_000
 const DOCUMENT_CONTEXT_MIN_CHAR_BUDGET = 4_000
 const DOCUMENT_CONTEXT_MAX_CHAR_BUDGET = 128_000
@@ -899,8 +904,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const maybeAutoCompactBeforeSend = useCallback(async (
         conversation: Conversation,
         messages: Message[],
-        pendingContent: string,
+        _pendingContent: string,
         force = false,
+        preflight?: AiRequestPreflight | null,
+        runtime?: PreparedAiSession | null,
     ): Promise<boolean> => {
         const settings = await setting_get_settings().catch(() => appSettingsRef.current)
         if (settings) appSettingsRef.current = settings
@@ -910,105 +917,90 @@ export function useAiController(focus: AiFocus): AiContextValue {
             || conversation.mode !== 'default'
             || (!force && !compactSettings.auto_compact_enabled)
         ) return false
-        const retryAfter = autoCompactRetryAfterRef.current.get(conversation.id) ?? 0
+        const targetConversationId = runtime?.conversationId ?? conversation.id
+        const retryAfter = autoCompactRetryAfterRef.current.get(targetConversationId) ?? 0
         if (!force && retryAfter > Date.now()) return false
-        if (retryAfter > 0) autoCompactRetryAfterRef.current.delete(conversation.id)
+        if (retryAfter > 0) autoCompactRetryAfterRef.current.delete(targetConversationId)
 
         const headMessage = [...messages]
             .reverse()
             .find((item) => item.nodeId != null && (force || item.role === 'assistant'))
         if (!headMessage?.nodeId) return false
+        const headNodeId = preflight?.head_node_id ?? headMessage.nodeId
 
-        const plugin = getAiPluginSnapshot().plugins.find((item) => item.id === conversation.pluginId)
-        const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
-        const contextWindowTokens = modelInfo?.context_window_tokens ?? null
+        const contextWindowTokens = preflight?.context_window_tokens ?? null
         if (!force && (!contextWindowTokens || contextWindowTokens <= 0)) return false
 
-        const calibrationFactor = headMessage.calibrationFactor ?? resolveTokenCalibrationFactor(
-            compactSettings.token_calibration_factors,
-            conversation.pluginId,
-            conversation.model,
-        )
-        let estimatedTokens = 0
+        const estimatedTokens = preflight?.estimated_input_tokens ?? 0
         let usageRatio = 0
-        const suggested = force || autoCompactSuggestedConversationIdsRef.current.has(conversation.id)
+        const suggested = force
+            || preflight?.suggest_compaction === true
+            || autoCompactSuggestedConversationIdsRef.current.has(targetConversationId)
         if (!force && contextWindowTokens) {
-            const estimatedMessages = [
-                ...messages,
-                {content: pendingContent},
-                ...(conversation.settings.systemPrompt.trim()
-                    ? [{content: conversation.settings.systemPrompt}]
-                    : []),
-            ]
-            estimatedTokens = await estimateMessagesTokens(
-                estimatedMessages,
-                calibrationFactor,
-                conversation.pluginId,
-                conversation.model,
-            )
-                .catch(error => {
-                    logger.warn('[useAiController][自动压缩] Token 预检失败，交由核心预算保护', {error})
-                    return 0
-                })
-            const usageTokens = headMessage.usage?.total_tokens ?? 0
-            const usedTokens = Math.max(usageTokens, estimatedTokens)
-            usageRatio = usedTokens / contextWindowTokens
+            usageRatio = estimatedTokens / contextWindowTokens
             if (!suggested && usageRatio < compactSettings.auto_compact_threshold_ratio) return false
         }
 
-        const inFlightKey = `${conversation.id}:${headMessage.nodeId}:${force ? 'forced' : 'pre-send'}`
+        const inFlightKey = `${targetConversationId}:${headNodeId}:${force ? 'forced' : 'pre-send'}`
         if (!markAutoCompactInFlight(inFlightKey)) return false
 
-        setCompactingConversationId(conversation.id)
+        setCompactingConversationId(targetConversationId)
         try {
             const result = await ai_compact_conversation({
-                conversationId: conversation.id,
+                conversationId: targetConversationId,
                 pluginId: conversation.pluginId,
                 model: conversation.model,
-                headNodeId: headMessage.nodeId,
+                headNodeId,
                 recentMessages: compactSettings.auto_compact_recent_messages,
                 detail: compactSettings.auto_compact_detail,
             })
-            autoCompactSuggestedConversationIdsRef.current.delete(conversation.id)
-            autoCompactRetryAfterRef.current.delete(conversation.id)
+            autoCompactSuggestedConversationIdsRef.current.delete(targetConversationId)
+            autoCompactRetryAfterRef.current.delete(targetConversationId)
             logger.log('[useAiController][自动压缩] 发送前压缩检查完成', {
-                conversationId: conversation.id,
+                conversationId: targetConversationId,
                 applied: result.applied,
                 positionNodeId: result.positionNodeId ?? null,
                 summaryChars: result.summaryChars,
                 suggested,
                 usageRatio,
-                usageTokens: headMessage.usage?.total_tokens ?? null,
                 estimatedTokens,
+                inputBudgetTokens: preflight?.input_budget_tokens ?? null,
+                outputReserveTokens: preflight?.output_reserve_tokens ?? null,
+                safetyReserveTokens: preflight?.safety_reserve_tokens ?? null,
+                requestFingerprint: preflight?.request_fingerprint ?? null,
                 force,
             })
             if (!result.applied) return false
 
-            if (conversation.sessionId) {
-                await getAiSessionApi()?.closeSession(conversation.sessionId)
+            const sessionId = runtime?.sid ?? conversation.sessionId
+            const runId = runtime?.runId ?? conversation.runId
+            if (sessionId) {
+                await getAiSessionApi()?.closeSession(sessionId)
             }
-            if (conversation.sessionId && conversation.runId) {
-                deleteRuntimeConversation(conversation.sessionId, conversation.runId)
+            if (sessionId && runId) {
+                deleteRuntimeConversation(sessionId, runId)
             }
             getAiSessionApi()?.activateSession(null, null)
             const clearRuntime = (item: Conversation) =>
-                item.id === conversation.id ? {...item, sessionId: null, runId: null} : item
+                item.id === conversation.id || item.id === targetConversationId
+                    ? {...item, sessionId: null, runId: null}
+                    : item
             conversationsRef.current = conversationsRef.current.map(clearRuntime)
             setAiConversations((prev) => prev.map(clearRuntime))
             return true
         } catch (error) {
             autoCompactRetryAfterRef.current.set(
-                conversation.id,
+                targetConversationId,
                 Date.now() + AUTO_COMPACT_RETRY_BACKOFF_MS,
             )
             logger.warn('[useAiController][自动压缩] 发送前压缩失败，继续发送', {
-                conversationId: conversation.id,
+                conversationId: targetConversationId,
                 error,
             })
             return false
         } finally {
             setCompactingConversationId((current) =>
-                current === conversation.id ? null : current,
+                current === targetConversationId ? null : current,
             )
             clearAutoCompactInFlight(inFlightKey)
         }
@@ -1390,7 +1382,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
         entryId: string | null,
         conversationSettings?: ConversationSettings | null,
     ): Promise<TaskContextPayload> => {
-        const attributes: Record<string, string> = {}
         const [projResult, entryResult] = await Promise.allSettled([
             projectId ? (async () => {
                 const cached = projectNameCacheRef.current.get(projectId)
@@ -1410,69 +1401,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
             })() : Promise.resolve(null),
         ])
 
-        if (projectId) {
-            attributes.project_id = projectId
-            if (projResult.status === 'fulfilled' && projResult.value) {
-                attributes.project_name = projResult.value
-            }
-        }
-        if (entryId) {
-            attributes.entry_id = entryId
-            if (entryResult.status === 'fulfilled' && entryResult.value) {
-                attributes.entry_snippet = entryResult.value
-            }
-        }
         const systemPrompt = getConversationSpecificPrompt(
             conversationSettings ?? null,
             appSettingsRef.current,
         )
-        if (systemPrompt) {
-            attributes[CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE] = [
-                '当前对话独有提示词如下。它只作用于当前对话，不代表全局设置。',
-                systemPrompt,
-            ].join('\n')
-        }
-
-        const hints: string[] = []
-        const modeLabel = toolAccessMode === 'reader'
-            ? 'reader（读者模式）'
-            : toolAccessMode === 'writer'
-                ? 'writer（作家模式）'
-                : 'assistant（助手模式）'
-        hints.push(`当前工具权限模式：${modeLabel}。请只使用当前可用工具，不要声称拥有未开放能力。`)
-        hints.push('引用当前项目具体词条时使用 Markdown 链接格式：[词条标题](fc://self/entry/词条ID)，不要使用缺少项目 ID 的旧格式。')
-        if (!webSearchEnabled) {
-            hints.push(
-                '用户已禁用 "web_search" 和 "open_url" 工具。' +
-                '若问题涉及联网获取信息，请勿主观臆断，而是告知用户开启"联网搜索"功能后再试。'
-            )
-        }
-        if (!editModeEnabled) {
-            hints.push(
-                'reader（读者模式）：所有写入类工具已被禁用。' +
-                '若用户要求修改内容，请告知其切换到"助手模式"或"作家模式"后再操作。'
-            )
-        } else if (toolAccessMode === 'assistant') {
-            hints.push('assistant（助手模式）：允许写入工具，但写入和删除操作必须等待用户确认后才能执行。')
-        } else if (toolAccessMode === 'writer') {
-            hints.push(
-                'writer（作家模式）：常规新建、改写和移动操作可直接执行；删除类操作仍必须等待用户确认。'
-            )
-        }
-        if (hints.length > 0) {
-            attributes.ai_instructions = hints.join('\n')
-        }
-
-        return {
-            attributes: {
-                ...attributes,
-                ai_tool_mode: toolAccessMode,
-            },
-            flags: {
-                read_only: toolAccessMode === 'reader',
-                auto_confirm_writes: toolAccessMode === 'writer',
-            },
-        }
+        return buildTaskContextPayload({
+            projectId,
+            projectName: projResult.status === 'fulfilled' ? projResult.value : null,
+            entryId,
+            entrySnippet: entryResult.status === 'fulfilled' ? entryResult.value : null,
+            systemPrompt,
+            toolAccessMode,
+            webSearchEnabled,
+            editModeEnabled,
+        })
     }, [editModeEnabled, toolAccessMode, webSearchEnabled])
 
     const appendDocumentContext = useCallback(async (
@@ -1493,13 +1435,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 query: query?.trim() || null,
             })
             if (result.sources.length === 0 || !result.markdown.trim()) return ctx
-            return {
-                ...ctx,
-                attributes: {
-                    ...(ctx.attributes ?? {}),
-                    [DOCUMENT_CONTEXT_ATTRIBUTE]: result.markdown,
-                },
-            }
+            return withDocumentContext(ctx, result.markdown)
         } catch (error) {
             logger.warn('[useAiController] 构建文档上下文失败，继续使用基础上下文', {
                 conversationId,
@@ -2168,6 +2104,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
         if (!trimmed) return
+        // 用户点击发送即冻结页面焦点；后续会话创建、文档检索或页面切换不能改绑本轮引用。
+        const submissionFocus = {...focusRef.current}
         await modelSwitchInFlightRef.current
 
         const traceId = createAiTraceId()
@@ -2202,26 +2140,38 @@ export function useAiController(focus: AiFocus): AiContextValue {
             target: PreparedAiSession,
             documentAttachmentItemIds: string[] = [],
             query?: string,
-        ) => {
+        ): Promise<TaskContextPayload> => {
             try {
                 await ai_update_session(
                     target.sid,
                     buildSessionUpdateParams(currentSettings, sessionParamsRef.current.thinking),
                 )
-                const ctx = await resolveContextPayload(
-                    focusRef.current.projectId,
-                    focusRef.current.entryId,
-                    currentSettings,
-                )
-                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId, documentAttachmentItemIds, query)
-                await ai_set_task_context(target.sid, enrichedCtx)
             } catch (error) {
-                logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
+                logger.warn('[useAiController][发送链路] 同步对话模型参数失败，继续构建上下文', {
                     traceId,
                     sessionId: target.sid,
                     error,
                 })
             }
+            const ctx = await resolveContextPayload(
+                submissionFocus.projectId,
+                submissionFocus.entryId,
+                currentSettings,
+            )
+            const enrichedCtx = await appendDocumentContext(
+                ctx,
+                target.conversationId,
+                documentAttachmentItemIds,
+                query,
+            )
+            await ai_set_task_context(target.sid, enrichedCtx).catch((error) => {
+                logger.warn('[useAiController][发送链路] 预检上下文同步失败，提交时仍携带同一快照', {
+                    traceId,
+                    sessionId: target.sid,
+                    error,
+                })
+            })
+            return enrichedCtx
         }
         const recreateMissingSession = async (failedSession: PreparedAiSession): Promise<PreparedAiSession | null> => {
             logger.warn('[useAiController][发送链路] 后端会话不存在，准备重建后继续发送', {
@@ -2338,10 +2288,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
         && currentConv.reportContext
             ? buildReportBootstrapPrompt(currentConv.reportContext, trimmed)
             : trimmed
-        const compactApplied = await maybeAutoCompactBeforeSend(currentConv, messagesBeforeNewUser, actualPrompt)
-        const existingSid = sessionClosedForEdit || compactApplied ? null : currentConv.sessionId
-        const existingRunId = sessionClosedForEdit || compactApplied ? null : currentConv.runId
-        const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
+        const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
+        const existingRunId = sessionClosedForEdit ? null : currentConv.runId
+        let preparedSession = await (async (): Promise<PreparedAiSession | null> => {
             if (existingSid && existingRunId) {
                 logger.log('[useAiController][发送链路] 复用当前对话已有后端会话', {
                     traceId,
@@ -2436,8 +2385,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             // 兜底推送：session 刚建立时 effect 可能尚未触发，确保首轮 assemble 有上下文
             try {
                 const ctx = await resolveContextPayload(
-                    focusRef.current.projectId,
-                    focusRef.current.entryId,
+                    submissionFocus.projectId,
+                    submissionFocus.entryId,
                     currentSettings,
                 )
                 const enrichedCtx = await appendDocumentContext(
@@ -2489,6 +2438,39 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })()
         if (!preparedSession) return
 
+        let submissionContext = await syncPreparedSessionContext(
+            preparedSession,
+            documentAttachmentItemIdsForSend,
+            actualPrompt,
+        )
+        const requestPreflight = await ai_preflight_request(preparedSession.sid, actualPrompt)
+            .catch((error) => {
+                logger.warn('[useAiController][自动压缩] 有效请求预检失败，交由核心预算保护', {
+                    traceId,
+                    sessionId: preparedSession?.sid ?? null,
+                    error,
+                })
+                return null
+            })
+        const compactApplied = await maybeAutoCompactBeforeSend(
+            currentConv,
+            messagesBeforeNewUser,
+            actualPrompt,
+            false,
+            requestPreflight,
+            preparedSession,
+        )
+        if (compactApplied) {
+            const recreatedSession = await recreateMissingSession(preparedSession)
+            if (!recreatedSession) return
+            preparedSession = recreatedSession
+            submissionContext = await syncPreparedSessionContext(
+                preparedSession,
+                documentAttachmentItemIdsForSend,
+                actualPrompt,
+            )
+        }
+
         const pendingAttachmentIds =
             pendingDocumentAttachmentIdsByConversationRef.current[preparedSession.conversationId]
             ?? pendingDocumentAttachmentIdsByConversationRef.current[currentConvId]
@@ -2502,8 +2484,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
             .map((itemId) => pendingItemsById.get(itemId))
             .filter((item): item is DocumentContextItem => Boolean(item))
             .map(documentItemToAttachment)
-
-        await syncPreparedSessionContext(preparedSession, documentAttachmentItemIdsForSend, actualPrompt)
 
         const userMessage: Message = {
             id: `u_${Date.now()}`,
@@ -2544,7 +2524,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
             isReportBootstrap: actualPrompt !== trimmed,
         })
         try {
-            await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
+            await session.sendMessage(
+                actualPrompt,
+                preparedSession.sid,
+                preparedSession.runId,
+                traceId,
+                submissionContext,
+            )
         } catch (error) {
             if (!isMissingBackendSessionError(error)) {
                 logger.error('[useAiController][发送链路] 发送失败且无法自动恢复', {
@@ -2565,7 +2551,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             const recoveredSession = await recreateMissingSession(preparedSession)
             if (!recoveredSession) return
-            await syncPreparedSessionContext(recoveredSession, documentAttachmentItemIdsForSend, actualPrompt)
+            submissionContext = await syncPreparedSessionContext(
+                recoveredSession,
+                documentAttachmentItemIdsForSend,
+                actualPrompt,
+            )
             logger.log('[useAiController][发送链路] 会话重建后重试发送', {
                 traceId,
                 conversationId: recoveredSession.conversationId,
@@ -2573,7 +2563,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 runId: recoveredSession.runId,
             })
             try {
-                await session.sendMessage(actualPrompt, recoveredSession.sid, recoveredSession.runId, traceId)
+                await session.sendMessage(
+                    actualPrompt,
+                    recoveredSession.sid,
+                    recoveredSession.runId,
+                    traceId,
+                    submissionContext,
+                )
             } catch (retryError) {
                 logger.error('[useAiController][发送链路] 会话重建后重试仍失败', {
                     traceId,

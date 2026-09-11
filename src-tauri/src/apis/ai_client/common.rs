@@ -7,8 +7,9 @@ pub(super) use crate::PendingEditsState;
 pub(super) use crate::SettingsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
-    AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,
-    ImageSession, PluginKind, SessionEvent, SessionHandle, TaskContext, TurnStatus, Usage,
+    AudioDecoder, AudioSource, ContextSnapshotPlacement, ConversationNode, ConversationNodeSeed,
+    DefaultOrchestrator, ImageSession, PluginKind, SessionEvent, SessionHandle, TaskContext,
+    TurnContextSnapshot, TurnStatus, Usage,
     image::ImageRequest,
     llm::types::{Message, ToolCall},
 };
@@ -112,6 +113,16 @@ pub(crate) struct EventContextTrimmed {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct EventRequestUsage {
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) turn_id: u64,
+    pub(crate) request_id: u64,
+    pub(crate) attempt: u32,
+    pub(crate) usage: Usage,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct EventBranchChanged {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -208,6 +219,9 @@ pub struct StoredCompact {
     pub position_node_id: u64,
     pub text: String,
     pub created_at: String,
+    /// 压缩边界处仍然有效的参考材料；恢复时作为 user 参考消息放在摘要之后。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_snapshot: Option<TurnContextSnapshot>,
 }
 
 /// 当前对话独有的大模型参数与系统提示词。
@@ -265,6 +279,8 @@ pub struct StoredConversation {
     )]
     pub settings: StoredConversationSettings,
     pub messages: Vec<StoredMessage>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub context_snapshots: Vec<TurnContextSnapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -272,7 +288,7 @@ pub struct StoredConversation {
 }
 
 fn default_conversation_schema_version() -> u32 {
-    4
+    5
 }
 
 pub(super) fn character_conversation_meta_path(
@@ -379,20 +395,67 @@ pub(super) fn chat_store_save_conversation(
 
     let json =
         serde_json::to_string_pretty(conversation).map_err(|e| format!("序列化对话失败: {}", e))?;
+    if let Ok(previous) = std::fs::read_to_string(&path)
+        && let Ok(previous_value) = serde_json::from_str::<serde_json::Value>(&previous)
+        && let Some(previous_schema) = previous_value
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64)
+        && previous_schema < u64::from(conversation.schema_version)
+    {
+        let backup_path = path.with_extension(format!("schema-v{previous_schema}.json.bak"));
+        if !backup_path.exists() {
+            let mut backup = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&backup_path)
+                .map_err(|e| format!("创建会话升级备份失败 {:?}: {}", backup_path, e))?;
+            backup
+                .write_all(previous.as_bytes())
+                .and_then(|_| backup.sync_all())
+                .map_err(|e| format!("写入会话升级备份失败 {:?}: {}", backup_path, e))?;
+        }
+    }
     let temp_path = path.with_extension("json.tmp");
     {
         let mut file = std::fs::File::create(&temp_path)
             .map_err(|e| format!("创建对话临时文件失败 {:?}: {}", temp_path, e))?;
         file.write_all(json.as_bytes())
             .map_err(|e| format!("写入对话临时文件失败 {:?}: {}", temp_path, e))?;
-        file.flush()
+        file.sync_all()
             .map_err(|e| format!("刷新对话临时文件失败 {:?}: {}", temp_path, e))?;
     }
 
-    if path.exists() {
-        std::fs::remove_file(&path).map_err(|e| format!("移除旧对话文件失败 {:?}: {}", path, e))?;
+    replace_conversation_file(&temp_path, &path)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn replace_conversation_file(temp_path: &Path, path: &Path) -> Result<(), String> {
+    std::fs::rename(temp_path, path).map_err(|e| format!("保存对话文件失败 {:?}: {}", path, e))
+}
+
+#[cfg(target_os = "windows")]
+fn replace_conversation_file(temp_path: &Path, path: &Path) -> Result<(), String> {
+    if !path.exists() {
+        return std::fs::rename(temp_path, path)
+            .map_err(|e| format!("保存对话文件失败 {:?}: {}", path, e));
     }
-    std::fs::rename(&temp_path, &path).map_err(|e| format!("保存对话文件失败 {:?}: {}", path, e))
+    let recovery_path = path.with_extension("json.recovery");
+    if recovery_path.exists() {
+        std::fs::remove_file(&recovery_path)
+            .map_err(|e| format!("清理旧恢复文件失败 {:?}: {}", recovery_path, e))?;
+    }
+    std::fs::rename(path, &recovery_path)
+        .map_err(|e| format!("创建对话恢复文件失败 {:?}: {}", recovery_path, e))?;
+    match std::fs::rename(temp_path, path) {
+        Ok(()) => {
+            let _ = std::fs::remove_file(recovery_path);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = std::fs::rename(&recovery_path, path);
+            Err(format!("保存对话文件失败 {:?}: {}", path, error))
+        }
+    }
 }
 
 pub(super) fn chat_store_delete_conversation(paths: &PathsState, id: &str) -> Result<(), String> {
@@ -546,6 +609,35 @@ pub(super) fn stored_conversation_to_runtime_seeds(
     }
 
     seeds
+}
+
+pub(super) fn stored_conversation_to_runtime_context_snapshots(
+    conversation: &StoredConversation,
+) -> Vec<TurnContextSnapshot> {
+    let Some(compact) = conversation.compact.as_ref() else {
+        return conversation.context_snapshots.clone();
+    };
+    let path = active_message_path(&conversation.messages, conversation.head);
+    let Some(boundary_index) = path
+        .iter()
+        .position(|message| message.node_id == Some(compact.position_node_id))
+    else {
+        return conversation.context_snapshots.clone();
+    };
+    let retained_node_ids = path
+        .iter()
+        .skip(boundary_index + 1)
+        .filter_map(|message| message.node_id)
+        .collect::<HashSet<_>>();
+    let mut snapshots = compact.context_snapshot.iter().cloned().collect::<Vec<_>>();
+    snapshots.extend(
+        conversation
+            .context_snapshots
+            .iter()
+            .filter(|snapshot| retained_node_ids.contains(&snapshot.owner_node_id))
+            .cloned(),
+    );
+    snapshots
 }
 
 fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<StoredMessage> {
@@ -713,6 +805,7 @@ fn chat_store_save_snapshot(
     requested_settings: Option<StoredConversationSettings>,
     nodes: Vec<ConversationNode>,
     head: Option<u64>,
+    context_snapshots: Vec<TurnContextSnapshot>,
     outcome: Option<TurnSnapshotOutcome>,
 ) -> Result<(), String> {
     let messages = conversation_nodes_to_stored_messages(nodes);
@@ -722,19 +815,25 @@ fn chat_store_save_snapshot(
 
     let now = chrono::Utc::now().to_rfc3339();
     let existing = chat_store_get_conversation(paths, conversation_id)?;
-    let (title, created_at, compact, settings, mut messages) = match existing {
-        Some(conversation) => (
-            conversation.meta.title.clone(),
-            conversation.meta.created_at.clone(),
-            conversation.compact.clone(),
-            conversation.settings.clone(),
-            merge_compacted_runtime_snapshot(conversation, messages),
-        ),
+    let (title, created_at, compact, settings, context_snapshots, mut messages) = match existing {
+        Some(conversation) => {
+            let merged_context_snapshots =
+                merge_runtime_context_snapshots(&conversation, context_snapshots);
+            (
+                conversation.meta.title.clone(),
+                conversation.meta.created_at.clone(),
+                conversation.compact.clone(),
+                conversation.settings.clone(),
+                merged_context_snapshots,
+                merge_compacted_runtime_snapshot(conversation, messages),
+            )
+        }
         None => (
             auto_title(&messages),
             now.clone(),
             None,
             requested_settings.unwrap_or_default(),
+            context_snapshots,
             messages,
         ),
     };
@@ -754,11 +853,40 @@ fn chat_store_save_snapshot(
         },
         settings,
         messages,
+        context_snapshots,
         head,
         compact,
     };
 
     chat_store_save_conversation(paths, &conversation)
+}
+
+fn merge_runtime_context_snapshots(
+    existing: &StoredConversation,
+    runtime_snapshots: Vec<TurnContextSnapshot>,
+) -> Vec<TurnContextSnapshot> {
+    if existing.compact.is_none() {
+        return runtime_snapshots;
+    }
+    let carried = existing
+        .compact
+        .as_ref()
+        .and_then(|compact| compact.context_snapshot.as_ref());
+    let mut merged = existing.context_snapshots.clone();
+    for snapshot in runtime_snapshots {
+        if carried.is_some_and(|carried| carried == &snapshot) {
+            continue;
+        }
+        if let Some(index) = merged.iter().position(|item| {
+            item.owner_node_id == snapshot.owner_node_id && item.placement == snapshot.placement
+        }) {
+            merged[index] = snapshot;
+        } else {
+            merged.push(snapshot);
+        }
+    }
+    merged.sort_by_key(|snapshot| snapshot.owner_node_id);
+    merged
 }
 
 fn conversation_is_owned_by(
@@ -787,7 +915,7 @@ async fn save_session_snapshot(
     persistence: &SessionPersistence,
     outcome: Option<TurnSnapshotOutcome>,
 ) {
-    let (nodes, head) = persistence.handle.tree_snapshot().await;
+    let (nodes, head, context_snapshots) = persistence.handle.persistence_snapshot().await;
     let ai_state = app.state::<AiState>();
     let (plugin_id, model) = {
         let sessions = ai_state.sessions.lock().await;
@@ -816,6 +944,7 @@ async fn save_session_snapshot(
         persistence.settings.clone(),
         nodes,
         head,
+        context_snapshots,
         outcome,
     ) {
         Ok(()) => log::info!(
@@ -890,6 +1019,10 @@ pub(crate) async fn cleanup_session_state(
 pub(crate) async fn save_api_usage(
     app: &AppHandle,
     session_id: &str,
+    run_id: &str,
+    turn_id: u64,
+    request_id: u64,
+    request_attempt: u32,
     plugin_id: &str,
     model: &str,
     usage: &Usage,
@@ -911,13 +1044,18 @@ pub(crate) async fn save_api_usage(
         resolve_usage_price(&defaults, plugin_id, model, manifest_model.as_ref());
 
     log::info!(
-        "[usage] saving: session={} model={} plugin={} prompt={} completion={} total={}",
+        "[usage] saving request: session={} run={} turn={} request={}.{} model={} plugin={} prompt={} completion={} total={} cached={:?}",
         session_id,
+        run_id,
+        turn_id,
+        request_id,
+        request_attempt,
         model,
         plugin_id,
         usage.prompt_tokens,
         usage.completion_tokens,
-        usage.total_tokens
+        usage.total_tokens,
+        usage.cached_prompt_tokens,
     );
 
     let app_state = app.state::<std::sync::Arc<crate::AppState>>();
@@ -934,6 +1072,13 @@ pub(crate) async fn save_api_usage(
         prompt_price_per_m,
         completion_price_per_m,
         currency,
+        record_granularity: "request".to_string(),
+        run_id: Some(run_id.to_string()),
+        turn_id: i64::try_from(turn_id).ok(),
+        request_id: i64::try_from(request_id).ok(),
+        request_attempt: Some(i64::from(request_attempt)),
+        cached_prompt_tokens: usage.cached_prompt_tokens,
+        cache_creation_prompt_tokens: usage.cache_creation_prompt_tokens,
     };
     if let Err(e) = worldflow_core::insert_api_usage(&db.pool, &input).await {
         log::error!("[usage] insert failed: {}", e);
@@ -1408,6 +1553,41 @@ pub(crate) fn spawn_session_event_loop<S>(
                         )
                         .ok();
                 }
+                SessionEvent::RequestUsage {
+                    turn_id,
+                    request_id,
+                    attempt,
+                    usage,
+                } => {
+                    let (plugin_id, model) = {
+                        let ai_state = app_clone.state::<AiState>();
+                        let sessions = ai_state.sessions.lock().await;
+                        sessions
+                            .get(&sid)
+                            .map(|entry| (entry.plugin_id.clone(), entry.model.clone()))
+                            .unwrap_or_else(|| {
+                                (persistence.plugin_id.clone(), persistence.model.clone())
+                            })
+                    };
+                    save_api_usage(
+                        &app_clone, &sid, &rid, turn_id, request_id, attempt, &plugin_id, &model,
+                        &usage,
+                    )
+                    .await;
+                    app_clone
+                        .emit(
+                            "ai:request_usage",
+                            EventRequestUsage {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                turn_id,
+                                request_id,
+                                attempt,
+                                usage,
+                            },
+                        )
+                        .ok();
+                }
                 SessionEvent::TurnEnd {
                     status,
                     node_id,
@@ -1434,19 +1614,6 @@ pub(crate) fn spawn_session_event_loop<S>(
                         continuation_of,
                     });
                     save_session_snapshot(&app_clone, &sid, &persistence, snapshot_outcome).await;
-                    if let Some(ref u) = usage {
-                        let (plugin_id, model) = {
-                            let ai_state = app_clone.state::<AiState>();
-                            let sessions = ai_state.sessions.lock().await;
-                            sessions
-                                .get(&sid)
-                                .map(|entry| (entry.plugin_id.clone(), entry.model.clone()))
-                                .unwrap_or_else(|| {
-                                    (persistence.plugin_id.clone(), persistence.model.clone())
-                                })
-                        };
-                        save_api_usage(&app_clone, &sid, &plugin_id, &model, u).await;
-                    }
                     if let Some(factor) = calibration_factor {
                         save_token_calibration(&app_clone, &calibration_key, factor).await;
                     }
@@ -1619,6 +1786,7 @@ mod tests {
                 timestamp,
             }],
             Some(1),
+            Vec::new(),
             None,
         )
         .unwrap();
@@ -1658,6 +1826,7 @@ mod tests {
         assert_eq!(conversation.messages[0].turn_status, None);
         assert_eq!(conversation.messages[0].finish_reason, None);
         assert_eq!(conversation.messages[0].continuation_of, None);
+        assert!(conversation.context_snapshots.is_empty());
     }
 
     #[test]
@@ -1695,6 +1864,7 @@ mod tests {
             None,
             vec![user.clone(), first.clone()],
             Some(2),
+            Vec::new(),
             Some(TurnSnapshotOutcome {
                 node_id: 2,
                 turn_status: "ok".to_string(),
@@ -1719,6 +1889,7 @@ mod tests {
             None,
             vec![user, first, second],
             Some(3),
+            Vec::new(),
             Some(TurnSnapshotOutcome {
                 node_id: 3,
                 turn_status: "ok".to_string(),
@@ -1731,7 +1902,7 @@ mod tests {
         let saved = chat_store_get_conversation(&paths, "session_outcome")
             .unwrap()
             .unwrap();
-        assert_eq!(saved.schema_version, 4);
+        assert_eq!(saved.schema_version, 5);
         let first = saved
             .messages
             .iter()
@@ -1746,6 +1917,118 @@ mod tests {
         assert_eq!(second.finish_reason.as_deref(), Some("stop"));
         assert_eq!(second.continuation_of, Some(2));
 
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn compact_restore_carries_effective_context_after_summary_boundary() {
+        let context_snapshot = TurnContextSnapshot {
+            owner_node_id: 2,
+            placement: ContextSnapshotPlacement::AfterNode,
+            assembly_version: 1,
+            content_hash: "digest".to_string(),
+            sources: vec![flowcloudai_client::ContextSnapshotSource {
+                source: "entry".to_string(),
+                version: 1,
+                content_hash: "source-digest".to_string(),
+                content: "仍然有效的词条资料".to_string(),
+            }],
+        };
+        let timestamp = "2026-09-09T00:00:00Z".to_string();
+        let message = |node_id, parent, role: &str, content: &str| StoredMessage {
+            message_id: Some(format!("msg_{node_id}")),
+            node_id: Some(node_id),
+            turn_id: Some(node_id),
+            parent,
+            role: role.to_string(),
+            content: Some(content.to_string()),
+            reasoning: None,
+            timestamp: timestamp.clone(),
+            work_seconds: None,
+            turn_status: None,
+            finish_reason: None,
+            continuation_of: None,
+            tool_call_id: None,
+            tool_calls: None,
+            attachments: Vec::new(),
+        };
+        let conversation = StoredConversation {
+            schema_version: 5,
+            meta: ConversationMeta {
+                id: "compact-context".to_string(),
+                title: "压缩恢复".to_string(),
+                plugin_id: "test".to_string(),
+                model: "test".to_string(),
+                created_at: timestamp.clone(),
+                updated_at: timestamp.clone(),
+            },
+            settings: StoredConversationSettings::default(),
+            messages: vec![
+                message(1, None, "user", "旧问题"),
+                message(2, Some(1), "assistant", "旧回答"),
+                message(3, Some(2), "user", "保留问题"),
+                message(4, Some(3), "assistant", "保留回答"),
+            ],
+            context_snapshots: Vec::new(),
+            head: Some(4),
+            compact: Some(StoredCompact {
+                position_node_id: 2,
+                text: "历史摘要".to_string(),
+                created_at: timestamp,
+                context_snapshot: Some(context_snapshot.clone()),
+            }),
+        };
+
+        let seeds = stored_conversation_to_runtime_seeds(&conversation);
+        assert_eq!(seeds.first().and_then(|seed| seed.node_id), Some(2));
+        assert_eq!(seeds.first().unwrap().message.role, "system");
+        let snapshots = stored_conversation_to_runtime_context_snapshots(&conversation);
+        assert_eq!(snapshots, vec![context_snapshot]);
+    }
+
+    #[test]
+    fn schema_upgrade_preserves_original_file_as_recovery_backup() {
+        let root = std::env::temp_dir().join(format!(
+            "flowcloudai-schema-upgrade-backup-test-{}",
+            Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(root.join("chats")).unwrap();
+        let paths = PathsState {
+            db_path: root.join("flowcloudai.db"),
+            plugins_path: root.join("plugins"),
+        };
+        let old_json = serde_json::json!({
+            "schema_version": 4,
+            "id": "upgrade_test",
+            "title": "旧格式",
+            "plugin_id": "test",
+            "model": "test",
+            "created_at": "2026-09-09T00:00:00Z",
+            "updated_at": "2026-09-09T00:00:00Z",
+            "messages": []
+        });
+        let conversation_path = root.join("chats/upgrade_test.json");
+        std::fs::write(
+            &conversation_path,
+            serde_json::to_string_pretty(&old_json).unwrap(),
+        )
+        .unwrap();
+        let mut upgraded: StoredConversation = serde_json::from_value(old_json.clone()).unwrap();
+        upgraded.schema_version = 5;
+
+        chat_store_save_conversation(&paths, &upgraded).unwrap();
+
+        let backup_path = root.join("chats/upgrade_test.schema-v4.json.bak");
+        let backup: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(backup_path).unwrap()).unwrap();
+        assert_eq!(backup, old_json);
+        assert_eq!(
+            chat_store_get_conversation(&paths, "upgrade_test")
+                .unwrap()
+                .unwrap()
+                .schema_version,
+            5
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

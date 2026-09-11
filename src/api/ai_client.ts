@@ -220,6 +220,20 @@ export interface AiUsage {
   prompt_tokens: number
   completion_tokens: number
   total_tokens: number
+  cached_prompt_tokens?: number | null
+  cache_creation_prompt_tokens?: number | null
+  request_count?: number
+  cache_usage_known_requests?: number
+  cache_creation_usage_known_requests?: number
+}
+
+export interface AiEventRequestUsage {
+  session_id: string
+  run_id: string
+  turn_id: number
+  request_id: number
+  attempt: number
+  usage: AiUsage
 }
 
 export interface AiEventTurnEnd {
@@ -330,8 +344,12 @@ export const ai_create_character_session = ({
 export const ai_build_character_project_snapshot = (projectId: string, entryId: string) =>
     command<AiBuildCharacterProjectSnapshotResult>('ai_build_character_project_snapshot', {projectId, entryId})
 
-export const ai_send_message = (sessionId: string, message: string, clientTraceId?: string) =>
-  command<void>('ai_send_message', { sessionId, message, clientTraceId })
+export const ai_send_message = (
+  sessionId: string,
+  message: string,
+  clientTraceId?: string,
+  ctx?: TaskContextPayload,
+) => command<void>('ai_send_message', {sessionId, message, clientTraceId, ctx})
 
 export const ai_continue_generation = (sessionId: string, nodeId: number, clientTraceId?: string) =>
   command<void>('ai_continue_generation', { sessionId, nodeId, clientTraceId })
@@ -499,6 +517,7 @@ export interface StoredCompact {
   position_node_id: number
   text: string
   created_at: string
+  context_snapshot?: TurnContextSnapshot | null
 }
 
 export interface StoredConversationSettings {
@@ -515,8 +534,24 @@ export interface StoredConversation extends ConversationMeta {
   schema_version?: number
   settings?: StoredConversationSettings
   messages: StoredMessage[]
+  context_snapshots?: TurnContextSnapshot[]
   head?: number | null
   compact?: StoredCompact | null
+}
+
+export interface ContextSnapshotSource {
+  source: string
+  version: number
+  content_hash: string
+  content: string
+}
+
+export interface TurnContextSnapshot {
+  owner_node_id: number
+  placement?: 'user_message' | 'after_node'
+  assembly_version: number
+  content_hash: string
+  sources: ContextSnapshotSource[]
 }
 
 export interface CompactConversationRequest {
@@ -767,6 +802,21 @@ export interface AiTokenEstimateRequest {
 export const ai_estimate_tokens = (request: AiTokenEstimateRequest) =>
     command<number>('ai_estimate_tokens', {request})
 
+export interface AiRequestPreflight {
+    estimated_input_tokens: number
+    context_window_tokens: number | null
+    output_reserve_tokens: number | null
+    safety_reserve_tokens: number | null
+    input_budget_tokens: number | null
+    suggest_compaction: boolean | null
+    head_node_id: number | null
+    request_fingerprint: string
+    estimate_source: 'baseline' | 'full'
+}
+
+export const ai_preflight_request = (sessionId: string, pendingUserMessage: string) =>
+    command<AiRequestPreflight>('ai_preflight_request', {sessionId, pendingUserMessage})
+
 // ── 工具管理 ──────────────────────────────────────────────────────────────────
 
 export const ai_enable_tool = (name: string) =>
@@ -787,6 +837,7 @@ export interface TaskContextPayload {
     projectId?: string | null
     taskType?: string | null
     attributes?: Record<string, string>
+    instructionAttributes?: Record<string, string>
     flags?: Record<string, boolean>
 }
 

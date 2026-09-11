@@ -79,6 +79,7 @@ pub async fn ai_create_llm_session(
     let mut restored_model = None;
     let mut restored_settings = None;
     let mut restored_history = None;
+    let mut restored_context_snapshots = None;
     let resolved_conversation_id = if let Some(conv_id) = conversation_id.as_deref() {
         let conversation = chat_store_get_conversation(paths.inner(), conv_id)
             .map_err(ApiError::internal)?
@@ -92,6 +93,9 @@ pub async fn ai_create_llm_session(
         restored_head = conversation.head;
         restored_model = Some(conversation.meta.model.clone());
         restored_settings = Some(conversation.settings.clone());
+        restored_context_snapshots = Some(stored_conversation_to_runtime_context_snapshots(
+            &conversation,
+        ));
         restored_history = Some(stored_conversation_to_runtime_seeds(&conversation));
         conversation.meta.id
     } else {
@@ -144,6 +148,9 @@ pub async fn ai_create_llm_session(
 
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
+    }
+    if let Some(context_snapshots) = restored_context_snapshots {
+        session.preload_context_snapshots(context_snapshots);
     }
     let requested_tool_access = tool_access.as_deref().unwrap_or("assistant");
     let effective_tool_access =
@@ -642,9 +649,11 @@ fn message_log_preview(message: &str) -> String {
 #[tauri::command]
 pub async fn ai_send_message(
     ai_state: State<'_, AiState>,
+    settings_state: State<'_, SettingsState>,
     session_id: String,
     message: String,
     client_trace_id: Option<String>,
+    ctx: Option<super::task_context::TaskContextDto>,
 ) -> Result<(), ApiError> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
     let message_bytes = message.len();
@@ -659,7 +668,14 @@ pub async fn ai_send_message(
         preview
     );
 
-    let (input_tx, run_id, plugin_id, model, kind, channel_capacity, channel_max_capacity) = {
+    let submitted_context = match ctx {
+        Some(ctx) => {
+            Some(super::task_context::resolve_task_context(settings_state.inner(), ctx).await)
+        }
+        None => None,
+    };
+
+    let (handle, run_id, plugin_id, model, kind, channel_capacity, channel_max_capacity) = {
         let sessions = ai_state.sessions.lock().await;
         let active_count = sessions.len();
         let Some(entry) = sessions.get(&session_id) else {
@@ -697,7 +713,7 @@ pub async fn ai_send_message(
             input_tx.max_capacity()
         );
         (
-            input_tx.clone(),
+            entry.handle.clone(),
             entry.run_id.clone(),
             entry.plugin_id.clone(),
             entry.model.clone(),
@@ -707,24 +723,22 @@ pub async fn ai_send_message(
         )
     };
 
-    input_tx
-        .send(message)
+    handle
+        .submit_user_turn(message, submitted_context)
         .await
-        .map_err(|_| {
+        .map_err(|error| {
             log::error!(
-                "[ai_send_message][channel_closed] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={}",
+                "[ai_send_message][submit_failed] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} error={}",
                 trace_id,
                 session_id,
                 run_id,
                 kind,
                 plugin_id,
-                model
+                model,
+                error
             );
-            ApiError::new(
-                ErrorCode::LlmSessionClosed,
-                format!("Session '{}' 已关闭", session_id),
-            )
-            .with_kv("session_id", session_id.clone())
+            ApiError::new(ErrorCode::LlmSessionClosed, error)
+                .with_kv("session_id", session_id.clone())
         })?;
     log::info!(
         "[ai_send_message][queued] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} bytes={} chars={} previous_capacity={} previous_max_capacity={} current_capacity={}",
@@ -738,7 +752,7 @@ pub async fn ai_send_message(
         message_chars,
         channel_capacity,
         channel_max_capacity,
-        input_tx.capacity()
+        channel_capacity
     );
     Ok(())
 }

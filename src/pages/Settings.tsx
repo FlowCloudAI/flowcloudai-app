@@ -1994,10 +1994,12 @@ export default function Settings({
     const usageActivityDays = useMemo(() => buildUsageActivityDays(usageDaily), [usageDaily])
     const usageMonthLabels = useMemo(() => buildUsageMonthLabels(), [])
     const usageActiveDays = usageDaily.filter(row => row.call_count > 0).length
-    const usageAverageTokens = usageSummary && usageSummary.call_count > 0
-        ? Math.round(usageSummary.total_tokens / usageSummary.call_count)
+    const usageMeasuredRecords = usageSummary
+        ? usageSummary.request_count + usageSummary.legacy_turn_count
         : 0
-    const usageTopModel = usageByModel[0] ?? null
+    const usageAverageTokens = usageSummary && usageMeasuredRecords > 0
+        ? Math.round(usageSummary.total_tokens / usageMeasuredRecords)
+        : 0
     if (loading || !settings) {
         return (
             <div className="settings-outer">
@@ -2765,7 +2767,7 @@ export default function Settings({
                                                         <span
                                                             key={day.date}
                                                             className={`usage-heatmap-cell usage-heatmap-cell--${day.intensity}`}
-                                                            title={`${day.label}：${day.totalTokens.toLocaleString()} 消耗，${day.callCount.toLocaleString()} 次调用`}
+                                                            title={`${day.label}：${day.totalTokens.toLocaleString()} 消耗，${day.callCount.toLocaleString()} 条用量记录`}
                                                         />
                                                     ) : (
                                                         <span key={`empty-${index}`}
@@ -2791,20 +2793,27 @@ export default function Settings({
                                             <h2 className="settings-section-title fc-section-title">活动洞察</h2>
                                             <dl className="usage-insight-list">
                                                 <div>
-                                                    <dt>AI 使用次数</dt>
-                                                    <dd>{usageSummary?.call_count.toLocaleString() ?? '0'}</dd>
+                                                    <dt>实际 API 请求</dt>
+                                                    <dd>{usageSummary?.request_count.toLocaleString() ?? '0'}</dd>
                                                 </div>
                                                 <div>
                                                     <dt>活跃天数</dt>
                                                     <dd>{usageActiveDays.toLocaleString()}</dd>
                                                 </div>
                                                 <div>
-                                                    <dt>平均每次消耗</dt>
+                                                    <dt>平均每条用量记录</dt>
                                                     <dd>{usageAverageTokens.toLocaleString()}</dd>
                                                 </div>
                                                 <div>
-                                                    <dt>最常用模型</dt>
-                                                    <dd>{usageTopModel?.model ?? '无'}</dd>
+                                                    <dt>缓存读取</dt>
+                                                    <dd>
+                                                        {usageSummary?.cached_prompt_tokens == null
+                                                            ? '未知'
+                                                            : usageSummary.cached_prompt_tokens.toLocaleString()}
+                                                        {usageSummary && usageSummary.request_count > 0
+                                                            ? `（${usageSummary.cache_usage_known_count}/${usageSummary.request_count} 请求有统计）`
+                                                            : ''}
+                                                    </dd>
                                                 </div>
                                             </dl>
                                         </div>
@@ -2848,7 +2857,8 @@ export default function Settings({
                                                         <th>模型</th>
                                                         <th>供应商</th>
                                                         <th>类型</th>
-                                                        <th>调用次数</th>
+                                                        <th>API 请求 / 旧回合</th>
+                                                        <th>缓存读取</th>
                                                         <th>提问消耗</th>
                                                         <th>应答消耗</th>
                                                         <th>总消耗</th>
@@ -2865,7 +2875,14 @@ export default function Settings({
                                                                         row.modality === 'image' ? '图片' : '语音'}
                                                                 </span>
                                                             </td>
-                                                            <td>{row.call_count.toLocaleString()}</td>
+                                                            <td>
+                                                                {row.request_count.toLocaleString()} / {row.legacy_turn_count.toLocaleString()}
+                                                            </td>
+                                                            <td title={`${row.cache_usage_known_count}/${row.request_count} 个请求返回了缓存口径`}>
+                                                                {row.cached_prompt_tokens == null
+                                                                    ? '未知'
+                                                                    : row.cached_prompt_tokens.toLocaleString()}
+                                                            </td>
                                                             <td>{row.prompt_tokens.toLocaleString()}</td>
                                                             <td>{row.completion_tokens.toLocaleString()}</td>
                                                             <td className="usage-total-col">

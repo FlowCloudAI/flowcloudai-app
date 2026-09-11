@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test:ai-conversation-draft": "node --test --experimental-test-isolation=none ./scripts/ai-conversation-state.test.ts",
     "test:ai-continuation": "node --test --experimental-test-isolation=none ./scripts/ai-continuation.test.ts",
+    "test:ai-context-submission": "node --test --experimental-test-isolation=none ./scripts/ai-context-submission.test.ts",
     "test:roleplay-tts": "node --test --experimental-test-isolation=none ./scripts/roleplay-tts.test.ts",
     "test:entry-tab-mounting": "node --test --experimental-test-isolation=none ./scripts/entry-tab-mounting.test.ts",
     "test:overlay-alert-modal": "node --test --experimental-strip-types ./scripts/overlay-alert-modal.test.ts",

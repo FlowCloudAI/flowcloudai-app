@@ -5,7 +5,18 @@ export interface ApiUsageCost {
     amount: number
 }
 
-export interface ApiUsageSummary {
+export interface ApiUsageRecordStats {
+    request_count: number
+    legacy_turn_count: number
+    cached_prompt_tokens: number | null
+    cache_usage_known_count: number
+    cache_usage_unknown_count: number
+    cache_creation_prompt_tokens: number | null
+    cache_creation_usage_known_count: number
+    cache_creation_usage_unknown_count: number
+}
+
+export interface ApiUsageSummary extends ApiUsageRecordStats {
     total_prompt_tokens: number
     total_completion_tokens: number
     total_tokens: number
@@ -14,7 +25,7 @@ export interface ApiUsageSummary {
     unknown_price_count: number
 }
 
-export interface ApiUsageByModel {
+export interface ApiUsageByModel extends ApiUsageRecordStats {
     model: string
     provider: string
     modality: string
@@ -26,7 +37,7 @@ export interface ApiUsageByModel {
     unknown_price_count: number
 }
 
-export interface ApiUsageDaily {
+export interface ApiUsageDaily extends ApiUsageRecordStats {
     date: string
     prompt_tokens: number
     completion_tokens: number

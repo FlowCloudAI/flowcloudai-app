@@ -626,6 +626,7 @@ pub fn run() {
             ai_get_usage_by_model,
             ai_get_usage_daily,
             ai_estimate_tokens,
+            ai_preflight_request,
             docctx_supported_extensions,
             docctx_add_files,
             docctx_list_items,
