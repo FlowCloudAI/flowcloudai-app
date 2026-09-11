@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-08-30
+> 更新日期：2026-09-11
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -11,6 +11,7 @@
 | 状态 | 含义 |
 | --- | --- |
 | `现行` | 当前有效，可直接作为判断依据 |
+| `待评审` | 可交互设计提案，尚未授权生产实现；只用于评审布局、入口和产品取舍 |
 | `归档` | 已完成工作的过程记录，只用于追溯 |
 | `结论记录` | 设计 QA，但视觉证据已丢失，只剩当时的判断 |
 
@@ -88,6 +89,7 @@
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
+| [../designs/desktop-entry-workspace.html](../designs/desktop-entry-workspace.html) | 待评审 | 2026-09-11 | **词条页面编辑落位设计稿**：词条 Tab 内统一“阅读 / 编辑页面”，可视、展示校对和代码共享一份草稿，AI 只保留全局入口；给出 1440 / 1024 / 低于 988px 的三栏与浮层预算、390px 移动端受控编辑、项目首页关系和 Markdown 回退边界。四个场景互斥展示，仅本地交互，未接入生产数据或原生窗口 |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-26 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§5.3 登记公共顶栏固定材质阴影的唯一例外，§9 规则 8 规定底部面板不承载滚动或输入内容 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |

@@ -1,0 +1,355 @@
+<!doctype html>
+<!--
+状态：待评审（设计稿，非生产界面）｜日期：2026-09-11
+范围：app_main 词条页面文档在桌面宽窗、桌面窄窗、全局 AI 浮层与移动端受控编辑中的落位。
+依据：工作区 docs/词条主题换装系统规划.md §0.10、§0.11、§9、§11、§14；
+app_main/designs/desktop-project-home.html；app_entry_page_editor 的 P0–P3 交互结论。
+本文件只用于评审布局、入口、宽度预算与过渡策略；不连接数据库、模型或 Tauri，不持久化。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowCloudAI · 词条页面编辑落位设计稿</title>
+<style>
+:root {
+  color-scheme: light;
+  --fc-color-bg: #ffffff;
+  --fc-color-bg-secondary: #f4f5f7;
+  --fc-color-bg-tertiary: #e9edf3;
+  --fc-color-bg-elevated: #ffffff;
+  --fc-color-text: #202631;
+  --fc-color-text-secondary: #5e6877;
+  --fc-color-border: #d6dde7;
+  --fc-color-border-strong: #aeb9c8;
+  --fc-color-primary: #315fbd;
+  --fc-color-primary-subtle: #e8effc;
+  --fc-color-success: #236a47;
+  --fc-color-success-subtle: #e7f5ed;
+  --fc-color-warning: #7a4d08;
+  --fc-color-warning-subtle: #fff3d8;
+  --fc-color-overlay: rgb(18 26 39 / 42%);
+  --fc-shadow-lg: 0 16px 42px rgb(24 37 58 / 22%);
+  --fc-radius-sm: 6px;
+  --fc-radius-md: 8px;
+  --fc-radius-lg: 12px;
+  --fc-radius-full: 999px;
+  --fc-space-xs: 4px;
+  --fc-space-sm: 8px;
+  --fc-space-md: 12px;
+  --fc-space-lg: 16px;
+  --fc-space-xl: 24px;
+  --fc-font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fc-font-size-2xs: 12px;
+  --fc-font-size-xs: 13px;
+  --fc-font-size-sm: 14px;
+  --fc-font-size-md: 16px;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --fc-color-bg: #20242b;
+  --fc-color-bg-secondary: #181c22;
+  --fc-color-bg-tertiary: #2b313a;
+  --fc-color-bg-elevated: #292f38;
+  --fc-color-text: #e5e9f0;
+  --fc-color-text-secondary: #abb5c4;
+  --fc-color-border: #3d4653;
+  --fc-color-border-strong: #657184;
+  --fc-color-primary: #9bbcff;
+  --fc-color-primary-subtle: #293a57;
+  --fc-color-success: #84d8ac;
+  --fc-color-success-subtle: #243d32;
+  --fc-color-warning: #edc177;
+  --fc-color-warning-subtle: #47391f;
+  --fc-color-overlay: rgb(5 8 13 / 62%);
+  --fc-shadow-lg: 0 16px 42px rgb(0 0 0 / 38%);
+}
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--fc-color-bg-secondary); }
+body { margin: 0; min-height: 100dvh; background: var(--fc-color-bg-secondary); color: var(--fc-color-text); font: var(--fc-font-size-sm)/1.5 var(--fc-font-family); }
+button, textarea { font: inherit; color: inherit; }
+button { min-height: 32px; padding: 6px 11px; border: 1px solid transparent; border-radius: var(--fc-radius-md); background: transparent; cursor: pointer; }
+button:hover { background: var(--fc-color-bg-tertiary); }
+button:focus-visible, [contenteditable="true"]:focus-visible, a:focus-visible { outline: 2px solid var(--fc-color-primary); outline-offset: 2px; }
+button[aria-pressed="true"], .is-selected { color: var(--fc-color-primary); background: var(--fc-color-primary-subtle); }
+button.primary { color: var(--fc-color-bg); background: var(--fc-color-primary); }
+button.outline { border-color: var(--fc-color-border); background: var(--fc-color-bg); }
+button:disabled { cursor: default; opacity: .48; }
+a { color: var(--fc-color-primary); }
+[hidden] { display: none !important; }
+.grow { flex: 1; }
+.muted { color: var(--fc-color-text-secondary); }
+.row { display: flex; align-items: center; gap: var(--fc-space-sm); flex-wrap: wrap; }
+.eyebrow, .status, .measure, small { font-size: var(--fc-font-size-2xs); }
+.eyebrow { color: var(--fc-color-primary); font-weight: 650; letter-spacing: .06em; }
+.status { color: var(--fc-color-text-secondary); }
+.pill { display: inline-flex; align-items: center; min-height: 26px; padding: 3px 9px; border-radius: var(--fc-radius-full); color: var(--fc-color-text-secondary); background: var(--fc-color-bg-secondary); }
+.segmented { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--fc-radius-full); background: var(--fc-color-bg-secondary); }
+.segmented button { min-height: 28px; border-radius: var(--fc-radius-full); padding: 4px 12px; }
+.review-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: var(--fc-space-md); min-height: 54px; padding: 9px 16px; border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-elevated); }
+.review-bar strong { white-space: nowrap; }
+.scene-switcher { display: flex; gap: var(--fc-space-xs); flex-wrap: wrap; }
+.scene-switcher button { font-size: var(--fc-font-size-2xs); }
+.stage { min-height: 820px; padding: var(--fc-space-lg); overflow: auto; background: var(--fc-color-bg-secondary); }
+.prototype { --scene-width: 1440px; --project-tree-width: 256px; width: var(--scene-width); min-height: 760px; margin: 0 auto; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); overflow: hidden; background: var(--fc-color-bg-secondary); box-shadow: var(--fc-shadow-lg); }
+.prototype[data-scene="narrow"], .prototype[data-scene="floating"] { --scene-width: 1024px; --project-tree-width: 0px; }
+.prototype[data-scene="mobile"] { --scene-width: 390px; min-height: 780px; }
+.prototype[data-scene="mobile"] .desktop-app { display: none; }
+.prototype:not([data-scene="mobile"]) .mobile-app { display: none; }
+.app-tabs { display: flex; align-items: center; gap: var(--fc-space-sm); height: 48px; padding: 7px 14px; }
+.app-tab { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 16px; border-radius: var(--fc-radius-md); color: var(--fc-color-text-secondary); text-decoration: none; }
+.app-tab.active { color: var(--fc-color-text); background: var(--fc-color-bg); }
+.desktop-grid { position: relative; display: grid; grid-template-columns: var(--project-tree-width) minmax(0, 1fr) 50px; height: 712px; background: var(--fc-color-bg); }
+.project-tree { min-width: 0; border-right: 1px solid var(--fc-color-border); overflow: auto; background: var(--fc-color-bg); }
+.prototype[data-scene="narrow"] .project-tree, .prototype[data-scene="floating"] .project-tree { display: none; }
+.project-heading { padding: 16px 14px 10px; }
+.project-heading p { margin: 4px 0 0; font-size: var(--fc-font-size-2xs); }
+.nav-group { padding: 6px 10px; }
+.nav-group-title { padding: 10px 8px 4px; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.nav-group button { display: block; width: 100%; margin: 2px 0; text-align: left; }
+.nav-group .indent { padding-left: 28px; }
+.project-note { margin: 14px; padding: 10px; border-radius: var(--fc-radius-md); background: var(--fc-color-bg-secondary); font-size: var(--fc-font-size-2xs); color: var(--fc-color-text-secondary); }
+.entry-workspace { position: relative; display: flex; min-width: 0; flex-direction: column; overflow: hidden; background: var(--fc-color-bg); }
+.entry-location, .entry-command { display: flex; align-items: center; gap: var(--fc-space-sm); flex-wrap: wrap; padding: 8px 14px; border-bottom: 1px solid var(--fc-color-border); }
+.entry-location { min-height: 40px; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.entry-command { min-height: 50px; }
+.editor-toolbar { display: grid; grid-template-columns: 1.2fr 1fr 1fr .8fr; min-height: 74px; border-bottom: 1px solid var(--fc-color-border); overflow-x: auto; }
+.tool-group { min-width: 138px; padding: 8px 10px 6px; border-right: 1px solid var(--fc-color-border); }
+.tool-group:last-child { border-right: 0; }
+.tool-group .group-title { display: block; margin-bottom: 4px; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.tool-group .group-actions { display: flex; gap: 3px; flex-wrap: nowrap; }
+.tool-group button { min-width: 54px; padding-inline: 8px; font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.editor-mode-bar { display: flex; align-items: center; gap: var(--fc-space-sm); min-height: 44px; padding: 6px 12px; border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-secondary); }
+.mode-note { margin-left: auto; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.editor-area { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.editor-grid { display: grid; grid-template-columns: 232px minmax(480px, 1fr) 336px; height: 100%; }
+.prototype[data-scene="narrow"] .editor-grid, .prototype[data-scene="floating"] .editor-grid { grid-template-columns: 210px minmax(440px, 1fr) 288px; }
+.editor-grid.display-mode { grid-template-columns: minmax(0, 1fr) !important; }
+.editor-grid.code-mode { grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr) !important; }
+.editor-grid.display-mode .layer-panel, .editor-grid.display-mode .inspector, .editor-grid.code-mode .layer-panel, .editor-grid.code-mode .inspector, .editor-grid.code-mode .page-canvas { display: none; }
+.editor-grid:not(.code-mode) .source-editor, .editor-grid:not(.code-mode) .source-preview { display: none; }
+.layer-panel, .inspector { min-width: 0; overflow: auto; background: var(--fc-color-bg); }
+.layer-panel { border-right: 1px solid var(--fc-color-border); }
+.inspector { border-left: 1px solid var(--fc-color-border); }
+.panel-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; min-height: 42px; padding: 8px 12px; border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg); }
+.layer-list { padding: 8px; }
+.layer-row { display: flex; align-items: center; gap: 6px; min-height: 34px; padding: 5px 8px; border-radius: var(--fc-radius-sm); font-size: var(--fc-font-size-xs); }
+.layer-row.level-2 { padding-left: 22px; }
+.layer-row.level-3 { padding-left: 38px; }
+.layer-row small { margin-left: auto; color: var(--fc-color-text-secondary); }
+.inspector-tabs { display: flex; gap: 3px; padding: 8px; border-bottom: 1px solid var(--fc-color-border); }
+.inspector-tabs button { flex: 1; padding-inline: 4px; font-size: var(--fc-font-size-2xs); }
+.inspector-body { padding: 14px; }
+.control-block { margin-bottom: 16px; }
+.control-block strong { display: block; margin-bottom: 8px; font-size: var(--fc-font-size-xs); }
+.choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.choice { min-height: 42px; border: 1px solid var(--fc-color-border); background: var(--fc-color-bg); }
+.inspector-note, .rollout-note { padding: 10px 12px; border-radius: var(--fc-radius-md); background: var(--fc-color-bg-secondary); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.page-canvas, .source-preview { min-width: 0; overflow: auto; padding: 22px; background: var(--fc-color-bg-secondary); }
+.entry-page { max-width: 760px; min-height: 100%; margin: 0 auto; padding: 34px clamp(24px, 5cqw, 56px); border: 1px solid var(--fc-color-border); background: var(--fc-color-bg); }
+.entry-page .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.entry-page h1 { margin: 12px 0 6px; font-size: 31px; line-height: 1.25; }
+.entry-page h2 { margin: 24px 0 10px; font-size: 19px; }
+.entry-page h3 { margin: 0 0 10px; font-size: var(--fc-font-size-md); }
+.entry-page p { margin: 8px 0; line-height: 1.8; }
+.page-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 22px; margin-top: 24px; }
+.facts-card { padding: 15px; border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-secondary); }
+.facts-card dl { margin: 0; }
+.facts-card dt { margin-top: 10px; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.facts-card dd { margin: 2px 0 0; }
+.selection-outline { outline: 2px solid var(--fc-color-primary); outline-offset: 6px; }
+.canvas-measure { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 10px auto; padding: 4px 8px; border-radius: var(--fc-radius-full); color: var(--fc-color-primary); background: var(--fc-color-primary-subtle); font-size: var(--fc-font-size-2xs); }
+.source-editor { overflow: auto; padding: 18px; border-right: 1px solid var(--fc-color-border); background: var(--fc-color-bg-secondary); }
+.source-editor pre { min-height: 100%; margin: 0; padding: 16px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-md); background: var(--fc-color-bg); font: var(--fc-font-size-2xs)/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.source-preview .entry-page { max-width: 520px; }
+.tool-rail { display: flex; flex-direction: column; gap: 6px; padding: 10px 5px; border-left: 1px solid var(--fc-color-border); background: var(--fc-color-bg); }
+.tool-rail button { min-width: 40px; min-height: 42px; padding: 6px 3px; font-size: var(--fc-font-size-2xs); }
+.tool-rail .rail-bottom { margin-top: auto; }
+.workspace-status { min-height: 30px; padding: 6px 12px; border-top: 1px solid var(--fc-color-border); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.compact-only { display: none; }
+.prototype[data-scene="narrow"] .compact-only, .prototype[data-scene="floating"] .compact-only { display: inline-flex; }
+.floating-backdrop { position: absolute; inset: 48px 50px 0 0; z-index: 10; display: none; background: var(--fc-color-overlay); }
+.floating-ai { position: absolute; z-index: 11; top: 88px; right: 62px; bottom: 18px; display: none; width: 500px; overflow: hidden; border: 1px solid var(--fc-color-border-strong); border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-lg); }
+.prototype[data-scene="floating"] .floating-backdrop, .prototype[data-scene="floating"] .floating-ai { display: flex; }
+.floating-ai { flex-direction: column; }
+.floating-header { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 9px 14px; border-bottom: 1px solid var(--fc-color-border); }
+.ai-conversation { flex: 1; overflow: auto; padding: 16px; }
+.message { max-width: 88%; margin: 0 0 12px; padding: 10px 12px; border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-secondary); }
+.message.user { margin-left: auto; color: var(--fc-color-primary); background: var(--fc-color-primary-subtle); }
+.ai-proposal { margin-top: 14px; padding: 12px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-md); }
+.ai-composer { padding: 12px; border-top: 1px solid var(--fc-color-border); }
+.ai-composer textarea { width: 100%; min-height: 74px; resize: none; padding: 10px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-md); background: var(--fc-color-bg); }
+.mobile-app { position: relative; min-height: 780px; background: var(--fc-color-bg); }
+.mobile-topbar { display: flex; align-items: center; min-height: 56px; padding: 8px 12px; border-bottom: 1px solid var(--fc-color-border); }
+.mobile-topbar button { min-height: 44px; }
+.mobile-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg); }
+.mobile-toolbar .row { gap: 6px; }
+.mobile-toolbar button { min-height: 44px; flex: 1 1 72px; }
+.mobile-canvas { height: 618px; overflow: auto; padding: 18px 14px 110px; background: var(--fc-color-bg-secondary); }
+.mobile-page { min-height: 100%; padding: 24px 20px; background: var(--fc-color-bg); }
+.mobile-page h1 { margin: 10px 0 4px; font-size: 28px; line-height: 1.25; }
+.mobile-page h2 { margin: 24px 0 8px; font-size: 18px; }
+.mobile-page p { line-height: 1.85; }
+.mobile-facts { margin: 20px 0; padding: 14px; border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-secondary); }
+.keyboard-contract { position: absolute; right: 12px; bottom: 12px; left: 12px; padding: 10px 12px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-md); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-lg); font-size: var(--fc-font-size-2xs); }
+.decision-section { max-width: 1120px; margin: 0 auto 48px; padding: 0 18px; }
+.decision-section h2 { margin: 0 0 8px; font-size: 22px; }
+.decision-section > p { margin-top: 0; color: var(--fc-color-text-secondary); }
+.decision-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.decision-card { padding: 16px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); background: var(--fc-color-bg); }
+.decision-card h3 { margin: 0 0 8px; font-size: var(--fc-font-size-md); }
+.decision-card p, .decision-card li { font-size: var(--fc-font-size-xs); }
+.budget-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: var(--fc-font-size-xs); }
+.budget-table th, .budget-table td { padding: 9px; border: 1px solid var(--fc-color-border); text-align: left; vertical-align: top; }
+.budget-table th { background: var(--fc-color-bg-secondary); }
+.decision-list { margin: 18px 0 0; padding-left: 22px; }
+.decision-list li { margin: 10px 0; }
+dialog { width: min(640px, calc(100vw - 32px)); max-height: 82dvh; overflow: auto; padding: 22px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); color: var(--fc-color-text); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-lg); }
+dialog::backdrop { background: var(--fc-color-overlay); }
+dialog h2 { margin-top: 0; }
+dialog footer { display: flex; justify-content: flex-end; margin-top: 18px; }
+@media (max-width: 760px) { .review-bar { position: static; align-items: flex-start; flex-direction: column; } .scene-switcher { width: 100%; } .stage { padding: 10px 0; } .decision-grid { grid-template-columns: 1fr; } .decision-section { padding-inline: 12px; } }
+</style>
+</head>
+<body>
+<header class="review-bar">
+  <div><strong>词条页面编辑落位 · 待评审</strong><div class="status">四个场景互斥显示；示例不连接生产数据。</div></div>
+  <div class="scene-switcher" role="group" aria-label="评审场景">
+    <button data-scene-button="wide" aria-pressed="true">桌面宽 · 1440</button>
+    <button data-scene-button="narrow" aria-pressed="false">桌面窄 · 1024</button>
+    <button data-scene-button="floating" aria-pressed="false">AI 浮层 · 1024</button>
+    <button data-scene-button="mobile" aria-pressed="false">移动编辑 · 390</button>
+  </div>
+  <span class="grow"></span><button class="outline" id="theme-button">切换深浅色</button><button class="outline" id="decisions-button">查看待拍板项</button>
+</header>
+<main>
+  <section class="stage" aria-label="设计场景画布">
+    <div class="prototype" id="prototype" data-scene="wide">
+      <div class="desktop-app">
+        <div class="app-tabs" aria-label="桌面标签结构"><span class="app-tab">主页</span><a class="app-tab" href="desktop-project-home.html">雾海纪事 · 项目首页</a><span class="app-tab active">林岚 · 词条</span><span class="grow"></span><span class="status">页面文档试运行</span></div>
+        <div class="desktop-grid">
+          <aside class="project-tree" aria-label="项目分类树">
+            <div class="project-heading"><strong>雾海纪事</strong><p class="muted">项目工作区</p></div>
+            <nav class="nav-group"><button>项目首页</button><button>全部词条</button><button>项目管理</button><div class="nav-group-title">人物</div><button class="indent is-selected">林岚</button><button class="indent">沈烬</button><div class="nav-group-title">地点</div><button class="indent">灯塔港</button><div class="nav-group-title">组织</div><button class="indent">巡航队</button></nav>
+            <div class="project-note">分类树默认 256px，最小 240px。窄窗时收起为“目录”浮出入口，不挤压页面编辑器。</div>
+          </aside>
+          <section class="entry-workspace" aria-label="林岚词条工作区">
+            <div class="entry-location"><button class="compact-only outline" id="directory-button">目录</button><span>雾海纪事 / 人物 / 林岚</span><span class="grow"></span><span class="pill">HTML 页面 · 试运行</span><button id="rollout-button">回退说明</button></div>
+            <div class="entry-command"><div class="segmented" role="group" aria-label="词条任务"><button id="read-button" aria-pressed="false">阅读</button><button id="edit-button" aria-pressed="true">编辑页面</button></div><span class="grow"></span><span class="status" id="save-state" role="status">已保存 · 项目 r12 / 词条 r38</span><button id="undo-button" disabled>撤销</button><button class="primary" id="save-button" disabled>保存页面</button></div>
+            <div class="editor-toolbar" id="editor-toolbar">
+              <section class="tool-group" aria-label="内容组"><span class="group-title">内容</span><div class="group-actions"><button>添加</button><button>链接</button><button>图片</button></div></section>
+              <section class="tool-group" aria-label="文字组"><span class="group-title">文字</span><div class="group-actions"><button>标题</button><button>加粗</button><button>颜色</button></div></section>
+              <section class="tool-group" aria-label="布局组"><span class="group-title">布局</span><div class="group-actions"><button>排列</button><button>间距</button><button>对齐</button></div></section>
+              <section class="tool-group" aria-label="视图组"><span class="group-title">视图</span><div class="group-actions"><button>图层</button><button>属性</button></div></section>
+            </div>
+            <div class="editor-mode-bar" id="editor-mode-bar"><div class="segmented" role="group" aria-label="页面编辑方式"><button data-editor-mode="visual" aria-pressed="true">可视编辑</button><button data-editor-mode="display" aria-pressed="false">展示校对</button><button data-editor-mode="code" aria-pressed="false">页面代码</button></div><span class="mode-note" id="mode-note">同一份 HTML/CSS 草稿 · 当前写入：通用</span></div>
+            <div class="editor-area">
+              <div class="editor-grid" id="editor-grid">
+                <aside class="layer-panel" aria-label="文档图层"><div class="panel-heading"><strong>文档图层</strong><span class="grow"></span><span class="measure">232px</span></div><div class="layer-list" role="tree" aria-label="页面结构"><div class="layer-row" role="treeitem" aria-level="1" aria-expanded="true">页面根容器 <small>可视</small></div><div class="layer-row level-2" role="treeitem" aria-level="2">词条资料 <small>绑定</small></div><div class="layer-row level-2 is-selected" role="treeitem" aria-level="2" aria-selected="true" aria-expanded="true">人物介绍 <small>布局</small></div><div class="layer-row level-3" role="treeitem" aria-level="3">人物资料 <small>容器</small></div><div class="layer-row level-3" role="treeitem" aria-level="3">经历与性格 <small>正文</small></div><div class="layer-row level-2" role="treeitem" aria-level="2">关联词条 <small>绑定</small></div></div></aside>
+                <div class="page-canvas" aria-label="页面画布"><div class="canvas-measure" id="canvas-measure">画布 ≥480px · 实际约566px</div><article class="entry-page" id="entry-page"><header><div class="chips"><span class="pill">人物</span><span class="pill">巡航队</span></div><h1>林岚</h1><p class="muted">巡航队的领航员，熟悉雾海的潮汐与沿岸灯塔。</p></header><div class="page-columns selection-outline" id="page-columns"><section class="facts-card"><h3>人物资料</h3><dl><dt>身份</dt><dd>领航员</dd><dt>常驻地</dt><dd>灯塔港</dd><dt>所属</dt><dd>巡航队</dd></dl></section><section><h2>经历与性格</h2><p id="desktop-prose">林岚在灯塔港长大。她习惯把航路画在随身携带的旧册子里，每经过一座灯塔，都会记下当日的风向。</p><p>一次漫长的雾季之后，她加入巡航队，负责寻找能够让补给船安全返航的路线。</p></section></div></article></div>
+                <aside class="inspector" aria-label="页面属性"><div class="panel-heading"><strong>人物介绍 · 属性</strong><span class="grow"></span><span class="measure">336px</span></div><div class="inspector-tabs" role="tablist" aria-label="属性页"><button aria-pressed="false">文字</button><button aria-pressed="true">布局</button><button aria-pressed="false">颜色与效果</button></div><div class="inspector-body"><div class="control-block"><strong>内容排列</strong><div class="choice-row"><button class="choice">上下排列</button><button class="choice is-selected">左右两列</button></div></div><div class="control-block"><strong>列宽</strong><div class="choice-row"><button class="choice">1 : 1</button><button class="choice is-selected">1 : 2</button></div></div><div class="control-block"><strong>列间距</strong><div class="row"><button class="outline">紧凑</button><button class="is-selected">适中</button><button class="outline">宽松</button></div></div><p class="inspector-note">属性窗格只编辑当前页面草稿；切页签、固定、收起与选择节点不产生文档操作。</p></div></aside>
+                <section class="source-editor" aria-label="页面代码编辑器"><pre contenteditable="true" spellcheck="false">&lt;section data-fc-node-id="ab12cd34-0001-4a01-8b01-000000000002"&gt;
+  &lt;aside data-fc-bind="facts"&gt;…&lt;/aside&gt;
+  &lt;article&gt;
+    &lt;h2&gt;经历与性格&lt;/h2&gt;
+    &lt;p&gt;林岚在灯塔港长大。…&lt;/p&gt;
+  &lt;/article&gt;
+&lt;/section&gt;
+
+/* 与可视编辑共享同一份草稿 */
+@media (min-width: 48rem) {
+  [data-fc-node-id="ab12cd34-0001-4a01-8b01-000000000002"] {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+  }
+}</pre></section>
+                <section class="source-preview" aria-label="代码草稿预览"><div class="canvas-measure">只读草稿预览</div><article class="entry-page"><div class="chips"><span class="pill">人物</span></div><h1>林岚</h1><h2>经历与性格</h2><p>代码合法时即时更新；校验失败则保留最后一次合法画面。</p></article></section>
+              </div>
+            </div>
+            <div class="workspace-status" id="workspace-status" role="status">可视编辑 · 选择、排版和正文修改进入同一内存草稿</div>
+          </section>
+          <nav class="tool-rail" aria-label="全局工具栏"><button disabled title="设计稿不展开灵感功能">灵感</button><button id="ai-button" aria-pressed="false">AI</button><button>历史</button><button class="rail-bottom">帮助</button></nav>
+          <div class="floating-backdrop" aria-hidden="true"></div>
+          <aside class="floating-ai" aria-label="AI 助手浮层"><header class="floating-header"><div><strong>AI 助手</strong><div class="status">当前上下文：林岚 · 未保存页面草稿</div></div><span class="grow"></span><button id="close-ai-button">关闭</button></header><div class="ai-conversation"><div class="message user">把人物资料保持在左边，经历放在右边；手机仍然单列。</div><div class="message">我会保留正文、链接和资料绑定，只调整“人物介绍”的响应式排列。</div><div class="ai-proposal"><strong>候选修改</strong><p>桌面：1 : 2 两列，间距 24px。<br>移动：保持单列。<br>正文与资料字段：不改。</p><div class="row"><button class="outline">查看差异</button><button class="primary" id="apply-ai-button">应用到页面草稿</button></div></div></div><div class="ai-composer"><textarea aria-label="给 AI 助手的消息">继续调整页面，保留现有内容。</textarea><div class="row"><span class="status">复用全局对话与模型配置</span><span class="grow"></span><button class="primary">发送</button></div></div></aside>
+        </div>
+      </div>
+      <section class="mobile-app" aria-label="移动端词条受控编辑"><header class="mobile-topbar"><button id="mobile-back">返回</button><div><strong>林岚</strong><div class="status">HTML 页面 · 受控编辑</div></div><span class="grow"></span><button class="primary" id="mobile-save">保存</button></header><div class="mobile-toolbar"><div class="row"><div class="segmented" role="group" aria-label="移动词条任务"><button id="mobile-read" aria-pressed="false">阅读</button><button id="mobile-edit" aria-pressed="true">编辑正文</button></div><button class="outline" id="mobile-meta">词条资料</button></div><div class="row" id="mobile-format-row"><button>段落</button><button>标题</button><button>加粗</button><button>链接</button></div></div><div class="mobile-canvas" id="mobile-canvas"><article class="mobile-page"><div class="row"><span class="pill">人物</span><span class="pill">巡航队</span></div><h1>林岚</h1><p class="muted">巡航队的领航员，熟悉雾海的潮汐与沿岸灯塔。</p><section class="mobile-facts"><strong>人物资料</strong><p>身份：领航员<br>常驻地：灯塔港<br>所属：巡航队</p></section><h2>经历与性格</h2><p id="mobile-prose" contenteditable="true">林岚在灯塔港长大。移动端直接编辑受控 HTML 文本意图，不读取 DOM diff，也不保存浏览器自行生成的标签。</p><p>图片、链接和基础行内格式可编辑；块排序、主题资产、手写 CSS 与桌面专用布局不在移动端提供。</p></article></div><div class="keyboard-contract">键盘几何由 Android/iOS 原生适配层发布；页面只滚动内部画布以露出光标，不改应用根高度。此稿没有横向滚动区，因此不需要 <code>data-mobile-horizontal-scroll</code>。</div></section>
+    </div>
+  </section>
+  <section class="decision-section" id="decision-section">
+    <span class="eyebrow">落位结论</span><h2>一套页面文档，两端按能力分工</h2><p>下面是实现前可直接复核的宽度账本与待拍板决策；G0、数据契约和验收设备仍未关闭，因此本稿不授权生产实现。</p>
+    <div class="decision-grid"><article class="decision-card"><h3>位置与项目首页</h3><p>页面编辑留在词条 Tab，不另开全宽业务 Tab。“阅读 / 编辑页面”与项目首页的“阅读 / 编辑首页”使用同一层级语言；对象名说明改的是词条页面还是项目首页。项目分类树和全局工具仍属于 app_main 外壳。</p></article><article class="decision-card"><h3>四种编辑方式</h3><p>可视 → “可视编辑”；展示 → “展示校对”；代码 → “页面代码”；AI → 右侧全局 AI。全局 AI 获得当前词条、选区和未保存草稿上下文，候选仍回到同一页面草稿，不保留编辑器内部第二套 AI 入口。</p></article><article class="decision-card"><h3>面板协调</h3><p>宽窗用 DockPanelScaffold 组合图层、画布、属性；窄窗先收起项目树，低于 988px 后图层与属性改用 FloatingPanel 且一次只开一个。AI 最小 500px，编辑期间始终浮出并自动收起属性窗格，不与三栏并排。</p></article><article class="decision-card"><h3>移动端能力</h3><p>从词条详情的“编辑”进入受控 HTML 正文；提供文字、标题、基础行内格式、链接、图片与资料编辑。没有块排序、主题资产和手写 CSS。输入意图经前端文档 API 进入内存草稿，页面层不直接依赖 Tauri。</p></article></div>
+    <table class="budget-table"><thead><tr><th>场景</th><th>外壳预算</th><th>页面编辑器预算</th><th>结论</th></tr></thead><tbody><tr><td>1440px 宽窗</td><td>分类树 256 + 工具栏 50，词条区 1134</td><td>图层 232 + 画布 480 + 属性 336 = 1048</td><td>可常驻三栏，余量 86px；功能组位置固定。</td></tr><tr><td>1024px 窄窗</td><td>分类树收起 + 工具栏 50，词条区 974</td><td>紧凑档 210 + 440 + 288 = 938</td><td>可保留三栏，余量 36px；目录按需浮出。</td></tr><tr><td>低于 988px</td><td>分类树继续收起，工具栏 50</td><td>三栏最小 938 已无法满足</td><td>画布常驻；图层、属性用共享 FloatingPanel 互斥浮出。</td></tr><tr><td>AI 打开</td><td>全局 AI 停靠栏最小 500</td><td>500 + 1048 或 938 均超预算</td><td>编辑时不并排停靠；用共享 500px FloatingPanel 覆盖，关闭后恢复原面板。</td></tr></tbody></table>
+    <h3>需要项目负责人拍板</h3><ol class="decision-list"><li><strong>位置：</strong>确认采用“同一词条 Tab 内的阅读 / 编辑页面”，不新增独立全宽页面编辑 Tab。</li><li><strong>宽度：</strong>确认 1440 常驻三栏、1024 紧凑三栏、低于 988 改互斥浮层；AI 在编辑中只浮出，不允许与三栏硬挤。</li><li><strong>AI：</strong>确认取消编辑器内部 AI 模式的产品入口，由 app_main 全局 AI 唯一承接页面上下文、历史与候选应用。</li><li><strong>移动端：</strong>确认正文与基础行内能力首批范围；坚持原生适配层拥有键盘几何、页面画布只负责 caret reveal，且不新增横向工具栏。</li><li><strong>Markdown 过渡：</strong>不在词条内提供 HTML/Markdown 实时切换或双写。由项目级试运行开关把仍是 Markdown 的词条一键路由回旧渲染/旧编辑器；转换前可退出预览，转换保存后旧 Markdown 只留恢复快照。恢复旧版内容走显式预览与确认事务，不把两个格式同时当真值。</li></ol>
+    <p class="rollout-note"><strong>回退边界：</strong>P2 的“一键回退”是发布/项目级路由开关，不是作者在同一词条里反复切换两套可编辑内容。<code>documentFormat</code> 决定唯一编辑器；HTML 词条若要恢复旧内容，必须显式恢复快照并产生新的可审计修订。</p>
+  </section>
+</main>
+<dialog id="rollout-dialog" aria-labelledby="rollout-title"><h2 id="rollout-title">Markdown 过渡与回退</h2><p>旧词条默认继续使用现有 Markdown 渲染和编辑器。用户选择“预览新版页面”时只创建候选；取消后原内容不变。</p><p>确认转换并保存后，HTML/CSS 成为唯一真值，旧 Markdown 只作为恢复快照。恢复旧版需预览影响并确认一次事务，不进行双写。</p><p>发布试运行开关可让尚未转换的词条一键回到旧路径；它不承诺用旧渲染器解释已经保存的 HTML。</p><footer><button class="primary" data-close-dialog>知道了</button></footer></dialog>
+<dialog id="directory-dialog" aria-labelledby="directory-title"><h2 id="directory-title">项目目录 · 浮出</h2><p>窄窗口默认收起 256px 分类树。此入口复用 FloatingPanel 展示项目首页、全部词条、项目管理和分类，不改变页面草稿。</p><div class="nav-group"><button>项目首页</button><button>全部词条</button><button>项目管理</button><button class="is-selected">人物 / 林岚</button></div><footer><button class="primary" data-close-dialog>返回页面</button></footer></dialog>
+<dialog id="mobile-meta-dialog" aria-labelledby="mobile-meta-title"><h2 id="mobile-meta-title">词条资料</h2><p>生产实现复用现有移动端词条资料页；这里不另造表单，也不把资料值复制进 HTML。</p><footer><button class="primary" data-close-dialog>返回正文</button></footer></dialog>
+<script>
+// 设计稿只切换本地展示状态；生产面板归属由 app_main 的 overlay/layout 公共层实现。
+const prototype = document.getElementById('prototype');
+const editorGrid = document.getElementById('editor-grid');
+const editorToolbar = document.getElementById('editor-toolbar');
+const editorModeBar = document.getElementById('editor-mode-bar');
+const workspaceStatus = document.getElementById('workspace-status');
+const saveState = document.getElementById('save-state');
+const saveButton = document.getElementById('save-button');
+const undoButton = document.getElementById('undo-button');
+let editorMode = 'visual';
+let entryTask = 'edit';
+let dirty = false;
+function setScene(next) {
+  prototype.dataset.scene = next;
+  document.querySelectorAll('[data-scene-button]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.sceneButton === next)));
+  document.getElementById('ai-button').setAttribute('aria-pressed', String(next === 'floating'));
+  const compact = next === 'narrow' || next === 'floating';
+  document.querySelector('.layer-panel .measure').textContent = compact ? '210px' : '232px';
+  document.querySelector('.inspector .measure').textContent = compact ? '288px' : '336px';
+  document.getElementById('canvas-measure').textContent = compact ? '画布 ≥440px · 词条区 974px' : '画布 ≥480px · 词条区 1134px';
+}
+function setEditorMode(next) {
+  editorMode = next;
+  editorGrid.classList.toggle('display-mode', next === 'display' || entryTask === 'read');
+  editorGrid.classList.toggle('code-mode', next === 'code' && entryTask === 'edit');
+  document.querySelectorAll('[data-editor-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.editorMode === next)));
+  document.getElementById('mode-note').textContent = next === 'code' ? '源码与右侧预览共享同一份草稿 · 非第二份真值' : next === 'display' ? '展示校对只隐藏编辑辅助，不另存页面' : '同一份 HTML/CSS 草稿 · 当前写入：通用';
+  workspaceStatus.textContent = next === 'code' ? '页面代码 · 合法修改即时进入同一草稿，预览保留最后合法画面' : next === 'display' ? '展示校对 · 当前未保存草稿，不显示选择框和属性面板' : '可视编辑 · 选择、排版和正文修改进入同一内存草稿';
+}
+function setEntryTask(next) {
+  entryTask = next;
+  document.getElementById('read-button').setAttribute('aria-pressed', String(next === 'read'));
+  document.getElementById('edit-button').setAttribute('aria-pressed', String(next === 'edit'));
+  editorToolbar.hidden = next === 'read'; editorModeBar.hidden = next === 'read';
+  editorGrid.classList.toggle('display-mode', next === 'read' || editorMode === 'display');
+  editorGrid.classList.toggle('code-mode', next === 'edit' && editorMode === 'code');
+  document.getElementById('page-columns').classList.toggle('selection-outline', next === 'edit' && editorMode === 'visual');
+  workspaceStatus.textContent = next === 'read' ? '阅读 · 只呈现已保存页面；编辑入口仍在当前词条 Tab' : '编辑页面 · 可视、展示校对和页面代码共用一份草稿';
+}
+function markDirty(message) { dirty = true; saveState.textContent = '有未保存页面修改 · 项目 r12 / 词条 r38'; saveButton.disabled = false; undoButton.disabled = false; workspaceStatus.textContent = message; }
+document.querySelectorAll('[data-scene-button]').forEach(button => button.addEventListener('click', () => setScene(button.dataset.sceneButton)));
+document.querySelectorAll('[data-editor-mode]').forEach(button => button.addEventListener('click', () => setEditorMode(button.dataset.editorMode)));
+document.getElementById('read-button').addEventListener('click', () => setEntryTask('read'));
+document.getElementById('edit-button').addEventListener('click', () => setEntryTask('edit'));
+document.getElementById('ai-button').addEventListener('click', () => setScene('floating'));
+document.getElementById('close-ai-button').addEventListener('click', () => setScene('narrow'));
+document.getElementById('apply-ai-button').addEventListener('click', () => markDirty('AI 候选已应用到同一页面草稿；关闭浮层即可继续可视编辑或撤销'));
+document.getElementById('save-button').addEventListener('click', () => { if (!dirty) return; dirty = false; saveState.textContent = '已保存 · 项目 r12 / 词条 r39'; saveButton.disabled = true; undoButton.disabled = true; workspaceStatus.textContent = '页面 HTML/CSS、资料绑定与资产引用已按一次原子保存呈现（设计示例）'; });
+document.getElementById('undo-button').addEventListener('click', () => { dirty = false; saveState.textContent = '已保存 · 项目 r12 / 词条 r38'; saveButton.disabled = true; undoButton.disabled = true; workspaceStatus.textContent = '已撤销页面草稿中的示例修改'; });
+document.getElementById('desktop-prose').addEventListener('click', () => markDirty('示例正文已进入编辑焦点；正式实现由文档输入意图产生操作'));
+document.getElementById('theme-button').addEventListener('click', () => { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; });
+document.getElementById('decisions-button').addEventListener('click', () => document.getElementById('decision-section').scrollIntoView({behavior: 'smooth'}));
+document.getElementById('rollout-button').addEventListener('click', () => document.getElementById('rollout-dialog').showModal());
+document.getElementById('directory-button').addEventListener('click', () => document.getElementById('directory-dialog').showModal());
+document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+document.getElementById('mobile-read').addEventListener('click', () => { document.getElementById('mobile-read').setAttribute('aria-pressed', 'true'); document.getElementById('mobile-edit').setAttribute('aria-pressed', 'false'); document.getElementById('mobile-format-row').hidden = true; document.getElementById('mobile-prose').contentEditable = 'false'; });
+document.getElementById('mobile-edit').addEventListener('click', () => { document.getElementById('mobile-read').setAttribute('aria-pressed', 'false'); document.getElementById('mobile-edit').setAttribute('aria-pressed', 'true'); document.getElementById('mobile-format-row').hidden = false; document.getElementById('mobile-prose').contentEditable = 'true'; document.getElementById('mobile-prose').focus(); });
+document.getElementById('mobile-save').addEventListener('click', event => { event.currentTarget.textContent = '已保存'; });
+document.getElementById('mobile-meta').addEventListener('click', () => document.getElementById('mobile-meta-dialog').showModal());
+document.getElementById('mobile-back').addEventListener('click', () => document.getElementById('mobile-read').click());
+document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (prototype.dataset.scene === 'mobile') document.getElementById('mobile-save').click(); else saveButton.click(); } });
+setScene('wide'); setEditorMode('visual'); setEntryTask('edit');
+</script>
+</body>
+</html>
