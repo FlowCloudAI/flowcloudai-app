@@ -1,5 +1,11 @@
+/**
+ * 通用浮层外壳：统一 portal、动效、焦点恢复、滚动锁与关闭入口。
+ * Alert 模态拥有更高关闭优先级，具体判定由同目录纯逻辑模块提供。
+ */
 import {type CSSProperties, type ReactNode, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {useAlertModalState} from 'flowcloudai-ui'
+import {shouldDismissOverlay} from './overlayDismissalModel'
 import {pushOverlay, removeOverlay} from './overlayStack'
 import './Overlay.css'
 
@@ -43,6 +49,7 @@ export default function Overlay({
     dataTourId,
     children,
 }: OverlayProps) {
+    const isAlertModalOpen = useAlertModalState()
     const transitionDurationMs = variant === 'sheet' ? SHEET_TRANSITION_MS : FLOATING_TRANSITION_MS
     const [mounted, setMounted] = useState(open)
     const [active, setActive] = useState(false)
@@ -55,7 +62,7 @@ export default function Overlay({
     useEffect(() => {
         onCloseRef.current = onClose
         dismissibleRef.current = dismissible
-    })
+    }, [dismissible, onClose])
 
     /*
      * Sheet 开启时先挂载 closed 态，完整绘制一帧后再进入 open 态。只排一个 rAF 时，
@@ -126,16 +133,6 @@ export default function Overlay({
             if (dismissibleRef.current) onCloseRef.current?.()
         })
 
-        // 捕获阶段拦截 Esc：先于 window 冒泡监听（如移动端返回处理）执行并阻断，避免连带回退页面。
-        const onKeyDownCapture = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && dismissibleRef.current) {
-                e.preventDefault()
-                e.stopPropagation()
-                onCloseRef.current?.()
-            }
-        }
-        window.addEventListener('keydown', onKeyDownCapture, true)
-
         const bodyOverflow = document.body.style.overflow
         document.body.style.overflow = 'hidden'
 
@@ -147,12 +144,24 @@ export default function Overlay({
 
         return () => {
             removeOverlay(id)
-            window.removeEventListener('keydown', onKeyDownCapture, true)
             document.body.style.overflow = bodyOverflow
             cancelAnimationFrame(focusRaf)
             prevFocus?.focus?.()
         }
     }, [open])
+
+    useEffect(() => {
+        if (!open) return
+        // AlertProvider 的捕获监听位于 document；这里若先阻断，Esc 会关闭底层面板而留下确认框。
+        const onKeyDownCapture = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape' || !shouldDismissOverlay(dismissibleRef.current, isAlertModalOpen)) return
+            e.preventDefault()
+            e.stopPropagation()
+            onCloseRef.current?.()
+        }
+        window.addEventListener('keydown', onKeyDownCapture, true)
+        return () => window.removeEventListener('keydown', onKeyDownCapture, true)
+    }, [isAlertModalOpen, open])
 
     if (!mounted) return null
 
@@ -168,7 +177,10 @@ export default function Overlay({
             style={overlayStyle}
             onMouseDown={(e) => {
                 // 仅背板（自身）被按下时关闭，面板内部按下不触发。
-                if (e.target === e.currentTarget && dismissibleRef.current) onCloseRef.current?.()
+                if (
+                    e.target === e.currentTarget &&
+                    shouldDismissOverlay(dismissibleRef.current, isAlertModalOpen)
+                ) onCloseRef.current?.()
             }}
         >
             <div
