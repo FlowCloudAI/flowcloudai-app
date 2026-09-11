@@ -6,7 +6,7 @@ import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import './mobileTokens.css'
 import './mobileAccessibility.css'
 import './MobileApp.css'
-import {useAlert} from 'flowcloudai-ui'
+import {useAlert, useAlertModalState} from 'flowcloudai-ui'
 import {
     type CSSProperties,
     type TransitionEvent,
@@ -74,6 +74,7 @@ import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileS
 import {useMobileInputMode} from './useMobileInputMode'
 import {useAndroidPredictiveBack} from './useAndroidPredictiveBack'
 import {useMobilePagePopTransition} from './useMobilePagePopTransition'
+import {canHandleMobileBack} from './mobileBackOwnershipModel'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -103,6 +104,7 @@ interface MobileEdgeBackOrigin {
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
+    const isAlertModalOpen = useAlertModalState()
     const closingRef = useRef(false)
     const mobileAppRef = useRef<HTMLDivElement>(null)
     const sideDrawerShellRef = useRef<HTMLDivElement>(null)
@@ -261,16 +263,18 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const prepareEdgeBackNavigation = useCallback(async (): Promise<boolean> => {
         pendingEdgeBackTargetRef.current = null
+        if (!canHandleMobileBack('edge-gesture', isAlertModalOpen)) return false
         if (!await runLeaveGuard('back')) return false
         const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
         if (target === 'exit' && !await confirmExit()) return false
         pendingEdgeBackTargetRef.current = target
         return true
-    }, [activeStack.canGoBack, activeTab, confirmExit, runLeaveGuard])
+    }, [activeStack.canGoBack, activeTab, confirmExit, isAlertModalOpen, runLeaveGuard])
 
     const commitPreparedEdgeBackNavigation = useCallback(async (): Promise<boolean> => {
         const target = pendingEdgeBackTargetRef.current
         pendingEdgeBackTargetRef.current = null
+        if (!canHandleMobileBack('edge-gesture', isAlertModalOpen)) return false
         if (!target) return false
         if (target === 'page') {
             if (!activeStack.canGoBack) return false
@@ -278,7 +282,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             return true
         }
         return await commitBackTarget(target)
-    }, [activeStack, commitBackTarget])
+    }, [activeStack, commitBackTarget, isAlertModalOpen])
     /*
      * 分类树是否正在拖拽。用 ref 不用 state：它只在手势回调里被读，
      * 走 state 会在每次拖拽起止时重渲染整个移动端外壳，白白掉帧。
@@ -316,16 +320,20 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
          * 手一滑就弹退出框，而且确认期间页面会停在拖到一半的位置等你回答。
          * 系统返回键仍然可以退出（带确认），那是平台约定，不动。
          */
-        canStartEdgeBack: () => edgeBackTarget !== 'exit',
+        canStartEdgeBack: () => (
+            canHandleMobileBack('edge-gesture', isAlertModalOpen)
+            && edgeBackTarget !== 'exit'
+        ),
         // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
         shouldSuppress: () => categoryDragActiveRef.current,
     })
     const canAnimateAndroidPredictiveBack = useCallback(() => (
-        !mobileInputModeActive
+        canHandleMobileBack('predictive', isAlertModalOpen)
+        && !mobileInputModeActive
         && !sideDrawerOpen
         && !hasOpenOverlay()
         && edgeBackTarget !== 'exit'
-    ), [edgeBackTarget, mobileInputModeActive, sideDrawerOpen])
+    ), [edgeBackTarget, isAlertModalOpen, mobileInputModeActive, sideDrawerOpen])
     const androidPredictiveBack = useAndroidPredictiveBack({
         enabled: platformInfo.os === 'android',
         canAnimate: canAnimateAndroidPredictiveBack,
@@ -581,6 +589,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const handleBack = useCallback(() => {
         // 任一路返回正在播动画都不再受理：页面栈只允许提交一次。
         if (activeEdgeBackPhase !== 'idle') return
+        // Alert 是最上层模态；Provider 未公开主动取消 API，因此返回在这里安全吞掉。
+        if (!canHandleMobileBack('fallback', isAlertModalOpen)) return
         // 输入期间第一次返回只收起键盘；退出输入模式后才允许关闭浮层或回退页面。
         if (dismissFocusedInput()) return
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
@@ -590,7 +600,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             return
         }
         void runBackNavigation()
-    }, [activeEdgeBackPhase, closeCategoryDrawer, dismissFocusedInput, runBackNavigation, sideDrawerOpen])
+    }, [activeEdgeBackPhase, closeCategoryDrawer, dismissFocusedInput, isAlertModalOpen, runBackNavigation, sideDrawerOpen])
 
     useEffect(() => {
         const handleAndroidBackFallback = () => {

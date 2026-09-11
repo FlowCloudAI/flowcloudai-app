@@ -1,5 +1,5 @@
 import './TourProvider.css'
-import {Button} from 'flowcloudai-ui'
+import {Button, useAlertModalState} from 'flowcloudai-ui'
 import {
     type CSSProperties,
     type ReactNode,
@@ -75,6 +75,7 @@ const DEFAULT_LABELS: Required<TourLabels> = {
 }
 
 export function TourProvider({children}: TourProviderProps) {
+    const isAlertModalOpen = useAlertModalState()
     const [registeredTours, setRegisteredTours] = useState<Record<string, TourDefinition>>({})
     const [activeTour, setActiveTour] = useState<ActiveTour | null>(null)
     const [targetRect, setTargetRect] = useState<TourTargetRect | null>(null)
@@ -390,6 +391,7 @@ export function TourProvider({children}: TourProviderProps) {
         if (!activeTour) return undefined
 
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (isAlertModalOpen) return
             if (event.key !== 'Escape' && isEditingElement(event.target)) return
 
             if (event.key === 'Escape') {
@@ -408,7 +410,7 @@ export function TourProvider({children}: TourProviderProps) {
         return () => {
             window.removeEventListener('keydown', handleKeyDown, true)
         }
-    }, [activeTour, nextStep, previousStep, skipTour])
+    }, [activeTour, isAlertModalOpen, nextStep, previousStep, skipTour])
 
     const contextValue = useMemo<TourContextValue>(() => ({
         isActive: Boolean(activeTour),

@@ -60,7 +60,10 @@ test('无手势的返回也走滑出转场，顶栏按钮与三键返回和边�
 
 test('首页根部的边缘右划不发起退出应用，谓词落在唯一的候选判定点上', () => {
     // 返回目标是 exit 时手势整段不介入：不预热、不跟手、不结算，也就不会弹退出确认。
-    assert.match(mobileAppSource, /canStartEdgeBack: \(\) => edgeBackTarget !== 'exit'/)
+    assert.match(
+        mobileAppSource,
+        /canStartEdgeBack: \(\) => \([\s\S]*?canHandleMobileBack\('edge-gesture', isAlertModalOpen\)[\s\S]*?&& edgeBackTarget !== 'exit'[\s\S]*?\)/,
+    )
     /*
      * 必须落在 edgeBackCandidate 上。移动分支在 runtime.edgeBackCandidate 为真时会自己
      * 补 edgeBackPreparedRef 并调 onEdgeBackStart——只挡按下预热那一处拦不住它，

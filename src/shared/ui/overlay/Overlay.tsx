@@ -59,10 +59,14 @@ export default function Overlay({
     // 在 effect 中同步（不在渲染期写 ref，遵循 react-hooks/refs）。
     const onCloseRef = useRef(onClose)
     const dismissibleRef = useRef(dismissible)
+    const isAlertModalOpenRef = useRef(isAlertModalOpen)
     useEffect(() => {
         onCloseRef.current = onClose
         dismissibleRef.current = dismissible
     }, [dismissible, onClose])
+    useEffect(() => {
+        isAlertModalOpenRef.current = isAlertModalOpen
+    }, [isAlertModalOpen])
 
     /*
      * Sheet 开启时先挂载 closed 态，完整绘制一帧后再进入 open 态。只排一个 rAF 时，
@@ -130,7 +134,9 @@ export default function Overlay({
     useEffect(() => {
         if (!open) return
         const id = pushOverlay(() => {
-            if (dismissibleRef.current) onCloseRef.current?.()
+            if (shouldDismissOverlay(dismissibleRef.current, isAlertModalOpenRef.current)) {
+                onCloseRef.current?.()
+            }
         })
 
         const bodyOverflow = document.body.style.overflow
