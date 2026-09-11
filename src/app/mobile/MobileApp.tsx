@@ -274,7 +274,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const commitPreparedEdgeBackNavigation = useCallback(async (): Promise<boolean> => {
         const target = pendingEdgeBackTargetRef.current
         pendingEdgeBackTargetRef.current = null
-        if (!canHandleMobileBack('edge-gesture', isAlertModalOpen)) return false
         if (!target) return false
         if (target === 'page') {
             if (!activeStack.canGoBack) return false
@@ -282,7 +281,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             return true
         }
         return await commitBackTarget(target)
-    }, [activeStack, commitBackTarget, isAlertModalOpen])
+    }, [activeStack, commitBackTarget])
     /*
      * 分类树是否正在拖拽。用 ref 不用 state：它只在手势回调里被读，
      * 走 state 会在每次拖拽起止时重渲染整个移动端外壳，白白掉帧。

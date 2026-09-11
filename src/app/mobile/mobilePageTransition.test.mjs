@@ -4,18 +4,52 @@ import test from 'node:test'
 import {URL} from 'node:url'
 
 import {getMobilePageTransitionLayers} from './mobilePageTransition.ts'
+import {resolveAndroidPredictiveBackInvoke} from './androidPredictiveBackModel.ts'
 
 const mobileAppCss = readFileSync(new URL('./MobileApp.css', import.meta.url), 'utf8')
 const mobileAppSource = readFileSync(new URL('./MobileApp.tsx', import.meta.url), 'utf8')
 const transitionHostSource = readFileSync(new URL('./MobilePageTransitionHost.tsx', import.meta.url), 'utf8')
 const sideDrawerGestureSource = readFileSync(new URL('./useMobileSideDrawerGesture.ts', import.meta.url), 'utf8')
 const pagePopTransitionSource = readFileSync(new URL('./useMobilePagePopTransition.ts', import.meta.url), 'utf8')
+const androidPredictiveBackSource = readFileSync(new URL('./useAndroidPredictiveBack.ts', import.meta.url), 'utf8')
 const mobileTokensCss = readFileSync(new URL('./mobileTokens.css', import.meta.url), 'utf8')
 
 test('双层转场在空栈中只保留根页', () => {
     assert.deepEqual(getMobilePageTransitionLayers([], 'home-root'), [
         {key: 'home-root', page: null},
     ])
+})
+
+test('预测式返回在离开确认打开再关闭后仍提交已获准的同一次手势', () => {
+    // 确认框开合只更新回调 ref，不会推进 attempt；用户确认后仍属于原手势。
+    assert.equal(resolveAndroidPredictiveBackInvoke({
+        startedAttempt: 7,
+        currentAttempt: 7,
+        preparationAllowed: true,
+    }), 'commit')
+    // 下方只固定监听生命周期结构；上面的纯模型断言才覆盖最终提交语义。
+    assert.match(
+        androidPredictiveBackSource,
+        /window\.removeEventListener\('flowcloudai:android-back-invoked',[\s\S]*?\}, \[enabled\]\)/,
+        '长生命周期原生监听只能随 enabled 重建，不能被确认框开合产生的回调身份变化打断',
+    )
+    const preparedCommit = mobileAppSource.match(
+        /const commitPreparedEdgeBackNavigation = useCallback\([\s\S]*?\n {4}\}, \[[^\]]*\]\)/,
+    )?.[0] ?? ''
+    assert.doesNotMatch(preparedCommit, /isAlertModalOpen|canHandleMobileBack/)
+})
+
+test('预测式返回尊重离开确认取消，并丢弃被新手势覆盖的旧准备结果', () => {
+    assert.equal(resolveAndroidPredictiveBackInvoke({
+        startedAttempt: 8,
+        currentAttempt: 8,
+        preparationAllowed: false,
+    }), 'cancel')
+    assert.equal(resolveAndroidPredictiveBackInvoke({
+        startedAttempt: 8,
+        currentAttempt: 9,
+        preparationAllowed: true,
+    }), 'stale')
 })
 
 test('双层转场只保留当前页和直接前驱，并保持稳定 key', () => {

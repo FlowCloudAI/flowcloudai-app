@@ -5,9 +5,10 @@
  * 跟手位移。输入、浮层和抽屉不启动页面预览，最终返回交给原有优先级处理。
  */
 
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useLayoutEffect, useRef, useState} from 'react'
 import type {MobileEdgeBackPhase} from './useMobileSideDrawerGesture'
 import {getMobileBackSettleDurationMs} from './useMobilePagePopTransition'
+import {resolveAndroidPredictiveBackInvoke} from './androidPredictiveBackModel'
 
 const FALLBACK_EVENT = 'flowcloudai:android-back-fallback'
 
@@ -52,6 +53,15 @@ export function useAndroidPredictiveBack({
     const latestProgressRef = useRef(0)
     const preparationRef = useRef<Promise<boolean> | null>(null)
     const settleTimerRef = useRef<number | null>(null)
+    const callbacksRef = useRef({canAnimate, beforeBack, commitBack, onStart, onFinish})
+
+    /*
+     * 原生手势监听跨越异步确认框；回调更新不能拆掉监听并把进行中的 attempt 判旧。
+     * layout effect 先于确认框 Provider 完成关闭后的 Promise，同一手势提交时可读到最新闭包。
+     */
+    useLayoutEffect(() => {
+        callbacksRef.current = {canAnimate, beforeBack, commitBack, onStart, onFinish}
+    }, [beforeBack, canAnimate, commitBack, onFinish, onStart])
 
     useEffect(() => {
         if (!enabled) return
@@ -69,7 +79,7 @@ export function useAndroidPredictiveBack({
             latestProgressRef.current = 0
             setProgress(0)
             setPhase('idle')
-            if (notifyFinish) onFinish()
+            if (notifyFinish) callbacksRef.current.onFinish()
         }
         const settleToIdle = (nextPhase: MobileEdgeBackPhase, nextProgress: number, done?: () => void) => {
             clearSettle()
@@ -87,7 +97,7 @@ export function useAndroidPredictiveBack({
             latestProgressRef.current = clampProgress(
                 (event as CustomEvent<AndroidBackProgressDetail>).detail?.progress,
             )
-            eligibleRef.current = canAnimate()
+            eligibleRef.current = callbacksRef.current.canAnimate()
             activeRef.current = false
             setProgress(0)
             setPhase('idle')
@@ -96,11 +106,11 @@ export function useAndroidPredictiveBack({
                 return
             }
 
-            preparationRef.current = Promise.resolve(beforeBack()).then(result => {
+            preparationRef.current = Promise.resolve(callbacksRef.current.beforeBack()).then(result => {
                 const allowed = result !== false
                 if (attempt !== attemptRef.current || !allowed) return allowed
                 activeRef.current = true
-                onStart()
+                callbacksRef.current.onStart()
                 setPhase('tracking')
                 setProgress(latestProgressRef.current)
                 return true
@@ -127,17 +137,22 @@ export function useAndroidPredictiveBack({
 
             void (async () => {
                 const allowed = await (preparationRef.current ?? Promise.resolve(false))
-                if (attempt !== attemptRef.current) return
-                if (!allowed) {
+                const resolution = resolveAndroidPredictiveBackInvoke({
+                    startedAttempt: attempt,
+                    currentAttempt: attemptRef.current,
+                    preparationAllowed: allowed,
+                })
+                if (resolution === 'stale') return
+                if (resolution === 'cancel') {
                     reset()
                     return
                 }
                 if (!activeRef.current) {
                     activeRef.current = true
-                    onStart()
+                    callbacksRef.current.onStart()
                 }
                 settleToIdle('committing', 1, () => {
-                    void Promise.resolve(commitBack())
+                    void Promise.resolve(callbacksRef.current.commitBack())
                 })
             })()
         }
@@ -154,7 +169,7 @@ export function useAndroidPredictiveBack({
             window.removeEventListener('flowcloudai:android-back-cancel', handleCancel)
             window.removeEventListener('flowcloudai:android-back-invoked', handleInvoke)
         }
-    }, [beforeBack, canAnimate, commitBack, enabled, onFinish, onStart])
+    }, [enabled])
 
     return {
         phase,
