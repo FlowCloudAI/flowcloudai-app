@@ -6,6 +6,7 @@
 
 :root {
     --app-shell-bg: var(--fc-color-bg-secondary);
+    --workspace-page-content-min-width: 40rem;
 }
 
 body {
@@ -209,13 +210,24 @@ body {
     flex: 1;
     min-width: 0;
     min-height: 0;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "page dock";
     overflow: hidden;
     position: relative;
 }
 
+.workspace-content--dock-fullscreen {
+    grid-template-areas: "dock dock";
+}
+
+.workspace-content--dock-fullscreen > .page-container {
+    /* 全屏时 page area 不存在；复用显式 dock area，避免隐藏节点生成隐式轨道。 */
+    grid-area: dock;
+}
+
 .page-container {
-    flex: 1;
+    grid-area: page;
     min-width: 0;
     min-height: 0;
     position: relative;

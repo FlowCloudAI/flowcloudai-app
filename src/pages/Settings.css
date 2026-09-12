@@ -126,7 +126,7 @@
 
 .settings-scroll-area {
   flex: 1;
-  min-width: 0;
+  min-width: var(--workspace-page-content-min-width);
   min-height: 0;
   border: 1px solid var(--fc-color-border);
   border-radius: var(--fc-radius-xl);
@@ -139,6 +139,7 @@
 }
 
 .settings-loading-shell {
+  min-width: var(--workspace-page-content-min-width);
   overflow: hidden;
   border: 1px solid var(--fc-color-border);
   border-radius: var(--fc-radius-xl);

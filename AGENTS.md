@@ -154,6 +154,8 @@ npm run android:build:signed:apk
 - 前端采用 ESM 严格模式与 React hook 优先结构。  
 - Rust 使用 2024 Edition，类型名 `PascalCase`，函数与变量 `snake_case`，常量 `SCREAMING_SNAKE_CASE`。  
 - 样式优先使用 `flowcloudai-ui` 的 `--fc-*` 设计 token，避免硬编码颜色、间距、阴影。  
+- 桌面工作区的页面区与 Dock 槽位统一由 `.workspace-content` 的 CSS Grid `grid-template-areas` 定位，不依赖 DOM 顺序；后续新增左侧或底部槽位时只扩展 areas，不改回 flex 横排。
+- 桌面中央页面主体的宽度下限统一使用 `--workspace-page-content-min-width`；主页、设置页和项目/词条编辑主轨不得各自硬编码另一套下限。
 - 前端逻辑仅通过 `src-tauri` 对外能力进行文件与系统边界访问。  
 
 ## 目录结构与模块职责
@@ -229,4 +231,4 @@ app_main/
   **不要再为键盘问题去改这个 viewport meta**。完整现行方案、兼容边界与验收项见
   `docs/mobile_keyboard_layout.md`。
 
-文档同步时间：2026-08-28 +08:00
+文档同步时间：2026-09-12 +08:00

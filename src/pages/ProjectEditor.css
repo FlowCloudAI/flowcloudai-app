@@ -1,7 +1,6 @@
 /* ── 布局 ───────────────────────────────────────────────────────────────── */
 
 .pe-layout {
-    --pe-content-min-width: 40rem;
     display: flex;
     height: 100%;
     overflow: hidden;
@@ -200,7 +199,7 @@
     position: relative;
     flex: 1;
     width: 100%;
-    min-width: var(--pe-content-min-width);
+    min-width: var(--workspace-page-content-min-width);
     height: 100%;
     min-height: 0;
     overflow: hidden;
