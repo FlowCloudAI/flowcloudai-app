@@ -37,7 +37,6 @@ export interface HomeLastSession {
     sidePanel: {
         contentKey: string
         collapsed: boolean
-        mode: string
     }
 }
 

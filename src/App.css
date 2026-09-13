@@ -217,15 +217,6 @@ body {
     position: relative;
 }
 
-.workspace-content--dock-fullscreen {
-    grid-template-areas: "dock dock";
-}
-
-.workspace-content--dock-fullscreen > .page-container {
-    /* 全屏时 page area 不存在；复用显式 dock area，避免隐藏节点生成隐式轨道。 */
-    grid-area: dock;
-}
-
 .page-container {
     grid-area: page;
     min-width: 0;
@@ -251,13 +242,6 @@ body {
 .page-container--project-editor .pe-content {
     border: 1px solid var(--fc-color-border);
     box-sizing: border-box;
-}
-
-.page-container.is-hidden-for-dock-fullscreen {
-    /* 子页面会自行恢复 visibility；由父层统一隐藏并停止绘制。 */
-    opacity: 0;
-    content-visibility: hidden;
-    pointer-events: none;
 }
 
 .page-wrapper {
@@ -425,10 +409,6 @@ body {
 
 [data-backdrop] .app-layout {
     background: var(--app-shell-bg);
-}
-
-[data-backdrop] .dockable-side-panel--fullscreen {
-    --dockable-side-panel-fullscreen-bg: transparent;
 }
 
 /* 组件库外层 chrome：右侧图标栏与浮动标签栏底色透明，露出磨砂层。

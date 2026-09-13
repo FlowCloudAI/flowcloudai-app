@@ -1,5 +1,4 @@
 import {type ReactNode, useEffect, useMemo, useRef, useState} from 'react'
-import type {DockableSidePanelMode} from '../../shared/ui/layout/DockableSidePanel'
 import {
     DockPanelIconButton,
     DockPanelMain,
@@ -20,7 +19,6 @@ import {
 import HelpArticle from './components/HelpArticle'
 import HelpHome from './components/HelpHome'
 import HelpModuleHome from './components/HelpModuleHome'
-import HelpSidebar from './components/HelpSidebar'
 import './components/HelpPanel.css'
 
 export interface HelpPanelRequest {
@@ -30,14 +28,11 @@ export interface HelpPanelRequest {
 }
 
 interface UseHelpPanelOptions {
-    panelMode?: DockableSidePanelMode
     request?: HelpPanelRequest | null
-    onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
 }
 
 export interface HelpPanelSlots {
-    side: ReactNode
     main: ReactNode
 }
 
@@ -53,12 +48,9 @@ function scrollToSection(topicKey: HelpTopicKey, sectionId: string | null, bodyE
 }
 
 export function useHelpPanel({
-    panelMode,
     request,
-    onTogglePanelMode,
     onToggleCollapsed,
 }: UseHelpPanelOptions = {}): HelpPanelSlots {
-    const resolvedPanelMode = panelMode ?? 'floating'
     const [activeModuleKey, setActiveModuleKey] = useState<HelpModuleKey | null>(null)
     const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey | null>(null)
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
@@ -135,41 +127,13 @@ export function useHelpPanel({
         })
     }
 
-    const sideContent = (
-        <HelpSidebar
-            groups={topicGroups}
-            activeHome={!activeModuleKey && !activeTopicKey}
-            activeModuleKey={activeModuleKey}
-            activeTopicKey={activeTopic?.key ?? null}
-            searchText={searchText}
-            onSearchTextChange={setSearchText}
-            onSelectHome={handleSelectHome}
-            onSelectModule={handleSelectModule}
-            onSelectTopic={handleSelectTopic}
-        />
-    )
-
     const mainContent = (
-        <DockPanelMain className={`help-main help-main--${resolvedPanelMode}`}>
+        <DockPanelMain className="help-main help-main--floating">
             <DockPanelTopbar className="help-main__topbar">
                 <div className="help-main__topbar-left">
                     <DockPanelTitle>帮助中心</DockPanelTitle>
                 </div>
                 <div className="help-main__topbar-actions">
-                    <DockPanelIconButton
-                        type="button"
-                        onClick={() => onTogglePanelMode?.()}
-                        title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
-                        aria-label={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                            {panelMode === 'fullscreen' ? (
-                                <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
-                            ) : (
-                                <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
-                            )}
-                        </svg>
-                    </DockPanelIconButton>
                     <DockPanelIconButton
                         type="button"
                         onClick={() => onToggleCollapsed?.()}
@@ -186,7 +150,6 @@ export function useHelpPanel({
                 <HelpArticle
                     topic={activeTopic}
                     bodyRef={articleBodyRef}
-                    panelMode={resolvedPanelMode}
                     onSelectHome={handleSelectHome}
                     onSelectSection={handleSelectSection}
                 />
@@ -211,9 +174,5 @@ export function useHelpPanel({
         </DockPanelMain>
     )
 
-    if (panelMode === 'fullscreen') {
-        return {side: sideContent, main: mainContent}
-    }
-
-    return {side: null, main: mainContent}
+    return {main: mainContent}
 }

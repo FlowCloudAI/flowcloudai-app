@@ -1,6 +1,5 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {listenNativeFileDrop, openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {Button, MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
@@ -33,7 +32,6 @@ import {
     buildRenderableAiChatMarkdown,
     parseAiChatEntryHref,
 } from '../lib/aiChatMarkdown'
-import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
@@ -433,25 +431,18 @@ function DocumentContextRail({items, onRetry, onRemove}: DocumentContextRailProp
 
 interface AIChatContentProps {
     controller: AiContextValue
-    panelMode?: DockableSidePanelMode
-    onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     onOpenWriterModeSettings?: () => void
-    /** fullscreen 双 slot 模式下，sidebar JSX 会 portal 到这个元素；为 null 时正常 inline 渲染 */
-    sidePortalTarget?: HTMLElement | null
 }
 
 export default function AIChatContent({
                                            controller,
-                                           panelMode,
-                                           onTogglePanelMode,
                                            onToggleCollapsed,
                                            onOpenEntry,
                                            onOpenPluginManagement,
                                            onOpenWriterModeSettings,
-                                       sidePortalTarget,
                                    }: AIChatContentProps) {
     const ctx = controller
     const {
@@ -1403,25 +1394,23 @@ export default function AIChatContent({
 
     const sidebarJsx = (
         <>
-            {!ctx.sidebarCollapsed && !sidePortalTarget && (
+            {!ctx.sidebarCollapsed && (
                 <div className="ai-sidebar-overlay" onClick={() => ctx.setSidebarCollapsed(true)}/>
             )}
             <DockPanelSide className="ai-sidebar">
                 <div className="ai-sidebar-top">
                     <DockPanelTopbar className="ai-sidebar-topbar" variant="side">
                         <DockPanelTitle className="ai-sidebar-topbar-title">对话列表</DockPanelTitle>
-                        {panelMode !== 'fullscreen' && (
-                            <DockPanelIconButton
-                                className="ai-sidebar-close-btn"
-                                onClick={() => ctx.setSidebarCollapsed(true)}
-                                title="收起侧边栏"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-                                     strokeWidth="1.5">
-                                    <path d="M9 2L4 7L9 12"/>
-                                </svg>
-                            </DockPanelIconButton>
-                        )}
+                        <DockPanelIconButton
+                            className="ai-sidebar-close-btn"
+                            onClick={() => ctx.setSidebarCollapsed(true)}
+                            title="收起侧边栏"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                <path d="M9 2L4 7L9 12"/>
+                            </svg>
+                        </DockPanelIconButton>
                     </DockPanelTopbar>
                     <div className="ai-sidebar-controls dock-panel-sidebar-controls">
                         <div className="dock-panel-control-group">
@@ -1646,7 +1635,7 @@ export default function AIChatContent({
 
     return (
         <>
-            {sidePortalTarget ? createPortal(sidebarJsx, sidePortalTarget) : sidebarJsx}
+            {sidebarJsx}
 
             <DockPanelMain
                 id={AI_CHAT_DROP_ZONE_ID}
@@ -1664,22 +1653,20 @@ export default function AIChatContent({
                 )}
                 <DockPanelTopbar className="ai-topbar">
                     <div className="ai-topbar-left">
-                        {panelMode !== 'fullscreen' && (
-                            <DockPanelIconButton
-                                className="ai-topbar-toggle"
-                                onClick={() => ctx.setSidebarCollapsed((prev) => !prev)}
-                                title={ctx.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-                            >
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                     strokeWidth="1.5">
-                                    {ctx.sidebarCollapsed ? (
-                                        <path d="M6 3L11 8L6 13"/>
-                                    ) : (
-                                        <path d="M10 3L5 8L10 13"/>
-                                    )}
-                                </svg>
-                            </DockPanelIconButton>
-                        )}
+                        <DockPanelIconButton
+                            className="ai-topbar-toggle"
+                            onClick={() => ctx.setSidebarCollapsed((prev) => !prev)}
+                            title={ctx.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                {ctx.sidebarCollapsed ? (
+                                    <path d="M6 3L11 8L6 13"/>
+                                ) : (
+                                    <path d="M10 3L5 8L10 13"/>
+                                )}
+                            </svg>
+                        </DockPanelIconButton>
                         <div className="ai-plugin-switcher" ref={pluginSwitcherRef}>
                             {isPluginMenuOpen && (
                                 <div className="ai-plugin-menu">
@@ -1747,24 +1734,6 @@ export default function AIChatContent({
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                                  strokeWidth="1.5">
                                 <path d="M8 3v10M3 8h10"/>
-                            </svg>
-                        </DockPanelIconButton>
-                        <DockPanelIconButton
-                            className="ai-topbar-toggle"
-                            onClick={() => onTogglePanelMode?.()}
-                            title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                 strokeWidth="1.5">
-                                {panelMode === 'fullscreen' ? (
-                                    <>
-                                        <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
-                                    </>
-                                ) : (
-                                    <>
-                                        <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
-                                    </>
-                                )}
                             </svg>
                         </DockPanelIconButton>
                         <DockPanelIconButton

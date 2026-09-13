@@ -32,11 +32,6 @@
     min-height: 0;
 }
 
-/* 全屏：sidebar 融入舞台，main 由共享骨架呈现为圆角工作区 */
-.dockable-side-panel--fullscreen .idea-page {
-    background: transparent;
-}
-
 .idea-page__main-topbar-left {
     display: flex;
     align-items: center;

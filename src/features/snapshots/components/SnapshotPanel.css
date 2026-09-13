@@ -1,10 +1,6 @@
-/* ============================================
-   Snapshot 面板：sidebar(左) + main(右) 双 slot 布局
-   floating: 由 .snapshot-panel 容器包住 sidebar + main
-   fullscreen: side/main 各自独立，由 DockableSidePanel 放到对应 slot
-   ============================================ */
+/* Snapshot 面板按上方历史记录、下方控制区组织停靠布局。 */
 
-/* floating 模式整体容器：上下分布（main 在上、控制面板在下） */
+/* 整体容器上下分布（main 在上、控制面板在下）。 */
 .snapshot-panel {
     display: flex;
     flex-direction: column;

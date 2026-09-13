@@ -55,7 +55,6 @@ type OpenSettingsOptions = Omit<SettingsOpenIntent, 'requestId'> & {
     focusRequest?: boolean
 }
 const AI_MIN_PANEL_WIDTH = 500
-const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
 const RECENT_PAGE_LIMIT = 10
 let desktopWindowShown = false
 
@@ -439,9 +438,6 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
     })
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
-    const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
-    const [fullscreenSideWidth, setFullscreenSideWidth] = useState(FULLSCREEN_SIDE_DEFAULT_WIDTH)
-    const [fullscreenSideCollapsed, setFullscreenSideCollapsed] = useState(false)
     const [projectReloadTokens, setProjectReloadTokens] = useState<Record<string, number>>({})
     useEffect(() => {
         if (aiPanelCollapsed) return
@@ -475,7 +471,6 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
 
     const collapseAiPanel = useCallback(() => {
         handleAiPanelCollapsedChange(true)
-        setAiPanelMode((prev) => prev === 'fullscreen' ? 'floating' : prev)
     }, [handleAiPanelCollapsedChange])
 
     const expandAiPanelToMinWidth = useCallback(() => {
@@ -1089,57 +1084,35 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             sidePanel: {
                 contentKey: sidePanelContentKey,
                 collapsed: aiPanelCollapsed,
-                mode: aiPanelMode,
             },
         })
-    }, [activeHomeTarget, activeKey, aiPanelCollapsed, aiPanelMode, mainContentKey, sidePanelContentKey])
+    }, [activeHomeTarget, activeKey, aiPanelCollapsed, mainContentKey, sidePanelContentKey])
 
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
 
-    const togglePanelMode = useCallback(() => {
-        setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')
-    }, [])
-
     const ideaSlots = useIdeaPanel({
         contextProjectId: aiFocus.projectId,
         onOpenEntry: handleOpenEntry,
-        panelMode: aiPanelMode,
-        onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
     })
     const snapshotSlots = useSnapshotPanel({
         projectId: aiFocus.projectId,
-        panelMode: aiPanelMode,
-        onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
         onVersionApplied: handleProjectVersionApplied,
         dirtyEntryCount,
     })
     const aiChatSlots = useAIChatPanel({
         controller: aiController,
-        panelMode: aiPanelMode,
-        onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
         onOpenEntry: handleOpenEntry,
         onOpenPluginManagement: handleOpenPluginManagement,
         onOpenWriterModeSettings: handleOpenWriterModeSettings,
     })
     const helpSlots = useHelpPanel({
-        panelMode: aiPanelMode,
         request: helpRequest,
-        onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
     })
-
-    const sidePanelSides = useMemo<Record<string, ReactNode>>(() => {
-        const out: Record<string, ReactNode> = {}
-        if (mountedSidePanelKeys.includes('idea')) out.idea = ideaSlots.side
-        if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.side
-        if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.side
-        if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.side
-        return out
-    }, [mountedSidePanelKeys, ideaSlots.side, snapshotSlots.side, aiChatSlots.side, helpSlots.side])
 
     const sidePanelMains = useMemo<Record<string, ReactNode>>(() => {
         const out: Record<string, ReactNode> = {}
@@ -1426,8 +1399,8 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
                 </div>}
             </div>
             <div className="main-content">
-                <div className={`workspace-content ${aiPanelMode === 'fullscreen' ? 'workspace-content--dock-fullscreen' : ''}`}>
-                    <div className={`page-container ${mainContentKey === 'home' && activeHomeProjectId ? 'page-container--project-editor' : ''} ${mainContentKey === 'settings' ? 'page-container--settings' : ''} ${aiPanelMode === 'fullscreen' ? 'is-hidden-for-dock-fullscreen' : ''}`}>
+                <div className="workspace-content">
+                    <div className={`page-container ${mainContentKey === 'home' && activeHomeProjectId ? 'page-container--project-editor' : ''} ${mainContentKey === 'settings' ? 'page-container--settings' : ''}`}>
                         <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
                             <div className="home-page-stack">
                                 <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
@@ -1482,20 +1455,13 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
                         </div>
                     </div>
                     <DockableSidePanel
-                        mode={aiPanelMode}
                         width={aiPanelWidth}
                         minWidth={AI_MIN_PANEL_WIDTH}
                         maxWidthRatio={0.7}
                         collapsed={aiPanelCollapsed}
                         onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
-                        onModeChange={setAiPanelMode}
-                        fullscreenSideWidth={fullscreenSideWidth}
-                        fullscreenSideCollapsed={fullscreenSideCollapsed}
-                        onFullscreenSideWidthChange={setFullscreenSideWidth}
-                        onFullscreenSideCollapsedChange={setFullscreenSideCollapsed}
                         handleTitle="拖拽调整宽度"
-                        sides={sidePanelSides}
                         mains={sidePanelMains}
                         activeKey={sidePanelContentKey}
                     />

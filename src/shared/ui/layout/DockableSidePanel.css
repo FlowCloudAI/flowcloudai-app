@@ -1,17 +1,11 @@
 .dockable-side-panel {
     --dockable-side-panel-handle-width: var(--app-drag-handle-width, 8px);
-    --dockable-side-panel-handle-gutter: 8px;
     --dockable-side-panel-handle-gap-height: 48px;
     --dockable-side-panel-handle-gap-half: 24px;
     --dockable-side-panel-collapsed-width: 0px;
     --dock-panel-owned-radius: var(--fc-radius-xl);
     --dock-panel-owned-border: 1px solid var(--fc-color-border);
     --dsp-width: 0px;
-    --dockable-side-panel-fullscreen-side-width: 320px;
-    --dockable-side-panel-fullscreen-bg: var(--fc-color-bg-secondary);
-}
-
-.dockable-side-panel {
     grid-area: dock;
     min-width: 0;
     min-height: 0;
@@ -19,19 +13,6 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     position: relative;
-}
-
-.dockable-side-panel--fullscreen {
-    height: 100%;
-    padding: 0;
-    background: var(--dockable-side-panel-fullscreen-bg);
-}
-
-.dockable-side-panel--fullscreen.is-fullscreen-animating {
-    transition:
-            transform 0.18s ease,
-            border-radius 0.18s ease;
-    will-change: transform;
 }
 
 .dockable-side-panel--floating {
@@ -46,17 +27,17 @@
     transition: width 0.18s ease, border-color 0.15s ease, outline-color 0.15s ease;
 }
 
-/* 正常拖拽：无 transition */
+/* 正常拖拽：无 transition。 */
 .dockable-side-panel--floating.is-dragging {
     transition: none;
 }
 
-/* 跨过阈值进入 collapse preview：transition 重新开启，面板在用户手里就开始动画 */
+/* 跨过阈值进入 collapse preview：transition 重新开启，面板在用户手里就开始动画。 */
 .dockable-side-panel--floating.is-dragging.is-collapse-preview {
     transition: width 0.14s ease, border-color 0.15s ease;
 }
 
-/* 从收起预览拖回普通宽度时，短暂恢复 transition，避免跳开 */
+/* 从收起预览拖回普通宽度时，短暂恢复 transition，避免跳开。 */
 .dockable-side-panel--floating.is-dragging.is-collapse-restoring {
     transition: width 0.14s ease, border-color 0.15s ease, outline-color 0.15s ease;
 }
@@ -76,10 +57,6 @@
     border-left-color: transparent;
 }
 
-.dockable-side-panel--floating.is-fullscreen-preview {
-    border-left-color: color-mix(in srgb, var(--fc-color-primary) 58%, var(--fc-color-border));
-}
-
 .dockable-side-panel__body {
     flex: 1;
     min-width: 0;
@@ -89,58 +66,18 @@
     box-sizing: border-box;
     border: var(--dock-panel-owned-border);
     border-radius: var(--dock-panel-owned-radius);
-}
-
-.dockable-side-panel--fullscreen .dockable-side-panel__body {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-}
-
-/* ===== 双 slot API：side-stack / main-stack 与 layer 互斥切换 ===== */
-.dockable-side-panel__side-stack {
-    display: grid;
-    grid-template-areas: "layer";
-    width: var(--dockable-side-panel-fullscreen-side-width);
-    flex-shrink: 0;
-    min-height: 0;
-    overflow: hidden;
-    transition: width 0.18s ease;
-}
-
-.dockable-side-panel--fullscreen.is-dragging .dockable-side-panel__side-stack {
-    transition: none;
-}
-
-.dockable-side-panel--fullscreen.is-dragging.is-fullscreen-side-collapse-preview .dockable-side-panel__side-stack,
-.dockable-side-panel--fullscreen.is-dragging.is-fullscreen-side-collapse-restoring .dockable-side-panel__side-stack {
-    transition: width 0.14s ease;
-}
-
-.dockable-side-panel--fullscreen.is-fullscreen-side-collapsed .dockable-side-panel__side-stack,
-.dockable-side-panel--fullscreen.is-fullscreen-side-collapse-preview .dockable-side-panel__side-stack {
-    width: 0;
-}
-
-.dockable-side-panel--fullscreen .dock-panel-side,
-.dockable-side-panel--fullscreen .ai-side-portal-host {
-    --dock-panel-sidebar-width: var(--dockable-side-panel-fullscreen-side-width);
+    padding-left: 0;
 }
 
 .dockable-side-panel__main-stack {
     display: grid;
     grid-template-areas: "layer";
     flex: 1;
-    min-width: 0;
+    min-width: var(--dockable-side-panel-content-min-width);
     min-height: 0;
     overflow: hidden;
 }
 
-.dockable-side-panel--floating .dockable-side-panel__main-stack {
-    min-width: var(--dockable-side-panel-content-min-width);
-}
-
-.dockable-side-panel__side-layer,
 .dockable-side-panel__main-layer {
     grid-area: layer;
     min-width: 0;
@@ -152,15 +89,10 @@
     pointer-events: none;
 }
 
-.dockable-side-panel__side-layer.active,
 .dockable-side-panel__main-layer.active {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-}
-
-.dockable-side-panel--floating .dockable-side-panel__body {
-    padding-left: 0;
 }
 
 .dockable-side-panel__resize-handle {
@@ -179,49 +111,7 @@
     justify-content: center;
 }
 
-.dockable-side-panel__side-resize-handle {
-    position: relative;
-    width: var(--dockable-side-panel-handle-width);
-    min-width: var(--dockable-side-panel-handle-width);
-    cursor: col-resize;
-    z-index: 30;
-    background: transparent;
-    transition: background 0.1s ease;
-    user-select: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
 .dockable-side-panel__resize-handle::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 2px;
-    transform: translateX(-50%);
-    background: linear-gradient(
-            180deg,
-            transparent 0%,
-            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
-            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
-            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-height)),
-            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-half)),
-            transparent calc(50% - var(--dockable-side-panel-handle-gap-half)),
-            transparent calc(50% + var(--dockable-side-panel-handle-gap-half)),
-            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-half)),
-            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-height)),
-            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
-            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
-            transparent 100%
-    );
-    opacity: 0;
-    transition: opacity 0.14s ease, width 0.1s ease;
-}
-
-.dockable-side-panel__side-resize-handle::before {
     content: "";
     position: absolute;
     top: 0;
@@ -291,24 +181,18 @@
 }
 
 .dockable-side-panel__resize-handle:hover::before,
-.dockable-side-panel__resize-handle.is-dragging::before,
-.dockable-side-panel__side-resize-handle:hover::before,
-.dockable-side-panel__side-resize-handle.is-dragging::before {
+.dockable-side-panel__resize-handle.is-dragging::before {
     opacity: 1;
 }
 
 .dockable-side-panel__resize-handle:hover .dockable-side-panel__resize-grip,
-.dockable-side-panel__resize-handle.is-dragging .dockable-side-panel__resize-grip,
-.dockable-side-panel__side-resize-handle:hover .dockable-side-panel__resize-grip,
-.dockable-side-panel__side-resize-handle.is-dragging .dockable-side-panel__resize-grip {
+.dockable-side-panel__resize-handle.is-dragging .dockable-side-panel__resize-grip {
     transform: none;
     border-color: transparent;
     background: transparent;
 }
 
 .dockable-side-panel__resize-handle:hover .dockable-side-panel__resize-dot,
-.dockable-side-panel__resize-handle.is-dragging .dockable-side-panel__resize-dot,
-.dockable-side-panel__side-resize-handle:hover .dockable-side-panel__resize-dot,
-.dockable-side-panel__side-resize-handle.is-dragging .dockable-side-panel__resize-dot {
+.dockable-side-panel__resize-handle.is-dragging .dockable-side-panel__resize-dot {
     background: color-mix(in srgb, var(--fc-color-primary) 55%, var(--fc-color-text));
 }

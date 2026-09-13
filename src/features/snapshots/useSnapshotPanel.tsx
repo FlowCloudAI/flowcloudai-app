@@ -17,14 +17,12 @@ import {
 } from '../../api'
 import '../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../shared/ui/layout/DockPanelScaffold.css'
-import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../shared/ui/layout/DockPanelScaffold'
+import {DockPanelIconButton, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../shared/ui/layout/DockPanelScaffold'
 import {FloatingPanel} from '../../shared/ui/overlay'
 import './components/SnapshotPanel.css'
 
 interface UseSnapshotPanelOptions {
     projectId?: string | null
-    panelMode?: 'floating' | 'fullscreen'
-    onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onVersionApplied?: (projectId: string) => void
     dirtyEntryCount?: number
@@ -173,14 +171,11 @@ function buildBranchMembership(graph: SnapshotGraph): Map<string, string[]> {
 }
 
 export interface SnapshotPanelSlots {
-    side: ReactNode
     main: ReactNode
 }
 
 export function useSnapshotPanel({
                                      projectId = null,
-                                     panelMode,
-                                     onTogglePanelMode,
                                      onToggleCollapsed,
                                      onVersionApplied,
                                      dirtyEntryCount = 0,
@@ -405,12 +400,6 @@ export function useSnapshotPanel({
     const RAIL_OVERLAP = 2
     const midY = RAIL_PX / 2
 
-    const sideTopbar = (
-        <DockPanelTopbar className="snapshot-side__topbar" variant="side">
-            <DockPanelTitle className="snapshot-side__topbar-title">历史版本</DockPanelTitle>
-        </DockPanelTopbar>
-    )
-
     const sideSections = (
         <>
             <div className="snapshot-side__section">
@@ -449,32 +438,10 @@ export function useSnapshotPanel({
         </>
     )
 
-    const sideContent = (
-        <DockPanelSide className="snapshot-side">
-            {sideTopbar}
-            {sideSections}
-        </DockPanelSide>
-    )
-
     const mainTopbar = (
         <DockPanelTopbar className="snapshot-main__topbar">
             <DockPanelTitle className="snapshot-main__title">保存历史</DockPanelTitle>
             <div className="snapshot-main__topbar-actions">
-                <DockPanelIconButton
-                    type="button"
-                    className="snapshot-main__icon-btn"
-                    onClick={() => onTogglePanelMode?.()}
-                    title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
-                >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                         strokeWidth="1.5">
-                        {panelMode === 'fullscreen' ? (
-                            <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
-                        ) : (
-                            <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
-                        )}
-                    </svg>
-                </DockPanelIconButton>
                 <DockPanelIconButton
                     type="button"
                     className="snapshot-main__icon-btn"
@@ -698,21 +665,7 @@ export function useSnapshotPanel({
         </FloatingPanel>
     )
 
-    const mainContent = (
-        <DockPanelMain className="snapshot-main">
-            {mainTopbar}
-            {mainViewport}
-            {branchDialog}
-        </DockPanelMain>
-    )
-
-    if (panelMode === 'fullscreen') {
-        return {side: sideContent, main: mainContent}
-    }
-
-    // floating 模式：head 常驻顶部，下面是 side（控制面板），底部是 main viewport
     return {
-        side: null,
         main: (
             <div className="snapshot-panel">
                 {mainTopbar}

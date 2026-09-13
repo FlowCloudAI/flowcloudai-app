@@ -1,4 +1,4 @@
-:where(.dock-panel-side, .dock-panel-main, .dock-panel-topbar, .idea-page, .idea-page__sidebar, .idea-page__main, .ai-chat-layout, .ai-side-portal-host, .snapshot-panel, .snapshot-side, .snapshot-main) {
+:where(.dock-panel-side, .dock-panel-main, .dock-panel-topbar, .idea-page, .idea-page__sidebar, .idea-page__main, .ai-chat-layout, .snapshot-panel, .snapshot-side, .snapshot-main) {
     --dock-panel-bg: var(--fc-color-bg);
     --dock-panel-sidebar-bg: var(--fc-color-bg-secondary);
     --dock-panel-topbar-bg: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
@@ -34,11 +34,6 @@
     flex-shrink: 0;
 }
 
-.dockable-side-panel--fullscreen .dock-panel-side {
-    background: transparent;
-    border-right: 0;
-}
-
 .dock-panel-main {
     position: relative;
     flex: 1;
@@ -50,12 +45,6 @@
     flex-direction: column;
     overflow: hidden;
     background: var(--dock-panel-bg);
-}
-
-.dockable-side-panel--fullscreen .dock-panel-main {
-    box-sizing: border-box;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-xl);
 }
 
 .dock-panel-topbar {

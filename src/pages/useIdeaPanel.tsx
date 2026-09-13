@@ -37,13 +37,10 @@ type IdeaViewMode = 'inbox' | 'all' | 'processed' | 'archived'
 interface UseIdeaPanelOptions {
     contextProjectId?: string | null
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
-    panelMode?: 'floating' | 'fullscreen'
-    onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
 }
 
 export interface IdeaPanelSlots {
-    side: ReactNode
     main: ReactNode
 }
 
@@ -103,8 +100,6 @@ function buildEntryTitleFromIdea(title: string, content: string) {
 export function useIdeaPanel({
                                  contextProjectId = null,
                                  onOpenEntry,
-                                 panelMode,
-                                 onTogglePanelMode,
                                  onToggleCollapsed,
                              }: UseIdeaPanelOptions = {}): IdeaPanelSlots {
     const {showAlert} = useAlert()
@@ -224,20 +219,7 @@ export function useIdeaPanel({
         }
     }, [selectedIdeaId, selectedIdeaProjectId])
 
-    // fullscreen 模式下 .idea-page 容器不渲染，强制非 compact、不收起
-    useEffect(() => {
-        if (panelMode === 'fullscreen') {
-            setCompactLayout(false)
-            setSidebarCollapsed(false)
-            return
-        }
-        if (panelMode === 'floating') {
-            setSidebarCollapsed(true)
-        }
-    }, [panelMode])
-
-    // 用 ref callback：div 挂载/卸载时立即启/停 ResizeObserver，
-    // 不依赖 useEffect 时序，floating ↔ fullscreen 切换稳定。
+    // 用 ref callback：div 挂载/卸载时立即启/停 ResizeObserver。
     const setLayoutRef = useCallback((el: HTMLDivElement | null) => {
         layoutRef.current = el
 
@@ -522,41 +504,24 @@ export function useIdeaPanel({
         <DockPanelMain className="idea-page__main">
             <DockPanelTopbar className="idea-page__main-topbar">
                 <div className="idea-page__main-topbar-left">
-                    {panelMode !== 'fullscreen' && (
-                        <DockPanelIconButton
-                            type="button"
-                            className="idea-page__sidebar-toggle"
-                            onClick={() => setSidebarCollapsed((prev) => !prev)}
-                            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                 strokeWidth="1.5">
-                                {sidebarCollapsed ? (
-                                    <path d="M6 3L11 8L6 13"/>
-                                ) : (
-                                    <path d="M10 3L5 8L10 13"/>
-                                )}
-                            </svg>
-                        </DockPanelIconButton>
-                    )}
-                    <DockPanelTitle className="idea-page__main-title">灵感便签</DockPanelTitle>
-                </div>
-                <div className="idea-page__main-topbar-right">
                     <DockPanelIconButton
                         type="button"
-                        className="idea-page__sidebar-toggle idea-page__fullscreen-toggle"
-                        onClick={() => onTogglePanelMode?.()}
-                        title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
+                        className="idea-page__sidebar-toggle"
+                        onClick={() => setSidebarCollapsed((prev) => !prev)}
+                        title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
                     >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                              strokeWidth="1.5">
-                            {panelMode === 'fullscreen' ? (
-                                <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
+                            {sidebarCollapsed ? (
+                                <path d="M6 3L11 8L6 13"/>
                             ) : (
-                                <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
+                                <path d="M10 3L5 8L10 13"/>
                             )}
                         </svg>
                     </DockPanelIconButton>
+                    <DockPanelTitle className="idea-page__main-title">灵感便签</DockPanelTitle>
+                </div>
+                <div className="idea-page__main-topbar-right">
                     <DockPanelIconButton
                         type="button"
                         className="idea-page__sidebar-toggle idea-page__collapse-toggle"
@@ -698,14 +663,7 @@ export function useIdeaPanel({
         </DockPanelMain>
     )
 
-    if (panelMode === 'fullscreen') {
-        // 全屏：side / main 独立交给 DockableSidePanel 双 slot
-        return {side: sideContent, main: mainContent}
-    }
-
-    // floating：sidebar 嵌入 .idea-page grid 内（兼容 compact 抽屉行为）
     return {
-        side: null,
         main: (
             <div
                 ref={setLayoutRef}

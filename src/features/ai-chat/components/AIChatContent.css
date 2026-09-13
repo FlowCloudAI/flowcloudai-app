@@ -452,30 +452,6 @@
     cursor: pointer;
 }
 
-/* ========== 全屏模式：sidebar 通过 portal 在 DockableSidePanel side slot 显示 ========== */
-/* portal host 容器（DockableSidePanel side-layer 内的承接元素） */
-.ai-side-portal-host {
-    display: flex;
-    width: var(--dock-panel-sidebar-width);
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-}
-
-/* portal 后的 sidebar：复用 .ai-sidebar 默认外观，但 override 定位/抽屉行为 */
-.ai-side-portal-host .ai-sidebar {
-    position: static;
-    width: 100%;
-    min-width: 0;
-    height: 100%;
-    z-index: auto;
-    transform: none;
-    opacity: 1;
-    pointer-events: auto;
-    border-right: 0;
-    background: transparent;
-}
-
 /* ========== 右侧主区域 ========== */
 .ai-main {
     --ai-chat-content-max-width: 840px;

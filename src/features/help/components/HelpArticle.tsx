@@ -6,14 +6,12 @@ import {
     getHelpSectionDomId,
     type HelpTopic,
 } from '../../../shared/help/helpCatalog'
-import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {getHelpSectionMarkdown} from '../../../shared/help/helpMarkdown'
 import './HelpArticle.css'
 
 interface HelpArticleProps {
     topic: HelpTopic
     bodyRef: RefObject<HTMLDivElement | null>
-    panelMode: DockableSidePanelMode
     onSelectHome: () => void
     onSelectSection: (sectionId: string) => void
 }
@@ -34,7 +32,6 @@ function resolveMarkdownColorMode(theme: string): 'light' | 'dark' {
 export default function HelpArticle({
     topic,
     bodyRef,
-    panelMode,
     onSelectHome,
     onSelectSection,
 }: HelpArticleProps) {
@@ -78,17 +75,10 @@ export default function HelpArticle({
                     </div>
                 </header>
 
-                {panelMode === 'fullscreen' ? (
-                    <nav className="help-doc__toc" aria-label="本篇目录">
-                        <div className="help-doc__toc-title">本篇目录</div>
-                        <div className="help-doc__toc-list">{tocItems}</div>
-                    </nav>
-                ) : (
-                    <details className="help-doc__toc">
-                        <summary className="help-doc__toc-title">本篇目录</summary>
-                        <div className="help-doc__toc-list">{tocItems}</div>
-                    </details>
-                )}
+                <details className="help-doc__toc">
+                    <summary className="help-doc__toc-title">本篇目录</summary>
+                    <div className="help-doc__toc-list">{tocItems}</div>
+                </details>
 
                 <div className="help-doc__sections">
                     {topic.sections.map((section, index) => (

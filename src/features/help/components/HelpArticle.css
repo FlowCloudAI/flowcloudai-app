@@ -271,73 +271,6 @@
     display: none;
 }
 
-.help-main--fullscreen .help-doc {
-    display: grid;
-    width: min(100%, 66rem);
-    grid-template-columns: minmax(0, 48rem) minmax(12rem, 14rem);
-    column-gap: var(--fc-space-2xl);
-    align-items: start;
-}
-
-.help-main--fullscreen .help-content-home-button,
-.help-main--fullscreen .help-doc__header,
-.help-main--fullscreen .help-doc__sections,
-.help-main--fullscreen .help-doc__tips {
-    grid-column: 1;
-}
-
-.help-main--fullscreen .help-content-home-button {
-    justify-self: start;
-}
-
-.help-main--fullscreen .help-doc__toc {
-    position: sticky;
-    top: var(--fc-space-lg);
-    grid-column: 2;
-    grid-row: 2 / span 3;
-    max-height: calc(100vh - 8rem);
-    margin: var(--fc-space-xl) 0 0;
-    overflow-y: auto;
-    padding: 0 0 0 var(--fc-space-md);
-    border: 0;
-    border-left: 2px solid var(--fc-color-border);
-    border-radius: 0;
-    background: transparent;
-}
-
-.help-main--fullscreen .help-doc__toc-title {
-    margin-bottom: var(--fc-space-sm);
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--fc-font-weight-normal, 400);
-}
-
-.help-main--fullscreen .help-doc__toc-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-xs);
-}
-
-.help-main--fullscreen .help-doc__toc-item {
-    position: relative;
-    display: block;
-    padding: var(--fc-space-xs) 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: var(--fc-line-height-normal);
-}
-
-.help-main--fullscreen .help-doc__toc-item:hover {
-    background: transparent;
-    color: var(--fc-color-primary);
-}
-
-.help-main--fullscreen .help-doc__toc-item span {
-    display: none;
-}
-
 @media (max-width: 720px) {
     .help-main__body {
         padding: var(--fc-space-md);
@@ -350,18 +283,5 @@
 
     .help-doc__section-number {
         display: none;
-    }
-}
-
-@media (max-width: 960px) {
-    .help-main--fullscreen .help-doc {
-        display: block;
-        width: min(100%, 48rem);
-    }
-
-    .help-main--fullscreen .help-doc__toc {
-        position: static;
-        max-height: none;
-        margin: var(--fc-space-md) 0 var(--fc-space-lg);
     }
 }
