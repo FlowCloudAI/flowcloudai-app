@@ -1,6 +1,6 @@
 # app_main 文档索引
 
-> 更新日期：2026-09-11
+> 更新日期：2026-09-13
 >
 > 本索引覆盖 `app_main` 全部项目文档：`docs/`、`plans/`、`designs/`。
 > 平台构建手册（iOS / macOS / Android）是 `AGENTS.md` 明确要求先读的前置文档，见 §1。
@@ -19,9 +19,9 @@
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
-| [tauri_macos_debug_and_release.md](tauri_macos_debug_and_release.md) | 现行 | 2026-08-28 | macOS 原生窗口、`underWindowBackground` 材质、透明 WKWebView 私有 API、调试、DMG、Developer ID 签名与公证边界。`AGENTS.md` 指定的 macOS 权威手册 |
+| [tauri_macos_debug_and_release.md](tauri_macos_debug_and_release.md) | 现行 | 2026-09-13 | macOS 原生窗口、`underWindowBackground` 材质、透明 WKWebView 私有 API、文件打开队列、启动显示死锁、调试、DMG、Developer ID 签名与公证边界。`AGENTS.md` 指定的 macOS 权威手册 |
 | [tauri_ios_debug_and_release.md](tauri_ios_debug_and_release.md) | 现行 | 2026-08-17 | iOS 环境自检、真机调试、Archive 与 IPA 导出。`AGENTS.md` 指定的 iOS 权威手册。最低支持 iOS 16.2 |
-| [Android.md](Android.md) | 现行 | 2026-05-07 | Android 测试流程与 ADB 约定，包名 `cn.flowcloudai.www` |
+| [Android.md](Android.md) | 现行 | 2026-09-13 | Android 测试流程与 ADB 约定，包名 `cn.flowcloudai.www`；含 APK 构建脚本与 release keystore 签名约束 |
 | [publish.md](publish.md) | 现行 | 2026-05-27 | 桌面端 Windows 发布与 Tauri updater 签名、上传流程 |
 
 > Android 模拟器加载不到 Vite 的排查过程见 `docs/devlog/2026-08-16-android-模拟器-vite-不可达.md`；日常统一用 `npm run android:dev`。
@@ -67,7 +67,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [主窗口亚克力毛玻璃实现纪要.md](主窗口亚克力毛玻璃实现纪要.md) | 归档 | 2026-05-31 | 桌面端主窗口毛玻璃效果的讨论与落地记录。**能力边界结论（CSS 做不到透出桌面）另见 `docs/devlog/2026-05-31-主窗口毛玻璃-能力边界.md`** |
-| [app_main_fcui_token_audit_memory.md](app_main_fcui_token_audit_memory.md) | 归档 | 2026-06-01 | `--fc-*` 语义令牌审计结论固化，防止口径漂移。组件复用现行口径见根 `AGENTS.md` §5.2 |
+| [app_main_fcui_token_audit_memory.md](app_main_fcui_token_audit_memory.md) | 归档 | 2026-06-01 | `--fc-*` 语义令牌审计结论固化，防止口径漂移。组件复用现行口径见 `AGENTS.md`「复用与数据安全」 |
 | [0.2.3_change.md](0.2.3_change.md) | 归档 | 2026-05-14 | 0.2.3 改动的按文件影响排查清单 |
 | [windows_font_package_size_comparison.md](windows_font_package_size_comparison.md) | 归档 | 2026-08-08 | 加入字体前后 Windows 安装包体积对比：10.7 MiB → 59.2 MiB |
 
@@ -85,10 +85,11 @@
 
 ## 7. 设计基线与设计稿（`../designs/`）
 
-`AGENTS.md` 规定：界面改动需先出可审计的单文件 HTML 设计稿，统一存 `designs/<主题名>.html`。当前有 7 份 HTML 设计稿。
+`AGENTS.md`「设计稿」规定何时需要先出单文件 HTML 设计稿（`designs/<主题名>.html`），制作规则见 [`设计稿约定.md`](../designs/设计稿约定.md)。
 
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
+| [../designs/设计稿约定.md](../designs/设计稿约定.md) | 现行 | 2026-09-13 | 设计稿的交付形式、单文件约束、状态拆分、反馈迭代、证据留存与确认流程；由 `AGENTS.md` 迁入 |
 | [../designs/desktop-entry-workspace.html](../designs/desktop-entry-workspace.html) | 待评审 | 2026-09-11 | **词条页面编辑落位设计稿**：词条 Tab 内统一“阅读 / 编辑页面”，可视、展示校对和代码共享一份草稿，AI 只保留全局入口；给出 1440 / 1024 / 低于 988px 的三栏与浮层预算、390px 移动端受控编辑、项目首页关系和 Markdown 回退边界。四个场景互斥展示，仅本地交互，未接入生产数据或原生窗口 |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-26 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§5.3 登记公共顶栏固定材质阴影的唯一例外，§9 规则 8 规定底部面板不承载滚动或输入内容 |

@@ -6,7 +6,7 @@
  * 上一页只是重新可见，拿不到返回值。
  *
  * 这里用一个按 token 订阅的极小 store 补上这条通路（不是 CustomEvent —— 见
- * AGENTS §5.1：跨页状态一律走 store）。调用方在打开子页时生成 token 并订阅，
+ * app_main/AGENTS.md「移动端界面」：跨页状态一律走 store）。调用方在打开子页时生成 token 并订阅，
  * 子页保存成功后 publish，订阅方立即收到并消费掉。
  */
 type Listener = (value: unknown) => void

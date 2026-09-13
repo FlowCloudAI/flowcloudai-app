@@ -11,9 +11,8 @@
 
 | 文件 | 为什么 |
 | --- | --- |
-| 工作区根 `AGENTS.md` | §1.1 子项目前置读取、§2 反馈准则、§5.1 移动端红线、§5.2 公共 UI 复用清单、§8 提交规范、§9 文档规约 |
-| `app_main/AGENTS.md` | 本仓坑点，尤其**「任何渲染 Markdown 的表面都必须自己接管锚点点击」**与 Android 键盘唯一高度来源 |
-| `app_main/README.md` | §1.1 要求与 `AGENTS.md` 成对读取 |
+| 工作区根 `AGENTS.md` | 协作方式、验证（原生界面验证边界）、仓库与提交；文档规则见 `docs/文档规约.md` |
+| `app_main/AGENTS.md` | 移动端界面红线、复用与数据安全（2026-09-13 前在根 `AGENTS.md` §5.1 / §5.2），尤其**「任何渲染 Markdown 的表面都要自己接管锚点点击」**与软键盘唯一高度来源 |
 | `designs/mobile-ui-baseline.md` | 尺度与结构规范。**§9 规则 5（空状态必须含主操作）、规则 8（底部面板不承载滚动或输入）、§6.1 规则 2（扩热区不放大视觉）本轮直接相关** |
 | `designs/mobile-entry-detail.html` | 布局与视觉参考，**不是实现蓝本**，见 §1 |
 | `docs/devlog/README.md`（工作区根） | 移动端坑最密的地方，动手前扫一眼索引 |
@@ -34,7 +33,7 @@
 | `<style>` 里的 `:root { --fc-color-primary: #378add; ... }` | 那是**模拟**的 token，硬编码色值。真实 token 由 `flowcloudai-ui` 与 `mobileTokens.css` 提供 | 直接 `var(--fc-color-primary)` / `var(--mobile-gap-item)`，业务 CSS **禁止出现任何色值字面量与裸数值**（基线 §0.1、§4 规则 1） |
 | `.phone` / `.status-bar` / `.tabbar` / `.design-shell` / `.design-notes` / `.switcher` | 是设计稿的**画布与外壳**，不是产品界面。手机边框、状态栏、侧栏说明都是给人看稿用的 | 什么都不做。Tab 栏由 `MobileApp` 已有实现负责 |
 | `.attr-chip` / `.rel-row` / `.viewer__bar` / `.section-head` 等类名 | 是**稿子本地的命名**，为了写稿方便 | 沿用本仓 BEM：`mobile-entry-detail__*`、`mobile-entry-properties__*`，写进已有的 `MobileEntryDetail.css` |
-| 稿子里的 `<button>`、`<input>`、`<textarea>` 原生控件 | 稿子不引入组件库 | 用 `flowcloudai-ui` 的 `Button` / `Input` / `Select`（AGENTS §5.2），已有的 `MobilePageTopBar` / `MobileTopActionPill` / `MobileAnchoredActionMenu` |
+| 稿子里的 `<button>`、`<input>`、`<textarea>` 原生控件 | 稿子不引入组件库 | 用 `flowcloudai-ui` 的 `Button` / `Input` / `Select`（`app_main/AGENTS.md`「复用与数据安全」），已有的 `MobilePageTopBar` / `MobileTopActionPill` / `MobileAnchoredActionMenu` |
 | `→ ← ↔ ↗ ↙` 文字箭头 | 稿子用字符省事；字符箭头在不同字体下字形、基线、粗细都不一致 | **画成 SVG**，放进 `MobileEntryDetailActionIcon` 或同目录的图标模块，与现有图标同一套描边风格（`stroke-width` 1.8–2，`stroke-linecap: round`） |
 | 内联 `style="..."` | 稿子里为了少写 CSS 用了若干内联样式 | 全部落到 CSS 类 |
 | 稿子的 `<script>` 状态切换 | 只用于在稿子里切换展示状态 | 程序里状态来自 React state 与页面栈 |
@@ -76,7 +75,7 @@
 
 ## 3. 实施步骤
 
-**分 5 个提交，每步独立可验证、可停。** AGENTS §8：一个独立改动一个 commit，提交信息中文。
+**分 5 个提交，每步独立可验证、可停。** 根 AGENTS「仓库与提交」：一个独立改动一个 commit，提交信息中文。
 **每一步做完都要跑 §4 的验证，不要攒到最后。**
 
 ### 步骤 A — 展示态重排（不含图片浏览器）
@@ -104,9 +103,9 @@
 - 两态：单图（捏合缩放 + 滑动翻页 + 底部缩略图条 + 设为主图 / 删除）、画廊（网格多选 + 批量删除）。
 - **不复用桌面 `EntryImageLightbox`**（决定 5）。桌面那套是「预览/画廊切换 + 百分比缩放按钮 + 键盘方向键」，形态不适配触摸。
 - ⚠️ **`MobileEntryProperties.tsx:208` 现在用的就是桌面 `EntryImageLightbox`，要一并换掉**，否则属性页和展示态会是两套图片浏览体验。
-- 浮层外壳优先用 `src/shared/ui/overlay` 的 `Overlay` / `FloatingPanel`（AGENTS §5.2），它已经处理了 portal、遮罩、Esc/背板关闭、滚动锁与返回栈。**不要手写 `createPortal` 和全局 `keydown`。**
-- 缩略图条是横向滚动区 → 必须带 `data-mobile-horizontal-scroll`（AGENTS §5.1）。
-- ⚠️ 不要用 `translateZ(0)` 强制合成层，2026-07-13 已因 tile 内存超限暂停该做法（AGENTS §5.1）。
+- 浮层外壳优先用 `src/shared/ui/overlay` 的 `Overlay` / `FloatingPanel`（`app_main/AGENTS.md`「复用与数据安全」），它已经处理了 portal、遮罩、Esc/背板关闭、滚动锁与返回栈。**不要手写 `createPortal` 和全局 `keydown`。**
+- 缩略图条是横向滚动区 → 必须带 `data-mobile-horizontal-scroll`（`app_main/AGENTS.md`「移动端界面」）。
+- ⚠️ 不要用 `translateZ(0)` 强制合成层，2026-07-13 已因 tile 内存超限暂停该做法（`app_main/AGENTS.md`「移动端界面」）。
 
 ### 步骤 C — 编辑态骨架重排
 
@@ -160,7 +159,7 @@ npm run test:mobile-edge-back
 
 ### 真机验证（Android，设备已验证可用）
 
-浏览器预览**不能**作为验收证据（AGENTS §4.1：词条页依赖 Tauri command 与本地数据库）。
+浏览器预览**不能**作为验收证据（根 AGENTS「验证」：词条页依赖 Tauri command 与本地数据库）。
 
 ```bash
 export ANDROID_HOME="$HOME/Library/Android/sdk"
@@ -186,7 +185,7 @@ adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof cn.
 
 再用 Node 内置 `WebSocket` 连 `http://127.0.0.1:9222/json` 里的 `webSocketDebuggerUrl` 发 `Runtime.evaluate`。
 
-**证据必须提交进仓库**：`designs/audits/<主题>-<日期>/`，附 `README.md` 说明设备、构建、抓取方式（AGENTS §9.4）。指向仓库外临时目录的证据等于没有证据。
+**证据必须提交进仓库**：`designs/audits/<主题>-<日期>/`，附 `README.md` 说明设备、构建、抓取方式（根 `docs/文档规约.md` 第 4 节）。指向仓库外临时目录的证据等于没有证据。
 
 ### iOS
 
@@ -199,9 +198,9 @@ adb forward tcp:9222 localabstract:webview_devtools_remote_$(adb shell pidof cn.
 - ⚠️ **`MobileEntryDetail.css` 有 14 组完全相同的选择器块**（`__title` / `__markdown` / `__summary` / `__image-grid` / `__connection-card` 等各定义两次，一处在文件前段、一处在后段）。2026-08-24 的 padding 回归就是这个结构造成的：改了前一处，后一处在同等特异性下覆盖回去。**改样式前先确认自己改的是不是最后生效的那一处**，顺手合并重复块（可以单独一个提交）。
 - ⚠️ **`.mobile-page:not(.mobile-nav-safe-fixed)` 特异性是 (0,2,0)**，会故意压掉页面级的 `padding` 简写。编辑态用了 `padding-inline` / `padding-top` / `padding-bottom` 分写就是为了绕开它。
 - ⚠️ **Android 页面必须自己声明 `--mobile-keyboard-extra` 与 `--mobile-nav-reserved-height`**：外壳只在 `html[data-mobile-keyboard-owner='ios']` 下加键盘分量。参考 `MobileAiChat.css` / `MobileIdea.css` 的写法。
-- ⚠️ **`visualViewport` 只能用于输入态判断，不得用于写根高度、平移外壳或预测键盘高度**（AGENTS §5.1、`docs/devlog/2026-08-24-移动端软键盘-双端原生布局接管.md`）。
-- ⚠️ **新增的 Markdown 预览表面必须接管锚点点击**（`app_main/AGENTS.md` 坑点章节）。`AppShell` 的 `useTopLevelNavigationGuard` 是兜底，不是许可。
-- ⚠️ **单个移动端页面文件原则上不超过 800 行**（AGENTS §5.1）。`MobileEntryDetail.tsx` 现在 645 行，本轮会继续增长，**超过前先拆 hook 或子组件**。
+- ⚠️ **`visualViewport` 只能用于输入态判断，不得用于写根高度、平移外壳或预测键盘高度**（`app_main/AGENTS.md`「移动端界面」、`docs/devlog/2026-08-24-移动端软键盘-双端原生布局接管.md`）。
+- ⚠️ **新增的 Markdown 预览表面必须接管锚点点击**（`app_main/AGENTS.md`「复用与数据安全」）。`AppShell` 的 `useTopLevelNavigationGuard` 是兜底，不是许可。
+- ⚠️ **单个移动端页面文件原则上不超过 800 行**（`app_main/AGENTS.md`「移动端界面」）。`MobileEntryDetail.tsx` 现在 645 行，本轮会继续增长，**超过前先拆 hook 或子组件**。
 - ⚠️ **页面层禁止直接 `import` `@tauri-apps/*`**，先收口到 `api/`。
 - ⚠️ **新增跨页共享状态走 store**（`useSyncExternalStore` 模式），禁止新增 `CustomEvent`。
 - ⚠️ **底部面板不承载滚动或输入内容**（基线 §9 规则 8）。本轮如果想用 `MobileBottomSheet` 装图片浏览器或属性编辑，**都不行**，用页面栈或全屏浮层。

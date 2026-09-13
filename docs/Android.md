@@ -142,6 +142,20 @@ Release 测试用于交付前验证真实安装包。它不依赖本机开发服
     - 内置模板、图片访问、插件安装、文件选择等平台能力正常。
     - 日志中没有 Rust panic、WebView 资源错误、路径错误和权限错误。
 
+## APK 构建与签名
+
+| 命令 | 用途 |
+| --- | --- |
+| `npm run android:dev` | 调试入口。`scripts/android-dev.cjs` 从 `ANDROID_HOME` / `ANDROID_SDK_ROOT` / `ANDROID_NDK_HOME` 查找工具链；优先使用已连接设备，没有时启动第一个 AVD（可用 `$env:ANDROID_AVD_NAME` 指定）；等待开机、清理端口占用，为 `5176`（Vite）与 `1422`（HMR）设置 `adb reverse` 后以 `--host 127.0.0.1` 启动 |
+| `npm run android:build:debug:x86_64` | x86_64 模拟器 Debug APK；脚本使用 Windows `set` 语法 |
+| `npm run android:build:apk` | 待签名的通用 Release APK |
+| `npm run android:sign:apk` | 只签名已有 APK |
+| `npm run android:build:signed:apk` | 先构建再签名 |
+
+- 改 Android dev 端口时同时更新 `vite.config.ts`、`src-tauri/tauri.android.conf.json` 与 `scripts/android-dev.cjs`；桌面/iOS 使用 `5175/1421`，Android 使用 `5176/1422`，不要混写。
+- `scripts/sign-android-apk.ps1` 是 Windows PowerShell 脚本，默认 keystore 路径、别名和输出文件名带本机/版本假设，正式发布前逐项核对，不能直接当作通用发布配置。
+- **已发布版本必须永久复用同一把 release keystore。** 签名脚本在默认 keystore 不存在时会创建新密钥和密码文件，这只适合首次建钥：执行前先确认目标路径，建成后离线备份。禁止提交 keystore 或密码文件，也不能因换电脑重建——换签名的包无法覆盖安装已发布版本。
+
 ## 截图与取证
 
 需要保留截图时使用设备文件中转，避免 PowerShell 直接重定向二进制流：

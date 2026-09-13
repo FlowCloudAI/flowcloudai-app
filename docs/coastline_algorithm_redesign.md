@@ -22,7 +22,7 @@
 - **顶点拍板结果**：v2 不保留原始顶点钉死（§6.1 风险已确认接受）。
 - **已验证**：scratch 工程内 11 项单测全过（含顶点细分不变性 Hausdorff < 0.5px）；
   位移统计显示峰值打满振幅上限、长短边悬殊形状质感一致（mean 5.40 vs 5.41px）。
-  注意 `app_main` 本地 `cargo test` 因 STATUS_ENTRYPOINT_NOT_FOUND 无法直接运行（既有坑，见 AGENTS.md 第 6 节）；
+  注意 `app_main` 本地 `cargo test` 因 STATUS_ENTRYPOINT_NOT_FOUND 无法直接运行（Windows 既有坑，见 `app_main/AGENTS.md`「验证」）；
   公开 API 回归放在 `src-tauri/tests/coastline_v2.rs` 集成测试（经清单注入可直接运行）。
 - **待办**：`tauri:dev` 下的人工视觉验收（对照 §6.2 的三个用例）。
 

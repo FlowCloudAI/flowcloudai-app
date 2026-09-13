@@ -1,6 +1,6 @@
 # macOS 调试与发布流程
 
-> 状态：现行 ｜ 日期：2026-08-28
+> 状态：现行 ｜ 日期：2026-09-13
 
 本文记录 `app_main` 的 macOS 原生窗口、调试、打包、签名与公证边界。所有命令都在 Mac 的 `app_main` 根目录执行。
 
@@ -13,6 +13,12 @@
 - macOS 主窗口保持 `create: false`，由 setup 读取合并后的平台配置创建唯一窗口；同时保留 `decorations: true` 与 `titleBarStyle: Overlay`，启用透明 WKWebView 和 `underWindowBackground` 系统材质。设置中的“毛玻璃效果”会同时控制原生材质与 WebView 半透明着色层。
 - Tauri 的透明 WKWebView 依赖 `app.macOSPrivateApi: true` 和 Cargo `macos-private-api` 特性。该实现使用系统 `NSVisualEffectView` 做模糊，但透明背景入口仍属于 Tauri 标注的私有 API：当前官网 Developer ID DMG 路线接受这一取舍，Mac App Store 不接受。正式 DMG 必须以实际公证结果为准。
 - 当前正式发行目标是官网直接下载的已签名、公证 DMG。Mac App Store 需要 App Sandbox，而现有自定义数据目录、插件和通用文件访问必须先完成单独的沙箱兼容评估。
+- 交通灯位置当前验收值为 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但保留 `5.25rem` 的交通灯避让。调整坐标要同步检查主页/Tab 左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不提交新坐标值。
+- 不要给 `fileAssociations` 添加当前 schema 不支持的 `icon` 字段，也不要把文件类型配置写进生成的 `.app/Contents/Info.plist`；长期来源是 `src-tauri/Info.macos.plist` 与 `src-tauri/icons/fcplug.icns`、`fcworld.icns`。
+- `.fcworld` / `.fcplug` 的系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列：Windows/Linux 由单实例参数转发，macOS 由 `RunEvent::Opened` 转发，再由 `src/features/desktop-file-open/DesktopFileOpenController.tsx` 串行消费并进入导入/安装确认。macOS 禁止在 setup 阶段启用 `tauri-plugin-single-instance`，否则新进程可能在 Launch Services 交付文件 URL 前退出并吞掉 Finder 双击事件；任何平台都不能在原生事件回调中绕过确认直接改数据。
+- `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为收口在平台配置、OS class 或 target 条件代码中，不为 macOS 复制 `MacApp.tsx` 或 React 业务状态。
+- `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄；原生窗口边框负责缩放，不等于可以把它设为 `0`。
+- `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规；启用 `zoomHotkeysEnabled` 时桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。二者是共享配置，修改后要回归 Windows、Linux 与移动端。
 
 ## 2. 首次环境检查
 
@@ -30,6 +36,11 @@ npm run macos:dev
 ```
 
 该命令等价于在当前 Mac 上启动 Tauri 开发模式，终端会持续显示前端、Rust 与 WebView 相关日志。开发模式只编译当前机器架构，不会额外编译 iOS、Windows、Android 或 Intel 版本。
+
+- React/TypeScript/CSS 保存后走 Vite HMR，Rust 自动重编译；`tauri.macos.conf.json` 等原生窗口配置会触发应用重建/重启，不能靠 HMR 验证。
+- 主窗口初始为 `visible: false`，前端后端状态变为 ready/failed 后直接调用 `showWindow()`。不要把显示操作包进 `requestAnimationFrame`：macOS 可能暂停隐藏 WKWebView 的帧回调，形成“窗口不显示就没有下一帧”的启动死锁。正常启动日志必须出现 `主窗口显示完成 platform=macos ... visible_after=true`。
+- React StrictMode/HMR 可能让 Tauri 原生监听器先于 React cleanup 被释放；事件清理统一经过 `src/api/events.ts` 的安全释放逻辑，窗口 resize/close 监听也不能直接调用异步 unlisten 而留下未处理拒绝。
+- 同时只运行一个 macOS dev/Release 实例与一套 Vite 服务。程序坞有图标但没有窗口时，先检查端口和旧进程，再看窗口显示日志，不要先归因于前端白屏。
 
 首轮至少验证：
 
@@ -53,6 +64,7 @@ npm run macos:build:local
 - `macos:build:debug` 生成当前架构的未签名 Debug `.app`，用于快速验证打包资源。
 - `macos:build:local` 生成当前架构的 Release `.app` 与 `.dmg`，使用 ad-hoc 签名，只适合本机/内部验证，其他用户打开时仍可能看到 Gatekeeper 提示。
 - 产物位于 `src-tauri/target/<profile>/bundle/macos/` 与 `src-tauri/target/<profile>/bundle/dmg/`，不提交 Git。
+- 前端或 Tauri 配置变化会重新嵌入资源并触发 Release 链接，在 Apple Silicon 开发机上可能耗时数分钟；这不代表在编译全平台。
 - 文件图标变更后检查 `.app/Contents/Info.plist` 的 `CFBundleDocumentTypes`、`UTExportedTypeDeclarations`，并确认两个 `.icns` 位于 `.app/Contents/Resources/`。
 
 ## 5. 正式站外发行

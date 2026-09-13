@@ -1,234 +1,54 @@
 # app_main — AGENTS.md
 
-## 项目概览
+Tauri 2 + React 19 主应用，一套代码承载 Windows、Linux、macOS、Android、iOS；前端只经 `src-tauri` 访问文件与系统能力。
 
-`app_main` 是 FlowCloudAI 的 Tauri + React（TypeScript）主应用，同时承载 Windows、Linux、macOS、Android 与 iOS 外壳，提供世界观建模、关系图编辑、地图展示与插件入口。
+文档索引 `docs/README.md`（覆盖 `docs/`、`plans/`、`designs/`）；踩坑记录在工作区根 `docs/devlog/`，本仓条目最多。
 
-## 文档入口
+## 验证
 
-本仓库文档索引：`app_main/docs/README.md`。索引带状态标记（`现行` / `归档` / `结论记录` / `失效`），先看状态再决定要不要读。`docs/`、`plans/`、`designs/` 三处文档统一由该索引收口，含平台构建手册、待办计划与设计基线。
+- 前端改动跑 `npm run lint && npm run build`；`src-tauri/` 有改动再跑 `cargo check` / `cargo test`。
+- Windows 上 `cargo test` 可能报 `STATUS_ENTRYPOINT_NOT_FOUND`：测试 exe 缺 common-controls v6 清单，是清单/链接问题，`cargo clean` 无效（根 `docs/devlog/2026-06-02-cargo-test-入口点缺失.md`）。
+- 浏览器预览不加载 Tauri 后端，依赖真实数据的界面只能用原生应用或 debug APK + ADB 验证；静态布局例外，详见根 `AGENTS.md`「验证」。
+- 打包、发布或原生配置（窗口、CSP、capability、签名）改动：构建成功不等于可用，要实际运行产物，验收清单在对应平台手册里。
 
-**问题排查记录（问题 → 根因 → 方案）不放本仓**，统一在工作区根 `docs/devlog/`，索引 `docs/devlog/README.md`。`app_main` 是 devlog 里条目最多的仓库——动移动端、构建链路、地图渲染前先扫一眼，多数坑已经踩过。
+## 平台
 
-跨子项目文档在工作区根 `docs/README.md`。**写、移、删文档前先读根 `AGENTS.md` §9 文档规约**——状态标记、放置规则、devlog 格式、证据要求都在那里。
+动某个平台的窗口、构建或发布链路前先读对应手册：macOS `docs/tauri_macos_debug_and_release.md`、iOS `docs/tauri_ios_debug_and_release.md`、Android `docs/Android.md`。以下几条改错会直接坏掉，而且从代码里看不出来：
 
-## 构建 / 运行 / 测试 / lint
+- **启动顺序敏感**：Windows 无边框透明窗口、macOS 隐藏的 Overlay 窗口都依赖初始化顺序，出错表现为白屏或窗口不出现。主窗口初始 `visible: false`，前端 ready/failed 后直接调 `showWindow()`；不要包进 `requestAnimationFrame`——macOS 会暂停隐藏 WKWebView 的帧回调，窗口不显示就没有下一帧，形成启动死锁。
+- **dev 端口**：桌面/iOS 为 `5175`、HMR `1421`，`src-tauri/tauri.conf.json` 与 `vite.config.ts` 必须一致；Android 覆盖为 `5176`/`1422`，改动时同步 `vite.config.ts`、`src-tauri/tauri.android.conf.json`、`scripts/android-dev.cjs` 三处。
+- **macOS**：`tauri.macos.conf.json` 必须保留 `create: false`，由 setup 创建唯一的 `main` 窗口，否则重复 label 启动即崩。setup 阶段不能启用 `tauri-plugin-single-instance`：新进程可能在 Launch Services 交付文件 URL 前退出，吞掉 Finder 双击。透明窗口依赖 `macos-private-api`，Mac App Store 不接受，换发行渠道前要先替换实现。
+- **共享 CSP 与 capability**：CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后 WebKit 持续报 IPC 违规；启用 `zoomHotkeysEnabled` 时桌面 capability 要含 `core:webview:allow-set-webview-zoom`。这是全平台共享配置，改完回归所有平台。
+- **iOS**：`src-tauri/gen/apple/` 是可重建的生成目录，长期改动写进 `src-tauri/ios/project.yml` 与 `src-tauri/icons/ios/`，否则 `ios:init` 后丢失。每次安装的沙箱容器 UUID 可能变化，移动端不能持久化系统默认数据目录的绝对路径。
+- **Android 签名**：已发布版本必须永久复用同一把 release keystore。`scripts/sign-android-apk.ps1` 在默认 keystore 不存在时会**新建**密钥，只适合首次建钥——执行前确认路径，换电脑也不能重建。
+- `.fcworld` / `.fcplug` 的系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列，再由前端串行进入导入/安装确认；任何平台都不能在原生事件回调里跳过确认直接改数据。
+- Team ID、Apple 凭据、证书、keystore 与密码文件只放本机环境或 CI secrets。
 
-```bash
-cd app_main
-npm install
-npm run lint
-npm run build
-npm run tauri -- dev
-```
+## 移动端界面
 
-```bash
-npm run tauri:build:windows
-npm run tauri:build:windows:signed
-npm run tauri:build:linux
-```
+- 页面文件不超过 800 行，超过前先拆 hook 或子组件（`src/app/mobile/pages/` 由 eslint `max-lines` 检查）。
+- 移动端界面代码不直接 import `@tauri-apps/*`，经 `src/api/` 或共享适配层，浏览器预览才能 mock、双端才能同测（`src/app/mobile/` 由 eslint 检查）。
+- 新增横向滚动区域加 `data-mobile-horizontal-scroll`，侧边抽屉手势据此放行横滑。不要为 Android 纵向压扁问题恢复 `translateZ(0)` 强制合成层：2026-07-13 起暂停，Chromium 148 模拟器持续 tile 内存超限、可能触发 renderer OOM，而真机未复现压扁。
+- 跨页或跨端共享状态走 store（参考 `projectListStore` 的 `useSyncExternalStore` 模式），不新增 `CustomEvent` 事件名做长期同步。
+- **软键盘布局只有一个 owner**：WebView 与应用外壳几何保持稳定，Android / iOS 各自的原生适配器发布遮挡量 `--fc-kb`，前端只压缩 AI 消息区、灵感正文等内部空间。不写根高度、不整壳平移、不预测键盘高度；`visualViewport` 只用于判断输入态。消费公式、已接入页面与验收边界见 `docs/mobile_keyboard_layout.md`。已实测无效、不要再试：Tauri Android WebView 的 `navigator.virtualKeyboard` 可写但 `env(keyboard-inset-height)` 恒为 0、`geometrychange` 不触发；viewport meta 的 `interactive-widget` 三个取值在 iOS 与 Android 上都无差异。
+- 侧边抽屉拖动态 `is-drawer-dragging` 与页面边缘返回 `is-edge-back-direct` 必须分开，不能重新引入同时命中外壳与页面层的 `is-dragging`，否则 Android WebView 在手势开始和回弹结束时各闪一次。改这组状态或 selector 时运行 `mobilePageTransition.test.mjs`；真机慢拖与取消回弹需要用户验证，交付时说明。
 
-```bash
-cd src-tauri
-cargo check
-cargo test
-```
+## 桌面布局
 
-`app_main` 的前端命令以 `app_main/package.json` 为准，Rust 命令以 `app_main/src-tauri/Cargo.toml` 为准。
+- 工作区页面区与 Dock 槽位由 `.workspace-content` 的 `grid-template-areas` 定位，不依赖 DOM 顺序；新增槽位只扩展 areas，不改回 flex 横排。
+- 中央页面主体最小宽度统一用 `--workspace-page-content-min-width`，主页、设置、项目/词条编辑不各自硬编码。
+- `--app-drag-handle-width` 同时控制外壳留白、Dock 间距与侧栏拖拽手柄，macOS 下也不能设为 0。
 
-## macOS 调试与打包（仅 macOS）
+## 复用与数据安全
 
-macOS 完整操作手册是 [`docs/tauri_macos_debug_and_release.md`](docs/tauri_macos_debug_and_release.md)。修改 Mac 窗口或发布链路前先读该文档。
+- 新界面先查 `flowcloudai-ui`（导出以 `lib_ui/ui/src/index.ts` 为准）与 `src/shared/ui`：浮层用 `shared/ui/overlay`（`Overlay` / `FloatingPanel` 已处理 portal、遮罩、Esc、滚动锁与返回栈），Dock 面板用 `shared/ui/layout`，词条/标签表单复用 `TagCreator`、`EntryTypeCreator` 等现有领域组件，词条正文双端都用 `features/entries/components/MarkdownEditor`，缺 AI 插件提示用 `AiPluginMissingOverlay`。主题、右键菜单与 alert 的 Provider 已在 `src/app/index/AppShell.tsx` 接入，不另建。
+- **监听后端 `*-request` 事件的确认组件必须同时挂到 `DesktopApp` 和 `MobileApp`**，漏挂一端会让后端请求静默挂起。
+- **任何渲染 Markdown 的表面都要自己接管锚点点击**：容器 `onClick` 里用 `resolveMarkdownAnchor` 取锚点、无条件 `preventDefault`，再决定跳词条、走 `api/opener` 还是提示拒绝。WebView 主文档一旦导航离开，整个应用连同未保存内容被替换且无法返回；`AppShell` 的 `useTopLevelNavigationGuard` 只是兜底，不是可以不接的许可。2026-08-25 因此丢过一次正文（根 `docs/devlog/2026-08-25-移动端预览链接把应用打没.md`）。
 
-### 文件职责与平台边界
+## 设计稿
 
-- `src-tauri/tauri.macos.conf.json` 是 macOS 自动合并的平台配置；必须保留 `create: false`，由 setup 读取合并配置创建唯一的 `main` 窗口，否则会因重复 label 在启动时崩溃。窗口保留 `decorations: true`、`titleBarStyle: Overlay`，并使用 `transparent: true` + `underWindowBackground` 系统材质。透明 WKWebView 依赖共享配置 `app.macOSPrivateApi: true` 与 Cargo 的 `macos-private-api` 特性：当前官网 Developer ID DMG 路线可使用，但 Mac App Store 不接受该私有 API，改变发行渠道前必须先替换实现。当前已验收 `trafficLightPosition: {x: 16, y: 26}`；`src/App.css` 在 macOS 隐藏应用内 Logo，但仍保留 `5.25rem` 的交通灯避让。后续调整坐标时必须同步检查主页/Tab 的左侧间距，并在不同缩放与内外接屏幕上验证，未经验收不要提交新坐标值。
-- `src-tauri/Info.macos.plist` 与 `src-tauri/icons/fcplug.icns`、`fcworld.icns` 是 macOS 自定义文件类型和 Finder 图标的长期来源；Windows 仍由 `tauri.conf.json` + NSIS `DefaultIcon` 使用 `.ico`。不要给 `fileAssociations` 添加当前 schema 不支持的 `icon` 字段，也不要把 macOS 文件类型配置写入生成的 `.app/Contents/Info.plist`。
-- `.fcworld` / `.fcplug` 的桌面系统打开请求统一进入 `src-tauri/src/desktop_file_open.rs` 队列：Windows/Linux 由单实例参数转发，macOS 由 `RunEvent::Opened` 转发，再由 `src/features/desktop-file-open/DesktopFileOpenController.tsx` 串行消费并进入现有导入/安装确认。macOS 禁止在 setup 阶段启用 `tauri-plugin-single-instance`，否则新进程可能在 Launch Services 交付文件 URL 前退出并吞掉 Finder 双击事件；任何平台都不能在原生事件回调中绕过确认直接改数据。
-- `scripts/macos-workflow.mjs` 统一执行环境检查、dev、本地 Release 和正式 Universal 发布。Mac 专属行为优先收口在平台配置、OS class 或 target 条件代码中，不能为了 macOS 复制一套 `MacApp.tsx`、React 业务状态或 SwiftUI 业务界面。
-- `--app-drag-handle-width` 同时控制桌面 shell 留白、Dock 面板间距和侧栏拖拽手柄，macOS 下也必须保留；原生窗口边框负责缩放不等于可以把该变量设为 `0`。
-- `src-tauri/tauri.conf.json` 的 CSP 必须允许 `connect-src 'self' ipc: http://ipc.localhost`，否则打包后的 WebKit 会持续报告 Tauri IPC 违规。启用 `zoomHotkeysEnabled` 时，桌面 capability 必须包含 `core:webview:allow-set-webview-zoom`。修改共享 CSP/capability 后要回归 Windows、Linux 与移动端，不能把它们当成纯 Mac 配置。
+用户要"设计稿 / 视觉规划 / 界面方案"，或新增整页、大改布局而用户没给出具体布局要求时，先做 `designs/<主题>.html` 单文件设计稿，确认后再实现；其余界面改动直接实现。制作规则见 `designs/设计稿约定.md`。
 
-### 日常调试与窗口启动
+## 提交
 
-- `npm run macos:dev` 只构建当前 Mac 架构并在当前终端持续输出 Vite、Rust、WebKit 与前端转发日志。React/TypeScript/CSS 保存后走 Vite HMR；Rust 自动重编译；`tauri.macos.conf.json` 等原生窗口配置会触发应用重建/重启，不能靠 HMR 验证。
-- 主窗口初始为 `visible: false`，前端后端状态变为 ready/failed 后直接调用 `showWindow()`。禁止重新把显示操作包进 `requestAnimationFrame`：macOS 可能暂停隐藏 WKWebView 的帧回调，形成“窗口不显示就没有下一帧”的启动死锁。正常启动日志必须出现 `主窗口显示完成 platform=macos ... visible_after=true`。
-- React StrictMode/HMR 可能让 Tauri 原生监听器先于 React cleanup 被释放；事件清理统一经过 `src/api/events.ts` 的安全释放逻辑，窗口 resize/close 监听也不能直接调用异步 unlisten 而留下未处理拒绝。
-- 同时只运行一个 macOS dev/Release 实例与一套 Vite 服务。程序坞有图标但没有窗口时，先检查端口和旧进程，再看窗口显示日志，不要先归因于前端白屏。
-
-### Release 与签名边界
-
-- `npm run macos:build:local` 生成当前架构、优化后的 `.app`/`.dmg`，使用 ad-hoc 签名，只适合本机安装与功能验收；它不是可公开分发的已公证包。
-- `MACOS_BUILD_NUMBER=... npm run macos:build:release` 默认构建 Apple Silicon + Intel Universal 包，并强制检查 `APPLE_SIGNING_IDENTITY`、Apple 公证凭据和 `TAURI_SIGNING_PRIVATE_KEY`。这些材料只放本机钥匙串、环境变量或 CI secrets，禁止提交；Personal Team 不能替代 Developer ID Application 站外签名。
-- 当前发行边界是官网 DMG，不是 Mac App Store。除 App Sandbox、自定义数据目录、插件、文件导入、Keychain 与网络能力外，透明 WKWebView 使用的 `macos-private-api` 也不符合 Mac App Store 要求；不得直接复用站外包配置。
-- `target/release/bundle/` 是可再生产物，不提交。前端或 Tauri 配置变化会重新嵌入资源并触发 Release 链接，本项目在 Apple Silicon 开发机上可能耗时数分钟，这不是默认的全平台编译。
-- 构建成功不等于适配完成：必须实际运行最终 `.app`，检查模板/数据库/插件初始化、窗口显示、CSP 与未处理拒绝日志，并验证原生交通灯、拖拽/全屏/关闭拦截、Command 快捷键、项目与聊天恢复、插件/文件访问、Keychain、自定义数据目录。DMG 还要做完整性校验；Gatekeeper 与公证状态只能用正式 Developer ID 包验收。
-
-## iOS 调试与打包（仅 macOS）
-
-iOS 的完整操作手册是 [`docs/tauri_ios_debug_and_release.md`](docs/tauri_ios_debug_and_release.md)。修改 iOS 构建链路前先读该文档；以下内容用于说明仓库内各文件的职责与常用入口。
-
-### 仓库内文件与生成目录
-
-- `scripts/ios-workflow.mjs`：统一执行环境自检、工程初始化、真机调试、Archive 与 IPA 导出，并检查构建锁、版本号和产物 SHA-256。
-- `src-tauri/icons/ios/`：受 Git 跟踪的 iOS AppIcon 唯一来源；`ios:init`、`ios:dev`、`ios:run` 与打包命令会同步到生成的 `Assets.xcassets`。若只在 Xcode 中操作，先执行 `npm run ios:sync-icons`；禁止把 Tauri 默认图标留在 `src-tauri/gen/apple` 后直接打包。
-- `scripts/ios-xcode-build.sh`：Xcode Build Phase 到 Node、Cargo 与本地 Tauri CLI 的桥接脚本；重新生成 Xcode 工程后不应再手工补 PATH。
-- `src-tauri/ios/project.yml`：受 Git 跟踪的 XcodeGen 模板，是 iOS 原生工程配置的长期来源。
-- `src-tauri/gen/apple/`：Tauri/Xcode 生成目录，已忽略且可随时重建。禁止把长期修改只写在这里，否则 `ios:init` 后会丢失。
-- `artifacts/ios/`：工作流整理出的 IPA 与 `.sha256` 文件，已忽略，不提交 Git。
-
-### 首次准备与日常调试
-
-Team ID 只放在本机环境，不写入仓库：
-
-```zsh
-export APPLE_DEVELOPMENT_TEAM="你的 Team ID"
-npm run ios:doctor
-npm run ios:init
-```
-
-`ios:init` 只在生成工程不存在，或 `src-tauri/ios/project.yml`、原生配置发生变化后执行。日常调试使用：
-
-```zsh
-npm run ios:dev -- "Xcode 中显示的设备名称"
-npm run ios:dev -- "Xcode 中显示的设备名称" --open
-npm run ios:run -- "Xcode 中显示的设备名称"
-npm run ios:build:sim:debug
-```
-
-- `ios:dev` 使用 Vite 热更新，iPhone 需要与 Mac 同网并允许 App 访问本地网络；`--open` 用 Xcode 打开生成工程，适合看完整设备日志。
-- `ios:run` 使用打包后的前端，不依赖 Vite，更接近 Release 行为；功能回归优先用它。
-- `ios:build:sim:debug` 只适合基础界面检查，不能替代真机权限、沙箱、签名和 WebView 手势验证。
-
-### IPA 与发布边界
-
-```zsh
-npm run ios:build:debug
-IOS_BUILD_NUMBER=42 npm run ios:build:release-test
-IOS_BUILD_NUMBER=42 npm run ios:build:appstore
-IOS_BUILD_NUMBER=42 npm run ios:archive
-```
-
-- 正式构建必须显式设置递增的 `IOS_BUILD_NUMBER`；不要直接给底层 Tauri 追加 `--build-number`，统一脚本会把该值准确写入 `CFBundleVersion`。
-- `ios:build:release-test` 是注册设备测试包，不是 TestFlight；TestFlight 与 App Store 使用 `ios:build:appstore`，脚本只导出、不上传。
-- Personal Team 可做本人真机开发，但 TestFlight/App Store 分发需要 Apple Developer Program、有效分发证书与 App Store Connect 应用记录。
-- `APPLE_DEVELOPMENT_TEAM`、Apple ID、设备 ID、证书、描述文件和签名材料均属于本机/发布环境，禁止提交。
-- iOS 编译成功不等于可用：至少用真机验证启动、项目/聊天数据恢复、文件访问、Rust/前端日志和双指缩放。同一时间只运行一个 `ios:dev`、Xcode 调试或打包任务，避免 Rust 输出目录锁互相等待。
-
-## Android 调试与打包（主要在 Windows）
-
-Android 当前的固定入口是 `package.json` 中的脚本；模拟器网络故障的原因与排查方式记录在工作区 `docs/devlog/2026-08-16-android-模拟器-vite-不可达.md`（该文件在根仓库，不在本仓）。Android Studio/SDK、Platform Tools、NDK、Rust Android targets 与至少一个 AVD 应先准备好。
-
-### 调试入口
-
-```powershell
-npm run android:dev
-```
-
-`scripts/android-dev.cjs` 会自动完成以下工作：
-
-- 从 `ANDROID_HOME` / `ANDROID_SDK_ROOT` / `ANDROID_NDK_HOME` 等环境变量查找 SDK、ADB、Emulator 与 NDK，并配置四个 Rust Android target 的编译器。
-- 优先使用已连接且启动完成的设备；没有设备时自动启动第一个 AVD。可在 PowerShell 中用 `$env:ANDROID_AVD_NAME="AVD 名称"` 指定模拟器。
-- 等待 `sys.boot_completed=1`，清理 Android 开发端口占用，并为 `5176`（Vite）和 `1422`（HMR）设置 `adb reverse`。
-- 最终以 `tauri android dev --host 127.0.0.1` 启动，避免依赖模拟器访问 Windows 局域网地址和防火墙入站规则。
-
-若更改端口，必须同时更新 `vite.config.ts`、`src-tauri/tauri.android.conf.json` 与 `scripts/android-dev.cjs`。桌面/iOS 默认使用 `5175/1421`，Android 使用 `5176/1422`，不要混写。
-
-### APK 构建与签名
-
-```powershell
-npm run android:build:debug:x86_64
-npm run android:build:apk
-npm run android:sign:apk
-npm run android:build:signed:apk
-```
-
-- `android:build:debug:x86_64` 使用 Windows `set` 语法，仅用于 x86_64 模拟器 Debug APK。
-- `android:build:apk` 生成待签名的通用 Release APK；`android:sign:apk` 只签名已有 APK；`android:build:signed:apk` 先构建再签名。
-- `scripts/sign-android-apk.ps1` 是 Windows PowerShell 脚本，默认 keystore 路径、别名和输出文件名带本机/版本假设。正式发布前必须核对这些值，不能把示例路径直接当作通用发布配置。
-- Android 已发布版本必须永久复用同一把 release keystore。签名脚本在默认 keystore 不存在时会创建新密钥和密码文件，这只适合首次建钥；执行前先确认目标路径，建成后离线备份，禁止提交 keystore 或密码文件，也不能因换电脑随意重建。
-- APK 构建成功后仍需用 debug APK + ADB 或签名 Release APK 在目标设备上验证；浏览器/Vite 空壳不能替代 Tauri 后端、数据库、权限与文件访问测试。
-
-## 代码风格与命名约定
-
-- 前端采用 ESM 严格模式与 React hook 优先结构。  
-- Rust 使用 2024 Edition，类型名 `PascalCase`，函数与变量 `snake_case`，常量 `SCREAMING_SNAKE_CASE`。  
-- 样式优先使用 `flowcloudai-ui` 的 `--fc-*` 设计 token，避免硬编码颜色、间距、阴影。  
-- 桌面工作区的页面区与 Dock 槽位统一由 `.workspace-content` 的 CSS Grid `grid-template-areas` 定位，不依赖 DOM 顺序；后续新增左侧或底部槽位时只扩展 areas，不改回 flex 横排。
-- 桌面中央页面主体的宽度下限统一使用 `--workspace-page-content-min-width`；主页、设置页和项目/词条编辑主轨不得各自硬编码另一套下限。
-- 前端逻辑仅通过 `src-tauri` 对外能力进行文件与系统边界访问。  
-
-## 目录结构与模块职责
-
-```text
-app_main/
-├── designs/           # 正式界面修改前的单文件 HTML 设计稿与设计审计包
-├── docs/              # 项目文档（索引：docs/README.md）
-├── plans/             # 开放中的计划，完成后合并进 docs/ 或删除
-├── src/               # 页面、路由、编辑器与状态层
-├── src-tauri/         # Tauri 命令、窗口、文件、插件桥接
-├── public/            # 前端静态资源
-├── scripts/           # 构建与联调脚本
-└── dist/              # 前端产物（不提交）
-```
-
-## 界面设计稿约定
-
-当界面改动需要先确定布局、信息层级、响应式行为或交互入口时，正式修改 React / CSS 前先制作可审计的 HTML 设计稿；用户明确要求直接实现或仅做局部样式修正时可跳过。
-
-- 用户提出“视觉规划 / 设计稿 / 界面方案”时，默认交付物就是 `designs/` 下的 HTML，而不是聊天中的图片生成结果、文字描述或临时原型；只有用户明确要求图片方案时才使用图片稿。
-- 不默认使用 Figma 或其他外部设计工具。除非用户明确指定，否则设计稿统一保存到 `app_main/designs/<主题名>.html`，不得放在临时目录或 `.codex/visualizations/`。
-- 每份设计稿必须是易于直接编辑和通过 `file://` 打开的单文件 HTML：CSS 与必要的少量 JavaScript 全部内联，不依赖构建步骤、包管理器、CDN、网络资源或额外素材文件。
-- 设计稿用于确认最终布局与交互，不是一次性线框图。应表达真实的信息层级、主要组件、宽屏与窄屏状态及关键交互；内容可以精简，但不能省略影响设计判断的区域。
-- 设计前先核对真实入口、所属 Tab、触发动作和背后页面；不同 Tab、不同业务板块或不会同时出现的状态必须拆成独立设计稿，禁止为了展示方便拼成同一界面。浮层稿必须使用它实际出现时的页面作为背景上下文。
-- 同一方案的后续反馈应原地修改同一个 HTML 文件；除非用户要求对比多个方向，否则不要为每轮反馈复制新文件。
-- 优先用 CSS 自定义属性模拟 `--fc-*` 语义令牌，保持与应用主题、圆角、间距和控件密度一致；不在设计稿中复制生产组件实现或业务逻辑。
-- **设计 QA 的截图、矢量源等证据必须提交进仓库**，统一放 `designs/audits/<主题>-<日期>/`。指向仓库外临时目录（`.codex/`、系统 Temp、其他机器的用户目录）的证据等于没有证据——2026-08 已有 5 篇设计 QA 因此失去可复核性。
-- 交付设计稿时提供文件路径并列出需要用户确认的关键点。用户确认后再按该文件实现正式界面；实现过程中若必须偏离已确认设计，应先说明原因和影响。
-
-## 安全 / 禁止事项
-
-- 不提交真实 API Key、模型密钥、数据库连接串、签名私钥、用户隐私。  
-- 不提交 `node_modules/`、`dist/`、`target/`、日志等可再生产物。  
-- 不在前端模板中硬编码生产域名、鉴权参数或凭证。  
-
-## 提交与 PR 规范
-
-- 提交信息默认中文。  
-- PR 说明需包含：`npm run lint`、`npm run build`、`cd src-tauri && cargo test` 结果与关键风险。  
-- 涉及启动链路须补充白屏、窗口初始化和插件加载顺序核验。  
-
-## 项目特有坑点
-
-- **移动端返回与抽屉拖动态必须隔离**：`useMobileSideDrawerGesture` 同时采样两类横向手势，但
-  侧边抽屉只能通过 `is-drawer-dragging` 改变 surface 圆角、边框和遮罩；页面边缘返回只能通过
-  `is-edge-back-direct` 控制前景页 transform。禁止重新引入同时命中外壳与页面层的泛化
-  `is-dragging`，否则 Android WebView 会在手势开始和取消回弹结束时各闪一次。修改这组状态或
-  selector 时必须运行 `mobilePageTransition.test.mjs`，并在真机分别慢拖与取消回弹。
-
-- `app_main/src-tauri/tauri.conf.json` 的桌面/iOS `devUrl` 与 `app_main/vite.config.ts` 必须对齐（`5175`，HMR `1421`）；Android 覆盖为 `5176`/`1422`，三处同步规则见 Android 章节。
-- Windows 无边框透明窗口与 macOS 隐藏 Overlay 窗口都对初始化顺序敏感；macOS 禁止在隐藏 WKWebView 的 `requestAnimationFrame` 中显示窗口。
-- 不能混用大小写错误的插件目录名与 manifest，加载失败会表现为插件不可见。  
-- macOS 的 `icon.icns` 正常不代表 iOS AppIcon 正常：`src-tauri/gen/apple` 可能独立残留 Tauri 默认图标。iOS 图标以 `src-tauri/icons/ios/` 为唯一来源，提交前执行 `npm run ios:doctor`，并以 Xcode Asset Catalog 成功编译及真机主屏幕显示为最终验收；不要提交生成目录来掩盖同步问题。
-- iOS 每次安装可能获得不同的沙箱容器 UUID，移动端不得持久化系统默认数据目录的绝对路径；必须在每次启动时从当前沙箱解析。桌面端自定义数据目录策略不受此限制。
-- **任何渲染 Markdown 的表面都必须自己接管锚点点击。** WebView 主文档一旦导航离开应用地址，
-  整个应用就被替换掉：`fc://` / `entry-title://` 会得到 `net::ERR_UNKNOWN_URL_SCHEME` 错误页，
-  http(s) 外链则把站点加载进应用窗口——两种都会连同未保存内容一起丢失，且没有应用内返回路径。
-  新增预览面板时必须在容器上接 `onClick`，用 `resolveMarkdownAnchor` 取锚点后**无条件 `preventDefault`**，
-  再决定跳词条、走 `api/opener`，还是提示拒绝。`AppShell` 的 `useTopLevelNavigationGuard` 是最后一道
-  兜底（捕获阶段只 `preventDefault`、不 `stopPropagation`），**它是防漏网的，不是「可以不接」的许可**。
-  2026-08-25 已因此丢过一次未保存正文，记录见 `docs/devlog/2026-08-25-移动端预览链接把应用打没.md`。
-
-- **2026-08-20 的双端原生键盘架构仍保持回退**：`a781f94` 撤销了 iOS/Android 共享 `occludedBottom` store、Tab 原生显隐和页面/Portal 通用键盘布局；回退前完整代码与证据固定在标签 `mobile-keyboard-native-v1-2026-08-20`。2026-08-23 重新引入的是范围更窄的 **Android-only** 路径，只服务 AI composer 与灵感正文，不恢复共享 store、不改变 Tab 位置、不写 iOS 布局。iOS 仍按未解决问题独立设计与真机验收。
-
-- **Android 键盘布局的唯一高度来源是原生 `WindowInsetsCompat.Type.ime()`**：
-  Activity 使用 `adjustResize` 兼容旧 Android/WebView 的 Insets 派发，但不缩短、不 padding、不平移 WebView；读取原始 IME 后，在传给 WebView 前把 IME 类型归零，避免新版 WebView 再次处理。动画期间只发布 `WindowInsetsAnimationCompat.Callback.onProgress` 的实际帧，禁止把 `onApplyWindowInsets` 提前到达的终点与中间帧混写，也禁止前端历史高度预测、250ms 自演过渡和整壳 transform。前端唯一落地点是 `--fc-kb`，页面侧只允许按同一组公式重定义 `--mobile-nav-reserved-height` 来消费它（`--mobile-keyboard-extra: max(var(--fc-kb, 0px) - var(--mobile-nav-height), 0px)`），不得另写根高度、整壳平移或高度预测——写清「怎么消费」而不是「谁在消费」：AI、灵感、词条编辑/属性/关系、项目描述都已走这条路，列名单只会过期；`visualViewport` 只保留给 iOS/旧桥的输入态检测，不得写 Android 布局。
-
-  2026-08-23 真机实测（Xiaomi / Android 16 / WebView 143）还确认：
-  `navigator.virtualKeyboard` 在 Tauri 的 Android WebView 里**存在但失效**——`overlaysContent = true` 写入被接受且
-  回读为 true，但 `env(keyboard-inset-height)` 与 `boundingRect` 恒为 0、`geometrychange` 一次都不触发，不要依赖它。
-  `interactive-widget` 的三个取值在 iOS（WebKit 根本没实现）和 Android（实测逐项相同）都不产生任何差异，
-  **不要再为键盘问题去改这个 viewport meta**。完整现行方案、兼容边界与验收项见
-  `docs/mobile_keyboard_layout.md`。
-
-文档同步时间：2026-09-12 +08:00
+PR 附实际跑过的验证命令与结果、关键风险；动启动链路时说明白屏、窗口初始化与插件加载顺序的核验。

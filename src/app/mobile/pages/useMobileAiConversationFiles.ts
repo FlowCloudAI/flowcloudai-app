@@ -1,7 +1,7 @@
 /*
  * AI 会话的文件出入口：导出会话、添加文档上下文。
  *
- * 从 MobileAiChat.tsx 拆出来只是为了守住 800 行红线（AGENTS.md §5.1），
+ * 从 MobileAiChat.tsx 拆出来只是为了守住 800 行红线（app_main/AGENTS.md「移动端界面」，eslint max-lines 检查），
  * 逻辑与原实现一致。
  */
 import {useCallback} from 'react'

@@ -160,7 +160,7 @@ artifacts/ios/flowcloudai-ios-v<Version>-b<Build Number>-<导出方式>.ipa.sha2
 
 ### `Blocking waiting for file lock on iOS`
 
-旧的 `ios:dev` / Xcode 调试会话仍在持有 Rust 输出目录。先在旧终端按 `Ctrl+C`，或结束由 `ios:dev --open` 启动的调试会话，再重新打包。仓库工作流会在打包前检查这把锁并直接给出占用进程 PID，避免无期限等待。
+旧的 `ios:dev` / Xcode 调试会话仍在持有 Rust 输出目录。先在旧终端按 `Ctrl+C`，或结束由 `ios:dev --open` 启动的调试会话，再重新打包。仓库工作流会在打包前检查这把锁并直接给出占用进程 PID，避免无期限等待。同一时间只运行一个 `ios:dev`、Xcode 调试或打包任务。
 
 ### iPhone 无法访问 `http://<Mac IP>:5175`
 

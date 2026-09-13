@@ -85,7 +85,7 @@ function formatUsageNumber(value: number): string {
  * 用量热力图（与桌面同一份取数，见 features/settings/usageActivity）。
  *
  * 52 周在手机上放不下，横向滚动是必然选择；容器必须带 data-mobile-horizontal-scroll，
- * 否则侧边抽屉手势会把横滑吃掉（见 AGENTS.md §5.1）。
+ * 否则侧边抽屉手势会把横滑吃掉（见 app_main/AGENTS.md「移动端界面」）。
  * 初始滚到最右：不这么做的话，用户一进来看到的是一年前那片空白。
  */
 function UsageHeatmap({daily, totalTokens}: {daily: ApiUsageDaily[]; totalTokens: number | null}) {
