@@ -8,6 +8,7 @@ import {
     useState,
 } from 'react'
 import './DockableSidePanel.css'
+import {useDockSplitDrag} from './useDockSplitDrag'
 
 const PANEL_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const COLLAPSE_PREVIEW_CLASS = 'is-collapse-preview'
@@ -24,6 +25,10 @@ interface DockableSidePanelProps {
     handleTitle?: string
     mains: Record<string, ReactNode>
     activeKey: string
+    secondaryKey?: string | null
+    splitRatio: number
+    onSplitRatioChange: (ratio: number) => void
+    onSplitCollapse: (which: 'primary' | 'secondary') => void
 }
 
 export default function DockableSidePanel({
@@ -37,8 +42,13 @@ export default function DockableSidePanel({
     handleTitle = '拖拽调整宽度',
     mains,
     activeKey,
+    secondaryKey = null,
+    splitRatio,
+    onSplitRatioChange,
+    onSplitCollapse,
 }: DockableSidePanelProps) {
     const rootRef = useRef<HTMLElement | null>(null)
+    const mainStackRef = useRef<HTMLDivElement | null>(null)
     // 仅用于控制 CSS class（mousedown/mouseup 各切一次）。
     const [isDraggingClass, setIsDraggingClass] = useState(false)
     const [dragHint, setDragHint] = useState('')
@@ -51,6 +61,15 @@ export default function DockableSidePanel({
     // mousedown 时已是 collapsed 状态，等待鼠标移动到展开后的手柄位置再激活拖拽。
     const pendingExpandRef = useRef(false)
     const pendingExpandHandleXRef = useRef(0)
+    const hasSecondary = secondaryKey !== null
+        && secondaryKey !== activeKey
+        && Object.prototype.hasOwnProperty.call(mains, secondaryKey)
+    const {dragHint: splitDragHint, handleSplitResizeStart} = useDockSplitDrag({
+        containerRef: mainStackRef,
+        splitRatio,
+        onSplitRatioChange,
+        onSplitCollapse,
+    })
 
     const clearCollapseRestore = useCallback(() => {
         if (collapseRestoreTimerRef.current !== null) {
@@ -222,16 +241,55 @@ export default function DockableSidePanel({
                 </div>
             </div>
             <div className="dockable-side-panel__body">
-                <div className="dockable-side-panel__main-stack">
-                    {Object.entries(mains).map(([key, node]) => (
+                <div
+                    ref={mainStackRef}
+                    className={`dockable-side-panel__main-stack${hasSecondary ? ' is-split' : ''}`}
+                    style={hasSecondary ? {
+                        '--dsp-split-primary-size': `${Math.min(1, Math.max(0, splitRatio)) * 100}%`,
+                    } as CSSProperties : undefined}
+                >
+                    {Object.entries(mains).map(([key, node]) => {
+                        const isPrimary = key === activeKey
+                        const isSecondary = hasSecondary && key === secondaryKey
+                        const isActive = isPrimary || isSecondary
+                        return (
+                            <div
+                                key={key}
+                                className={[
+                                    'dockable-side-panel__main-layer',
+                                    isActive ? 'active' : '',
+                                    hasSecondary && isPrimary ? 'is-primary' : '',
+                                    isSecondary ? 'is-secondary' : '',
+                                ].filter(Boolean).join(' ')}
+                                aria-hidden={!isActive}
+                            >
+                                {node}
+                            </div>
+                        )
+                    })}
+                    {hasSecondary && (
                         <div
-                            key={key}
-                            className={`dockable-side-panel__main-layer${key === activeKey ? ' active' : ''}`}
-                            aria-hidden={key !== activeKey}
+                            className="dockable-side-panel__split-handle"
+                            onMouseDown={handleSplitResizeStart}
+                            role="separator"
+                            aria-orientation="horizontal"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.round(splitRatio * 100)}
+                            title="拖拽调整上下分栏比例"
                         >
-                            {node}
+                            {splitDragHint && (
+                                <div className="dockable-side-panel__split-drag-hint">
+                                    {splitDragHint}
+                                </div>
+                            )}
+                            <div className="dockable-side-panel__resize-grip" aria-hidden="true">
+                                <span className="dockable-side-panel__resize-dot"/>
+                                <span className="dockable-side-panel__resize-dot"/>
+                                <span className="dockable-side-panel__resize-dot"/>
+                            </div>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
         </section>

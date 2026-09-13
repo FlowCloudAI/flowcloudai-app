@@ -37,6 +37,12 @@ import {
     useWorldCheckTaskStore,
 } from '../../features/project-editor/stores/worldCheckTaskStore'
 import DesktopFileOpenController from '../../features/desktop-file-open/DesktopFileOpenController'
+import {
+    SIDE_PANEL_CONTENTS,
+    SIDE_PANEL_SPLIT_PAIRS,
+    type SidePanelContentKey,
+} from './sidePanelContents'
+import {getSidePanelMinWidth, normalizeSidePanelLayout} from './sidePanelLayout'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
@@ -50,11 +56,9 @@ type ProjectToolTabMeta = {
 }
 
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
-type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
 type OpenSettingsOptions = Omit<SettingsOpenIntent, 'requestId'> & {
     focusRequest?: boolean
 }
-const AI_MIN_PANEL_WIDTH = 500
 const RECENT_PAGE_LIMIT = 10
 let desktopWindowShown = false
 
@@ -436,15 +440,40 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         focus: null,
         requestId: 0,
     })
-    const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
+    const [aiPanelWidth, setAiPanelWidth] = useState(() => getSidePanelMinWidth(
+        {primary: 'ai-chat', secondary: null},
+        SIDE_PANEL_CONTENTS,
+    ))
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
+    const [sidePanelSecondaryKey, setSidePanelSecondaryKey] = useState<SidePanelContentKey | null>(null)
+    const [splitRatio, setSplitRatio] = useState(0.45)
     const [projectReloadTokens, setProjectReloadTokens] = useState<Record<string, number>>({})
+    const normalizedSidePanelLayout = useMemo(() => normalizeSidePanelLayout(
+        {primary: sidePanelContentKey, secondary: sidePanelSecondaryKey},
+        SIDE_PANEL_CONTENTS,
+        SIDE_PANEL_SPLIT_PAIRS,
+        () => false,
+    ), [sidePanelContentKey, sidePanelSecondaryKey])
+    const sidePanelMinWidth = useMemo(
+        () => getSidePanelMinWidth(normalizedSidePanelLayout, SIDE_PANEL_CONTENTS),
+        [normalizedSidePanelLayout],
+    )
     useEffect(() => {
         if (aiPanelCollapsed) return
-        setMountedSidePanelKeys(prev => (
-            prev.includes(sidePanelContentKey) ? prev : [...prev, sidePanelContentKey]
-        ))
-    }, [aiPanelCollapsed, sidePanelContentKey])
+        const nextKeys = [
+            normalizedSidePanelLayout.primary,
+            normalizedSidePanelLayout.secondary,
+        ].filter((key): key is SidePanelContentKey => key !== null)
+        setMountedSidePanelKeys((previousKeys) => {
+            const missingKeys = nextKeys.filter((key) => !previousKeys.includes(key))
+            return missingKeys.length === 0 ? previousKeys : [...previousKeys, ...missingKeys]
+        })
+    }, [aiPanelCollapsed, normalizedSidePanelLayout])
+
+    useEffect(() => {
+        if (aiPanelCollapsed) return
+        setAiPanelWidth((previousWidth) => Math.max(previousWidth, sidePanelMinWidth))
+    }, [aiPanelCollapsed, sidePanelMinWidth])
 
     const clearSidePanelSelection = useCallback(() => {
         setSelectedKey(prev => (
@@ -457,7 +486,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
     const handleAiPanelCollapsedChange = useCallback((nextCollapsed: boolean) => {
         const wasCollapsed = aiPanelCollapsed
         if (!nextCollapsed && wasCollapsed) {
-            setAiPanelWidth(AI_MIN_PANEL_WIDTH)
+            setAiPanelWidth(sidePanelMinWidth)
         }
         setAiPanelCollapsed(nextCollapsed)
         if (nextCollapsed) {
@@ -465,18 +494,18 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             return
         }
         if (wasCollapsed) {
-            setSelectedKey(sidePanelContentKey)
+            setSelectedKey(normalizedSidePanelLayout.primary)
         }
-    }, [aiPanelCollapsed, clearSidePanelSelection, sidePanelContentKey])
+    }, [aiPanelCollapsed, clearSidePanelSelection, normalizedSidePanelLayout.primary, sidePanelMinWidth])
 
     const collapseAiPanel = useCallback(() => {
         handleAiPanelCollapsedChange(true)
     }, [handleAiPanelCollapsedChange])
 
     const expandAiPanelToMinWidth = useCallback(() => {
-        setAiPanelWidth(AI_MIN_PANEL_WIDTH)
+        setAiPanelWidth(sidePanelMinWidth)
         setAiPanelCollapsed(false)
-    }, [])
+    }, [sidePanelMinWidth])
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
@@ -867,6 +896,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
     }, [handleWindowClose, win])
 
     const handleSideBarSelect = useCallback((key: string, options?: { forceOpen?: boolean }) => {
+        setSidePanelSecondaryKey(null)
         if (key === 'world-check-task' && latestWorldCheckTask) {
             setSelectedKey('')
             collapseAiPanel()
@@ -878,7 +908,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             return
         }
         if (key === 'idea' || key === 'ai-chat' || key === 'snapshot' || key === 'help') {
-            if (!aiPanelCollapsed && sidePanelContentKey === key && !options?.forceOpen) {
+            if (!aiPanelCollapsed && normalizedSidePanelLayout.primary === key && !options?.forceOpen) {
                 collapseAiPanel()
                 setSelectedKey('')
                 return
@@ -895,7 +925,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         if (key === 'settings') {
             openSettings()
         }
-    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, handleOpenProjectTool, latestWorldCheckTask, openSettings, sidePanelContentKey])
+    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, handleOpenProjectTool, latestWorldCheckTask, normalizedSidePanelLayout.primary, openSettings])
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
         openSettings({tab: 'plugins', pluginKind: kind})
@@ -1082,14 +1112,14 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             mainContentKey,
             activeTabKey: activeKey || null,
             sidePanel: {
-                contentKey: sidePanelContentKey,
+                contentKey: normalizedSidePanelLayout.primary,
                 collapsed: aiPanelCollapsed,
             },
         })
-    }, [activeHomeTarget, activeKey, aiPanelCollapsed, mainContentKey, sidePanelContentKey])
+    }, [activeHomeTarget, activeKey, aiPanelCollapsed, mainContentKey, normalizedSidePanelLayout.primary])
 
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
-    const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
+    const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : normalizedSidePanelLayout.primary
 
     const ideaSlots = useIdeaPanel({
         contextProjectId: aiFocus.projectId,
@@ -1122,6 +1152,13 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.main
         return out
     }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main, helpSlots.main])
+    const handleSplitCollapse = useCallback((which: 'primary' | 'secondary') => {
+        if (which === 'primary' && normalizedSidePanelLayout.secondary) {
+            setSidePanelContentKey(normalizedSidePanelLayout.secondary)
+            setSelectedKey(normalizedSidePanelLayout.secondary)
+        }
+        setSidePanelSecondaryKey(null)
+    }, [normalizedSidePanelLayout.secondary])
     const mountedPageKeys = useMemo(() => [...new Set([
         ...recentPageKeys,
         ...Object.keys(entryDirtyMap).filter(key => entryDirtyMap[key]),
@@ -1456,14 +1493,18 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
                     </div>
                     <DockableSidePanel
                         width={aiPanelWidth}
-                        minWidth={AI_MIN_PANEL_WIDTH}
+                        minWidth={sidePanelMinWidth}
                         maxWidthRatio={0.7}
                         collapsed={aiPanelCollapsed}
                         onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
                         handleTitle="拖拽调整宽度"
                         mains={sidePanelMains}
-                        activeKey={sidePanelContentKey}
+                        activeKey={normalizedSidePanelLayout.primary}
+                        secondaryKey={normalizedSidePanelLayout.secondary}
+                        splitRatio={splitRatio}
+                        onSplitRatioChange={setSplitRatio}
+                        onSplitCollapse={handleSplitCollapse}
                     />
                 </div>
                 <SideBar

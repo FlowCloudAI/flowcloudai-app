@@ -3,6 +3,8 @@
     --dockable-side-panel-handle-gap-height: 48px;
     --dockable-side-panel-handle-gap-half: 24px;
     --dockable-side-panel-collapsed-width: 0px;
+    --dockable-side-panel-split-handle-height: 8px;
+    --dockable-side-panel-split-min-height: 160px;
     --dock-panel-owned-radius: var(--fc-radius-xl);
     --dock-panel-owned-border: 1px solid var(--fc-color-border);
     --dsp-width: 0px;
@@ -93,6 +95,114 @@
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
+}
+
+.dockable-side-panel__main-stack.is-split {
+    grid-template-areas:
+            "primary"
+            "separator"
+            "secondary";
+    grid-template-rows:
+            minmax(var(--dockable-side-panel-split-min-height), var(--dsp-split-primary-size))
+            var(--dockable-side-panel-split-handle-height)
+            minmax(var(--dockable-side-panel-split-min-height), 1fr);
+}
+
+.dockable-side-panel__main-stack.is-split .dockable-side-panel__main-layer {
+    grid-area: primary;
+}
+
+.dockable-side-panel__main-stack.is-split .dockable-side-panel__main-layer.is-secondary {
+    grid-area: secondary;
+}
+
+.dockable-side-panel__main-stack.is-split.is-primary-collapse-preview {
+    grid-template-rows:
+            0
+            var(--dockable-side-panel-split-handle-height)
+            minmax(0, 1fr);
+}
+
+.dockable-side-panel__main-stack.is-split.is-secondary-collapse-preview {
+    grid-template-rows:
+            minmax(0, 1fr)
+            var(--dockable-side-panel-split-handle-height)
+            0;
+}
+
+.dockable-side-panel__split-handle {
+    grid-area: separator;
+    position: relative;
+    z-index: 30;
+    min-width: 0;
+    height: var(--dockable-side-panel-split-handle-height);
+    cursor: row-resize;
+    background: transparent;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dockable-side-panel__split-handle::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    transform: translateY(-50%);
+    background: linear-gradient(
+            90deg,
+            transparent 0%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-half)),
+            transparent calc(50% - var(--dockable-side-panel-handle-gap-half)),
+            transparent calc(50% + var(--dockable-side-panel-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
+            transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 0.14s ease, height 0.1s ease;
+}
+
+.dockable-side-panel__split-handle .dockable-side-panel__resize-grip {
+    width: var(--dockable-side-panel-handle-gap-height);
+    height: var(--dockable-side-panel-split-handle-height);
+    flex-direction: row;
+}
+
+.dockable-side-panel__split-handle:hover::before,
+.dockable-side-panel__main-stack.is-split-dragging .dockable-side-panel__split-handle::before {
+    opacity: 1;
+}
+
+.dockable-side-panel__split-handle:hover .dockable-side-panel__resize-dot,
+.dockable-side-panel__main-stack.is-split-dragging .dockable-side-panel__split-handle .dockable-side-panel__resize-dot {
+    background: color-mix(in srgb, var(--fc-color-primary) 55%, var(--fc-color-text));
+}
+
+.dockable-side-panel__split-drag-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    z-index: 2;
+    padding: 0.34rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 38%, var(--fc-color-border));
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    line-height: 1.2;
+    white-space: nowrap;
+    box-shadow: var(--fc-shadow-md);
+    pointer-events: none;
 }
 
 .dockable-side-panel__resize-handle {

@@ -31,7 +31,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [adr/0001-frontend-feature-modular-monolith.md](adr/0001-frontend-feature-modular-monolith.md) | 现行 | 2026-07-21 | ADR：前端功能模块化单体。`app` / `features` / `api` / `shared` 的边界与禁止跨模块复用界面内部实现 |
-| [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-05-20 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
+| [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |
 | [prompt_README.md](prompt_README.md) | 现行 | 2026-05-07 | Prompt & Tools 模块结构：`context_builders` / Tera 模板 / `senses` |
@@ -80,7 +80,7 @@
 | [../plans/ANDROID-01.md](../plans/ANDROID-01.md) | 现行 | 2026-08-02 | **Android 端唯一权威计划**，自述取代原 `MOBILE-01.md`。核心闭环 + 安装升级构建链路 |
 | [../plans/MOBILE-ENTRY-DETAIL-REBUILD.md](../plans/MOBILE-ENTRY-DETAIL-REBUILD.md) | 现行 | 2026-08-25 | **移动端词条详情改造落地计划**（待开工）。5 个步骤、每步的验证与真机流程、8 条已确认决定、7 类易踩坑。§1 明确设计稿只是布局与视觉参考，列出「绝对不能搬进程序的东西」对照表 |
 | [../plans/ENTRY-CLIPBOARD.md](../plans/ENTRY-CLIPBOARD.md) | 现行 | 2026-08-25 | **词条剪切 / 复制 / 多选**（待开工）。把分类归属变更从词条编辑页内部移出，改由列表与分类树上的剪贴操作完成；复制语义、多选触发方式、剪贴板存续范围等 6 项待定 |
-| [../plans/UI-01.md](../plans/UI-01.md) | 现行 | 2026-05-11 | 桌面端工作台交互问题核对：位置感、编辑对象、保存态、AI 引用对象 |
+| [../plans/UI-01.md](../plans/UI-01.md) | 现行 | 2026-09-13 | 桌面端工作台交互问题核对：位置感、编辑对象、保存态、AI 引用对象 |
 | [../plans/ENTRY-RELATION-WORKBENCH.md](../plans/ENTRY-RELATION-WORKBENCH.md) | 现行 | 2026-07-31 | 词条关系工作台布局。**自述「暂缓实现，日后重新评审」**，两栏方案前提已被宽度验证否决 |
 
 ## 7. 设计基线与设计稿（`../designs/`）

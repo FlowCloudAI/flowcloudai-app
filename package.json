@@ -17,6 +17,7 @@
     "test:overlay-alert-modal": "node --test --experimental-strip-types ./scripts/overlay-alert-modal.test.ts",
     "test:default-cover": "node --test --experimental-test-isolation=none ./scripts/default-cover.test.ts",
     "test:entry-map-binding": "node --test --experimental-strip-types ./src/features/maps/components/entryMapBinding.test.mjs",
+    "test:side-panel-layout": "node --test --experimental-strip-types ./src/app/desktop/sidePanelLayout.test.mjs",
     "test:map-preview-markers": "node --test --experimental-strip-types ./src/features/maps/components/MapShapeEditor/previewMarkers.test.mjs",
     "test:world-check-task": "node --test --experimental-test-isolation=none ./scripts/world-check-task-state.test.ts",
     "test:app-update-policy": "node --experimental-strip-types ./scripts/app-update-policy.test.ts",
