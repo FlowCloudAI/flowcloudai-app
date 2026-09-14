@@ -2788,8 +2788,11 @@ mod tests {
     use std::io::{Cursor, Read};
     use tempfile::TempDir;
     use worldflow_core::{
-        EntryOps, ProjectOps, SqliteDb, TagSchemaOps,
-        models::{CreateEntry, CreateProject, CreateTagSchema, EntryFilter, EntryTag, FCImage},
+        CategoryOps, EntryOps, EntryTypeOps, ProjectOps, SqliteDb, TagSchemaOps,
+        models::{
+            CreateCategory, CreateCustomEntryType, CreateEntry, CreateProject, CreateTagSchema,
+            EntryFilter, EntryTag, FCImage,
+        },
     };
     use zip::ZipArchive;
 
@@ -2956,7 +2959,10 @@ mod tests {
         let manifest: Value = serde_json::from_str(&read_zip_text(&mut zip, "manifest.json"))
             .expect("解析 manifest 失败");
         assert_eq!(manifest["format"], FCWORLD_FORMAT);
-        assert_eq!(manifest["contents"]["worldflow"]["schemaVersion"], 5);
+        assert_eq!(
+            manifest["contents"]["worldflow"]["schemaVersion"],
+            db.worldflow_schema_version()
+        );
         assert_eq!(manifest["contents"]["counts"]["entries"], 1);
         assert_eq!(manifest["contents"]["counts"]["images"], 3);
         assert_eq!(manifest["contents"]["maps"]["count"], 1);
@@ -2987,7 +2993,7 @@ mod tests {
         assert!(!entries_csv.contains(&entry_cover.to_string_lossy().to_string()));
         assert!(!entries_csv.contains(&format!("fc://{source_project_id}/image/entry-image")));
         assert!(!entries_csv.contains("fcimg:entry-image"));
-        assert!(entries_csv.contains(&format!("fc://{source_project_id}/image/asset-")));
+        assert!(entries_csv.contains("fc://self/image/asset-"));
         assert!(entries_csv.contains("fcimg:asset-"));
         assert!(projects_csv.contains("assets/images/"));
         assert!(entries_csv.contains("assets/images/"));
@@ -3051,7 +3057,7 @@ mod tests {
             .expect("应包含 entries.csv");
         assert!(
             imported_entries_csv
-                .contains(&format!("fc://{}/image/asset-", prepared.new_project_id))
+                .contains("fc://self/image/asset-")
         );
         assert!(
             !imported_entries_csv.contains(&format!("fc://{}/image/asset-", source_project_id))
@@ -3222,7 +3228,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn prepares_import_with_new_ids_assets_and_maps() {
+    async fn prepares_import_with_preserved_ids_assets_and_maps() {
         let (temp, db, paths) = new_test_db("fcworld_prepare_import").await;
         let project = db
             .create_project(CreateProject {
@@ -3346,19 +3352,20 @@ mod tests {
                 .expect("导出包应可校验");
         let prepared = import::prepare_fcworld_import(validated, &paths, "引用世界【导入】")
             .expect("导入数据应可重写");
-        let new_target_id = prepared
+        let target_id = prepared
             .id_maps
             .entries
             .get(&target.id.to_string())
-            .expect("目标词条应生成新 ID");
-        let new_schema_id = prepared
+            .expect("目标词条应保留 ID");
+        let schema_id = prepared
             .id_maps
             .tag_schemas
             .get(&tag_schema.id.to_string())
-            .expect("标签应生成新 ID");
+            .expect("标签应保留 ID");
         let new_project_id = prepared.new_project_id.to_string();
 
         assert_ne!(new_project_id, project.id.to_string());
+        assert_eq!(target_id, &target.id.to_string());
         assert_eq!(prepared.project_name, "引用世界【导入】");
         assert_eq!(prepared.map_count, 1);
         assert_eq!(prepared.asset_count, 1);
@@ -3379,23 +3386,20 @@ mod tests {
             .find(|item| item.table == WorldflowCsvTable::Entries)
             .map(|item| item.content.as_str())
             .expect("应包含 entries.csv");
-        assert!(entries_csv.contains(&format!("entry://{new_target_id}")));
-        assert!(entries_csv.contains(&format!("fc://{new_project_id}/entry/{new_target_id}")));
-        assert!(entries_csv.contains(&format!("fc://{new_project_id}")));
-        assert!(entries_csv.contains(new_schema_id));
-        assert!(!entries_csv.contains(&target.id.to_string()));
-        assert!(!entries_csv.contains(&tag_schema.id.to_string()));
+        assert!(entries_csv.contains(&format!("entry://{target_id}")));
+        assert!(entries_csv.contains(&format!("fc://self/entry/{target_id}")));
+        assert!(entries_csv.contains("fc://self"));
+        assert!(entries_csv.contains(schema_id));
 
         assert!(prepared.maps_json.contains(&new_project_id));
-        assert!(prepared.maps_json.contains(new_target_id));
+        assert!(prepared.maps_json.contains(target_id));
         assert!(prepared.maps_json.contains("data:image/png;base64"));
-        assert!(!prepared.maps_json.contains(&target.id.to_string()));
         assert!(!prepared.maps_json.contains("assets/images/"));
     }
 
     #[tokio::test]
     async fn imports_fcworld_as_new_project_with_assets_and_empty_maps() {
-        let (temp, db, paths) = new_test_db("fcworld_import_full").await;
+        let (temp, source_db, source_paths) = new_test_db("fcworld_import_full_source").await;
         let image_dir = temp.path().join("images");
         let project_cover = image_dir.join("project-cover.png");
         let entry_image = image_dir.join("entry-image.png");
@@ -3404,7 +3408,7 @@ mod tests {
         create_image(&entry_image);
         create_image(&entry_cover);
 
-        let project = db
+        let project = source_db
             .create_project(CreateProject {
                 name: "可导入世界".to_string(),
                 description: Some("导入测试".to_string()),
@@ -3412,37 +3416,44 @@ mod tests {
             })
             .await
             .expect("创建项目失败");
-        db.create_entry(CreateEntry {
-            project_id: project.id,
-            category_id: None,
-            title: "角色".to_string(),
-            summary: None,
-            content: Some("正文".to_string()),
-            r#type: Some("character".to_string()),
-            tags: None,
-            images: Some(vec![FCImage {
-                path: entry_image.clone(),
-                is_cover: true,
-                caption: Some("图注".to_string()),
-            }]),
-            cover_path: Some(entry_cover.to_string_lossy().to_string()),
-        })
-        .await
-        .expect("创建词条失败");
+        source_db
+            .create_entry(CreateEntry {
+                project_id: project.id,
+                category_id: None,
+                title: "角色".to_string(),
+                summary: None,
+                content: Some("正文".to_string()),
+                r#type: Some("character".to_string()),
+                tags: None,
+                images: Some(vec![FCImage {
+                    path: entry_image.clone(),
+                    is_cover: true,
+                    caption: Some("图注".to_string()),
+                }]),
+                cover_path: Some(entry_cover.to_string_lossy().to_string()),
+            })
+            .await
+            .expect("创建词条失败");
 
-        let project = db.get_project(&project.id).await.expect("读取项目失败");
-        let export = db
+        let project = source_db
+            .get_project(&project.id)
+            .await
+            .expect("读取项目失败");
+        let export = source_db
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package =
-            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let package = prepare_fcworld_package(&source_paths, project.clone(), export)
+            .expect("准备 fcworld 失败");
         let output_path = temp.path().join("可导入世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
+        let (_target_temp, target_db, target_paths) =
+            new_test_db("fcworld_import_full_target").await;
+
         let result = import_fcworld_package_to_db(
-            &db,
-            &paths,
+            &target_db,
+            &target_paths,
             &output_path,
             None,
             disabled_import_progress(),
@@ -3450,15 +3461,18 @@ mod tests {
         .await
         .expect("导入 fcworld 失败");
         let new_project_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
-        let imported_project = db.get_project(&new_project_id).await.expect("应写入新项目");
+        let imported_project = target_db
+            .get_project(&new_project_id)
+            .await
+            .expect("应写入新项目");
         assert_ne!(new_project_id, project.id);
-        assert_eq!(imported_project.name, "可导入世界【导入】");
+        assert_eq!(imported_project.name, "可导入世界");
         assert_eq!(result.imported_rows.projects, 1);
         assert_eq!(result.imported_rows.entries, 1);
-        assert_eq!(result.asset_count, 3);
+        assert_eq!(result.asset_count, 2);
         assert_eq!(result.map_count, 0);
 
-        let import_image_dir = paths
+        let import_image_dir = target_paths
             .db_path
             .parent()
             .unwrap()
@@ -3468,12 +3482,12 @@ mod tests {
         assert!(Path::new(&cover_path).starts_with(&import_image_dir));
         assert!(Path::new(&cover_path).exists());
 
-        let entries = db
+        let entries = target_db
             .list_entries(&new_project_id, EntryFilter::default(), 100, 0)
             .await
             .expect("读取导入词条列表失败");
         assert_eq!(entries.len(), 1);
-        let imported_entry = db
+        let imported_entry = target_db
             .get_entry(&entries[0].id)
             .await
             .expect("读取导入词条失败");
@@ -3487,7 +3501,7 @@ mod tests {
         assert!(imported_entry.cover_path.is_none());
 
         let imported_maps_path =
-            map_store_path(&paths, &new_project_id).expect("应能解析导入地图路径");
+            map_store_path(&target_paths, &new_project_id).expect("应能解析导入地图路径");
         let maps_json = std::fs::read_to_string(imported_maps_path).expect("应写入空地图文件");
         let maps_value: Value = serde_json::from_str(&maps_json).expect("地图文件应为 JSON");
         assert_eq!(maps_value["projectId"], new_project_id.to_string());
@@ -3570,8 +3584,9 @@ mod tests {
 
     #[tokio::test]
     async fn overwrites_duplicate_project_after_successful_import() {
-        let (temp, db, paths) = new_test_db("fcworld_import_overwrite").await;
-        let project = db
+        let (source_temp, source_db, source_paths) =
+            new_test_db("fcworld_import_overwrite_source").await;
+        let source_project = source_db
             .create_project(CreateProject {
                 name: "覆盖世界".to_string(),
                 description: None,
@@ -3579,49 +3594,81 @@ mod tests {
             })
             .await
             .expect("创建项目失败");
-        db.create_entry(CreateEntry {
-            project_id: project.id,
-            category_id: None,
-            title: "旧词条".to_string(),
-            summary: None,
-            content: Some("将被覆盖导入替换".to_string()),
-            r#type: None,
-            tags: None,
-            images: None,
-            cover_path: None,
-        })
-        .await
-        .expect("创建词条失败");
-        let project = db.get_project(&project.id).await.expect("读取项目失败");
-        let export = db
-            .export_project_csvs(project.id)
+        source_db
+            .create_entry(CreateEntry {
+                project_id: source_project.id,
+                category_id: None,
+                title: "旧词条".to_string(),
+                summary: None,
+                content: Some("将被覆盖导入替换".to_string()),
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .expect("创建词条失败");
+        let source_project = source_db
+            .get_project(&source_project.id)
+            .await
+            .expect("读取项目失败");
+        let export = source_db
+            .export_project_csvs(source_project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package =
-            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
-        let output_path = temp.path().join("覆盖世界.fcworld");
+        let package = prepare_fcworld_package(&source_paths, source_project.clone(), export)
+            .expect("准备 fcworld 失败");
+        let output_path = source_temp.path().join("覆盖世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
+        let (_target_temp, target_db, target_paths) =
+            new_test_db("fcworld_import_overwrite_target").await;
+        let target_project = target_db
+            .create_project(CreateProject {
+                name: "覆盖世界".to_string(),
+                description: Some("待覆盖项目".to_string()),
+                cover_image: None,
+            })
+            .await
+            .expect("创建覆盖目标项目失败");
+        target_db
+            .create_entry(CreateEntry {
+                project_id: target_project.id,
+                category_id: None,
+                title: "目标旧词条".to_string(),
+                summary: None,
+                content: Some("目标旧正文".to_string()),
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .expect("创建覆盖目标词条失败");
+
         let result = import_fcworld_package_to_db(
-            &db,
-            &paths,
+            &target_db,
+            &target_paths,
             &output_path,
             Some(FcworldImportOptions {
                 mode: FcworldImportMode::Overwrite,
                 project_name: None,
-                overwrite_project_id: Some(project.id.to_string()),
+                overwrite_project_id: Some(target_project.id.to_string()),
             }),
             disabled_import_progress(),
         )
         .await
         .expect("覆盖导入失败");
         let imported_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
-        let imported = db.get_project(&imported_id).await.expect("应写入新项目");
+        let imported = target_db
+            .get_project(&imported_id)
+            .await
+            .expect("应写入新项目");
 
-        assert_ne!(imported_id, project.id);
+        assert_ne!(imported_id, target_project.id);
         assert_eq!(imported.name, "覆盖世界");
-        assert!(db.get_project(&project.id).await.is_err());
-        let projects = db.list_projects().await.expect("读取项目列表失败");
+        assert!(target_db.get_project(&target_project.id).await.is_err());
+        let projects = target_db.list_projects().await.expect("读取项目列表失败");
         assert_eq!(
             projects
                 .iter()
@@ -3635,5 +3682,120 @@ mod tests {
                 .iter()
                 .any(|warning| warning.contains("已覆盖原世界观"))
         );
+    }
+
+    #[tokio::test]
+    async fn failed_overwrite_import_preserves_existing_project_data() {
+        let (temp, db, paths) = new_test_db("fcworld_import_rollback").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "回滚世界".to_string(),
+                description: Some("原项目说明".to_string()),
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let _category = db
+            .create_category(CreateCategory {
+                project_id: project.id,
+                parent_id: None,
+                name: "原分类".to_string(),
+                sort_order: Some(1),
+            })
+            .await
+            .expect("创建分类失败");
+        let tag_schema = db
+            .create_tag_schema(CreateTagSchema {
+                project_id: project.id,
+                name: "原标签".to_string(),
+                description: Some("标签定义".to_string()),
+                r#type: "string".to_string(),
+                target: vec!["character".to_string()],
+                default_val: None,
+                range_min: None,
+                range_max: None,
+                sort_order: Some(1),
+            })
+            .await
+            .expect("创建标签定义失败");
+        let entry_type = db
+            .create_entry_type(CreateCustomEntryType {
+                project_id: project.id,
+                name: "原类型".to_string(),
+                description: Some("类型定义".to_string()),
+                icon: None,
+                color: None,
+            })
+            .await
+            .expect("创建词条类型失败");
+        let entry = db
+            .create_entry(CreateEntry {
+                project_id: project.id,
+                category_id: None,
+                title: "原词条".to_string(),
+                summary: Some("原摘要".to_string()),
+                content: Some("原正文".to_string()),
+                r#type: Some(entry_type.id.to_string()),
+                tags: Some(vec![EntryTag {
+                    schema_id: tag_schema.id,
+                    value: json!("原值"),
+                }]),
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .expect("创建原词条失败");
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("回滚世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let error = import_fcworld_package_to_db(
+            &db,
+            &paths,
+            &output_path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Overwrite,
+                project_name: None,
+                overwrite_project_id: Some(project.id.to_string()),
+            }),
+            disabled_import_progress(),
+        )
+        .await
+        .expect_err("实体 ID 冲突时覆盖导入应回滚");
+        assert!(error.contains("fcworld 导入行数不匹配"));
+
+        let projects = db.list_projects().await.expect("读取项目列表失败");
+        assert_eq!(projects.len(), 1, "失败导入不应留下临时项目");
+        let preserved_project = db.get_project(&project.id).await.expect("原项目应保留");
+        assert_eq!(preserved_project.description.as_deref(), Some("原项目说明"));
+        let categories = db.list_categories(&project.id).await.expect("读取分类失败");
+        assert_eq!(categories.len(), 1);
+        assert_eq!(categories[0].name, "原分类");
+        let tag_schemas = db
+            .list_tag_schemas(&project.id)
+            .await
+            .expect("读取标签定义失败");
+        assert_eq!(tag_schemas.len(), 1);
+        assert_eq!(tag_schemas[0].name, "原标签");
+        let entry_types = db
+            .list_custom_entry_types(&project.id)
+            .await
+            .expect("读取词条类型失败");
+        assert_eq!(entry_types.len(), 1);
+        assert_eq!(entry_types[0].name, "原类型");
+        let entries = db
+            .list_entries(&project.id, EntryFilter::default(), 100, 0)
+            .await
+            .expect("读取词条失败");
+        assert_eq!(entries.len(), 1);
+        let preserved_entry = db.get_entry(&entry.id).await.expect("原词条应保留");
+        assert_eq!(preserved_entry.title, "原词条");
+        assert_eq!(preserved_entry.content, "原正文");
     }
 }
