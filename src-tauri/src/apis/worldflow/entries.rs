@@ -4,6 +4,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use tauri::Emitter;
+use worldflow_core::link_refs::{FcEntryRef, parse_fc_entry_ref};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -338,7 +339,7 @@ fn parse_entry_uri(raw: &str) -> Option<Uuid> {
     Uuid::parse_str(decoded.trim()).ok()
 }
 
-fn parse_internal_entry_links(content: &str) -> Vec<(Option<Uuid>, String)> {
+fn parse_internal_entry_links(content: &str, project_id: &Uuid) -> Vec<(Option<Uuid>, String)> {
     let mut links = Vec::new();
     let mut offset = 0usize;
 
@@ -367,29 +368,49 @@ fn parse_internal_entry_links(content: &str) -> Vec<(Option<Uuid>, String)> {
             continue;
         };
         let title_close = title_start + title_close_rel;
-        let link_prefix = "](entry://";
-        if !content[title_close..].starts_with(link_prefix) {
+        if !content[title_close..].starts_with("](") {
             offset = title_close + 1;
             continue;
         }
 
-        let id_start = title_close + link_prefix.len();
-        let Some(id_close_rel) = content[id_start..].find(')') else {
-            offset = id_start;
+        let href_start = title_close + 2;
+        let Some(href_close_rel) = content[href_start..].find(')') else {
+            offset = href_start;
             continue;
         };
-        let id_close = id_start + id_close_rel;
+        let href_close = href_start + href_close_rel;
+        let href = &content[href_start..href_close];
+        let entry_id = match parse_fc_entry_ref(href, project_id) {
+            Some(FcEntryRef::CurrentProject(entry_id)) => Some(entry_id),
+            // entry_links 只记录项目内链接，跨项目引用不能记成本项目出链。
+            Some(FcEntryRef::OtherProject { .. }) => {
+                offset = href_close + 1;
+                continue;
+            }
+            // 旧式 entry:// 链接的 ID 解析失败时退回按标题解析，保留历史行为。
+            None => match href.strip_prefix("entry://") {
+                Some(raw_id) => parse_entry_uri(raw_id),
+                None => {
+                    offset = title_close + 1;
+                    continue;
+                }
+            },
+        };
         let title = content[title_start..title_close].trim();
         if !title.is_empty() && !title.contains('\n') {
-            links.push((
-                parse_entry_uri(&content[id_start..id_close]),
-                title.to_string(),
-            ));
+            links.push((entry_id, title.to_string()));
         }
-        offset = id_close + 1;
+        offset = href_close + 1;
     }
 
     links
+}
+
+fn outgoing_link_targets(content: &str, project_id: &Uuid) -> Vec<SaveEntryLinkTarget> {
+    parse_internal_entry_links(content, project_id)
+        .into_iter()
+        .map(|(entry_id, title)| SaveEntryLinkTarget { entry_id, title })
+        .collect()
 }
 
 fn resolve_relation_payload(
@@ -459,6 +480,97 @@ mod entry_update_event_tests {
         );
 
         assert_eq!(affected, BTreeSet::from([current, linked, related]));
+    }
+
+    const PROJECT_ID: &str = "018f5fbb-0f3b-7c6d-8c4f-2a4a0b8f9c01";
+    const ENTRY_ID: &str = "018f5fbb-0f3b-7c6d-8c4f-2a4a0b8f9c02";
+
+    fn ids() -> (Uuid, Uuid) {
+        (
+            Uuid::parse_str(PROJECT_ID).unwrap(),
+            Uuid::parse_str(ENTRY_ID).unwrap(),
+        )
+    }
+
+    #[test]
+    fn internal_links_accept_fc_self_entry_refs() {
+        let (project_id, entry_id) = ids();
+
+        let links = parse_internal_entry_links(
+            &format!("见[目标](fc://self/entry/{entry_id})。"),
+            &project_id,
+        );
+
+        assert_eq!(links, vec![(Some(entry_id), "目标".to_string())]);
+    }
+
+    #[test]
+    fn internal_links_accept_fc_refs_with_current_project_id() {
+        let (project_id, entry_id) = ids();
+
+        let links = parse_internal_entry_links(
+            &format!("[目标](fc://{project_id}/entry/{entry_id})"),
+            &project_id,
+        );
+
+        assert_eq!(links, vec![(Some(entry_id), "目标".to_string())]);
+    }
+
+    #[test]
+    fn internal_links_skip_fc_refs_to_other_projects() {
+        let (project_id, entry_id) = ids();
+        let other_project_id = Uuid::from_u128(9);
+
+        let links = parse_internal_entry_links(
+            &format!("[外部](fc://{other_project_id}/entry/{entry_id}) [[本项目]]"),
+            &project_id,
+        );
+
+        assert_eq!(links, vec![(None, "本项目".to_string())]);
+    }
+
+    #[test]
+    fn internal_links_decode_percent_encoded_entry_ids() {
+        let (project_id, entry_id) = ids();
+        let encoded = ENTRY_ID.replace('-', "%2D");
+
+        let links =
+            parse_internal_entry_links(&format!("[目标](fc://self/entry/{encoded})"), &project_id);
+
+        assert_eq!(links, vec![(Some(entry_id), "目标".to_string())]);
+    }
+
+    #[test]
+    fn internal_links_skip_fc_refs_with_invalid_uuid_or_non_entry_resource() {
+        let (project_id, entry_id) = ids();
+
+        let links = parse_internal_entry_links(
+            &format!(
+                "[坏链](fc://self/entry/not-a-uuid) ![图](fc://self/image/{entry_id}) [外链](https://example.com)"
+            ),
+            &project_id,
+        );
+
+        assert!(links.is_empty(), "{links:?}");
+    }
+
+    #[test]
+    fn internal_links_keep_legacy_entry_uri_and_wiki_title_links() {
+        let (project_id, entry_id) = ids();
+
+        let links = parse_internal_entry_links(
+            &format!("[旧链](entry://{entry_id}) [旧坏链](entry://not-a-uuid) [[维基标题]]"),
+            &project_id,
+        );
+
+        assert_eq!(
+            links,
+            vec![
+                (Some(entry_id), "旧链".to_string()),
+                (None, "旧坏链".to_string()),
+                (None, "维基标题".to_string()),
+            ]
+        );
     }
 }
 
@@ -1189,10 +1301,7 @@ pub async fn db_save_entry_bundle(
         .map_err(|e| e.to_string())?;
     let content = input.content.clone().unwrap_or_default();
     let source_id = input.source_id.clone();
-    let outgoing_link_targets = parse_internal_entry_links(&content)
-        .into_iter()
-        .map(|(entry_id, title)| SaveEntryLinkTarget { entry_id, title })
-        .collect::<Vec<_>>();
+    let outgoing_link_targets = outgoing_link_targets(&content, &project_id);
     let relation_patches = input
         .relation_drafts
         .iter()
