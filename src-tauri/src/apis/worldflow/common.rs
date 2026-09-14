@@ -12,7 +12,8 @@ pub(super) use uuid::Uuid;
 pub(super) use worldflow_core::WorldflowError;
 pub(super) use worldflow_core::{
     CategoryOps, CsvImportBundle, CsvImportMode, EntryLinkOps, EntryOps, EntryRelationOps,
-    EntryTypeOps, IdeaNoteOps, ProjectOps, ProjectSettingOps, SqliteDb, TagSchemaOps, models::*,
+    EntryTypeOps, IdeaNoteOps, ProjectOps, ProjectSettingOps, SqliteDb,
+    TagSchemaOps, models::*,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
