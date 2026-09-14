@@ -9,7 +9,7 @@
 
 M1 完成，提交 `98e1fa3`；M2 完成，提交 `0900e80`；M3 完成，包含 Rust 校验与命令；M4 完成，内核测试 40/40；M5 完成最小草稿/队列/冲突切片；M6 仅完成 iframe `sandbox="allow-scripts"` 的最小画布壳，bridge 协议与发布 CSP 的原生证据仍缺；M7 部分完成，已接开关、TabBar/ButtonToolbar/Select/Input/Slider/Tree、源码模式、状态提示和 Dock 注册，属性面板实际内容与完整可视编辑尚缺。
 
-实际门禁：`core_world_data/cargo test` 通过；`cargo test --no-default-features --features sqlite` 通过；`app_main/npm run test:page-document` 40/40 通过；`npm run lint` 通过；`npm run build` 通过；`app_main/src-tauri/cargo check` 通过。`src-tauri/cargo test` 已启动编译，但本轮未取得最终测试汇总，不把它写成通过。
+实际门禁：`core_world_data/cargo test` 通过；`cargo test --no-default-features --features sqlite` 通过；`app_main/npm run test:page-document` 40/40 通过；`npm run lint` 通过；`npm run build` 通过；`app_main/src-tauri/cargo check` 通过。`src-tauri/cargo test` 通过（132 个库测试、7 个 coastline 集成测试、2 个 web_tools 测试通过，1 个联网测试忽略）。
 
 相对计划的偏离是没有复制完整 bridge 测试、没有把所有实验会话 hook 接入 UI、没有实现双作用域联合保存 UI，也没有改快照/导入导出路径。这些部分依赖完整 M7 和既有 `.fcworld` 改动边界，避免与他人工作冲突。设计稿六项默认决定采用如下：属性单开保留左栏且 AI 开启时收起；分屏 AI 在上、属性在下；分屏只在编辑页可用；属性页签平铺文字/布局/颜色与效果；标题栏取消后保留当前页面壳；最窄宽度不设固定断点，按内容下限处理。
 
