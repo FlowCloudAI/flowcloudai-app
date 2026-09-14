@@ -27,7 +27,7 @@
 | `.fcworld`：[fcworld.rs](../src-tauri/src/apis/worldflow/fcworld.rs)（HEAD）、[fcworld/import.rs](../src-tauri/src/apis/worldflow/fcworld/import.rs) | 当前格式版本 1，ZIP + JSON manifest，世界数据在 `data/worldflow/` CSV；导出对 entries 的 `content` 扫描并重写 `fcimg:`/`fc://` 图片引用，导入重映射项目/词条/图片引用及历史，未形成独立 HTML/CSS 文档载荷 | 纳入源码、文档版本、revision 与受管资产清单，以解析器定位的引用区间替代正文字符串扫描；同一快照导出，导入独立重校验并重建派生索引。C 验证语义往返，容器字节布局冻结仍属阶段 E |
 | Dock：[sidePanelContents](../src/app/desktop/sidePanelContents.ts)、[sidePanelLayout](../src/app/desktop/sidePanelLayout.ts)、[DockableSidePanel](../src/shared/ui/layout/DockableSidePanel.tsx) | 全屏已删除；四种内容为灵感、AI、快照、帮助，当前最小宽度均为 500。已预留主/副内容、上下比例、作用域规整和按内容计算宽度；允许配对表为空，没有可用的 AI/属性分栏 | 注册页面作用域的属性内容和 AI/属性配对，消费已有分栏机制并按内容设宽度下限。左栏只保留图层/导航；不重新引入 Dock 全屏或独立第三列属性栏 |
 
-根规划中的旧阶段措辞不能当作当前代码能力。工作区 `docs/词条主题换装系统规划.md` §0 的磁盘源码布局已被数据库方向替代，§0.10/§11 仍含实验继续迭代及 P0A 先于全部 contract 冻结的旧依赖；本计划按实验结束、A 冻结共同不变量、C 做用户任务验收执行。其内链修订说明确认了后端存在索引，但未覆盖上述 `fc://` 提取缺口及 AI 直写入口；根规划对 Dock 的一般布局建议也尚未反映 `ad41a68` 的分栏预留。这些差异只确定接入工作，不据此扩大本批改动。
+根规划当前版本已同步实验结题决策，§0.10、§11、§15 不再构成本计划与代码现状的差异。仍需接入的差异有三项：现有 `parse_internal_entry_links` 只识别 `[[标题]]` 与 `entry://...`，未识别 HTML 接入所需的 `fc://` 内链；AI 的 `edit_entry_content_lines`、`replace_entry_content` 仍经 `update_entry_content` 直写数据库，绕过保存包的出链重建；根规划对属性面板与 AI 面板只提出可收起并避免多侧栏挤压正文，尚未反映 `ad41a68` 已预留的 Dock 上下分栏、按内容最小宽度和配对注册。接入时据此统一链接重建、语义 intent 和 Dock 内容注册；这些差异只确定接入工作，不扩大本批改动。
 
 ## 3. 模块移植图
 
