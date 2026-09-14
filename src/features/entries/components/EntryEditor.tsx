@@ -76,7 +76,6 @@ import {buildEntryTagsPayload,} from './entryTagUtils'
 import ActionMenu from '../../../shared/ui/overlay/ActionMenu'
 
 import './EntryEditor.css'
-import PageDocumentWorkspace from '../../page-document/PageDocumentWorkspace'
 import {
     buildMarkdownPreviewSource,
     type InternalEntryLink,
@@ -1685,10 +1684,6 @@ export default function EntryEditor({
                             )}
                             {editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">
-                                    {import.meta.env.VITE_PAGE_DOCUMENT_EDITOR === '1' && (
-                                        <PageDocumentWorkspace html={draft.content} onChange={(html) => updateDraftFromUser((current) => ({...current, content: html}))} />
-                                    )}
-                                    <div className={import.meta.env.VITE_PAGE_DOCUMENT_EDITOR === '1' ? 'page-document-legacy-hidden' : undefined}>
                                     <EntryMarkdownToolbar
                                         canUndo={undoRedo.canUndo}
                                         canRedo={undoRedo.canRedo}
@@ -1854,7 +1849,6 @@ export default function EntryEditor({
                                             onOptionCommit={wikiLink.handleWikiOptionCommit}
                                             onActiveIndexChange={wikiLink.setActiveWikiOptionIndex}
                                         />
-                                    </div>
                                     </div>
                                 </div>
                             ) : (

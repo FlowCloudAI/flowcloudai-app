@@ -16,11 +16,10 @@ export const SIDE_PANEL_CONTENTS = [
     {key: 'ai-chat', minWidth: 500, scope: 'global'},
     {key: 'snapshot', minWidth: 500, scope: 'global'},
     {key: 'help', minWidth: 500, scope: 'global'},
-    {key: 'page-properties', minWidth: 272, scope: 'page'},
 ] as const satisfies readonly SidePanelContentDescriptor[]
 
 export type SidePanelContentKey = typeof SIDE_PANEL_CONTENTS[number]['key']
 
 export const SIDE_PANEL_SPLIT_PAIRS: readonly (
     readonly [SidePanelContentKey, SidePanelContentKey]
-)[] = [['ai-chat', 'page-properties']]
+)[] = []
