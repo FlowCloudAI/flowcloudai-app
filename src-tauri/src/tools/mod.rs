@@ -7,9 +7,12 @@ use crate::AppState;
 use crate::apis::worldflow::common::{
     open_category_db, open_entry_db, open_project_db, open_relation_db,
 };
+use crate::apis::worldflow::entries::sync_outgoing_links_from_content;
+use std::collections::BTreeSet;
 use uuid::Uuid;
 use worldflow_core::{
-    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
+    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, SqliteDb, TagSchemaOps,
+    models::*,
 };
 
 pub mod category_tools;
@@ -1328,7 +1331,7 @@ fn format_json_value_dev(value: &serde_json::Value) -> String {
     }
 }
 
-/// 创建词条
+/// 创建词条，并按正文建立出链；返回值同 [`update_entry_content`]。
 pub async fn create_entry(
     state: &AppState,
     project_id: &str,
@@ -1337,23 +1340,46 @@ pub async fn create_entry(
     entry_type: Option<String>,
     summary: Option<String>,
     content: Option<String>,
-) -> Result<Entry, String> {
+) -> Result<(Entry, BTreeSet<Uuid>), String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let category_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
     let db = open_project_db(state, &project_id).await?;
-    db.create_entry(CreateEntry {
-        project_id,
-        category_id: Some(category_id),
-        title,
-        summary,
-        content,
-        r#type: entry_type,
-        tags: None,
-        images: None,
-        cover_path: None,
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let entry = db
+        .create_entry(CreateEntry {
+            project_id,
+            category_id: Some(category_id),
+            title,
+            summary,
+            content,
+            r#type: entry_type,
+            tags: None,
+            images: None,
+            cover_path: None,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    let affected_entry_ids = if entry.content.is_empty() {
+        BTreeSet::from([entry.id])
+    } else {
+        sync_outgoing_links_or_log(&db, &entry).await
+    };
+    Ok((entry, affected_entry_ids))
+}
+
+/// 按正文重建出链；失败只记日志并退回只刷新本词条。
+///
+/// 调用时正文已经落库，此时返回错误会让模型以为“修改未完成”而重复写入。
+async fn sync_outgoing_links_or_log(db: &SqliteDb, entry: &Entry) -> BTreeSet<Uuid> {
+    sync_outgoing_links_from_content(db, entry)
+        .await
+        .unwrap_or_else(|error| {
+            log::warn!(
+                "[tools] 按正文重建出链失败 entry_id={}, error={}",
+                entry.id,
+                error
+            );
+            BTreeSet::from([entry.id])
+        })
 }
 
 /// 列出项目分类
@@ -1646,29 +1672,34 @@ pub async fn update_entry_fields(
     .map_err(|e| e.to_string())
 }
 
-/// 更新词条正文
+/// 更新词条正文，并按新正文重建出链。
+///
+/// 返回的 ID 集合包含本词条与新旧出链目标，调用方需逐个广播 `entry:updated`，目标词条的反链才会刷新。
 pub async fn update_entry_content(
     state: &AppState,
     entry_id: &str,
     content: Option<String>,
-) -> Result<Entry, String> {
+) -> Result<(Entry, BTreeSet<Uuid>), String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let db = open_entry_db(state, &entry_id, None).await?;
-    db.update_entry(
-        &entry_id,
-        UpdateEntry {
-            category_id: None,
-            title: None,
-            summary: None,
-            content,
-            r#type: None,
-            tags: None,
-            images: None,
-            cover_path: None,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let entry = db
+        .update_entry(
+            &entry_id,
+            UpdateEntry {
+                category_id: None,
+                title: None,
+                summary: None,
+                content,
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: None,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    let affected_entry_ids = sync_outgoing_links_or_log(&db, &entry).await;
+    Ok((entry, affected_entry_ids))
 }
 
 /// 向词条添加单个标签（如 schema_id 已存在则覆盖其 value）

@@ -413,6 +413,35 @@ fn outgoing_link_targets(content: &str, project_id: &Uuid) -> Vec<SaveEntryLinkT
         .collect()
 }
 
+/// 按词条当前正文重建出链，返回需要广播 `entry:updated` 的词条 ID（本词条与新旧出链目标）。
+///
+/// AI 工具写正文不经过 `db_save_entry_bundle`，写完不重建的话，目标词条的反链会停在旧正文。
+pub(crate) async fn sync_outgoing_links_from_content(
+    db: &SqliteDb,
+    entry: &Entry,
+) -> Result<BTreeSet<Uuid>, String> {
+    let previous_links = db
+        .list_outgoing_links(&entry.id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let links = db
+        .replace_outgoing_link_targets(
+            &entry.project_id,
+            &entry.id,
+            &outgoing_link_targets(&entry.content, &entry.project_id),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(collect_affected_entry_ids(
+        entry.id,
+        previous_links
+            .iter()
+            .chain(links.iter())
+            .map(|link| link.b_id),
+        [],
+    ))
+}
+
 fn resolve_relation_payload(
     entry_id: &Uuid,
     draft: &SaveEntryRelationDraft,

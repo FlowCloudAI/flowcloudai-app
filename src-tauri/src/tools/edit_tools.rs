@@ -116,7 +116,7 @@ async fn dispatch_edit_op(
                 }
                 .into());
             }
-            let entry =
+            let (_, affected_entry_ids) =
                 tools::update_entry_content(app_state.as_ref(), &entry_id, Some(after_content))
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
@@ -125,14 +125,17 @@ async fn dispatch_edit_op(
             struct Evt {
                 entry_id: String,
             }
-            app_handle
-                .emit(
-                    "entry:updated",
-                    Evt {
-                        entry_id: entry.id.to_string(),
-                    },
-                )
-                .map_err(|e| anyhow::anyhow!("修改未完成：emit 失败: {}", e))?;
+            // 出链目标的反链随正文变化，目标词条页也要收到更新事件。
+            for affected_entry_id in affected_entry_ids {
+                app_handle
+                    .emit(
+                        "entry:updated",
+                        Evt {
+                            entry_id: affected_entry_id.to_string(),
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("修改未完成：emit 失败: {}", e))?;
+            }
 
             Ok("用户审核已通过，更改已完成".to_string())
         }
@@ -182,7 +185,7 @@ async fn dispatch_edit_op(
                 }
                 .into());
             }
-            let entry =
+            let (_, affected_entry_ids) =
                 tools::update_entry_content(app_state.as_ref(), &entry_id, Some(new_content))
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
@@ -191,14 +194,17 @@ async fn dispatch_edit_op(
             struct Evt {
                 entry_id: String,
             }
-            app_handle
-                .emit(
-                    "entry:updated",
-                    Evt {
-                        entry_id: entry.id.to_string(),
-                    },
-                )
-                .map_err(|e| anyhow::anyhow!("修改未完成：emit 失败: {}", e))?;
+            // 出链目标的反链随正文变化，目标词条页也要收到更新事件。
+            for affected_entry_id in affected_entry_ids {
+                app_handle
+                    .emit(
+                        "entry:updated",
+                        Evt {
+                            entry_id: affected_entry_id.to_string(),
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("修改未完成：emit 失败: {}", e))?;
+            }
 
             Ok("用户审核已通过，更改已完成".to_string())
         }

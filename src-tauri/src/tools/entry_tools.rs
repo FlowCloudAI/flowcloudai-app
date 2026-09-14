@@ -557,7 +557,7 @@ async fn dispatch_entry_op(
             summary,
             content,
         } => {
-            let entry = tools::create_entry(
+            let (entry, affected_entry_ids) = tools::create_entry(
                 state.as_ref(),
                 &project_id,
                 &category_id,
@@ -581,6 +581,18 @@ async fn dispatch_entry_op(
                         project_id: entry.project_id.to_string(),
                     },
                 );
+                #[derive(serde::Serialize, Clone)]
+                struct UpdatedEvt {
+                    entry_id: String,
+                }
+                for linked_entry_id in affected_entry_ids.iter().filter(|id| **id != entry.id) {
+                    let _ = h.emit(
+                        "entry:updated",
+                        UpdatedEvt {
+                            entry_id: linked_entry_id.to_string(),
+                        },
+                    );
+                }
             }
             Ok("修改已完成".to_string())
         }
