@@ -296,6 +296,9 @@ Android 验收使用加载真实 Tauri 后端与本地数据库的 debug APK，�
 
 ## 实施进度
 
-- M1 数据 ADR：完成（工作区未提交）
-- M2 core_world_data 存储切片：完成（工作区未提交）
-- M3–M7：未开始
+- M1 数据 ADR：完成（98e1fa3）
+- M2 core_world_data 存储切片：完成（0900e80）
+- M3 Rust 校验与 Tauri command：部分完成（ca78378）
+- M4 文档内核与 M5 草稿会话：部分完成（ca78378）
+- M6 隔离画布：部分完成（ca78378）
+- M7 桌面编辑页：部分完成（ca78378）
