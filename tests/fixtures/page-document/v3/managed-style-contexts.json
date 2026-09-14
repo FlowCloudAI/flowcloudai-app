@@ -1,0 +1,7 @@
+{
+  "contractVersion": 3,
+  "managedStyleContexts": ["mobile", "desktop", "hover", "focus-within"],
+  "responsiveViewports": ["mobile", "desktop"],
+  "desktopMedia": "(min-width: 48rem)",
+  "rejectedLegacyContexts": ["tablet", "wide"]
+}

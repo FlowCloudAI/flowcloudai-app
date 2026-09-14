@@ -1,0 +1,31 @@
+@layer fc-renderer, fc-project, fc-entry, fc-node;
+
+@layer fc-project {
+  :root {
+    color-scheme: light dark;
+    --fc-entry-surface: #f5f1e8;
+    --fc-entry-text: #28241f;
+    --fc-entry-accent: #8f5b3d;
+    --fc-entry-content-width: 48rem;
+  }
+
+  .fc-entry {
+    box-sizing: border-box;
+    width: min(100%, var(--fc-entry-content-width));
+    margin-inline: auto;
+    padding: 2rem;
+    color: var(--fc-entry-text);
+    background: var(--fc-entry-surface);
+  }
+
+  .fc-entry__body {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .fc-entry img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+}

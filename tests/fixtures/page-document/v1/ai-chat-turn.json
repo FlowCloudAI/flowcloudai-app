@@ -1,0 +1,45 @@
+{
+  "contractVersion": 1,
+  "request": {
+    "messages": [
+      {"role": "user", "content": "把标题强调色改为更沉稳的蓝色"},
+      {"role": "assistant", "content": "已修改当前词条强调色，尚未保存。"},
+      {"role": "user", "content": "再解释一下这次修改影响了什么"}
+    ],
+    "draft": {
+      "baseRevision": 1,
+      "baseTemplateVersion": 1,
+      "baseProjectRevision": 1,
+      "entrySources": {
+        "article.html": "<template data-fc-entry-patch data-fc-document-version=\"1\" data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\" data-fc-base-template-version=\"1\"></template>",
+        "style.css": "@layer fc-entry { [data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\"] { --fc-entry-accent: #385f82; } }"
+      },
+      "projectSources": {
+        "article.html": "<!doctype html><html data-fc-document-version=\"1\" data-fc-template-version=\"1\"><head><title data-fc-bind=\"title\"></title></head><body><main class=\"fc-entry\" data-fc-slot=\"entry-root\"></main></body></html>",
+        "style.css": "@layer fc-renderer, fc-project, fc-entry, fc-node; @layer fc-project { :root {} }"
+      }
+    }
+  },
+  "response": {
+    "provider": "deepseek",
+    "apiFormat": "openai-responses",
+    "model": "deepseek-v4-flash",
+    "responseId": "resp_fixture_chat",
+    "message": "这次只覆盖了当前词条的强调色变量，不影响项目默认主题。",
+    "draft": {
+      "entrySources": {
+        "article.html": "<template data-fc-entry-patch data-fc-document-version=\"1\" data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\" data-fc-base-template-version=\"1\"></template>",
+        "style.css": "@layer fc-entry { [data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\"] { --fc-entry-accent: #385f82; } }"
+      },
+      "projectSources": {
+        "article.html": "<!doctype html><html data-fc-document-version=\"1\" data-fc-template-version=\"1\"><head><title data-fc-bind=\"title\"></title></head><body><main class=\"fc-entry\" data-fc-slot=\"entry-root\"></main></body></html>",
+        "style.css": "@layer fc-renderer, fc-project, fc-entry, fc-node; @layer fc-project { :root {} }"
+      }
+    },
+    "changedScopes": [],
+    "tools": [],
+    "diagnostics": [],
+    "usage": {"inputTokens": 120, "outputTokens": 24, "totalTokens": 144},
+    "pendingDecision": null
+  }
+}

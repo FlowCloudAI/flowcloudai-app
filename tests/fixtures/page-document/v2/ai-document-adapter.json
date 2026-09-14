@@ -1,0 +1,69 @@
+{
+  "query": {
+    "kinds": ["container"],
+    "sourceScope": "entry"
+  },
+  "request": {
+    "idempotencyKey": "fixture-create-and-style",
+    "operations": [
+      {
+        "kind": "insert-component",
+        "parent": {
+          "kind": "component",
+          "reference": "component:1"
+        },
+        "after": null,
+        "temporaryName": "lead",
+        "componentKind": "paragraph"
+      },
+      {
+        "kind": "set-property",
+        "target": {
+          "kind": "temporary",
+          "name": "lead"
+        },
+        "property": "color",
+        "action": {
+          "kind": "set-value",
+          "value": "#7c3aed"
+        }
+      },
+      {
+        "kind": "replace-text",
+        "target": {
+          "kind": "temporary",
+          "name": "lead"
+        },
+        "from": 0,
+        "to": 3,
+        "expected": "新段落",
+        "text": "首段链接"
+      },
+      {
+        "kind": "format-text",
+        "target": {
+          "kind": "temporary",
+          "name": "lead"
+        },
+        "from": 0,
+        "to": 2,
+        "expected": "首段",
+        "styles": {
+          "font-weight": "700",
+          "font-style": "italic"
+        }
+      },
+      {
+        "kind": "set-link",
+        "target": {
+          "kind": "temporary",
+          "name": "lead"
+        },
+        "from": 2,
+        "to": 4,
+        "expected": "链接",
+        "href": "#section"
+      }
+    ]
+  }
+}

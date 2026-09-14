@@ -12,10 +12,12 @@ mod auto_backup;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod desktop_file_open;
 mod document_context;
+mod document_validation;
 mod layout;
 /// `#[doc(hidden)]` 仅为让集成测试（`tests/coastline_v2.rs`）访问 map 模块；非稳定公开 API。
 #[doc(hidden)]
 pub mod map;
+mod page_document_commands;
 mod reports;
 mod senses;
 mod settings;
@@ -72,6 +74,7 @@ use apis::worldflow::system::*;
 use apis::worldflow::tags::*;
 use auto_backup::start_auto_backup_worker;
 use layout::cache::LayoutCacheState;
+use page_document_commands::*;
 use template::install_global_template_runtime;
 
 use anyhow::Result;
@@ -500,6 +503,11 @@ pub fn run() {
             check_mobile_app_update,
             get_app_update_changelog,
             // 项目
+            page_document_read_entry,
+            page_document_save_entry,
+            page_document_validate,
+            page_document_read_project_home,
+            page_document_save_project_home,
             db_create_project,
             db_get_project,
             db_list_projects,

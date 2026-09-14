@@ -1,0 +1,228 @@
+{
+  "contractVersion": 1,
+  "baseFixture": "contracts/fixtures/v1",
+  "cases": [
+    {
+      "id": "forbidden-script",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</div>",
+        "value": "<script>globalThis.compromised = true</script>\n    </div>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_element"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "event-handler",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "data-fc-node-id=\"44444444-4444-4444-8444-444444444444\"",
+        "value": "onclick=\"globalThis.compromised = true\" data-fc-node-id=\"44444444-4444-4444-8444-444444444444\""
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_event_handler"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "asset-path-traversal",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "fcasset://22222222-2222-4222-8222-222222222222",
+        "value": "fcasset://../../secrets"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "external-css-url",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-entry {",
+        "value": "@layer fc-entry {\n  [data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\"] { background-image: url(https://example.invalid/pixel.png); }"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "external-css-image-set",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e;\n    background-image: image-set(\"https://example.invalid/pixel.png\" 1x);"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "css-important",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e !important;"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_css_important"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "fullscreen-fixed-css",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e;\n    position: fixed;\n    inset: 0;"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_fullscreen_fixed_overlay"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "fullscreen-fixed-inline",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "id=\"linked-section\" data-fc-node-id=\"44444444-4444-4444-8444-444444444444\"",
+        "value": "id=\"linked-section\" style=\"position: fixed; inset: 0;\" data-fc-node-id=\"44444444-4444-4444-8444-444444444444\""
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_fullscreen_fixed_overlay"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "pseudo-element-content",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-entry {",
+        "value": "@layer fc-entry {\n  [data-fc-entry-id=\"11111111-1111-4111-8111-111111111111\"]::before { content: \"伪造的官方提示\"; }"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_pseudo_content"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "javascript-href",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "fc://self/entry/11111111-1111-4111-8111-111111111111",
+        "value": "javascript:alert(1)"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_href_scheme"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "html-data-href",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "fc://self/entry/11111111-1111-4111-8111-111111111111",
+        "value": "data:text/html,<script>alert(1)</script>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_href_scheme"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "unknown-href-scheme",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "fc://self/entry/11111111-1111-4111-8111-111111111111",
+        "value": "custom-protocol://opaque-target"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_href_scheme"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "layered-keyframes",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-entry {",
+        "value": "@layer fc-entry {\n  @keyframes pulse { from { opacity: 0; } to { opacity: 1; } }"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["selector_scope_violation"],
+      "expectedCategories": ["security"]
+    }
+  ],
+  "policyProbeCases": [
+    {
+      "id": "visual-override-zero-specificity-exclusion",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-node {",
+        "value": "@layer fc-node { @media (max-width: 30rem) { [data-fc-node-id=\"66666666-6666-4666-8666-666666666666\"] > .columns:not(:where([data-fc-node-id=\"77777777-7777-4777-8777-777777777777\"])) { gap: 2rem; } }"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "id": "custom-responsive-layout-source-only",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-node {",
+        "value": "@layer fc-node { @media (max-width: 30rem) { [data-fc-node-id=\"66666666-6666-4666-8666-666666666666\"] { gap: 2rem; } }"
+      },
+      "expectedStatus": 200,
+      "expectedCodes": ["visual_layout_source_only"],
+      "expectedCategories": ["capability"]
+    },
+    {
+      "id": "first-letter-source-only-currently-accepted",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "@layer fc-node {",
+        "value": "@layer fc-node {\n  [data-fc-node-id=\"44444444-4444-4444-8444-444444444444\"]::first-letter { font-weight: 700; }"
+      },
+      "expectedStatus": 200,
+      "expectedCodes": ["visual_text_pseudo_element"],
+      "expectedCategories": ["capability"]
+    },
+    {
+      "id": "animation-transition-currently-accepted",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e;\n    animation: pulse 50ms infinite;\n    transition: filter 50ms;"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "id": "non-prefixed-custom-property-currently-accepted",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e;\n    --not-fc-entry-var: 1;"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "id": "large-filter-currently-accepted",
+      "file": "entry/style.css",
+      "replace": {
+        "needle": "--fc-entry-accent: #99603e;",
+        "value": "--fc-entry-accent: #99603e;\n    filter: blur(400px);"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "id": "svg-animation-currently-accepted",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</figure>",
+        "value": "</figure>\n      <svg viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\"><animate attributeName=\"opacity\" values=\"0;1;0\" dur=\"50ms\" repeatCount=\"indefinite\"></animate></circle></svg>"
+      },
+      "expectedStatus": 200
+    }
+  ],
+  "assetUploadCases": [
+    {
+      "id": "spoofed-svg-upload",
+      "declaredMediaType": "image/png",
+      "fileName": "unsafe.png",
+      "bodyUtf8": "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>",
+      "expectedStatus": 415,
+      "expectedCode": "unsupported_asset_type"
+    }
+  ]
+}

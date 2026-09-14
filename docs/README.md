@@ -31,6 +31,7 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [adr/0001-frontend-feature-modular-monolith.md](adr/0001-frontend-feature-modular-monolith.md) | 现行 | 2026-07-21 | ADR：前端功能模块化单体。`app` / `features` / `api` / `shared` 的边界与禁止跨模块复用界面内部实现 |
+| [adr/0002-page-document-storage.md](adr/0002-page-document-storage.md) | 现行 | 2026-09-14 | 页面文档独立存储、revision CAS、幂等回执与派生投影语义 |
 | [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |
@@ -91,7 +92,9 @@
 | 文档 | 状态 | 日期 | 说明 |
 | --- | --- | --- | --- |
 | [../designs/设计稿约定.md](../designs/设计稿约定.md) | 现行 | 2026-09-13 | 设计稿的交付形式、单文件约束、状态拆分、反馈迭代、证据留存与确认流程；由 `AGENTS.md` 迁入 |
+| [../designs/entry-page-editor-chrome.html](../designs/entry-page-editor-chrome.html) | 待评审 | 2026-09-13 | **词条页面编辑器界面设计稿**：只改外壳与密度，不动功能语义。属性面板不新增第三列，改为住进桌面壳右侧既有的 Dock 槽位（与灵感 / AI / 快照 / 帮助 同一槽位，互斥切换），左栏只留图层与项目导航；AI 与属性可上下分屏，中间分隔条可拖、拖到端点松手即收起一格。Dock 列宽按内容给下限（属性 17–22rem、AI 20–32rem），Dock 吃到 AI 下限时左栏收成 44px 图标条，正文在四种状态下都保住 760px。槽位由 `grid-template-areas` 定位，与 `.workspace-content` 现行实现一致；右侧图标栏按真实实现画在最右（`SideBar placement="right"`）。另取消编辑器标题栏改工作条，画布 bg-secondary 底 + 760px 页面卡片，底部状态条。整屏自适应，不设固定场景宽度与断点：全部用 clamp / minmax / fr，首屏不出现滚动条；右上角实时显示画布与正文余量。含 6 项待确认决定 |
 | [../designs/desktop-entry-workspace.html](../designs/desktop-entry-workspace.html) | 待评审 | 2026-09-11 | **词条页面编辑落位设计稿**：词条 Tab 内统一“阅读 / 编辑页面”，可视、展示校对和代码共享一份草稿，AI 只保留全局入口；给出 1440 / 1024 / 低于 988px 的三栏与浮层预算、390px 移动端受控编辑、项目首页关系和 Markdown 回退边界。四个场景互斥展示，仅本地交互，未接入生产数据或原生窗口 |
+| [../designs/desktop-project-home.html](../designs/desktop-project-home.html) | 现行 | 2026-09-07 | **待评审项目首页设计稿**：项目 Tab 内的阅读/编辑、介绍、动态词条卡片、筛选、排版和手机预览；管理、类型模板与组件库保留独立入口说明。模拟来源更新不改变首页草稿；仅内存交互，未连接数据库或 AI，未做视觉验收。完整对象边界见工作区 `docs/词条主题换装系统规划.md` §0.11 |
 | [../designs/apple-ios-ui-ux-design-guidelines.md](../designs/apple-ios-ui-ux-design-guidelines.md) | 现行 | 2026-08-17 | 项目级 iOS/iPadOS 设计基线与验收清单。官方资料核验于 2026-08-17，对标 iOS 27，项目最低 iOS 16.2 |
 | [../designs/mobile-ui-baseline.md](../designs/mobile-ui-baseline.md) | 现行 | 2026-08-26 | 移动端 UI 基线规范 v1。**只管「尺度与结构」，不管视觉风格**；平台契约已同步 Android/iOS 独立原生键盘来源与共享 `--fc-kb` 内部布局边界；§5.3 登记公共顶栏固定材质阴影的唯一例外，§9 规则 8 规定底部面板不承载滚动或输入内容 |
 | [../designs/ios-mobile-hig-gap-audit.md](../designs/ios-mobile-hig-gap-audit.md) | 现行 | 2026-08-24 | 移动端对 iOS 规范的差距审计；IOS-005 已用独立 iOS 原生适配器在目标 iPhone 核心页面关闭，仍保留 iOS 16.2、第三方输入法与 iPad 验收边界 |

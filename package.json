@@ -58,7 +58,8 @@
     "android:build:apk": "tauri android build --apk",
     "android:sign:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1",
     "android:build:signed:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1 -Build",
-    "android:build:debug:x86_64": "set \"CARGO_PROFILE_DEV_DEBUG=0\" && set \"CARGO_PROFILE_DEV_STRIP=debuginfo\" && npm run tauri -- android build --debug --apk --target x86_64"
+    "android:build:debug:x86_64": "set \"CARGO_PROFILE_DEV_DEBUG=0\" && set \"CARGO_PROFILE_DEV_STRIP=debuginfo\" && npm run tauri -- android build --debug --apk --target x86_64",
+    "test:page-document": "node --test --experimental-strip-types src/features/page-document/application/*.test.ts src/features/page-document/domain/**/*.test.ts"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
@@ -84,7 +85,13 @@
     "react-dropzone": "^15.0.0",
     "react-i18next": "^17.0.2",
     "refractor": "^5.0.0",
-    "react-window": "^2.2.7"
+    "react-window": "^2.2.7",
+    "parse5": "^8.0.1",
+    "postcss": "^8.5.26",
+    "postcss-value-parser": "^4.2.0",
+    "css-select": "^7.0.0",
+    "css-what": "^8.0.0",
+    "entities": "^8.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
