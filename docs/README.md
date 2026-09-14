@@ -81,6 +81,7 @@
 | [../plans/MOBILE-ENTRY-DETAIL-REBUILD.md](../plans/MOBILE-ENTRY-DETAIL-REBUILD.md) | 现行 | 2026-08-25 | **移动端词条详情改造落地计划**（待开工）。5 个步骤、每步的验证与真机流程、8 条已确认决定、7 类易踩坑。§1 明确设计稿只是布局与视觉参考，列出「绝对不能搬进程序的东西」对照表 |
 | [../plans/ENTRY-CLIPBOARD.md](../plans/ENTRY-CLIPBOARD.md) | 现行 | 2026-08-25 | **词条剪切 / 复制 / 多选**（待开工）。把分类归属变更从词条编辑页内部移出，改由列表与分类树上的剪贴操作完成；复制语义、多选触发方式、剪贴板存续范围等 6 项待定 |
 | [../plans/UI-01.md](../plans/UI-01.md) | 现行 | 2026-09-13 | 桌面端工作台交互问题核对：位置感、编辑对象、保存态、AI 引用对象 |
+| [../plans/PAGE-DOCUMENT-01.md](../plans/PAGE-DOCUMENT-01.md) | 现行 | 2026-09-14 | 页面文档编辑接入计划：移植式重写、代码现状、阶段 A 原生隔离/存储/资产切片、阶段 C 词条闭环、能力准入与验收；衔接移动详情、保存状态和词条剪贴计划 |
 | [../plans/ENTRY-RELATION-WORKBENCH.md](../plans/ENTRY-RELATION-WORKBENCH.md) | 现行 | 2026-07-31 | 词条关系工作台布局。**自述「暂缓实现，日后重新评审」**，两栏方案前提已被宽度验证否决 |
 
 ## 7. 设计基线与设计稿（`../designs/`）
