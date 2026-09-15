@@ -81,9 +81,22 @@ VITE_PAGE_DOCUMENT_CANVAS=1 npm run macos:build:debug
 VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev
 ```
 
-默认 `npm run build` 只把 `index.html` 设为入口，并把业务页导入解析到空组件；启用时才加入
-`canvas.html` 并解析真实入口。每次发布前应在默认 `dist/` 搜索“页面文档预览”“隔离探针”及
-`page-document-canvas`，三者都不得出现。
+默认 `npm run build` 只把 `index.html` 设为入口，并把业务页导入解析到空组件；启用时先构建宿主，
+再由独立配置向 `dist/` 追加 `canvas.html`、经典运行时和普通样式表。每次发布前应在默认 `dist/`
+搜索“页面文档预览”“隔离探针”及 `page-document-canvas`，三者都不得出现。
+
+## CORS 与 opaque origin
+
+`sandbox="allow-scripts"` 没有 `allow-same-origin`，所以画布发出的跨来源模式请求以 opaque origin
+参与检查，在 Chromium 内核中对应 `Origin: null`。Vite 多入口此前为 `canvas.html` 生成
+`type="module"`、`crossorigin` 和 `modulepreload`；模块脚本必须通过 CORS，不能依赖开发服务器默认
+放开的 CORS 推断发布产物可用。
+
+本仓使用的 Tauri 2.11.5 在 `tauri/src/protocol/tauri.rs:169` 为全部协议资源固定返回
+`Access-Control-Allow-Origin: <主窗口 origin>`，与 `null` 不匹配。画布运行时因此改由独立 Vite
+配置打成单文件 IIFE，以普通 `<script src="/canvas/runtime.js" defer>` 加载；运行时 CSS 使用不带
+`crossorigin` 的普通 stylesheet。开关构建随后检查 `canvas.html` 不含 `type="module"`、
+`crossorigin` 或 `modulepreload`，且引用的两个静态资源确实存在。默认构建不执行这一步。
 
 ## 依据
 
@@ -114,6 +127,9 @@ VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev
 - 三端是否都让 Tauri 的 CSP 响应头与画布 meta CSP 取交集，并允许构建期生成的 bridge chunk。
 - 三端是否在拒绝作者网络、表单和导航时不产生请求、不替换画布页面，也不触发宿主顶层导航。
 - debug 原生产物的页面 URL、Vite 资源 URL 与 `script-src 'self'` 在 macOS 和 Android 上是否一致。
+- macOS WKWebView 加载 Tauri 自定义协议经典脚本和样式表时的 CORS 行为是否与标准网络协议一致。
+- CSP `'self'` 在 opaque-origin 画布中是否匹配 Tauri 打包脚本；若不匹配，只能调整画布独立策略，
+  不能放宽全局 CSP 或 `security.headers`。
 - iframe 销毁、重建、旋转和后台恢复时，Window 身份与消息时序是否符合协议生命周期假设。
 
 这些项目未通过前，本 ADR 保持“提议，待原生验证”，M6 不能写成原生验收完成。

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "tauri": "tauri",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node ./scripts/build-page-document-canvas.mjs",
     "lint": "eslint .",
     "test:ai-conversation-draft": "node --test --experimental-test-isolation=none ./scripts/ai-conversation-state.test.ts",
     "test:ai-continuation": "node --test --experimental-test-isolation=none ./scripts/ai-continuation.test.ts",
@@ -59,7 +59,8 @@
     "android:sign:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1",
     "android:build:signed:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1 -Build",
     "android:build:debug:x86_64": "set \"CARGO_PROFILE_DEV_DEBUG=0\" && set \"CARGO_PROFILE_DEV_STRIP=debuginfo\" && npm run tauri -- android build --debug --apk --target x86_64",
-    "test:page-document": "node --test --experimental-strip-types \"src/features/page-document/**/*.test.ts\""
+    "test:page-document": "node --test --experimental-strip-types \"src/features/page-document/**/*.test.ts\"",
+    "test:page-document-canvas-build": "node ./scripts/check-page-document-canvas-build.mjs"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",

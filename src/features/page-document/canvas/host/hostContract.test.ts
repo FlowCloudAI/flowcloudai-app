@@ -46,13 +46,14 @@ test('React 宿主固定使用独立 src 与最小 allow-scripts 沙箱', () => 
     assert.doesNotMatch(source, /srcDoc|allow-same-origin|allow-top-navigation|allow-popups|allow-forms/u)
 })
 
-test('画布 HTML 没有内联脚本并叠加无网络 CSP', () => {
+test('画布 HTML 使用经典脚本且没有内联脚本，并叠加无网络 CSP', () => {
     const source = readFileSync(new URL('../../../../../canvas.html', import.meta.url), 'utf8')
     assert.match(source, /default-src 'none'/u)
     assert.match(source, /connect-src 'none'/u)
     assert.match(source, /img-src 'none'/u)
     assert.match(source, /form-action 'none'/u)
-    assert.match(source, /script type="module" src=/u)
+    assert.match(source, /<script src="\/canvas\/runtime\.js" defer><\/script>/u)
+    assert.doesNotMatch(source, /type="module"|crossorigin|modulepreload/u)
     assert.doesNotMatch(source, /<script(?:\s[^>]*)?>\s*[^<\s]/u)
 })
 
