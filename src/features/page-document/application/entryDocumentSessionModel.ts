@@ -34,6 +34,7 @@ import {
     markDraftValidating,
     redoEntryDraft,
     undoEntryDraft,
+    type DocumentDraftUpdate,
     type DocumentDraftModel,
 } from './documentDraftModel.ts'
 
@@ -229,6 +230,26 @@ export function finishEntryDocumentValidation(
     return {
         ...state,
         model: acceptDraftValidation(state.model, 'entry', valid, preview.diagnostics),
+        preview: isRenderable(preview) ? preview : state.preview,
+        previewStale: !isRenderable(preview),
+    }
+}
+
+/** 已由内核接纳的可视候选回到同一会话，并立即刷新代码模式与隔离预览。 */
+export function acceptEntryDocumentVisualUpdate(
+    state: EntryDocumentSessionState,
+    update: DocumentDraftUpdate,
+): EntryDocumentSessionState {
+    if (!update.applied || update.model === state.model) return state
+    const next = {
+        ...state,
+        model: update.model,
+        pendingSave: null,
+        saveError: null,
+    }
+    const preview = compileState(next)
+    return {
+        ...next,
         preview: isRenderable(preview) ? preview : state.preview,
         previewStale: !isRenderable(preview),
     }

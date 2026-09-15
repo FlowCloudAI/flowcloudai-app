@@ -1,6 +1,7 @@
 // 本 Hook 管理词条页面文档的读取、前端防抖校验与独立保存；不接触词条 Markdown 持久化。
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useAlert} from 'flowcloudai-ui'
 import {
     pageDocumentReadEntry,
     pageDocumentSaveEntry,
@@ -8,7 +9,15 @@ import {
 } from '../../../api/pageDocument.ts'
 import {isDocumentScopeDirty, sourceDraftView} from '../application/documentDraftModel.ts'
 import {
+    createDocumentKernelDraftRuntime,
+    type KernelComponentInspectionRequest,
+    type KernelDraftEditRequest,
+    type KernelDraftPreparationResult,
+} from '../application/documentKernelDraftRuntime.ts'
+import {createVisualOperationQueue} from '../application/visualOperationQueue.ts'
+import {
     acceptEntryDocumentSave,
+    acceptEntryDocumentVisualUpdate,
     beginEntryDocumentValidation,
     canSaveEntryDocument,
     createEntryDocumentSessionState,
@@ -42,8 +51,12 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const [loadError, setLoadError] = useState<string | null>(null)
     const [loadAttempt, setLoadAttempt] = useState(0)
     const [state, setState] = useState<EntryDocumentSessionState | null>(null)
+    const [visualError, setVisualError] = useState<string | null>(null)
     const stateRef = useRef<EntryDocumentSessionState | null>(null)
     const inputRef = useRef(input)
+    const kernelRuntimeRef = useRef(createDocumentKernelDraftRuntime())
+    const visualQueueRef = useRef(createVisualOperationQueue())
+    const {showAlert} = useAlert()
 
     useEffect(() => {
         inputRef.current = input
@@ -180,6 +193,109 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const loadLatest = useCallback(() => mutate(loadLatestEntryDocument), [mutate])
     const retryLoad = useCallback(() => setLoadAttempt(current => current + 1), [])
 
+    const inspectComponent = useCallback((request: KernelComponentInspectionRequest) => {
+        const current = stateRef.current
+        if (!current) {
+            return Object.freeze({
+                status: 'rejected' as const,
+                failures: Object.freeze([
+                    Object.freeze({code: 'document-snapshot-unavailable', property: null}),
+                ]),
+            })
+        }
+        return kernelRuntimeRef.current.inspectComponent(current.model, current.snapshot, request)
+    }, [])
+
+    const prepareKernelEntry = useCallback(
+        (request: KernelDraftEditRequest): KernelDraftPreparationResult => {
+            const current = stateRef.current
+            if (!current || current.conflict) {
+                return Object.freeze({
+                    status: 'rejected' as const,
+                    diagnostics: Object.freeze([
+                        Object.freeze({
+                            severity: 'error' as const,
+                            category: 'capability' as const,
+                            code: current ? 'document-conflict-active' : 'document-snapshot-unavailable',
+                            message: current
+                                ? '页面文档存在版本冲突，请先选择冲突处理方式。'
+                                : '当前没有可准备的页面文档草稿。',
+                        }),
+                    ]),
+                })
+            }
+            return kernelRuntimeRef.current.prepare(current.model, current.snapshot, request)
+        },
+        [],
+    )
+
+    const reportVisualFailure = useCallback(
+        async (message: string): Promise<false> => {
+            setVisualError(message)
+            await showAlert(message, 'warning', 'nonInvasive', 2200)
+            return false
+        },
+        [showAlert],
+    )
+
+    const applyPreparedKernelEntry = useCallback(
+        async (
+            preparation: Exclude<KernelDraftPreparationResult, {status: 'rejected' | 'unchanged'}>,
+            label: string,
+            history: {historyGroupId?: string} = {},
+        ): Promise<boolean> => {
+            if (preparation.status === 'needs-decision') {
+                const impacts = [...new Set(preparation.decisions.map(item => `• ${item.message}`))]
+                const confirmed = await showAlert(
+                    `“${label}”会影响其他规则：\n\n${impacts.join('\n')}\n\n确认后才会写入当前草稿。`,
+                    'warning',
+                    'confirm',
+                )
+                if (confirmed !== 'yes') return false
+            }
+            const current = stateRef.current
+            if (!current) return reportVisualFailure('确认后已无法取得当前页面文档草稿。')
+            const update = kernelRuntimeRef.current.applyPrepared(
+                current.model,
+                current.snapshot,
+                preparation.edit,
+                label,
+                history,
+            )
+            if (!update.applied) {
+                return reportVisualFailure(
+                    update.diagnostics[0]?.message ?? '内核无法安全应用这次属性修改。',
+                )
+            }
+            setVisualError(null)
+            publish(acceptEntryDocumentVisualUpdate(current, update))
+            return true
+        },
+        [publish, reportVisualFailure, showAlert],
+    )
+
+    const applyKernelEntry = useCallback(
+        (
+            request: KernelDraftEditRequest,
+            label: string,
+            history: {historyGroupId?: string} = {},
+        ): Promise<boolean> =>
+            visualQueueRef.current.enqueue(async () => {
+                const preparation = prepareKernelEntry(request)
+                if (preparation.status === 'rejected') {
+                    return reportVisualFailure(
+                        preparation.diagnostics[0]?.message ?? '内核拒绝了这次属性修改。',
+                    )
+                }
+                if (preparation.status === 'unchanged') {
+                    setVisualError(null)
+                    return true
+                }
+                return applyPreparedKernelEntry(preparation, label, history)
+            }),
+        [applyPreparedKernelEntry, prepareKernelEntry, reportVisualFailure],
+    )
+
     return {
         loadStatus,
         loadError,
@@ -197,5 +313,10 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         keepDraft,
         loadLatest,
         retryLoad,
+        visualError,
+        inspectComponent,
+        prepareKernelEntry,
+        applyPreparedKernelEntry,
+        applyKernelEntry,
     }
 }
