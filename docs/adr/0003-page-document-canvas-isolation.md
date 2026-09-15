@@ -1,6 +1,6 @@
 # ADR 0003：页面文档隔离画布
 
-- 状态：提议；macOS 已原生验收，Android、Windows 待验证
+- 状态：提议；macOS、Android 已原生验收，Windows 待验证
 - 日期：2026-09-15
 
 ## 决策
@@ -38,9 +38,9 @@ HTML 只保留安全骨架与占位，不含外链脚本、样式表或 `style` 
 ### A：`srcdoc` iframe
 
 `sandbox="allow-scripts"` 在 WKWebView、WebView2 和 Android WebView 所遵循的 HTML 模型中都应设置
-sandboxed origin flag，因而得到 opaque origin；三端实际行为仍待原生验证。CSP 3 的“local scheme
-继承”算法要求 `srcdoc` 文档复制创建者当时的 CSP，所以宿主策略仍会约束它；画布内部的 meta CSP
-还能继续收紧该副本。
+sandboxed origin flag，因而得到 opaque origin。这个未采用的 `srcdoc` 方案没有另做原生验证；CSP 3
+的“local scheme 继承”算法要求 `srcdoc` 文档复制创建者当时的 CSP，所以宿主策略仍会约束它；画布
+内部的 meta CSP 还能继续收紧该副本。
 
 这个方案的 bridge 可以改成同来源外部脚本，但动态 `srcdoc` 本身不是 Tauri 构建期遍历的 HTML
 资产，Tauri 不会为其中的标签注入 nonce，也不会为动态内联脚本生成 hash。实验仓用内联 nonce
@@ -49,8 +49,9 @@ sandboxed origin flag，因而得到 opaque origin；三端实际行为仍待原
 
 ### B：blob URL iframe
 
-blob URL 继承创建它的环境 origin；加上当前 sandbox 后仍应被强制为 opaque origin，三端实际行为
-仍待原生验证。CSP 3 也把 `blob:` 列为需要继承创建者策略的本地方案，所以它不能绕开宿主 CSP。
+blob URL 继承创建它的环境 origin；加上当前 sandbox 后仍应被强制为 opaque origin。这个未采用的
+blob 方案没有另做原生验证；CSP 3 也把 `blob:` 列为需要继承创建者策略的本地方案，所以它不能绕开
+宿主 CSP。
 
 当前全局策略没有为 frame 导航开放 `blob:`，`frame-src` 缺省回退到 `default-src 'self'`；URL 标准
 又把 `blob:` 作为独立 scheme 处理，不能把 `'self'` 当成可移植的放行依据。满足该方案需要修改全局
@@ -59,10 +60,10 @@ CSP，这违反本决策的硬边界。blob 内的 HTML 也不属于 Tauri 嵌�
 
 ### C：独立打包页面
 
-独立页面从应用打包来源加载；未加 sandbox 时它与宿主同源，加上当前 sandbox 后应成为 opaque
-origin。macOS WKWebView 已由 2026-09-15 的 `'self'` 不匹配证据确认该组合语义；WebView2 和
-Android WebView 仍待原生验证。宿主现有 `default-src 'self'` 允许 iframe 请求这个打包页面，不需要
-修改全局 CSP。
+独立页面从应用打包来源加载；未加 sandbox 时它与宿主同源，加上当前 sandbox 后成为 opaque
+origin。macOS WKWebView 与 Android WebView 已在 2026-09-15 分别通过 `window.origin === "null"`
+及跨文档访问抛出 `SecurityError` 确认该组合语义；Windows WebView2 仍待原生验证。宿主现有
+`default-src 'self'` 允许 iframe 请求这个打包页面，不需要修改全局 CSP。
 
 Tauri 2.11.5 的资源服务会按所请求的 HTML 资产路径附加 CSP 响应头；`tauri-codegen` 2.6.3 在
 构建期遍历 `frontendDist` 内全部 HTML。它先向静态 `style` 元素注入 nonce，再按 HTML 路径记录
@@ -75,7 +76,8 @@ Tauri 2.11.5 的资源服务会按所请求的 HTML 资产路径附加 CSP 响�
 开关构建中，独立 Vite 配置先生成临时 IIFE，随后 `scripts/build-page-document-canvas.mjs` 把运行时
 内嵌进 `canvas.html`、写入精确 meta CSP 哈希并删除临时 JS/CSS。Tauri 再把整个 `dist` 作为嵌入
 资产处理，并为这个 HTML 的同一内联脚本向响应头追加哈希。这条路径由依赖源码和构建产物检查
-证明；Android WebView 与 Windows WebView2 是否同时接受响应头和 meta 两条策略仍待原生验证。
+证明；Android WebView 已由带开关的 debug APK 实测接受响应头和 meta 两条策略，Windows WebView2
+仍待原生验证。
 
 开发模式不支持画布。`devUrl` 直接或经移动端代理读取 Vite 资源，既不执行上述追加构建脚本，也不
 经过 Tauri 的嵌入资产与页面专属哈希处理，所以启用开关的普通 Vite dev server 不会生成可加载的
@@ -144,7 +146,7 @@ runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`�
 隔离状态隐藏。由此增加另一条运行时不变量：画布主题默认值必须位于最低优先级层，且 runtime style
 必须先于 author style 挂载。
 
-## macOS 原生验收
+## macOS 与 Android 原生验收
 
 2026-09-15，用户使用 `1f28a56` 的 `VITE_PAGE_DOCUMENT_CANVAS=1` macOS 调试构建完成五项原生
 验收，结果全部通过：
@@ -158,9 +160,32 @@ runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`�
 4. 切换样例及拖动窗口宽度后，画布高度随内容变化；停止操作后高度不再增长，且没有内部滚动条。
 5. 当前词条能显示标题与 Markdown 安全降级正文。
 
-这次验收没有覆盖作者行内 `style` 属性，也没有使用 Safari Web Inspector 网络面板确认隔离层拒绝
-恶意内容时未发起外部请求。开发探针已增加“合法：行内样式”，供下一次原生复核使用；上述两个
-缺口继续保留为 macOS 待验项。
+同日，用户使用包含 `0a3991c` 行内样式探针的
+`VITE_PAGE_DOCUMENT_CANVAS=1 npm run macos:build:debug` 产物完成补验。“合法：行内样式”正文段
+左侧显示竖线并产生缩进，证明经过隔离层保留的作者行内 `style` 在打包版中实际生效。Safari Web
+Inspector 在画布执行环境中得到 `window.origin === "null"`，访问 `parent.document` 抛出
+`SecurityError`；分别以跳过和不跳过作者侧校验两种路径加载 `external-css-url` 与
+`svg-image-external-href` 时，网络面板均没有 `example.invalid` 请求，只有重建画布产生的
+`canvas.html`。
+
+2026-09-15，用户使用
+`VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev` 生成的 aarch64 Android 真机 debug APK
+完成原生验收，结果全部通过：
+
+1. 合法共享样例显示米色背景和无衬线字体，标题、摘要与表格边框正常。
+2. “合法：行内样式”的正文段左侧竖线和缩进正常生效。
+3. `external-css-url` 与 `svg-image-external-href` 在正常路径由作者侧校验阻止，在跳过路径由隔离层
+   拒绝渲染。
+4. HTTPS 链接由系统浏览器打开，返回后仍停留在原词条；本页锚点无动作，不存在的词条不造成白屏。
+5. 横竖屏旋转后画布高度随内容变化且不持续增长。
+6. 应用进入后台十秒以上再恢复时预览仍在，切换样例后可以继续渲染。
+7. 真实词条显示标题与 Markdown 安全降级正文。
+
+Chrome `chrome://inspect` 在画布执行环境中得到 `window.origin === "null"`，访问 `parent.document`
+抛出 `SecurityError`。分别以跳过和不跳过作者侧校验两种路径加载上述两个恶意样例时，Network 面板
+没有 `example.invalid` 请求，只有重建画布产生的 `canvas.html`。因此，macOS WKWebView 与 Android
+WebView 已由 `window.origin` 与跨文档访问实测确认画布使用 opaque origin；两端也都确认了作者行内
+样式、无外部请求、导航接管、尺寸稳定和当前词条降级渲染。
 
 ## 依据
 
@@ -190,21 +215,7 @@ runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`�
 
 ## 待原生验证
 
-macOS WKWebView：
-
-- “合法：行内样式”探针经过隔离层保留的 `style` 属性在打包版中是否实际生效。
-- 使用 Safari Web Inspector 网络面板确认拦截恶意内容时没有发起任何外部请求。
-
-Android WebView：
-
-- 打包子页面是否成为 opaque origin、让 `'self'` 不匹配应用协议资源，且 `event.origin` 不可用于
-  鉴权。
-- Tauri 响应头与画布 meta CSP 是否取交集，并接受同一内联脚本哈希。
-- 经过隔离层保留的作者行内 `style` 属性是否在打包版中生效。
-- 拒绝作者网络、表单和导航时是否不产生请求、不替换画布页面，也不触发宿主顶层导航。
-- iframe 销毁、重建、旋转和后台恢复时，Window 身份与消息时序是否符合协议生命周期假设。
-
-Windows WebView2：
+仅剩 Windows WebView2：
 
 - 打包子页面是否成为 opaque origin、让 `'self'` 不匹配应用协议资源，且 `event.origin` 不可用于
   鉴权。
