@@ -219,11 +219,28 @@
 }
 
 .page-document-properties-panel__empty,
-.page-document-properties-panel__error {
+.page-document-properties-panel__error,
+.page-document-properties-panel__adoption {
     margin: 0;
     padding: var(--fc-space-lg);
 }
 
 .page-document-properties-panel__empty {
     color: var(--fc-color-text-secondary);
+}
+
+.page-document-properties-panel__adoption {
+    display: grid;
+    align-content: start;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-properties-panel__adoption p {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.page-document-properties-panel__adoption .fc-btn {
+    justify-self: start;
 }

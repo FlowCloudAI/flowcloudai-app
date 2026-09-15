@@ -15,6 +15,7 @@ import {
     type KernelDraftPreparationResult,
 } from '../application/documentKernelDraftRuntime.ts'
 import {createVisualOperationQueue} from '../application/visualOperationQueue.ts'
+import {createOpaqueElementAdoptionKernelRequest} from '../application/opaqueElementAdoption.ts'
 import {
     acceptEntryDocumentSave,
     acceptEntryDocumentVisualUpdate,
@@ -34,6 +35,7 @@ import {
     type EntryDocumentSessionState,
 } from '../application/entryDocumentSessionModel.ts'
 import type {SourceFileName} from '../domain/contract.ts'
+import type {LayerProjectionNode} from '../domain/layerProjection.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -296,6 +298,31 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         [applyPreparedKernelEntry, prepareKernelEntry, reportVisualFailure],
     )
 
+    const adoptOpaqueElement = useCallback(
+        async (node: LayerProjectionNode): Promise<string | null> => {
+            const current = stateRef.current
+            if (!current) {
+                reportVisualFailure('当前页面文档草稿不可用，无法纳入该元素。')
+                return null
+            }
+            const newNodeId = crypto.randomUUID()
+            let request: KernelDraftEditRequest
+            try {
+                request = createOpaqueElementAdoptionKernelRequest({
+                    node,
+                    articleHtml: current.model.entry.sources['article.html'],
+                    newNodeId,
+                })
+            } catch (error) {
+                reportVisualFailure(error instanceof Error ? error.message : '无法建立元素纳入请求。')
+                return null
+            }
+            const applied = await applyKernelEntry(request, '纳入可视编辑')
+            return applied ? newNodeId : null
+        },
+        [applyKernelEntry, reportVisualFailure],
+    )
+
     return {
         loadStatus,
         loadError,
@@ -318,5 +345,6 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         prepareKernelEntry,
         applyPreparedKernelEntry,
         applyKernelEntry,
+        adoptOpaqueElement,
     }
 }

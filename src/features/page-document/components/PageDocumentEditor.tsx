@@ -195,6 +195,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     entryStyleCss={scope.sources['style.css']}
                     inspectComponent={session.inspectComponent}
                     applyKernelEntry={session.applyKernelEntry}
+                    onAdopt={async node => {
+                        const adoptedNodeId = await session.adoptOpaqueElement(node)
+                        if (adoptedNodeId) setSelectedNodeId(adoptedNodeId)
+                        return adoptedNodeId
+                    }}
                     visualError={session.visualError}
                 />,
                 dockPortalHost,

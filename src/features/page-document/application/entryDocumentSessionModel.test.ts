@@ -1,6 +1,7 @@
 // 本测试固定词条页面文档会话的保存、重试、冲突与前端阻断语义。
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
+import {RFC_9562_UUID_PATTERN} from '../domain/uuidPolicy.ts'
 import type {PageDocument, SavePageDocumentResult} from '../../../api/pageDocument.ts'
 import {
     acceptEntryDocumentSave,
@@ -198,6 +199,24 @@ describe('entry page document session', () => {
         assert.equal(prepared.status, 'ready')
         if (prepared.status !== 'ready') return
         assert.equal('expectedRevision' in prepared.input, false)
+    })
+
+    it('新文档把 Markdown 降级段落全部生成为可选中的受管组件', () => {
+        const created = createEntryDocumentSessionState({
+            ...identity,
+            markdown: '第一行\n第二行\n\n第三段',
+        }, null)
+        const html = created.model.entry.sources['article.html']
+        const paragraphIds = [...html.matchAll(/<p data-fc-node-id="([^"]+)" data-fc-node-kind="paragraph">/gu)]
+            .map(match => match[1])
+
+        assert.equal(paragraphIds.length, 2)
+        assert.equal(new Set(paragraphIds).size, 2)
+        assert.ok(paragraphIds.every(id => RFC_9562_UUID_PATTERN.test(id)))
+        assert.match(html, />第一行<br>第二行<\/p>/u)
+        assert.match(html, />第三段<\/p>/u)
+        assert.equal(created.model.entry.diagnostics.some(item => item.severity === 'error'), false)
+        assert.equal(created.previewStale, false)
     })
 
     it('存在阻断诊断时禁止保存并保留上一次预览', () => {

@@ -48,6 +48,7 @@ describe('page document editor integration boundary', () => {
             '属性 ·',
             '修改生效范围：所有宽度',
             '清除本级设置',
+            '该元素尚未纳入可视编辑',
         ]) {
             assert.ok(checker.includes(marker), `默认产物扫描遗漏 ${marker}`)
         }

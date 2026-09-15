@@ -20,8 +20,8 @@ import {
     type CompiledCanvasPreview,
     wrapMarkdownFallback,
 } from '../canvas/host/compiledPreview.ts'
-import {markdownParagraphsToHtml} from '../canvas/host/markdownFallback.ts'
 import {parseDocumentDiagnostics} from '../domain/validators.ts'
+import {managedMarkdownParagraphsToHtml} from './managedMarkdownFallback.ts'
 import {
     acceptDraftValidation,
     acceptEntryDraftSave,
@@ -104,7 +104,7 @@ function snapshotFor(
             document?.html ??
             wrapMarkdownFallback(
                 identity.entryId,
-                markdownParagraphsToHtml(identity.markdown),
+                managedMarkdownParagraphsToHtml(identity.markdown),
             ),
         styleCss: document?.css ?? '',
         assets: [],

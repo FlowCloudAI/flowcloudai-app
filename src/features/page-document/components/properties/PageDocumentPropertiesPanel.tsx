@@ -18,6 +18,7 @@ import {
     VISUAL_FONT_WEIGHTS,
 } from '../../application/visualPropertyEditing.ts'
 import type {KernelDraftEditRequest} from '../../application/documentKernelDraftRuntime.ts'
+import {inferOpaqueAdoptionKind} from '../../application/opaqueElementAdoption.ts'
 import {BoxSpacingControls} from './BoxSpacingControls.tsx'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
@@ -32,6 +33,7 @@ interface PageDocumentPropertiesPanelProps {
         label: string,
         history?: {historyGroupId?: string},
     ) => Promise<boolean>
+    onAdopt: (node: LayerProjectionNode) => Promise<string | null>
     visualError: string | null
 }
 
@@ -103,6 +105,7 @@ export function PageDocumentPropertiesPanel({
     entryStyleCss,
     inspectComponent,
     applyKernelEntry,
+    onAdopt,
     visualError,
 }: PageDocumentPropertiesPanelProps) {
     const [tab, setTab] = useState<VisualPropertyGroup>('text')
@@ -110,6 +113,7 @@ export function PageDocumentPropertiesPanel({
         () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss) : [],
         [entryStyleCss, inspectComponent, node],
     )
+    const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
     const applyChanges = (
         changes: readonly VisualPropertyChange[],
         label: string,
@@ -131,20 +135,32 @@ export function PageDocumentPropertiesPanel({
                 <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
                 <span>修改范围 · 所有宽度</span>
             </header>
-            <div className="page-document-properties-panel__tabs" role="tablist" aria-label="属性分类">
-                {TABS.map(item => (
-                    <button
-                        key={item.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={tab === item.key}
-                        className={tab === item.key ? 'is-active' : ''}
-                        onClick={() => setTab(item.key)}
-                    >{item.label}</button>
-                ))}
-            </div>
+            {node?.managed && (
+                <div className="page-document-properties-panel__tabs" role="tablist" aria-label="属性分类">
+                    {TABS.map(item => (
+                        <button
+                            key={item.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={tab === item.key}
+                            className={tab === item.key ? 'is-active' : ''}
+                            onClick={() => setTab(item.key)}
+                        >{item.label}</button>
+                    ))}
+                </div>
+            )}
             {!node ? (
                 <p className="page-document-properties-panel__empty">在画布或图层中选择一个元素</p>
+            ) : !node.managed ? (
+                <div className="page-document-properties-panel__adoption">
+                    <strong>该元素尚未纳入可视编辑</strong>
+                    <p>{adoptKind ? '纳入只会增加组件身份，不会改写元素内部内容。' : '无法从当前元素安全推断可视组件类型，请在代码模式处理。'}</p>
+                    {adoptKind && (
+                        <Button type="button" size="sm" onClick={() => void onAdopt(node)}>
+                            转为{PAGE_DOCUMENT_NODE_KIND_LABELS[adoptKind] ?? adoptKind}
+                        </Button>
+                    )}
+                </div>
             ) : (
                 <div className="page-document-properties-panel__fields">
                     {tab === 'text' && (

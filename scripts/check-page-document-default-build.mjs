@@ -16,6 +16,7 @@ const forbidden = [
     '属性 ·',
     '修改生效范围：所有宽度',
     '清除本级设置',
+    '该元素尚未纳入可视编辑',
 ]
 
 function filesUnder(directory) {
