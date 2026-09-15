@@ -130,7 +130,7 @@ test('AI 对话结果允许普通回答，也严格校验候选源码和工具�
 test('版本化交接 fixture 的请求与响应通过同一运行时契约', () => {
     const fixture = JSON.parse(
         readFileSync(
-            new URL('../../../contracts/fixtures/v1/ai-chat-turn.json', import.meta.url),
+            new URL('../../../../tests/fixtures/page-document/v1/ai-chat-turn.json', import.meta.url),
             'utf8',
         ),
     ) as {request: unknown; response: unknown}

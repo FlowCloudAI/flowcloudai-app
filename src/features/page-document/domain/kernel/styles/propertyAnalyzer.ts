@@ -528,7 +528,7 @@ function resolveVariables(
     stack: Set<string>,
 ): {value: string | null; confidence: PropertyConfidence} {
     if (!rawValue.includes('var(')) return {value: rawValue, confidence: {kind: 'proven'}}
-    const nodes = structuredClone(valueParser(rawValue).nodes) as ValueNode[]
+    const nodes = valueParser(rawValue).nodes as ValueNode[]
     const uncertainty: string[] = []
     const visit = (items: ValueNode[]): void => {
         for (let index = 0; index < items.length; index += 1) {
@@ -586,7 +586,7 @@ function resolveVariables(
                 uncertainty.push(`变量 ${name} 没有可证明的值或回退。`)
                 continue
             }
-            const parsedReplacement = structuredClone(valueParser(replacement).nodes) as ValueNode[]
+            const parsedReplacement = valueParser(replacement).nodes as ValueNode[]
             items.splice(index, 1, ...parsedReplacement)
             index += parsedReplacement.length - 1
         }

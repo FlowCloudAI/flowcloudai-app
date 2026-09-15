@@ -2,6 +2,7 @@
 
 import {SOURCE_FILE_NAMES, type SourceFileName} from './primitives.ts'
 import {snapshotId, type SnapshotId} from './identity.ts'
+import {utf8ByteLength} from '../../utf8.ts'
 
 declare const COORDINATE_BRAND: unique symbol
 
@@ -92,10 +93,9 @@ export function utf16RangeFromUtf8ByteRange(
     let utf8Offset = 0
     let from: number | null = range.from === 0 ? 0 : null
     let to: number | null = range.to === 0 ? 0 : null
-    const encoder = new TextEncoder()
     for (const character of source) {
         utf16Offset += character.length
-        utf8Offset += encoder.encode(character).byteLength
+        utf8Offset += utf8ByteLength(character)
         if (utf8Offset === range.from) from = utf16Offset
         if (utf8Offset === range.to) to = utf16Offset
     }

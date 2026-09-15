@@ -59,7 +59,7 @@
     "android:sign:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1",
     "android:build:signed:apk": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sign-android-apk.ps1 -Build",
     "android:build:debug:x86_64": "set \"CARGO_PROFILE_DEV_DEBUG=0\" && set \"CARGO_PROFILE_DEV_STRIP=debuginfo\" && npm run tauri -- android build --debug --apk --target x86_64",
-    "test:page-document": "node --test --experimental-strip-types src/features/page-document/application/*.test.ts src/features/page-document/domain/**/*.test.ts"
+    "test:page-document": "node --test --experimental-strip-types \"src/features/page-document/**/*.test.ts\""
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",

@@ -135,7 +135,27 @@ export class HtmlSourceMapBuilder {
 
 /** 预览等派生消费者需要独立副本时使用；不会通过序列化重建语法树。 */
 export function cloneHtmlTree<T extends HtmlCompositionRoot>(root: T): T {
-    return structuredClone(root)
+    return cloneObjectGraph(root, new Map()) as T
+}
+
+function cloneObjectGraph(value: unknown, seen: Map<object, unknown>): unknown {
+    if (typeof value !== 'object' || value === null) return value
+    const existing = seen.get(value)
+    if (existing !== undefined) return existing
+
+    if (Array.isArray(value)) {
+        const clone: unknown[] = []
+        seen.set(value, clone)
+        for (const item of value) clone.push(cloneObjectGraph(item, seen))
+        return clone
+    }
+
+    const clone: Record<string, unknown> = {}
+    seen.set(value, clone)
+    for (const [key, item] of Object.entries(value)) {
+        clone[key] = cloneObjectGraph(item, seen)
+    }
+    return clone
 }
 
 function authorOrigin(

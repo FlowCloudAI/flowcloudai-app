@@ -7,6 +7,7 @@ import {
     type SourceRange,
     type Utf8SourceRange,
 } from './contract.ts'
+import {utf8ByteLength} from './utf8.ts'
 
 export type SourceEditErrorCode =
     | 'invalid_source_file'
@@ -54,8 +55,6 @@ interface Utf8OffsetIndex {
     stringOffsetByByte: ReadonlyMap<number, number>
 }
 
-const UTF8_ENCODER = new TextEncoder()
-
 function createUtf8OffsetIndex(source: string): Utf8OffsetIndex {
     const byteByStringOffset = new Map<number, number>([[0, 0]])
     const stringOffsetByByte = new Map<number, number>([[0, 0]])
@@ -63,7 +62,7 @@ function createUtf8OffsetIndex(source: string): Utf8OffsetIndex {
     let byteOffset = 0
     for (const character of source) {
         stringOffset += character.length
-        byteOffset += UTF8_ENCODER.encode(character).byteLength
+        byteOffset += utf8ByteLength(character)
         byteByStringOffset.set(stringOffset, byteOffset)
         stringOffsetByByte.set(byteOffset, stringOffset)
     }

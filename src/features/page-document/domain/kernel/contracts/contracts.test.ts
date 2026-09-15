@@ -29,7 +29,7 @@ describe('document kernel contracts', () => {
         const fixture = JSON.parse(
             readFileSync(
                 new URL(
-                    '../../../../../contracts/fixtures/v3/managed-style-contexts.json',
+                    '../../../../../../tests/fixtures/page-document/v3/managed-style-contexts.json',
                     import.meta.url,
                 ),
                 'utf8',

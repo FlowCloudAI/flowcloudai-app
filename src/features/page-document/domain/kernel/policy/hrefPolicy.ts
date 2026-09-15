@@ -70,13 +70,34 @@ function containsCodePointAtMost(value: string, maximum: number): boolean {
 }
 
 function validAbsoluteUrl(href: string, expectedScheme: 'http' | 'https'): boolean {
-    if (!href.toLowerCase().startsWith(`${expectedScheme}://`)) return false
-    try {
-        const parsed = new URL(href)
-        return parsed.protocol.toLowerCase() === `${expectedScheme}:` && parsed.hostname.length > 0
-    } catch {
-        return false
+    const prefix = `${expectedScheme}://`
+    if (!href.toLowerCase().startsWith(prefix)) return false
+
+    const remainder = href.slice(prefix.length)
+    const separatorIndex = remainder.search(/[/?#]/u)
+    const authority = separatorIndex < 0 ? remainder : remainder.slice(0, separatorIndex)
+    const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1)
+    if (hostAndPort.length === 0) return false
+
+    if (hostAndPort.startsWith('[')) {
+        const closingBracket = hostAndPort.indexOf(']')
+        if (closingBracket <= 1) return false
+        const port = hostAndPort.slice(closingBracket + 1)
+        return port.length === 0 || /^:\d+$/u.test(port)
     }
+
+    const colonIndex = hostAndPort.lastIndexOf(':')
+    const hostname = colonIndex < 0 ? hostAndPort : hostAndPort.slice(0, colonIndex)
+    const port = colonIndex < 0 ? '' : hostAndPort.slice(colonIndex + 1)
+    return (
+        hostname.length > 0 &&
+        !hostname.includes('\\') &&
+        !hostname.includes(':') &&
+        !hostname.includes('@') &&
+        !hostname.includes('[') &&
+        !hostname.includes(']') &&
+        (colonIndex < 0 || /^\d+$/u.test(port))
+    )
 }
 
 function validateEntryTitleHref(href: string): AuthorHrefValidationResult {

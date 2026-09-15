@@ -1,6 +1,10 @@
 // 这些测试验证现行只读、校验与 SaveBundle DTO 在网络边界拒绝未知字段和错误版本。
 import assert from 'node:assert/strict'
+import {readdirSync, readFileSync} from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
+import {fileURLToPath} from 'node:url'
+import * as ts from 'typescript'
 import {
     parseDocumentDiagnostics,
     parseEntryAssetSnapshot,
@@ -208,3 +212,112 @@ test('SaveBundle 同时约束双作用域源码、修订与嵌套结果', () => 
     assert.equal(invalid.ok, false)
     assert.ok(invalid.issues.some(issue => issue.code === 'revision_mismatch'))
 })
+
+test('页面文档领域层的导入闭包不依赖界面、平台或反向业务模块', () => {
+    const domainRoot = path.dirname(fileURLToPath(import.meta.url))
+    const sourceFiles = collectProductionSources(domainRoot)
+    const forbiddenImports: string[] = []
+
+    for (const file of sourceFiles) {
+        const source = ts.createSourceFile(
+            file,
+            readFileSync(file, 'utf8'),
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TS,
+        )
+        for (const specifier of moduleSpecifiers(source)) {
+            if (
+                specifier === 'react'
+                || specifier.startsWith('react/')
+                || specifier === '@tauri-apps'
+                || specifier.startsWith('@tauri-apps/')
+            ) {
+                forbiddenImports.push(`${path.relative(domainRoot, file)} -> ${specifier}`)
+                continue
+            }
+            if (!specifier.startsWith('.')) continue
+            const target = path.resolve(path.dirname(file), specifier)
+            const relativeTarget = path.relative(domainRoot, target)
+            if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
+                forbiddenImports.push(`${path.relative(domainRoot, file)} -> ${specifier}`)
+            }
+            const normalizedTarget = target.split(path.sep).join('/')
+            if (
+                normalizedTarget.includes('/features/entries/')
+                || normalizedTarget.includes('/features/project-editor/')
+            ) {
+                forbiddenImports.push(`${path.relative(domainRoot, file)} -> ${specifier}`)
+            }
+        }
+    }
+    assert.deepEqual(forbiddenImports, [])
+
+    const program = ts.createProgram({
+        rootNames: sourceFiles,
+        options: {
+            target: ts.ScriptTarget.ES2022,
+            module: ts.ModuleKind.ESNext,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            allowImportingTsExtensions: true,
+            noEmit: true,
+            skipLibCheck: true,
+        },
+    })
+    const checker = program.getTypeChecker()
+    const domGlobals = new Set<string>()
+    for (const source of program.getSourceFiles()) {
+        if (!sourceFiles.includes(source.fileName)) continue
+        const visit = (node: ts.Node): void => {
+            if (ts.isIdentifier(node)) {
+                const symbol = checker.getSymbolAtLocation(node)
+                if (
+                    symbol?.declarations?.some(declaration =>
+                        /^lib\.dom(?:\.iterable)?\.d\.ts$/.test(path.basename(declaration.getSourceFile().fileName)),
+                    )
+                ) {
+                    domGlobals.add(`${path.relative(domainRoot, source.fileName)}:${node.text}`)
+                }
+            }
+            ts.forEachChild(node, visit)
+        }
+        visit(source)
+    }
+    assert.deepEqual([...domGlobals].sort(), [])
+})
+
+function collectProductionSources(directory: string): string[] {
+    return readdirSync(directory, {withFileTypes: true})
+        .flatMap(entry => {
+            const target = path.join(directory, entry.name)
+            if (entry.isDirectory()) return collectProductionSources(target)
+            return entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')
+                ? [target]
+                : []
+        })
+        .sort()
+}
+
+function moduleSpecifiers(source: ts.SourceFile): string[] {
+    const specifiers: string[] = []
+    const visit = (node: ts.Node): void => {
+        if (
+            (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+            && node.moduleSpecifier
+            && ts.isStringLiteral(node.moduleSpecifier)
+        ) {
+            specifiers.push(node.moduleSpecifier.text)
+        }
+        if (
+            ts.isCallExpression(node)
+            && node.expression.kind === ts.SyntaxKind.ImportKeyword
+            && node.arguments.length === 1
+            && ts.isStringLiteral(node.arguments[0])
+        ) {
+            specifiers.push(node.arguments[0].text)
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(source)
+    return specifiers
+}
