@@ -20,6 +20,11 @@
     list-style: none;
 }
 
+.page-document-layer-tree li:focus {
+    outline: 2px solid var(--fc-color-primary);
+    outline-offset: 1px;
+}
+
 .page-document-layer-node {
     display: grid;
     grid-template-columns: 1.25rem minmax(0, 1fr);
