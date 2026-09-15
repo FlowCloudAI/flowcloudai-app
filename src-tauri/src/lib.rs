@@ -12,7 +12,9 @@ mod auto_backup;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod desktop_file_open;
 mod document_context;
-mod document_validation;
+/// 页面文档契约测试复用生产校验入口；此模块不是稳定公共 API。
+#[doc(hidden)]
+pub mod document_validation;
 mod layout;
 /// `#[doc(hidden)]` 仅为让集成测试（`tests/coastline_v2.rs`）访问 map 模块；非稳定公开 API。
 #[doc(hidden)]

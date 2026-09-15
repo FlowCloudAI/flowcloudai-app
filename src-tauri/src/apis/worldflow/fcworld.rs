@@ -3055,10 +3055,7 @@ mod tests {
             .find(|item| item.table == WorldflowCsvTable::Entries)
             .map(|item| item.content.as_str())
             .expect("应包含 entries.csv");
-        assert!(
-            imported_entries_csv
-                .contains("fc://self/image/asset-")
-        );
+        assert!(imported_entries_csv.contains("fc://self/image/asset-"));
         assert!(
             !imported_entries_csv.contains(&format!("fc://{}/image/asset-", source_project_id))
         );
