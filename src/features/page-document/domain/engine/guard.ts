@@ -53,16 +53,24 @@ export const FORBIDDEN_HTML_TAGS = new Set([
     'button',
     'base',
     'link',
+    'meta',
 ])
-export const URL_ATTRIBUTES = new Set([
-    'href',
-    'xlink:href',
-    'src',
-    'srcset',
+export const FORBIDDEN_HTML_ATTRIBUTES = new Set([
+    'ping',
     'action',
     'formaction',
-    'poster',
-    'ping',
+    'background',
+])
+export const FORBIDDEN_HTML_ATTRIBUTE_PREFIXES = new Set(['on'])
+export const MANAGED_RESOURCE_ATTRIBUTES = {
+    allElements: new Set(['src', 'srcset', 'poster']),
+    nonLinkElements: new Set(['href', 'xlink:href']),
+    linkElements: new Set(['a', 'area']),
+}
+export const URL_ATTRIBUTES = new Set([
+    ...FORBIDDEN_HTML_ATTRIBUTES,
+    ...MANAGED_RESOURCE_ATTRIBUTES.allElements,
+    ...MANAGED_RESOURCE_ATTRIBUTES.nonLinkElements,
 ])
 export const FORBIDDEN_AT_RULES = new Set(['import', 'font-face', 'namespace', 'document', 'page'])
 
@@ -354,7 +362,9 @@ function validateHtml(
                     ),
                 )
             }
-            if (name.startsWith('on')) {
+            if (
+                [...FORBIDDEN_HTML_ATTRIBUTE_PREFIXES].some(prefix => name.startsWith(prefix))
+            ) {
                 diagnostics.push(
                     htmlDiagnostic(
                         'forbidden_event_handler',
@@ -363,6 +373,7 @@ function validateHtml(
                         name,
                     ),
                 )
+                continue
             }
             if (name === 'contenteditable') {
                 diagnostics.push(
@@ -374,9 +385,20 @@ function validateHtml(
                     ),
                 )
             }
+            if (FORBIDDEN_HTML_ATTRIBUTES.has(name)) {
+                diagnostics.push(
+                    htmlDiagnostic(
+                        'forbidden_html_attribute',
+                        `作者 HTML 不允许使用 ${name} 属性。`,
+                        element,
+                        name,
+                    ),
+                )
+                continue
+            }
             if (!URL_ATTRIBUTES.has(name)) continue
 
-            if ((element.tagName === 'a' || element.tagName === 'area') && name === 'href') {
+            if (MANAGED_RESOURCE_ATTRIBUTES.linkElements.has(element.tagName) && name === 'href') {
                 const validation = validateAuthorHref(attribute.value)
                 if (!validation.allowed) {
                     diagnostics.push(
@@ -421,8 +443,8 @@ function validateHtml(
                         )
                     }
                 }
-            } else if (name === 'href' || name === 'xlink:href' || name === 'poster') {
-                registerHtmlAssetReference(
+            } else if (name === 'srcset') {
+                validateHtmlSrcset(
                     element,
                     name,
                     attribute.value,
@@ -430,8 +452,12 @@ function validateHtml(
                     referenced,
                     knownAssets,
                 )
-            } else if (name === 'srcset') {
-                validateHtmlSrcset(
+            } else if (
+                MANAGED_RESOURCE_ATTRIBUTES.allElements.has(name) ||
+                (MANAGED_RESOURCE_ATTRIBUTES.nonLinkElements.has(name) &&
+                    !MANAGED_RESOURCE_ATTRIBUTES.linkElements.has(element.tagName))
+            ) {
+                registerHtmlAssetReference(
                     element,
                     name,
                     attribute.value,

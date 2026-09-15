@@ -1,0 +1,24 @@
+{
+  "forbiddenTags": [
+    "script",
+    "style",
+    "iframe",
+    "object",
+    "embed",
+    "form",
+    "input",
+    "textarea",
+    "select",
+    "button",
+    "base",
+    "link",
+    "meta"
+  ],
+  "forbiddenAttributes": ["ping", "action", "formaction", "background"],
+  "forbiddenAttributePrefixes": ["on"],
+  "managedResourceAttributes": {
+    "allElements": ["src", "srcset", "poster"],
+    "nonLinkElements": ["href", "xlink:href"],
+    "linkElements": ["a", "area"]
+  }
+}

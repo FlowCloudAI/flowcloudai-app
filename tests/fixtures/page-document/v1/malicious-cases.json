@@ -25,6 +25,61 @@
       "expectedCategories": ["security"]
     },
     {
+      "id": "anchor-ping",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "<a href=\"#linked-section\">本页锚点</a>",
+        "value": "<a ping=\"https://example.invalid/audit\" href=\"#linked-section\">本页锚点</a>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_attribute"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "button-formaction",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</div>",
+        "value": "<button formaction=\"https://example.invalid/submit\">提交</button>\n    </div>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_element", "forbidden_html_attribute"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "forbidden-style-element",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</div>",
+        "value": "<style>.entry { color: red; }</style>\n    </div>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_element"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "meta-http-equiv",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</div>",
+        "value": "<meta http-equiv=\"refresh\" content=\"0;url=https://example.invalid\">\n    </div>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_element", "forbidden_meta_http_equiv"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "table-background",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "<table data-fc-node-id=\"dddddddd-dddd-4ddd-8ddd-dddddddddddd\"",
+        "value": "<table background=\"https://example.invalid/table.png\" data-fc-node-id=\"dddddddd-dddd-4ddd-8ddd-dddddddddddd\""
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["forbidden_html_attribute"],
+      "expectedCategories": ["security"]
+    },
+    {
       "id": "asset-path-traversal",
       "file": "entry/article.html",
       "replace": {

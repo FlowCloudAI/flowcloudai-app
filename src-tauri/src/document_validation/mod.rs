@@ -28,8 +28,14 @@ pub struct ValidationResult {
 }
 
 const FORBIDDEN_TAGS: &[&str] = &[
-    "script", "iframe", "object", "embed", "link", "meta", "base", "form",
+    "script", "style", "iframe", "object", "embed", "form", "input", "textarea", "select",
+    "button", "base", "link", "meta",
 ];
+const FORBIDDEN_ATTRIBUTES: &[&str] = &["ping", "action", "formaction", "background"];
+const FORBIDDEN_ATTRIBUTE_PREFIXES: &[&str] = &["on"];
+const MANAGED_RESOURCE_ATTRIBUTES: &[&str] = &["src", "srcset", "poster"];
+const NON_LINK_MANAGED_RESOURCE_ATTRIBUTES: &[&str] = &["href", "xlink:href"];
+const LINK_ELEMENTS: &[&str] = &["a", "area"];
 
 #[derive(Clone)]
 enum SignificantToken {
@@ -86,19 +92,35 @@ fn validate_element(
         let prefix = qualified_name.prefix.as_ref().map(AsRef::as_ref);
         let display_name =
             prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}:{name}"));
-        if name
-            .get(..2)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("on"))
-        {
+        if FORBIDDEN_ATTRIBUTE_PREFIXES.iter().any(|forbidden| {
+            name.get(..forbidden.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(forbidden))
+        }) {
             diagnostics.push(d("attribute", format!("禁止事件属性 {display_name}")));
+            continue;
+        }
+        if FORBIDDEN_ATTRIBUTES
+            .iter()
+            .any(|forbidden| display_name.eq_ignore_ascii_case(forbidden))
+        {
+            diagnostics.push(d("attribute", format!("禁止属性 {display_name}")));
+            continue;
         }
         let unqualified_href = prefix.is_none() && name.eq_ignore_ascii_case("href");
         let xlink_href = (prefix.is_some_and(|prefix| prefix.eq_ignore_ascii_case("xlink"))
             && name.eq_ignore_ascii_case("href"))
             || name.eq_ignore_ascii_case("xlink:href");
-        if unqualified_href
-            && (tag_name.eq_ignore_ascii_case("a") || tag_name.eq_ignore_ascii_case("area"))
-        {
+        let is_link_element = LINK_ELEMENTS
+            .iter()
+            .any(|link| tag_name.eq_ignore_ascii_case(link));
+        let non_link_managed_resource = NON_LINK_MANAGED_RESOURCE_ATTRIBUTES
+            .iter()
+            .any(|attribute| display_name.eq_ignore_ascii_case(attribute));
+        let managed_resource_attribute = MANAGED_RESOURCE_ATTRIBUTES
+            .iter()
+            .find(|attribute| name.eq_ignore_ascii_case(attribute))
+            .copied();
+        if unqualified_href && is_link_element {
             match parse_href(value, project_id) {
                 Ok(Some(target)) => {
                     if !link_targets.contains(&target) {
@@ -109,21 +131,22 @@ fn validate_element(
                 Err(()) => diagnostics.push(d("href", format!("不允许的 href: {value}"))),
             }
         }
-        if (unqualified_href
-            && !tag_name.eq_ignore_ascii_case("a")
-            && !tag_name.eq_ignore_ascii_case("area"))
-            || xlink_href
-        {
+        if non_link_managed_resource && !is_link_element {
             validate_managed_resource(value, &display_name, diagnostics);
         }
-        if name.eq_ignore_ascii_case("src") && !is_managed_asset_url(value) {
-            diagnostics.push(d("resource", format!("不允许的资源地址: {value}")));
+        if xlink_href && is_link_element {
+            diagnostics.push(d(
+                "attribute",
+                format!("链接元素不允许资源属性 {display_name}"),
+            ));
         }
-        if name.eq_ignore_ascii_case("poster") {
-            validate_managed_resource(value, &display_name, diagnostics);
-        }
-        if name.eq_ignore_ascii_case("srcset") {
-            validate_srcset(value, diagnostics);
+        match managed_resource_attribute {
+            Some("src") if !is_managed_asset_url(value) => {
+                diagnostics.push(d("resource", format!("不允许的资源地址: {value}")));
+            }
+            Some("poster") => validate_managed_resource(value, &display_name, diagnostics),
+            Some("srcset") => validate_srcset(value, diagnostics),
+            _ => {}
         }
         if name.eq_ignore_ascii_case("style") {
             validate_css_tokens(
@@ -648,6 +671,57 @@ mod tests {
     const PROJECT_ID: &str = "88888888-8888-4888-8888-888888888888";
     const ENTRY_ID: &str = "11111111-1111-4111-8111-111111111111";
     const ASSET_ID: &str = "22222222-2222-4222-8222-222222222222";
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct HtmlPolicyFixture {
+        forbidden_tags: Vec<String>,
+        forbidden_attributes: Vec<String>,
+        forbidden_attribute_prefixes: Vec<String>,
+        managed_resource_attributes: ManagedResourceAttributesFixture,
+    }
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ManagedResourceAttributesFixture {
+        all_elements: Vec<String>,
+        non_link_elements: Vec<String>,
+        link_elements: Vec<String>,
+    }
+
+    fn string_refs(items: &[String]) -> Vec<&str> {
+        items.iter().map(String::as_str).collect()
+    }
+
+    #[test]
+    fn shared_html_policy_matches_rust_validator_constants() {
+        let fixture: HtmlPolicyFixture = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests/fixtures/page-document/v1/html-policy.json"
+        )))
+        .unwrap();
+        assert_eq!(string_refs(&fixture.forbidden_tags), FORBIDDEN_TAGS);
+        assert_eq!(
+            string_refs(&fixture.forbidden_attributes),
+            FORBIDDEN_ATTRIBUTES
+        );
+        assert_eq!(
+            string_refs(&fixture.forbidden_attribute_prefixes),
+            FORBIDDEN_ATTRIBUTE_PREFIXES
+        );
+        assert_eq!(
+            string_refs(&fixture.managed_resource_attributes.all_elements),
+            MANAGED_RESOURCE_ATTRIBUTES
+        );
+        assert_eq!(
+            string_refs(&fixture.managed_resource_attributes.non_link_elements),
+            NON_LINK_MANAGED_RESOURCE_ATTRIBUTES
+        );
+        assert_eq!(
+            string_refs(&fixture.managed_resource_attributes.link_elements),
+            LINK_ELEMENTS
+        );
+    }
 
     #[test]
     fn derives_utf8_text_entities_and_internal_links_from_dom() {

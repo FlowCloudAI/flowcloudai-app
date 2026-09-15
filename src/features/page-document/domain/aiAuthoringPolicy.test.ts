@@ -9,7 +9,14 @@ import {
     validateAiStyleEditingCompatibility,
 } from './aiAuthoringPolicy.ts'
 import {CSS_LAYER_ORDER, parseCssSource} from './engine/cssParser.ts'
-import {guardDocumentSources, FORBIDDEN_AT_RULES, FORBIDDEN_HTML_TAGS} from './engine/guard.ts'
+import {
+    FORBIDDEN_AT_RULES,
+    FORBIDDEN_HTML_ATTRIBUTES,
+    FORBIDDEN_HTML_ATTRIBUTE_PREFIXES,
+    FORBIDDEN_HTML_TAGS,
+    guardDocumentSources,
+    MANAGED_RESOURCE_ATTRIBUTES,
+} from './engine/guard.ts'
 import {parseHtmlSource} from './engine/htmlParser.ts'
 import {DOCUMENT_LIMITS} from './engine/limits.ts'
 
@@ -19,6 +26,17 @@ interface MaliciousFixture {
         file: string
         replace: {needle: string; value: string}
     }>
+}
+
+interface HtmlPolicyFixture {
+    forbiddenTags: string[]
+    forbiddenAttributes: string[]
+    forbiddenAttributePrefixes: string[]
+    managedResourceAttributes: {
+        allElements: string[]
+        nonLinkElements: string[]
+        linkElements: string[]
+    }
 }
 
 const FIXTURE_ROOT = path.resolve(
@@ -135,31 +153,49 @@ test('HTML 资源属性逐项限制为受管资产并覆盖共享恶意样例', 
     assert.deepEqual(legal.diagnostics, [])
     assert.deepEqual(legal.referencedAssetIds, [assetId])
 
-    const requiredIds = [
-        'invalid-fcasset-uuid-version',
-        'svg-image-external-href',
-        'svg-use-external-xlink-href',
-        'external-srcset',
-        'external-poster',
-    ]
     const fixture = JSON.parse(readFixture('malicious-cases.json')) as MaliciousFixture
-    const cases = fixture.cases.filter(item => requiredIds.includes(item.id))
-    assert.deepEqual(
-        cases.map(item => item.id),
-        requiredIds,
-        '共享恶意资源样例不得缺项',
-    )
     const baseHtml = readFixture('entry/article.html')
-    for (const item of cases) {
-        assert.ok(baseHtml.includes(item.replace.needle), `${item.id} 的替换锚点不存在`)
-        const html = baseHtml.replace(item.replace.needle, item.replace.value)
+    const baseCss = readFixture('entry/style.css')
+    for (const item of fixture.cases) {
+        const source = readFixture(item.file)
+        assert.ok(source.includes(item.replace.needle), `${item.id} 的替换锚点不存在`)
+        const mutated = source.replace(item.replace.needle, item.replace.value)
+        const html = item.file.endsWith('.html') ? mutated : baseHtml
+        const css = item.file.endsWith('.css') ? mutated : baseCss
+        const parsedHtml = parseHtmlSource(html, {mode: 'fragment', scope: 'entry'})
+        const parsedCss = parseCssSource(css, 'entry')
         const result = guardDocumentSources(
-            [parseHtmlSource(html, {mode: 'fragment', scope: 'entry'})],
-            [],
+            [parsedHtml],
+            [parsedCss],
         )
         assert.ok(
-            result.diagnostics.some(diagnostic => diagnostic.code === 'invalid_asset_reference'),
-            `${item.id} 未被资源 guard 拒绝`,
+            [...parsedHtml.diagnostics, ...parsedCss.diagnostics, ...result.diagnostics].some(
+                diagnostic => diagnostic.severity === 'error',
+            ),
+            `${item.id} 未被页面文档策略拒绝`,
         )
     }
+})
+
+test('前端 HTML 策略常量与共享规则清单一致', () => {
+    const fixture = JSON.parse(readFixture('html-policy.json')) as HtmlPolicyFixture
+
+    assert.deepEqual([...FORBIDDEN_HTML_TAGS], fixture.forbiddenTags)
+    assert.deepEqual([...FORBIDDEN_HTML_ATTRIBUTES], fixture.forbiddenAttributes)
+    assert.deepEqual(
+        [...FORBIDDEN_HTML_ATTRIBUTE_PREFIXES],
+        fixture.forbiddenAttributePrefixes,
+    )
+    assert.deepEqual(
+        [...MANAGED_RESOURCE_ATTRIBUTES.allElements],
+        fixture.managedResourceAttributes.allElements,
+    )
+    assert.deepEqual(
+        [...MANAGED_RESOURCE_ATTRIBUTES.nonLinkElements],
+        fixture.managedResourceAttributes.nonLinkElements,
+    )
+    assert.deepEqual(
+        [...MANAGED_RESOURCE_ATTRIBUTES.linkElements],
+        fixture.managedResourceAttributes.linkElements,
+    )
 })
