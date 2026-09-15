@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowCloudAI · 词条页面编辑器界面设计稿</title>
+<style>
+:root {
+  --fc-color-bg: #FFFDFA; --fc-color-bg-secondary: #F5F4F3; --fc-color-bg-tertiary: #EFEEEA; --fc-color-bg-elevated: #FFFFFF;
+  --fc-color-text: #1D2026; --fc-color-text-secondary: #5C626D; --fc-color-text-tertiary: #8A909B;
+  --fc-color-border: #E2E0DC; --fc-color-border-light: #EDEBE7; --fc-color-border-strong: #C6C3BD;
+  --fc-color-primary: #2F6BD8; --fc-color-primary-subtle: #EAF1FD; --fc-color-primary-border: #B9D0F5;
+  --fc-color-warning: #8A5A06; --fc-color-warning-subtle: #FDF2DA; --fc-color-warning-border: #E8CFA0;
+  --fc-space-xs: 0.25rem; --fc-space-sm: 0.5rem; --fc-space-md: 0.75rem; --fc-space-lg: 1rem; --fc-space-xl: 1.5rem;
+  --fc-radius-sm: 0.25rem; --fc-radius-md: 0.5rem; --fc-radius-lg: 0.75rem; --fc-radius-xl: 1rem; --fc-radius-full: 999px;
+  --fc-font-size-2xs: 0.75rem; --fc-font-size-xs: 0.8125rem; --fc-font-size-sm: 0.875rem; --fc-font-size-md: 1rem;
+  --fc-font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --fc-shadow-sm: 0 1px 2px rgb(29 32 38 / 8%); --fc-shadow-lg: 0 16px 42px rgb(29 32 38 / 18%);
+  /* app_main 外壳的真实常量 */
+  --app-drag-handle-width: 0.5rem; --app-rail-width: 3.125rem; --app-topbar-height: 3rem;
+  /* 自适应列宽：只给上下限，不钉死 */
+  --dock-col: 0px;
+  --side-col: clamp(11rem, 15%, 13.5rem);
+  --side-rail-col: 2.75rem;
+  --dock-props-col: clamp(17rem, 24%, 22rem);
+  --dock-ai-col: clamp(20rem, 34%, 32rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-force-light]) {
+    --fc-color-bg: #1E2127; --fc-color-bg-secondary: #17191E; --fc-color-bg-tertiary: #272B33; --fc-color-bg-elevated: #23262D;
+    --fc-color-text: #E7E9ED; --fc-color-text-secondary: #A9AFBA; --fc-color-text-tertiary: #7C838F;
+    --fc-color-border: #353A44; --fc-color-border-light: #2C313A; --fc-color-border-strong: #5B6270;
+    --fc-color-primary: #8FB4FF; --fc-color-primary-subtle: #23324B; --fc-color-primary-border: #38507A;
+    --fc-color-warning: #E7BE78; --fc-color-warning-subtle: #3A3121; --fc-color-warning-border: #5A4A2C;
+    --fc-shadow-lg: 0 16px 42px rgb(0 0 0 / 45%);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { display: grid; grid-template-rows: auto minmax(0, 1fr); margin: 0; overflow: hidden;
+  background: var(--fc-color-bg-secondary); color: var(--fc-color-text); font: var(--fc-font-size-sm)/1.55 var(--fc-font-family); }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* ── 评审条（自适应换行，不固定高度） ── */
+.review-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--fc-space-sm);
+  padding: var(--fc-space-xs) var(--fc-space-md); border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-elevated); }
+.review-bar b { font-size: var(--fc-font-size-xs); }
+.review-bar .hint { color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); }
+.review-bar .spacer { flex: 1 1 auto; }
+.pill-btn { padding: 0.25rem 0.7rem; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-full);
+  background: var(--fc-color-bg); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.pill-btn[aria-pressed="true"] { border-color: var(--fc-color-primary-border); background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); }
+.state-switch { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-full); background: var(--fc-color-bg-secondary); }
+.state-switch button { height: 1.5rem; padding: 0 var(--fc-space-sm); border: 0; border-radius: var(--fc-radius-full);
+  background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.state-switch button[aria-pressed="true"] { background: var(--fc-color-bg-elevated); color: var(--fc-color-text); box-shadow: var(--fc-shadow-sm); }
+.readout { padding: 0.25rem 0.7rem; border: 1px solid var(--fc-color-primary-border); border-radius: var(--fc-radius-full);
+  background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+
+/* ── 原型：占满剩余高度 ── */
+.prototype { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; background: var(--fc-color-bg-secondary); }
+.prototype[data-dock="props"] { --dock-col: var(--dock-props-col); }
+/* Dock 吃到 AI 的下限时左栏让位收成图标条，正文在所有状态下都保住 47.5rem */
+.prototype[data-dock="ai"]    { --dock-col: var(--dock-ai-col); --side-col: var(--side-rail-col); }
+.prototype[data-dock="split"] { --dock-col: var(--dock-ai-col); --side-col: var(--side-rail-col); }
+
+.app-topbar { display: flex; align-items: center; gap: var(--fc-space-sm); height: var(--app-topbar-height);
+  padding: var(--fc-space-xs); border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-elevated); }
+.app-logo { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: var(--fc-radius-md);
+  background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); font-size: var(--fc-font-size-2xs); }
+.app-tabs { display: flex; align-items: center; gap: var(--fc-space-xs); flex: 1 1 0; min-width: 0; overflow: hidden; }
+.app-tab { display: inline-flex; align-items: center; gap: 0.4rem; height: 2rem; padding: 0 var(--fc-space-md);
+  border-radius: var(--fc-radius-md); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.app-tab.is-active { background: var(--fc-color-bg-tertiary); color: var(--fc-color-text); }
+.app-tab .dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--fc-color-primary); }
+.icon-btn { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid transparent;
+  border-radius: var(--fc-radius-md); background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.icon-btn.is-on { border-color: var(--fc-color-primary-border); background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); }
+
+/* app_main 真实顺序：页面 → Dock → 右侧图标栏（.side-bar placement="right"） */
+/* 槽位由 areas 定位，不依赖 DOM 顺序：Dock 收起时图标栏不会被自动布局挪进 Dock 列 */
+.app-body { display: grid; grid-template-columns: minmax(0, 1fr) var(--dock-col) var(--app-rail-width);
+  grid-template-areas: "page dock rail"; min-height: 0; padding-left: var(--app-drag-handle-width); }
+.app-rail { grid-area: rail; display: flex; flex-direction: column; align-items: center; gap: var(--fc-space-sm); padding: var(--fc-space-md) 0;
+  border-left: 1px solid var(--fc-color-border-light); background: var(--fc-color-bg-secondary); }
+.rail-icon { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: var(--fc-radius-md);
+  color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); }
+.rail-icon.is-active { background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); }
+.rail-sep { width: 1.25rem; height: 1px; background: var(--fc-color-border); }
+.page-container { grid-area: page; min-width: 0; min-height: 0; padding-bottom: var(--app-drag-handle-width); }
+
+/* ── app_main 既有的右侧面板位 ── */
+.app-dock { grid-area: dock; min-width: 0; min-height: 0; overflow: hidden;
+  padding: 0 0 var(--app-drag-handle-width) var(--app-drag-handle-width); }
+.prototype[data-dock="closed"] .app-dock { display: none; }
+.dock-surface { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); height: 100%; min-height: 0;
+  border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-xl); overflow: hidden; background: var(--fc-color-bg); }
+/* 默认 5:6，拖拽时 --split-top 覆盖为具体高度 */
+.prototype[data-dock="split"] .dock-surface { grid-template-rows: minmax(3.5rem, var(--split-top, 5fr)) auto minmax(3.5rem, 6fr); }
+.dock-pane { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.prototype[data-dock="ai"] [data-pane="props"], .prototype[data-dock="props"] [data-pane="ai"] { display: none; }
+.prototype:not([data-dock="split"]) .dock-splitter { display: none; }
+.pane-head { display: flex; align-items: center; gap: var(--fc-space-xs); padding: var(--fc-space-xs) var(--fc-space-sm);
+  border-bottom: 1px solid var(--fc-color-border-light); background: var(--fc-color-bg-elevated);
+  font-size: var(--fc-font-size-2xs); font-weight: 600; white-space: nowrap; overflow: hidden; }
+.pane-head .grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pane-head .icon-btn { flex: none; width: 1.75rem; height: 1.75rem; }
+.pane-body { min-height: 0; overflow: auto; padding: var(--fc-space-md); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.bubble { margin-bottom: var(--fc-space-sm); padding: var(--fc-space-sm) var(--fc-space-md); border-radius: var(--fc-radius-md); background: var(--fc-color-bg-secondary); }
+.bubble.me { background: var(--fc-color-primary-subtle); color: var(--fc-color-text); }
+
+/* 上下分隔条：抄 DockableSidePanel 既有 side-resize-handle 的语言，改为横向 */
+.dock-splitter { position: relative; display: grid; place-items: center; height: 0.5rem; cursor: row-resize;
+  background: var(--fc-color-bg-secondary); border-block: 1px solid var(--fc-color-border-light); }
+.dock-splitter::before { content: ""; position: absolute; inset: -3px 0; }
+.dock-splitter:hover, .dock-splitter.is-dragging { background: var(--fc-color-primary-subtle); }
+.grip { display: flex; gap: 3px; }
+.grip span { width: 3px; height: 3px; border-radius: 50%; background: var(--fc-color-border-strong); }
+.dock-splitter:hover .grip span, .dock-splitter.is-dragging .grip span { background: var(--fc-color-primary); }
+.drag-hint { position: absolute; top: 50%; right: var(--fc-space-sm); transform: translateY(-50%);
+  padding: 0.1rem var(--fc-space-sm); border-radius: var(--fc-radius-full); background: var(--fc-color-text);
+  color: var(--fc-color-bg); font-size: 0.7rem; white-space: nowrap; pointer-events: none; }
+
+/* ── 编辑器表面 ── */
+.editor-surface { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100%; min-height: 0;
+  border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-xl); overflow: hidden; background: var(--fc-color-bg); }
+.work-bar { display: flex; align-items: center; gap: var(--fc-space-sm); padding: var(--fc-space-xs) var(--fc-space-sm);
+  border-bottom: 1px solid var(--fc-color-border-light); background: var(--fc-color-bg-elevated); overflow: hidden; }
+.work-bar .title { font-size: var(--fc-font-size-xs); font-weight: 600; white-space: nowrap; }
+.work-bar .sep { flex: none; width: 1px; height: 1.1rem; background: var(--fc-color-border); }
+.segmented { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-full); background: var(--fc-color-bg-secondary); }
+.segmented button { height: 1.5rem; padding: 0 var(--fc-space-sm); border: 0; border-radius: var(--fc-radius-full);
+  background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.segmented button.is-active { background: var(--fc-color-bg-elevated); color: var(--fc-color-text); box-shadow: var(--fc-shadow-sm); }
+.saved { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: auto; color: var(--fc-color-text-secondary);
+  font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.saved .dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: #3f9a63; }
+
+.ribbon { border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-elevated); }
+.ribbon-tabs { display: flex; gap: 2px; padding: 0 var(--fc-space-sm); }
+.ribbon-tabs button { height: 2rem; padding: 0 var(--fc-space-md); border: 0; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); }
+.ribbon-tabs button.is-active { border-bottom-color: var(--fc-color-primary); color: var(--fc-color-text); }
+.ribbon-panel { display: flex; padding: 0 var(--fc-space-sm); overflow-x: auto; }
+.group { display: grid; grid-template-rows: auto auto; gap: 2px; padding: var(--fc-space-xs) var(--fc-space-sm) 0.2rem;
+  border-right: 1px solid var(--fc-color-border-light); }
+.group:last-child { border-right: 0; }
+.group-body { display: flex; align-items: center; gap: var(--fc-space-xs); }
+.group-title { color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); text-align: center; white-space: nowrap; }
+.ctl { display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; height: 1.75rem; padding: 0 var(--fc-space-sm);
+  border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-md); background: var(--fc-color-bg);
+  font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+.ctl.is-icon { width: 1.75rem; padding: 0; }
+.ctl.is-ghost { border-color: transparent; background: transparent; color: var(--fc-color-text-secondary); }
+.ctl[disabled] { color: var(--fc-color-text-tertiary); background: var(--fc-color-bg-secondary); }
+.stack { display: grid; gap: 2px; justify-items: stretch; }
+.scope-hint { color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); white-space: nowrap; }
+
+/* ── 两栏：左栏只放结构与导航，右侧整片归桌面壳 ── */
+.workspace { display: grid; grid-template-columns: var(--side-col) minmax(0, 1fr); min-height: 0; }
+.side { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0;
+  border-right: 1px solid var(--fc-color-border); background: var(--fc-color-bg-secondary); }
+.side-switch { display: flex; gap: 2px; padding: var(--fc-space-xs) var(--fc-space-sm); }
+.side-switch button { flex: 1 1 0; min-width: 0; height: 1.6rem; border: 1px solid transparent; border-radius: var(--fc-radius-md);
+  background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-switch button.is-active { border-color: var(--fc-color-border); background: var(--fc-color-bg); color: var(--fc-color-text); }
+.side-head { display: flex; align-items: center; gap: var(--fc-space-xs); padding: 0.2rem var(--fc-space-sm);
+  color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); font-weight: 600; white-space: nowrap; }
+.side-head .icon-btn { margin-left: auto; width: 1.5rem; height: 1.5rem; }
+.layer-list { min-height: 0; overflow: auto; padding: var(--fc-space-xs) var(--fc-space-sm) var(--fc-space-sm); }
+.layer-row { display: flex; align-items: center; gap: var(--fc-space-sm); min-height: 2.375rem; padding: 0.55rem var(--fc-space-md);
+  border-radius: var(--fc-radius-md); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-row .glyph { flex: none; width: 1.1rem; color: var(--fc-color-text-tertiary); text-align: center; }
+.layer-row.level-2 { padding-left: 1.6rem; }
+.layer-row.is-selected { background: var(--fc-color-primary-subtle); color: var(--fc-color-text); }
+.side-rail { display: none; flex-direction: column; align-items: center; gap: var(--fc-space-sm); padding: var(--fc-space-sm) 0; }
+.prototype[data-dock="ai"] .side-switch, .prototype[data-dock="ai"] .side-main,
+.prototype[data-dock="split"] .side-switch, .prototype[data-dock="split"] .side-main { display: none; }
+.prototype[data-dock="ai"] .side, .prototype[data-dock="split"] .side { grid-template-rows: minmax(0, 1fr); }
+.prototype[data-dock="ai"] .side-rail, .prototype[data-dock="split"] .side-rail { display: flex; }
+
+/* 属性面板内容（现在住在 Dock 里） */
+.props { display: grid; gap: var(--fc-space-xs); }
+.prop-tabs { display: flex; gap: 2px; position: sticky; top: calc(var(--fc-space-md) * -1); z-index: 1;
+  padding: var(--fc-space-xs) 0; background: var(--fc-color-bg); }
+.prop-tabs button { flex: 1 1 0; min-width: 0; height: 1.6rem; border: 1px solid transparent; border-radius: var(--fc-radius-md);
+  background: transparent; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prop-tabs button.is-active { border-color: var(--fc-color-border); background: var(--fc-color-bg-secondary); color: var(--fc-color-text); }
+.field { display: grid; gap: var(--fc-space-xs); padding: var(--fc-space-sm) 0; border-bottom: 1px solid var(--fc-color-border-light); }
+.field-label { font-size: var(--fc-font-size-2xs); font-weight: 600; color: var(--fc-color-text); }
+.field-row { display: flex; align-items: center; gap: var(--fc-space-xs); }
+.field-row .ctl { background: var(--fc-color-bg-elevated); }
+.field-row .grow { flex: 1 1 0; min-width: 0; }
+.field-row .num { flex: 0 0 4.5rem; }
+.state-chip { width: fit-content; max-width: 100%; padding: 0.1rem var(--fc-space-sm); border: 1px solid var(--fc-color-border-light);
+  border-radius: var(--fc-radius-full); background: var(--fc-color-bg-tertiary); color: var(--fc-color-text-secondary);
+  font-size: var(--fc-font-size-2xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state-chip[data-state="local"] { border-color: var(--fc-color-primary-border); background: var(--fc-color-primary-subtle); color: var(--fc-color-text); }
+.state-chip[data-state="inherited"] { border-style: dashed; }
+.state-chip[data-state="other-viewport"] { border-color: var(--fc-color-warning-border); background: var(--fc-color-warning-subtle); color: var(--fc-color-warning); }
+.state-chip[data-state="not-applicable"] { border-style: dotted; background: var(--fc-color-bg); }
+.disclosure { display: flex; align-items: center; gap: var(--fc-space-sm); padding: var(--fc-space-sm) 0;
+  border-bottom: 1px solid var(--fc-color-border-light); font-size: var(--fc-font-size-2xs); }
+.disclosure .summary { margin-left: auto; color: var(--fc-color-text-tertiary); }
+
+.canvas { min-width: 0; min-height: 0; overflow: auto; padding: clamp(0.75rem, 2vw, 1.5rem); background: var(--fc-color-bg-secondary); }
+.canvas-measure { position: sticky; top: 0; z-index: 2; width: max-content; margin: 0 0 var(--fc-space-sm) auto;
+  padding: 0.15rem var(--fc-space-sm); border-radius: var(--fc-radius-full); background: var(--fc-color-primary-subtle);
+  color: var(--fc-color-primary); font-size: var(--fc-font-size-2xs); }
+.entry-page { width: min(100%, 47.5rem); margin: 0 auto; padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 4%, 3rem);
+  border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-sm); }
+.entry-page h2 { margin: 0 0 0.3rem; font-size: clamp(1.25rem, 2.2vw, 1.65rem); }
+.entry-page h3 { margin: 1.1rem 0 0.4rem; font-size: clamp(1rem, 1.6vw, 1.15rem); }
+.entry-page .meta { color: var(--fc-color-text-tertiary); font-size: var(--fc-font-size-2xs); }
+.entry-page p { color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-xs); line-height: 1.9; }
+.entry-page .callout { margin: var(--fc-space-lg) 0; padding: var(--fc-space-md) var(--fc-space-lg); border-radius: var(--fc-radius-md);
+  background: #8f2c2c; color: #fdf6ee; text-align: center; font-size: var(--fc-font-size-2xs); }
+.node-selected { outline: 2px solid var(--fc-color-primary); outline-offset: 3px; border-radius: var(--fc-radius-sm); }
+
+.status-bar { display: flex; align-items: center; gap: var(--fc-space-md); padding: 0.2rem var(--fc-space-md);
+  border-top: 1px solid var(--fc-color-border); background: var(--fc-color-bg-secondary);
+  color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-2xs); overflow: hidden; white-space: nowrap; }
+.status-bar .right { margin-left: auto; display: flex; gap: var(--fc-space-md); }
+
+/* ── 说明抽屉：默认收起，不占首屏 ── */
+.notes { position: fixed; inset: auto 0 0 0; z-index: 40; max-height: min(78vh, 46rem); overflow: auto;
+  padding: var(--fc-space-lg) clamp(1rem, 5vw, 3rem) var(--fc-space-xl);
+  border-top: 1px solid var(--fc-color-border-strong); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-lg);
+  transform: translateY(100%); transition: transform .18s ease; }
+.notes[data-open="true"] { transform: translateY(0); }
+.notes h2 { margin: var(--fc-space-lg) 0 var(--fc-space-sm); font-size: var(--fc-font-size-md); }
+.notes h2:first-of-type { margin-top: 0; }
+.notes p, .notes li, .notes td, .notes th { font-size: var(--fc-font-size-2xs); color: var(--fc-color-text-secondary); }
+.notes table { width: 100%; border-collapse: collapse; }
+.notes th, .notes td { padding: var(--fc-space-sm); border: 1px solid var(--fc-color-border); text-align: left; vertical-align: top; }
+.notes th { background: var(--fc-color-bg-tertiary); color: var(--fc-color-text); }
+.notes .close { position: sticky; top: 0; float: right; }
+code { padding: 0 0.3rem; border-radius: var(--fc-radius-sm); background: var(--fc-color-bg-tertiary); font-size: 0.72rem; }
+</style>
+</head>
+<body>
+
+<div class="review-bar">
+  <b>词条页面编辑器 · 界面设计稿</b>
+  <span class="hint">待评审 · 2026-09-13 · 缩放窗口看不同宽度</span>
+  <span class="spacer"></span>
+  <span class="readout" id="readout">画布 —</span>
+  <span class="state-switch" id="dockSwitch">
+    <button type="button" data-state="closed" aria-pressed="true">Dock 收起</button>
+    <button type="button" data-state="props" aria-pressed="false">属性</button>
+    <button type="button" data-state="ai" aria-pressed="false">AI</button>
+    <button type="button" data-state="split" aria-pressed="false">上下分屏</button>
+  </span>
+  <button class="pill-btn" type="button" id="notesToggle" aria-pressed="false">设计说明</button>
+</div>
+
+<div class="prototype" id="prototype" data-dock="closed">
+
+  <div class="app-topbar">
+    <div class="app-logo">FC</div>
+    <div class="app-tabs">
+      <span class="app-tab">项目 · 雾港</span>
+      <span class="app-tab is-active"><span class="dot"></span>雾港档案馆</span>
+      <span class="app-tab">关系图</span>
+    </div>
+    <button class="icon-btn" type="button">设置</button>
+  </div>
+
+  <div class="app-body">
+    <div class="page-container">
+      <div class="editor-surface">
+
+        <div class="work-bar">
+          <span class="title">页面编辑</span>
+          <span class="sep"></span>
+          <div class="segmented"><button class="is-active" type="button">可视</button><button type="button">展示</button><button type="button">代码</button></div>
+          <span class="sep"></span>
+          <button class="ctl is-ghost" type="button">撤销</button>
+          <button class="ctl is-ghost" type="button">重做</button>
+          <span class="saved"><span class="dot"></span>已保存 · r137</span>
+        </div>
+
+        <div class="ribbon">
+          <div class="ribbon-tabs">
+            <button class="is-active" type="button">开始</button><button type="button">插入</button><button type="button">页面</button><button type="button">视图</button>
+          </div>
+          <div class="ribbon-panel">
+            <div class="group">
+              <div class="group-body">
+                <div class="stack"><span class="ctl">16 px</span><span class="scope-hint">整段 · 所有宽度</span></div>
+                <span class="ctl is-icon" style="font-weight:700">B</span><span class="ctl is-icon" style="font-style:italic">I</span>
+                <span class="ctl is-icon" style="text-decoration:underline">U</span><span class="ctl is-icon">A</span>
+              </div>
+              <div class="group-title">字体</div>
+            </div>
+            <div class="group">
+              <div class="group-body"><span class="ctl is-icon">≡</span><span class="ctl is-icon">⇤</span><span class="ctl is-icon">⇥</span><span class="ctl">行高 1.95</span></div>
+              <div class="group-title">段落 · 所有宽度</div>
+            </div>
+            <div class="group">
+              <div class="group-body"><span class="ctl">正文</span><span class="ctl is-icon">🎨</span></div>
+              <div class="group-title">样式</div>
+            </div>
+            <div class="group">
+              <div class="group-body"><span class="ctl is-icon">🔍</span><span class="ctl is-icon">↑</span><span class="ctl is-icon">↓</span><span class="ctl is-icon">🗑</span></div>
+              <div class="group-title">编辑与块操作</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <section class="side">
+            <div class="side-switch">
+              <button class="is-active" type="button">图层</button>
+              <button type="button">项目</button>
+            </div>
+            <div class="side-main">
+              <header class="side-head">文档图层<button class="icon-btn" type="button">⋯</button></header>
+              <div class="layer-list">
+                <div class="layer-row"><span class="glyph">▦</span>词条页眉</div>
+                <div class="layer-row"><span class="glyph">▤</span>布局容器 · 馆讯</div>
+                <div class="layer-row level-2 is-selected"><span class="glyph">¶</span>段落 · 昨夜亥时三刻…</div>
+                <div class="layer-row level-2"><span class="glyph">¶</span>段落 · 值夜馆员对本报…</div>
+                <div class="layer-row level-2"><span class="glyph">⛁</span>图库 · 七枚罗盘存照</div>
+                <div class="layer-row"><span class="glyph">▤</span>布局容器 · 馆务纪事</div>
+                <div class="layer-row"><span class="glyph">▦</span>词条页脚</div>
+              </div>
+            </div>
+            <div class="side-rail">
+              <span class="rail-icon is-active">层</span><span class="rail-icon">项</span><span class="rail-icon">⌕</span>
+            </div>
+          </section>
+
+          <section class="canvas">
+            <div class="canvas-measure" id="measure">画布 —</div>
+            <article class="entry-page">
+              <h2>雾港档案馆</h2>
+              <p class="meta">位于潮汐边界上的旧档案馆</p>
+              <div class="callout">潮历一四七年 · 六月望刊 · 大潮第三刊</div>
+              <h3>A-17 抽屉七枚罗盘彻夜同指一处：海图上仍是空白</h3>
+              <p class="node-selected">昨夜亥时三刻，大潮没过馆前第七级石阶。二楼东廊 A-17 抽屉里，七枚罗盘在同一时辰偏了头，指针全部停在同一点上——海图上的那一带至今是空白，从未有船在那片水域留下过航迹。</p>
+              <p>值夜馆员对本报表示，罗盘并非失灵，而是在“等一条尚未出港的船”。理事会今晨发表书面意见，拒绝移动抽屉位置。</p>
+            </article>
+          </section>
+        </div>
+
+        <div class="status-bar">
+          <span>修改生效范围：所有宽度</span>
+          <span>选中：段落 · 昨夜亥时三刻…</span>
+          <div class="right"><span>草稿已同步</span><span>预览 自适应</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <aside class="app-dock">
+      <div class="dock-surface" id="dockSurface">
+
+        <section class="dock-pane" data-pane="ai">
+          <header class="pane-head">
+            <span class="grow">AI · 对话</span>
+            <button class="icon-btn" type="button" data-go="split" title="与属性上下分屏">⇕</button>
+            <button class="icon-btn" type="button" data-go="closed" title="收起">✕</button>
+          </header>
+          <div class="pane-body">
+            <div class="bubble me">帮我把这一段改得更像报纸讯稿</div>
+            <div class="bubble">已给出三种改法，可直接回写到选中的段落。</div>
+            <div class="bubble">需要我同时调整该段的行高与段间距吗？</div>
+          </div>
+        </section>
+
+        <div class="dock-splitter" id="splitter" title="拖拽调整上下高度"><div class="grip"><span></span><span></span><span></span></div></div>
+
+        <section class="dock-pane" data-pane="props">
+          <header class="pane-head">
+            <span class="grow">属性 · 段落</span>
+            <button class="icon-btn" type="button" data-go="split" title="与 AI 上下分屏">⇕</button>
+            <button class="icon-btn" type="button" data-go="closed" title="收起">✕</button>
+          </header>
+          <div class="pane-body">
+            <div class="props">
+              <div class="prop-tabs">
+                <button type="button">文字</button><button type="button">布局</button><button class="is-active" type="button">颜色与效果</button>
+              </div>
+              <div class="field">
+                <div class="field-label">颜色</div>
+                <div class="field-row"><span class="ctl grow">背景</span><span class="ctl grow">文字</span></div>
+                <span class="state-chip" data-state="local">本级已设置 · 文字</span>
+              </div>
+              <div class="field">
+                <div class="field-label">边框粗细</div>
+                <div class="field-row"><span class="ctl grow">滑杆</span><span class="ctl num">1 px</span></div>
+                <span class="state-chip" data-state="inherited">本级未设置 · 继承自词条样式</span>
+              </div>
+              <div class="field">
+                <div class="field-label">上下外距</div>
+                <div class="field-row"><span class="ctl grow">滑杆</span><span class="ctl num">24 px</span></div>
+                <span class="state-chip" data-state="other-viewport">本档已设置 · 其他区间有覆盖</span>
+              </div>
+              <div class="field">
+                <div class="field-label">行列间距</div>
+                <div class="field-row"><span class="ctl grow" disabled>滑杆不可用</span><span class="ctl num" disabled>—</span></div>
+                <span class="state-chip" data-state="not-applicable">不适用 · 需要 Grid 或 Flex</span>
+              </div>
+              <div class="disclosure"><span>圆角</span><span class="summary">本级未设置</span><span>⌄</span></div>
+              <div class="disclosure"><span>盒阴影</span><span class="summary">阴影：无</span><span>⌄</span></div>
+              <div class="disclosure"><span>交互状态</span><span class="summary">未设置</span><span>⌄</span></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <nav class="app-rail">
+      <span class="rail-icon" data-rail="props">属</span>
+      <span class="rail-icon" data-rail="ai">AI</span>
+      <div class="rail-sep"></div>
+      <span class="rail-icon">灵</span><span class="rail-icon">快</span><span class="rail-icon">帮</span>
+    </nav>
+  </div>
+</div>
+
+<div class="notes" id="notes" data-open="false">
+  <button class="pill-btn close" type="button" id="notesClose">收起说明</button>
+
+  <h2>一、这一版的两处结论</h2>
+  <p><b>属性面板住进右侧 Dock，不新增第三列。</b>Dock 是一个槽位、内容互斥，属性进去占用的是已经存在的那一列，中央画布的宽度预算不变。左栏因此只留结构与导航（图层 / 项目），上一版“属性并进左栏”的做法作废——上下挤两样东西会让两边都矮。</p>
+  <p><b>唯一真实冲突是 AI × 属性，在槽位内部用上下分屏解决。</b>灵感、快照、帮助与属性不在同一动作阶段，互斥可接受；只有“让 AI 改一版、自己手调参数、再让它接着改”是连续动作，切槽位会把它切碎。上方分隔条可拖，拖到顶部松手即收起上格。</p>
+
+  <h2>二、右侧图标栏的位置已修正</h2>
+  <p>上一版把图标栏画在最左边，与实现不符。<code>.main-content</code> 是横向 flex，顺序为<b>页面 → Dock → 图标栏</b>，图标栏由 <code>SideBar placement="right"</code> 贴在最右并带 <code>border-left</code>；外壳只在左侧与底部留 <code>--app-drag-handle-width</code> 的空隙。本稿已按此排列。</p>
+
+  <h2>三、三种 Dock 状态的宽度规则</h2>
+  <table>
+    <tr><th>状态</th><th>Dock 列宽</th><th>左栏</th><th>理由</th></tr>
+    <tr><td>收起</td><td>0</td><td>正常宽度</td><td>默认态，画布拿满</td></tr>
+    <tr><td>属性</td><td><code>clamp(17rem, 24%, 22rem)</code></td><td>正常宽度</td><td>属性不需要 AI 的 500px 下限，要把下限做成按内容给</td></tr>
+    <tr><td>AI</td><td><code>clamp(20rem, 34%, 32rem)</code></td><td><b>自动收成图标条</b></td><td>沿用现有 <code>AI_MIN_PANEL_WIDTH</code>；左栏不让位时正文只剩 669px，低于阅读宽度</td></tr>
+    <tr><td>上下分屏</td><td>同 AI</td><td><b>自动收成图标条</b></td><td>合住按较大的下限算，其余同上</td></tr>
+  </table>
+  <p>规则收敛成一句：<b>Dock 吃到 AI 的下限时左栏收成图标条</b>。这样正文在四种状态下都是 760px（1440 窗口实测：收起 1173/760、属性 860/760、AI 849/760、分屏 849/760），不会出现“开个 AI 反而比分屏还挤”。左栏对齐 <code>ProjectEditor</code> 现有的 <code>minmax(11rem, 13.5rem)</code>；全部列宽只给上下限，不钉死断点。右上角读数实时显示余量，偏窄时变黄。</p>
+
+  <h2>四、分屏的实现难度（评审要点）</h2>
+  <p>拖拽本身不是难点：<code>DockableSidePanel</code> 里已经有第二条分隔条 —— 全屏态的侧栏分隔（<code>handleFullscreenSideResizeStart</code> / <code>.dockable-side-panel__side-resize-handle</code>），带阈值折叠、收起后点手柄先展开再跟手、折叠预览与恢复动画。上下分屏可以照抄，但它是<b>横向且只在全屏态存在</b>，需要一套纵向孪生（<code>row-resize</code>、高度、Y 轴起点）。</p>
+  <p>真正的成本在内容模型：组件现在是 <code>activeKey: string</code>，<code>mains</code> 里只有一层 <code>active</code>。分屏要求两层同时 active，牵动右侧图标栏的单选高亮（分屏时两个图标同时亮）、点当前项即收起面板的切换语义、以及 <code>mountedSidePanelKeys</code> 的挂载时机。另需先定两条规则：全屏态是否允许分屏（否则会变成 2×2），以及整条面板的折叠阈值与分屏格子的收起阈值如何互不误触。</p>
+  <p>属性是<b>页面作用域</b>的 Dock 内容，离开编辑页要自动退位；分屏下退位意味着剩下那格自动占满，不能留半条空面板。</p>
+
+  <h2>五、需要你拍板的</h2>
+  <ol>
+    <li><b>属性单开时左栏保留、AI 一开就收起</b>，这个不对称在宽屏没问题，窄窗口会翻转：1180 窗口实测属性态只剩 663/616，反而比 AI 态的 678/630 还窄。要么属性态也跟着收左栏（约回到 795/760），要么补一个“画布低于阅读宽度就收左栏”的条件。</li>
+    <li><b>分屏时上下谁在上。</b>本稿把 AI 放上、属性放下（属性更常改，靠近底部离手更近）。</li>
+    <li><b>分屏是否只在编辑页可用。</b>只在编辑页可用最省事；全局可用则要为灵感/快照/帮助两两组合都定义行为。</li>
+    <li><b>属性三个页签（文字 / 布局 / 颜色与效果）</b>在 17–22rem 的 Dock 里能平铺一行；若分屏后高度不够，是否改成按选中类型只显示相关页。</li>
+    <li><b>编辑器标题栏取消后</b>，若编辑器还要独立窗口运行，需要保留什么降级形态。</li>
+    <li><b>最窄可用宽度定在哪。</b>本稿不设死断点；需要“低于多少自动退出分屏”的阈值时再补。</li>
+  </ol>
+</div>
+
+<script>
+const proto = document.getElementById('prototype');
+const readout = document.getElementById('readout');
+const measure = document.getElementById('measure');
+const notes = document.getElementById('notes');
+const dockSwitch = document.getElementById('dockSwitch');
+const surface = document.getElementById('dockSurface');
+const splitter = document.getElementById('splitter');
+
+function refresh() {
+  const canvas = document.querySelector('.canvas');
+  const page = document.querySelector('.entry-page');
+  const cw = Math.round(canvas.getBoundingClientRect().width);
+  const pw = Math.round(page.getBoundingClientRect().width);
+  const tight = cw < 544;
+  readout.textContent = '画布 ' + cw + 'px ｜ 正文 ' + pw + 'px' + (tight ? ' · 偏窄' : '');
+  readout.style.borderColor = tight ? 'var(--fc-color-warning-border)' : 'var(--fc-color-primary-border)';
+  readout.style.background = tight ? 'var(--fc-color-warning-subtle)' : 'var(--fc-color-primary-subtle)';
+  readout.style.color = tight ? 'var(--fc-color-warning)' : 'var(--fc-color-primary)';
+  const band = cw >= 1152 ? '宽屏区间' : cw >= 768 ? '桌面区间' : cw >= 576 ? '平板区间' : '手机区间';
+  measure.textContent = '画布实际命中 · ' + band + ' ' + cw + 'px';
+}
+
+function setDock(state) {
+  proto.dataset.dock = state;
+  dockSwitch.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.state === state)));
+  // 分屏时两个图标同时高亮——这正是待解决的单选语义问题
+  document.querySelectorAll('.app-rail [data-rail]').forEach(el => {
+    const on = state === 'split' ? (el.dataset.rail === 'ai' || el.dataset.rail === 'props') : el.dataset.rail === state;
+    el.classList.toggle('is-active', on);
+  });
+  if (state === 'split') surface.style.removeProperty('--split-top');
+  refresh();
+  requestAnimationFrame(refresh);
+}
+
+dockSwitch.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setDock(b.dataset.state); });
+document.querySelectorAll('.app-rail [data-rail]').forEach(el => el.addEventListener('click', () => {
+  setDock(proto.dataset.dock === el.dataset.rail ? 'closed' : el.dataset.rail);
+}));
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => setDock(b.dataset.go)));
+
+/* 上下分隔条：与组件既有分隔条同一套行为——跟手、阈值预览、松手收起 */
+const MIN_PANE = 56;
+let hint = null;
+splitter.addEventListener('mousedown', e => {
+  if (proto.dataset.dock !== 'split') return;
+  e.preventDefault();
+  const rect = surface.getBoundingClientRect();
+  splitter.classList.add('is-dragging');
+  document.body.style.cursor = 'row-resize';
+  document.body.style.userSelect = 'none';
+  hint = document.createElement('div');
+  hint.className = 'drag-hint';
+  splitter.appendChild(hint);
+
+  let collapse = null;
+  const onMove = ev => {
+    const raw = ev.clientY - rect.top;
+    if (raw < MIN_PANE / 2) collapse = 'top';
+    else if (raw > rect.height - MIN_PANE / 2) collapse = 'bottom';
+    else collapse = null;
+    const next = Math.min(rect.height - MIN_PANE - 8, Math.max(MIN_PANE, raw));
+    surface.style.setProperty('--split-top', next + 'px');
+    hint.textContent = collapse === 'top' ? '释放后只留属性'
+      : collapse === 'bottom' ? '释放后只留 AI' : '调整上下高度';
+  };
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    splitter.classList.remove('is-dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (hint) { hint.remove(); hint = null; }
+    if (collapse === 'top') setDock('props');
+    else if (collapse === 'bottom') setDock('ai');
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+});
+
+const notesToggle = document.getElementById('notesToggle');
+function setNotes(open) { notes.dataset.open = String(open); notesToggle.setAttribute('aria-pressed', String(open)); }
+notesToggle.addEventListener('click', () => setNotes(notes.dataset.open !== 'true'));
+document.getElementById('notesClose').addEventListener('click', () => setNotes(false));
+new ResizeObserver(refresh).observe(document.querySelector('.canvas'));
+setDock('closed');
+</script>
+</body>
+</html>
