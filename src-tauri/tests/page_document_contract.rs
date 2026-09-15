@@ -98,11 +98,20 @@ fn managed_css_url_is_accepted() {
         &format!(".cover {{ background-image: url(fcasset://{ASSET_ID}); }}"),
     );
     assert!(result.valid, "{:?}", result.diagnostics);
+
+    let dynamic = validate_entry(
+        "<p>正文</p>",
+        &format!(
+            ".cover {{ --asset: 'fcasset://{ASSET_ID}'; background-image: url(var(--asset)); }}"
+        ),
+    );
+    assert!(!dynamic.valid, "动态 url() 不得绕过受管资源校验");
 }
 
 #[test]
 fn fixed_position_without_whitespace_is_rejected() {
     assert!(!validate_entry("<p>正文</p>", ".overlay{position:fixed}").valid);
+    assert!(!validate_entry("<p>正文</p>", ".notice:before { content: '伪造提示'; }").valid);
 }
 
 #[test]

@@ -300,11 +300,34 @@ fn scan_css_tokens(
             }
             Token::Function(name) => {
                 let is_url = name.eq_ignore_ascii_case("url");
+                if is_url {
+                    let parsed_url: Result<String, cssparser::ParseError<'_, ()>> = parser
+                        .parse_nested_block(|nested| {
+                            let value = nested
+                                .expect_string_cloned()
+                                .map_err(cssparser::ParseError::<()>::from)?;
+                            nested
+                                .expect_exhausted()
+                                .map_err(cssparser::ParseError::<()>::from)?;
+                            Ok(value.to_string())
+                        });
+                    match parsed_url {
+                        Ok(value) if is_managed_asset_url(&value) => {}
+                        Ok(value) => {
+                            diagnostics.push(d("css", format!("不允许的 CSS 资源地址: {value}")))
+                        }
+                        Err(_) => {
+                            diagnostics.push(d("css", "CSS url() 必须直接包含 fcasset://<uuid>"))
+                        }
+                    }
+                    pending_bang = false;
+                    push_significant(&mut significant, &mut statement, SignificantToken::Other);
+                    continue;
+                }
                 let nested_context = CssContext {
                     declarations: false,
                     pseudo_rule: context.pseudo_rule,
-                    quoted_strings_are_resources: is_url
-                        || name.eq_ignore_ascii_case("image-set")
+                    quoted_strings_are_resources: name.eq_ignore_ascii_case("image-set")
                         || name.eq_ignore_ascii_case("-webkit-image-set"),
                 };
                 let result: Result<(), cssparser::ParseError<'_, ()>> =
@@ -410,6 +433,15 @@ fn has_pseudo_element(statement: &[SignificantToken]) -> bool {
                 SignificantToken::Ident(_)
             ]
         )
+    }) || statement.windows(2).any(|tokens| {
+        matches!(
+            tokens,
+            [SignificantToken::Colon, SignificantToken::Ident(name)]
+                if matches!(
+                    name.to_ascii_lowercase().as_str(),
+                    "before" | "after" | "first-letter" | "first-line"
+                )
+        )
     })
 }
 
@@ -452,6 +484,20 @@ mod tests {
 
         let rejected = validate("<p>正文</p>", ".overlay{position:fixed}", Some(PROJECT_ID));
         assert!(!rejected.valid);
+
+        let dynamic_url = validate(
+            "<p>正文</p>",
+            ".cover { --asset: 'fcasset://22222222-2222-4222-8222-222222222222'; background: url(var(--asset)); }",
+            Some(PROJECT_ID),
+        );
+        assert!(!dynamic_url.valid);
+
+        let legacy_pseudo = validate(
+            "<p>正文</p>",
+            ".notice:before { content: '伪造提示'; }",
+            Some(PROJECT_ID),
+        );
+        assert!(!legacy_pseudo.valid);
     }
 
     #[test]
