@@ -9,6 +9,16 @@ import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
 
 const featureRoot = fileURLToPath(new URL('../../', import.meta.url))
+const appRoot = fileURLToPath(new URL('../../../../../', import.meta.url))
+const uiStyleRoot = fileURLToPath(new URL('../../../../../../lib_ui/ui/src/style/', import.meta.url))
+const appGlobalStyles = [
+    path.join(appRoot, 'src/App.css'),
+    path.join(appRoot, 'src/glassEffect.css'),
+    path.join(appRoot, 'src/assets/fonts/fonts.css'),
+    path.join(appRoot, 'src/app/mobile/mobileTokens.css'),
+    path.join(appRoot, 'src/app/mobile/mobileAccessibility.css'),
+    path.join(appRoot, 'src/app/mobile/mobileTypography.css'),
+]
 
 function collectCss(directory: string): string[] {
     return readdirSync(directory).flatMap(name => {
@@ -19,6 +29,10 @@ function collectCss(directory: string): string[] {
                 ? [absolute]
                 : []
     })
+}
+
+function collectCustomProperties(source: string, pattern: RegExp, group = 1): string[] {
+    return [...source.matchAll(pattern)].flatMap(match => match[group] ? [match[group]] : [])
 }
 
 test('画布 URL 把 token 放在 fragment 且不改变资源请求', () => {
@@ -62,4 +76,36 @@ test('page-document 下 CSS 不含颜色字面量', () => {
     for (const file of collectCss(featureRoot)) {
         assert.doesNotMatch(readFileSync(file, 'utf8'), colorLiteral, path.relative(featureRoot, file))
     }
+})
+
+test('page-document 宿主 CSS 使用的每个设计 token 都有全局定义', () => {
+    const definitionPattern = /(^|[;{])\s*(--fc-[a-z0-9-]+)\s*:/gimu
+    const usePattern = /var\(\s*(--fc-[a-z0-9-]+)/giu
+    const definitions = new Set([
+        ...collectCss(uiStyleRoot),
+        ...appGlobalStyles,
+    ].flatMap(file => collectCustomProperties(readFileSync(file, 'utf8'), definitionPattern, 2)))
+    const runtimePath = path.join(featureRoot, 'canvas/runtime/runtime.css')
+    const unresolved: string[] = []
+
+    for (const file of collectCss(featureRoot)) {
+        const source = readFileSync(file, 'utf8')
+        const uses = collectCustomProperties(source, usePattern)
+        if (file === runtimePath) {
+            const runtimeDefinitions = new Set(
+                [...source.matchAll(definitionPattern)].map(match => match[2]),
+            )
+            for (const token of uses) {
+                if (!token.startsWith('--fc-entry-') || !runtimeDefinitions.has(token)) {
+                    unresolved.push(`${path.relative(featureRoot, file)}: ${token}`)
+                }
+            }
+            continue
+        }
+        for (const token of uses) {
+            if (!definitions.has(token)) unresolved.push(`${path.relative(featureRoot, file)}: ${token}`)
+        }
+    }
+
+    assert.deepEqual(unresolved, [])
 })

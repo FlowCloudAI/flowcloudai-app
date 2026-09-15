@@ -3,9 +3,9 @@
     position: relative;
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--fc-border-color);
+    border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
-    background: var(--fc-bg-primary);
+    background: var(--fc-color-bg);
 }
 
 .page-document-canvas__frame {
@@ -21,8 +21,8 @@
     inset: 0;
     display: grid;
     place-items: center;
-    padding: var(--fc-space-4);
-    color: var(--fc-text-secondary);
+    padding: var(--fc-space-lg);
+    color: var(--fc-color-text-secondary);
     pointer-events: none;
 }
 
