@@ -30,7 +30,7 @@ const editorTheme = EditorView.theme({
         height: '100%',
         backgroundColor: 'transparent',
         color: 'var(--fc-color-text)',
-        fontSize: '13px',
+        fontSize: 'var(--fc-font-size-xs)',
     },
     '.cm-scroller': {
         fontFamily: 'ui-monospace, "SFMono-Regular", Consolas, monospace',

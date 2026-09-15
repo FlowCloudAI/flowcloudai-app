@@ -40,6 +40,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const {entryId, projectId, title, summary} = input
     const [loadStatus, setLoadStatus] = useState<EntryPageDocumentLoadStatus>('loading')
     const [loadError, setLoadError] = useState<string | null>(null)
+    const [loadAttempt, setLoadAttempt] = useState(0)
     const [state, setState] = useState<EntryDocumentSessionState | null>(null)
     const stateRef = useRef<EntryDocumentSessionState | null>(null)
     const inputRef = useRef(input)
@@ -73,7 +74,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             cancelled = true
         }
         // 标题与摘要变化只更新预览元数据，不能重新读取并覆盖本地页面草稿。
-    }, [entryId, projectId, publish])
+    }, [entryId, loadAttempt, projectId, publish])
 
     useEffect(() => {
         const current = stateRef.current
@@ -159,8 +160,25 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const discard = useCallback(() => mutate(discardEntryDocumentChanges), [mutate])
     const undo = useCallback(() => mutate(undoEntryDocumentSession), [mutate])
     const redo = useCallback(() => mutate(redoEntryDocumentSession), [mutate])
-    const keepDraft = useCallback(() => mutate(keepEntryDocumentDraft), [mutate])
+    const keepDraft = useCallback(async (): Promise<boolean> => {
+        const current = stateRef.current
+        if (!current?.conflict) return false
+        let latestDocument = current.conflict.latestDocument
+        if (!latestDocument) {
+            try {
+                latestDocument = await pageDocumentReadEntry(current.identity.entryId)
+            } catch {
+                // 状态模型会保留冲突，并给出不能用未知 revision 保存的明确原因。
+            }
+        }
+        const latest = stateRef.current
+        if (!latest || latest.identity.entryId !== current.identity.entryId) return false
+        const next = keepEntryDocumentDraft(latest, latestDocument)
+        publish(next)
+        return next.conflict === null
+    }, [publish])
     const loadLatest = useCallback(() => mutate(loadLatestEntryDocument), [mutate])
+    const retryLoad = useCallback(() => setLoadAttempt(current => current + 1), [])
 
     return {
         loadStatus,
@@ -178,5 +196,6 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         redo,
         keepDraft,
         loadLatest,
+        retryLoad,
     }
 }

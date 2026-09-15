@@ -8,6 +8,8 @@ import {
     createEntryDocumentSessionState,
     editEntryDocumentSource,
     finishEntryDocumentValidation,
+    keepEntryDocumentDraft,
+    loadLatestEntryDocument,
     prepareEntryDocumentSave,
     rejectEntryDocumentSave,
 } from './entryDocumentSessionModel.ts'
@@ -105,6 +107,72 @@ describe('entry page document session', () => {
         assert.equal(conflicted.model.entry.sources['article.html'], entryHtml('本地草稿'))
         assert.equal(conflicted.conflict?.currentRevision, 3)
         assert.equal(conflicted.conflict?.latestDocument?.html, entryHtml('磁盘最新'))
+    })
+
+    it('冲突后保留草稿会以磁盘最新版为基线并可再次保存', () => {
+        const prepared = prepareEntryDocumentSave(validEditedState(), () => 'save-conflict')
+        assert.equal(prepared.status, 'ready')
+        if (prepared.status !== 'ready') return
+        const latest = document(3, '磁盘最新')
+        const conflicted = rejectEntryDocumentSave(
+            prepared.state,
+            {kind: 'conflict', message: '版本冲突', currentRevision: 3},
+            latest,
+        )
+
+        const kept = keepEntryDocumentDraft(conflicted)
+        assert.equal(kept.persistedRevision, 3)
+        assert.equal(kept.snapshot.articleHtml, entryHtml('磁盘最新'))
+        assert.equal(kept.model.entry.baseSources['article.html'], entryHtml('磁盘最新'))
+        assert.equal(kept.model.entry.sources['article.html'], entryHtml('本地草稿'))
+        assert.equal(kept.model.entry.phase, 'dirty')
+        assert.equal(kept.conflict, null)
+        assert.equal(kept.pendingSave, null)
+
+        const retry = prepareEntryDocumentSave(kept, () => 'save-overwrite')
+        assert.equal(retry.status, 'ready')
+        if (retry.status !== 'ready') return
+        assert.equal(retry.input.expectedRevision, 3)
+        assert.equal(retry.input.requestKey, 'save-overwrite')
+        const saved = acceptEntryDocumentSave(retry.state, saveResult(retry, 4))
+        assert.equal(saved.model.entry.phase, 'clean')
+        assert.equal(saved.persistedRevision, 4)
+    })
+
+    it('冲突后读不到最新文档时保持冲突且不能保存', () => {
+        const prepared = prepareEntryDocumentSave(validEditedState(), () => 'save-conflict')
+        assert.equal(prepared.status, 'ready')
+        if (prepared.status !== 'ready') return
+        const conflicted = rejectEntryDocumentSave(
+            prepared.state,
+            {kind: 'conflict', message: '版本冲突', currentRevision: 3},
+        )
+
+        const kept = keepEntryDocumentDraft(conflicted)
+        assert.equal(kept.model.entry.phase, 'conflict')
+        assert.equal(kept.persistedRevision, 2)
+        assert.equal(kept.conflict?.resolutionError, '无法读取最新版本，暂不能覆盖保存')
+        assert.equal(canSaveEntryDocument(kept), false)
+        assert.equal(prepareEntryDocumentSave(kept, () => 'must-not-save').status, 'blocked')
+    })
+
+    it('载入最新版本会放弃本地修改并回到 clean', () => {
+        const prepared = prepareEntryDocumentSave(validEditedState(), () => 'save-conflict')
+        assert.equal(prepared.status, 'ready')
+        if (prepared.status !== 'ready') return
+        const latest = document(3, '磁盘最新')
+        const conflicted = rejectEntryDocumentSave(
+            prepared.state,
+            {kind: 'conflict', message: '版本冲突', currentRevision: 3},
+            latest,
+        )
+
+        const loaded = loadLatestEntryDocument(conflicted)
+        assert.equal(loaded.model.entry.sources['article.html'], entryHtml('磁盘最新'))
+        assert.equal(loaded.model.entry.baseSources['article.html'], entryHtml('磁盘最新'))
+        assert.equal(loaded.model.entry.phase, 'clean')
+        assert.equal(loaded.persistedRevision, 3)
+        assert.equal(loaded.conflict, null)
     })
 
     it('相同内容失败重试复用 requestKey', () => {

@@ -118,8 +118,11 @@ import {
     PAGE_DOCUMENT_EDITOR_ENABLED,
     PageDocumentEditorEntry,
 } from '@page-document-editor-entry'
+import {
+    shouldHandleEntryEditorShortcut,
+    type EntryEditorMode,
+} from '../lib/entryEditorShortcutModel'
 
-type EditorMode = 'edit' | 'browse' | 'page'
 type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
     plugins: PluginInfo[]
@@ -138,7 +141,7 @@ interface EntryEditorProps {
     categories: Category[]
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
-    initialEditorMode?: EditorMode
+    initialEditorMode?: EntryEditorMode
     onOpenEntry?: (entry: { id: string; title: string }) => void
     onTitleChange?: (entry: Entry) => void | Promise<void>
     onSaved?: (entry: Entry) => void | Promise<void>
@@ -252,7 +255,7 @@ export default function EntryEditor({
     const [saveError, setSaveError] = useState<string | null>(null)
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [generatingSummary, setGeneratingSummary] = useState(false)
-    const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
+    const [editorMode, setEditorMode] = useState<EntryEditorMode>(initialEditorMode)
     const [pageDocumentDirty, setPageDocumentDirty] = useState(false)
     const [pageDocumentResetVersion, setPageDocumentResetVersion] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
@@ -336,7 +339,6 @@ export default function EntryEditor({
     const lastSuccessfulSaveAtRef = useRef(0)
     const userEditVersionRef = useRef(0)
     const projectIdRef = useRef(projectId)
-    const wasActiveRef = useRef(active)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
@@ -349,7 +351,7 @@ export default function EntryEditor({
         )
         return result === 'yes'
     }, [pageDocumentDirty, showAlert])
-    const requestEditorMode = useCallback(async (nextMode: EditorMode) => {
+    const requestEditorMode = useCallback(async (nextMode: EntryEditorMode) => {
         if (nextMode === editorMode) return
         if (editorMode === 'page' && !(await confirmDiscardPageDocument())) return
         if (editorMode === 'page') {
@@ -421,19 +423,7 @@ export default function EntryEditor({
         lastSuccessfulSaveAtRef.current = Date.now()
     }, [])
 
-    useEffect(() => {
-        const wasActive = wasActiveRef.current
-        wasActiveRef.current = active
-        if (!wasActive || active || editorMode !== 'page' || !pageDocumentDirty) return
-        void confirmDiscardPageDocument().then(discard => {
-            if (discard) {
-                setPageDocumentDirty(false)
-                setPageDocumentResetVersion(current => current + 1)
-                return
-            }
-            if (entry) onOpenEntry?.({id: entry.id, title: entry.title})
-        })
-    }, [active, confirmDiscardPageDocument, editorMode, entry, onOpenEntry, pageDocumentDirty])
+    // ProjectEditor 会常驻挂载已打开的词条标签；切换 active 不会丢草稿，因此无需确认。
 
     useEffect(() => {
         projectEntriesRef.current = projectEntries
@@ -1270,6 +1260,7 @@ export default function EntryEditor({
             if (!(event.ctrlKey || event.metaKey)) return
 
             const key = event.key.toLowerCase()
+            if (!shouldHandleEntryEditorShortcut(editorMode, key)) return
 
             if (key === 's') {
                 event.preventDefault()
@@ -1298,7 +1289,7 @@ export default function EntryEditor({
         return () => {
             window.removeEventListener('keydown', handleKeyShortcut)
         }
-    }, [active, handleUndo, handleRedo])
+    }, [active, editorMode, handleUndo, handleRedo])
 
     async function handleUploadImages(): Promise<EntryImage[]> {
         try {

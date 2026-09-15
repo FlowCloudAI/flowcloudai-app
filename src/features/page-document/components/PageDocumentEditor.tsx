@@ -7,6 +7,7 @@ import type {SourceFileSet} from '../domain/contract.ts'
 import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
 import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
+import {resolvePageDocumentEditorLoadView} from './pageDocumentEditorLoadState.ts'
 import './PageDocumentEditor.css'
 
 type WorkspaceMode = 'visual' | 'display' | 'code'
@@ -65,7 +66,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         if (!active) return
         const handleKeyDown = (event: KeyboardEvent) => {
             if (
-                event.isComposing || event.altKey || event.shiftKey ||
+                event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey ||
                 !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's'
             ) return
             event.preventDefault()
@@ -86,12 +87,20 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     }, [dirty, state])
     const canUndo = mode === 'code' ? sourceHistory.canUndo : session.canUndo
     const canRedo = mode === 'code' ? sourceHistory.canRedo : session.canRedo
+    const loadView = resolvePageDocumentEditorLoadView(session.loadStatus, Boolean(state))
 
-    if (session.loadStatus === 'loading' || !state) {
-        return <div className="page-document-editor-state" role="status">正在建立页面编辑会话…</div>
+    if (loadView === 'error') {
+        return (
+            <div className="page-document-editor-state is-error" role="alert">
+                <span>{session.loadError || '读取页面文档失败。'}</span>
+                <Button type="button" size="sm" variant="outline" onClick={session.retryLoad}>
+                    重试读取
+                </Button>
+            </div>
+        )
     }
-    if (session.loadStatus === 'error') {
-        return <div className="page-document-editor-state is-error" role="alert">{session.loadError}</div>
+    if (loadView === 'loading' || !state) {
+        return <div className="page-document-editor-state" role="status">正在建立页面编辑会话…</div>
     }
 
     const scope = state.model.entry
@@ -146,13 +155,16 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 </Button>
             </header>
 
-            {conflict && !conflict.dismissed && (
+            {conflict && (
                 <section className="page-document-editor__conflict" role="alert">
                     <div>
-                        <strong>磁盘版本已更新到 {conflict.currentRevision ? `r${conflict.currentRevision}` : '未知 revision'}。</strong>
+                        <strong>磁盘版本已更新到 {conflict.currentRevision !== null ? `r${conflict.currentRevision}` : '未知 revision'}。</strong>
                         <span>本地草稿仍被保留；代码模式的差异会改为对比磁盘最新版本。</span>
+                        {conflict.resolutionError && <span>{conflict.resolutionError}</span>}
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={session.keepDraft}>保留草稿</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void session.keepDraft()}>
+                        保留草稿，覆盖最新版本时再保存
+                    </Button>
                     <Button type="button" size="sm" disabled={!conflict.latestDocument} onClick={session.loadLatest}>
                         载入最新版本（放弃本地修改）
                     </Button>

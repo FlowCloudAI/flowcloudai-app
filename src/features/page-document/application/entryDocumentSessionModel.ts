@@ -50,7 +50,7 @@ export interface EntryDocumentIdentity {
 export interface EntryDocumentConflictState {
     currentRevision: number | null
     latestDocument: PageDocument | null
-    dismissed: boolean
+    resolutionError: string | null
 }
 
 export interface EntryDocumentPendingSave {
@@ -211,7 +211,6 @@ export function editEntryDocumentSource(
         ...state,
         model,
         saveError: null,
-        conflict: state.conflict ? {...state.conflict, dismissed: false} : null,
     }
 }
 
@@ -247,6 +246,7 @@ function saveSignature(state: EntryDocumentSessionState): string {
 export function canSaveEntryDocument(state: EntryDocumentSessionState): boolean {
     return (
         (state.persistedRevision === undefined || isDocumentScopeDirty(state.model.entry)) &&
+        state.conflict === null &&
         state.model.entry.phase !== 'saving' &&
         state.model.entry.phase !== 'conflict' &&
         state.model.entry.validationPhase === 'valid' &&
@@ -351,9 +351,9 @@ export function rejectEntryDocumentSave(
             ),
             saveError: error,
             conflict: {
-                currentRevision: error.currentRevision,
+                currentRevision: latestDocument?.revision ?? error.currentRevision,
                 latestDocument,
-                dismissed: false,
+                resolutionError: null,
             },
         }
     }
@@ -366,10 +366,55 @@ export function rejectEntryDocumentSave(
 
 export function keepEntryDocumentDraft(
     state: EntryDocumentSessionState,
+    latestDocument: PageDocument | null = state.conflict?.latestDocument ?? null,
 ): EntryDocumentSessionState {
-    return state.conflict
-        ? {...state, conflict: {...state.conflict, dismissed: true}}
-        : state
+    if (!state.conflict) return state
+    if (!latestDocument) {
+        return {
+            ...state,
+            conflict: {
+                ...state.conflict,
+                resolutionError: '无法读取最新版本，暂不能覆盖保存',
+            },
+        }
+    }
+
+    const snapshot = snapshotFor(state.identity, latestDocument)
+    const baseSources: SourceFileSet = {
+        'article.html': latestDocument.html,
+        'style.css': latestDocument.css,
+    }
+    const entry = state.model.entry
+    const dirty =
+        entry.sources['article.html'] !== baseSources['article.html'] ||
+        entry.sources['style.css'] !== baseSources['style.css']
+    return {
+        ...state,
+        snapshot,
+        model: {
+            ...state.model,
+            entry: {
+                ...entry,
+                baseRevision: latestDocument.revision,
+                baseTemplateVersion: snapshot.baseTemplateVersion,
+                baseSources,
+                baseDiagnostics: snapshot.diagnostics,
+                latestRevision: latestDocument.revision,
+                latestTemplateVersion: snapshot.baseTemplateVersion,
+                latestSources: baseSources,
+                sourceStatus: snapshot.sourceStatus,
+                phase: dirty ? 'dirty' : 'clean',
+                error: null,
+                conflictCode: null,
+                conflict: null,
+            },
+            changeVersion: state.model.changeVersion + 1,
+        },
+        persistedRevision: latestDocument.revision,
+        pendingSave: null,
+        saveError: null,
+        conflict: null,
+    }
 }
 
 export function discardEntryDocumentChanges(
