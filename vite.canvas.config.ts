@@ -1,4 +1,4 @@
-// 本配置只构建 opaque-origin 画布运行时；IIFE 经典脚本避免模块脚本对 Origin: null 发起 CORS 校验。
+// 本配置只生成待内嵌的 opaque-origin 画布运行时；最终 HTML 与 CSP 哈希由构建脚本组装。
 
 import {readFileSync} from 'node:fs'
 import path from 'node:path'
@@ -8,6 +8,10 @@ import {defineConfig} from 'vite'
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+    define: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.LANG': 'undefined',
+    },
     plugins: [{
         name: 'emit-page-document-canvas-html',
         generateBundle() {
@@ -21,7 +25,7 @@ export default defineConfig({
     build: {
         target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
         minify: process.env.TAURI_ENV_DEBUG ? false : 'esbuild',
-        sourcemap: Boolean(process.env.TAURI_ENV_DEBUG),
+        sourcemap: false,
         outDir: path.resolve(rootDir, 'dist'),
         emptyOutDir: false,
         copyPublicDir: false,
@@ -31,7 +35,6 @@ export default defineConfig({
             name: 'PageDocumentCanvasRuntime',
             formats: ['iife'],
             fileName: () => 'canvas/runtime.js',
-            cssFileName: 'canvas/runtime',
         },
     },
 })

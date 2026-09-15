@@ -10,17 +10,17 @@ import {
 import {isolatePageDocument} from './isolationPolicy.ts'
 import {measureCanvasContentSize} from './contentSize.ts'
 import {readCanvasSessionToken} from './sessionToken.ts'
-import './runtime.css'
+import {mountCanvasStyles} from './styleMount.ts'
+import runtimeCss from './runtime.css?inline'
 
 const tokenCandidate = readCanvasSessionToken(window.location.hash)
 const rootCandidate = document.querySelector<HTMLElement>('#page-document-canvas-root')
-const authorStyleCandidate = document.querySelector<HTMLStyleElement>('#page-document-author-style')
 
-if (!tokenCandidate || !rootCandidate || !authorStyleCandidate) throw new Error('隔离画布缺少可信启动参数。')
+if (!tokenCandidate || !rootCandidate) throw new Error('隔离画布缺少可信启动参数。')
 
 const token = tokenCandidate
 const root = rootCandidate
-const authorStyle = authorStyleCandidate
+const {authorStyle} = mountCanvasStyles(document, runtimeCss)
 
 let outgoingSequence = 0
 let incomingSequence = 0

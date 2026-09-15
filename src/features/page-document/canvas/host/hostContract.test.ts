@@ -60,15 +60,17 @@ test('React 宿主固定使用独立 src 与最小 allow-scripts 沙箱', () => 
     assert.doesNotMatch(source, /srcDoc|allow-same-origin|allow-top-navigation|allow-popups|allow-forms/u)
 })
 
-test('画布 HTML 使用经典脚本且没有内联脚本，并叠加无网络 CSP', () => {
+test('画布 HTML 源文件只保留内联哈希构建所需的安全骨架和占位', () => {
     const source = readFileSync(new URL('../../../../../canvas.html', import.meta.url), 'utf8')
     assert.match(source, /default-src 'none'/u)
     assert.match(source, /connect-src 'none'/u)
     assert.match(source, /img-src 'none'/u)
     assert.match(source, /form-action 'none'/u)
-    assert.match(source, /<script src="\/canvas\/runtime\.js" defer><\/script>/u)
+    assert.match(source, /script-src __PAGE_DOCUMENT_CANVAS_SCRIPT_CSP__/u)
+    assert.match(source, /style-src 'unsafe-inline'/u)
+    assert.match(source, /<!-- PAGE_DOCUMENT_CANVAS_RUNTIME -->/u)
+    assert.doesNotMatch(source, /<script\b|<style\b|<link\b[^>]*stylesheet/iu)
     assert.doesNotMatch(source, /type="module"|crossorigin|modulepreload/u)
-    assert.doesNotMatch(source, /<script(?:\s[^>]*)?>\s*[^<\s]/u)
 })
 
 test('page-document 下 CSS 不含颜色字面量', () => {

@@ -5,6 +5,7 @@ import test from 'node:test'
 import {readFileSync} from 'node:fs'
 import {isolatePageDocument} from './isolationPolicy.ts'
 import {readCanvasSessionToken} from './sessionToken.ts'
+import {mountCanvasStyles} from './styleMount.ts'
 
 const V7_ASSET_ID = '018f47a2-3b4c-7d5e-8f90-123456789abc'
 
@@ -44,6 +45,50 @@ test('非法链接被保留为无 href 文本，不能产生导航意图', () =>
     assert.ok(result.artifact)
     assert.doesNotMatch(result.artifact?.html ?? '', /href=/u)
     assert.match(result.artifact?.html ?? '', />危险</u)
+})
+
+test('运行时与作者样式均动态创建，作者 HTML 的合法 style 属性继续保留', () => {
+    const created: Array<{
+        attributes: Map<string, string>
+        textContent: string
+        getAttribute(name: string): string | null
+        setAttribute(name: string, value: string): void
+    }> = []
+    const appended: unknown[] = []
+    const documentScope = {
+        createElement(tagName: string) {
+            assert.equal(tagName, 'style')
+            const element = {
+                attributes: new Map<string, string>(),
+                textContent: '',
+                getAttribute(name: string) {
+                    return this.attributes.get(name) ?? null
+                },
+                setAttribute(name: string, value: string) {
+                    this.attributes.set(name, value)
+                },
+            }
+            created.push(element)
+            return element
+        },
+        head: {
+            append(...nodes: unknown[]) {
+                appended.push(...nodes)
+            },
+        },
+    } as unknown as Document
+
+    const mounted = mountCanvasStyles(documentScope, ':root { color: CanvasText; }')
+    assert.equal(created.length, 2)
+    assert.deepEqual(appended, [mounted.runtimeStyle, mounted.authorStyle])
+    assert.equal(mounted.runtimeStyle.getAttribute('data-fc-canvas-style'), 'runtime')
+    assert.equal(mounted.runtimeStyle.textContent, ':root { color: CanvasText; }')
+    assert.equal(mounted.authorStyle.getAttribute('data-fc-canvas-style'), 'author')
+    assert.equal(mounted.authorStyle.textContent, '')
+
+    const isolated = isolatePageDocument('<p style="color: var(--fc-entry-text)">中文正文</p>', '')
+    assert.ok(isolated.artifact)
+    assert.match(isolated.artifact.html, /style="color: var\(--fc-entry-text\)"/u)
 })
 
 test('共享恶意样例绕过作者 guard 后仍被拒绝或清除全部执行与资源入口', () => {
