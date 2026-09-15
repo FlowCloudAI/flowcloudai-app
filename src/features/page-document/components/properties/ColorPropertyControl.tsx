@@ -53,32 +53,54 @@ export function ColorPropertyControl({
     const [hexDraft, setHexDraft] = useState(color.value.startsWith('#') ? color.value : '#000000')
     const [error, setError] = useState<string | null>(null)
     const interactionRef = useRef<string | null>(null)
+    const colorRef = useRef(color)
+    const pendingFlushRef = useRef(false)
     const attemptRef = useRef(0)
     useEffect(() => {
         const next = parseSerializedVisualColor(field.localValue ?? field.value)
         if (next) {
             setColor(next)
+            colorRef.current = next
             if (next.value.startsWith('#')) setHexDraft(next.value)
         }
         setError(null)
     }, [field.localValue, field.value])
 
-    const options = (): PropertyChangeOptions => ({
+    const options = (immediate = false): PropertyChangeOptions => ({
         historyGroupId: interactionRef.current ??= `page-color-${crypto.randomUUID()}`,
+        immediate,
     })
-    const publish = (next: VisualColorPropertyValue) => {
-        setColor(next)
-        if (next.value.startsWith('#')) setHexDraft(next.value)
-        setError(null)
-        rememberColor(next.value)
+    const requestChange = (next: VisualColorPropertyValue, changeOptions: PropertyChangeOptions) => {
         const attempt = ++attemptRef.current
-        void onChange(next, options()).then(applied => {
+        void onChange(next, changeOptions).then(applied => {
             if (applied || attempt !== attemptRef.current) return
             const persisted = parseSerializedVisualColor(field.localValue ?? field.value)
             if (!persisted) return
             setColor(persisted)
+            colorRef.current = persisted
             setHexDraft(persisted.value.startsWith('#') ? persisted.value : '#000000')
         })
+    }
+    const publish = (next: VisualColorPropertyValue, immediate = false) => {
+        setColor(next)
+        colorRef.current = next
+        if (next.value.startsWith('#')) setHexDraft(next.value)
+        setError(null)
+        rememberColor(next.value)
+        pendingFlushRef.current = !immediate
+        requestChange(next, options(immediate))
+    }
+    const flush = () => {
+        if (!interactionRef.current || !pendingFlushRef.current) return
+        pendingFlushRef.current = false
+        requestChange(colorRef.current, {
+            historyGroupId: interactionRef.current,
+            immediate: true,
+        })
+    }
+    const finish = () => {
+        flush()
+        interactionRef.current = null
     }
     const cell = (option: ColorOption) => (
         <Button
@@ -90,7 +112,10 @@ export function ColorPropertyControl({
             variant="outline"
             disabled={field.disabled}
             style={{'--page-document-color-preview': option.preview} as CSSProperties}
-            onClick={() => publish({...color, value: option.value})}
+            onClick={() => {
+                publish({...colorRef.current, value: option.value}, true)
+                finish()
+            }}
         ><span/></Button>
     )
 
@@ -111,7 +136,8 @@ export function ColorPropertyControl({
                 disabled={field.disabled}
                 aria-expanded={open}
                 onClick={() => {
-                    interactionRef.current = open ? null : `page-color-${crypto.randomUUID()}`
+                    if (open) finish()
+                    else interactionRef.current = `page-color-${crypto.randomUUID()}`
                     setOpen(current => !current)
                 }}
             >选择颜色</Button>
@@ -140,7 +166,7 @@ export function ColorPropertyControl({
                                     aria-label={`${field.label}色板`}
                                     type="color"
                                     value={hexDraft}
-                                    onChange={event => publish({...color, value: event.currentTarget.value})}
+                                    onChange={event => publish({...colorRef.current, value: event.currentTarget.value}, true)}
                                 />
                             </label>
                             <label>
@@ -156,8 +182,9 @@ export function ColorPropertyControl({
                                             setError('请输入六位十六进制颜色。')
                                             return
                                         }
-                                        publish({...color, value: value.toLowerCase()})
+                                        publish({...colorRef.current, value: value.toLowerCase()})
                                     }}
+                                    onBlur={finish}
                                 />
                             </label>
                             <label>
@@ -168,7 +195,16 @@ export function ColorPropertyControl({
                                     max={100}
                                     step={1}
                                     value={color.opacity}
-                                    onValueChange={value => publish({...color, opacity: Array.isArray(value) ? value[1] : value})}
+                                    onPointerDown={() => {
+                                        interactionRef.current ??= `page-color-${crypto.randomUUID()}`
+                                    }}
+                                    onPointerUp={finish}
+                                    onPointerCancel={finish}
+                                    onBlur={finish}
+                                    onKeyUp={event => {
+                                        if (event.key.startsWith('Arrow')) finish()
+                                    }}
+                                    onValueChange={value => publish({...colorRef.current, opacity: Array.isArray(value) ? value[1] : value})}
                                 />
                             </label>
                         </div>
@@ -176,7 +212,7 @@ export function ColorPropertyControl({
                 </div>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
                     清除本级设置
                 </Button>
             )}

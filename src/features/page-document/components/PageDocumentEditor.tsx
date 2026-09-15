@@ -194,7 +194,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     node={selectedNode}
                     entryStyleCss={scope.sources['style.css']}
                     inspectComponent={session.inspectComponent}
-                    applyKernelEntry={session.applyKernelEntry}
+                    applyKernelEntry={session.applyVisualPropertyEntry}
+                    flushPendingChanges={session.flushVisualPropertyEntry}
                     onAdopt={async node => {
                         const adoptedNodeId = await session.adoptOpaqueElement(node)
                         if (adoptedNodeId) setSelectedNodeId(adoptedNodeId)

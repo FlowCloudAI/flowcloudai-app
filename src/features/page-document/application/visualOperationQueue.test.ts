@@ -84,15 +84,35 @@ test('实时属性防抖窗口内只提交最后一个值，flush 可以立即�
         onStatus: status => statuses.push(status),
     })
 
-    scheduler.schedule(1)
-    scheduler.schedule(2)
-    scheduler.schedule(3)
+    const first = scheduler.schedule(1)
+    const second = scheduler.schedule(2)
+    const last = scheduler.schedule(3)
     assert.equal(clock.size(), 1)
     scheduler.flush()
-    await Promise.resolve()
+    assert.deepEqual(await Promise.all([first, second, last]), [true, true, true])
 
     assert.deepEqual(committed, [3])
     assert.equal(statuses.at(-1), 'applied')
+})
+
+test('实时属性 immediate 调节不等待合并窗口并返回提交结果', async () => {
+    const clock = fakeTimer()
+    const committed: number[] = []
+    const scheduler = createLiveVisualCommitScheduler<number>({
+        delayMs: 140,
+        timer: clock.timer,
+        commit: async value => {
+            committed.push(value)
+            return true
+        },
+        onStatus: () => undefined,
+    })
+
+    const accepted = scheduler.schedule(7, {immediate: true})
+
+    assert.deepEqual(committed, [7])
+    assert.equal(clock.size(), 0)
+    assert.equal(await accepted, true)
 })
 
 test('实时属性提交进行中只保留较新的待提交值', async () => {
@@ -116,6 +136,7 @@ test('实时属性提交进行中只保留较新的待提交值', async () => {
     clock.runAll()
     scheduler.schedule(2)
     scheduler.schedule(3)
+    scheduler.flush()
     releaseFirst?.(true)
     await Promise.resolve()
     clock.runAll()

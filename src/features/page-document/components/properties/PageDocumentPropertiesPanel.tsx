@@ -1,6 +1,6 @@
 // 本组件呈现“所有宽度”的有限调节控件；所有结构化修改均由内核适配层序列化和校验。
 
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {Button, Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 import type {
@@ -31,8 +31,9 @@ interface PageDocumentPropertiesPanelProps {
     applyKernelEntry: (
         request: KernelDraftEditRequest,
         label: string,
-        history?: {historyGroupId?: string},
+        options?: PropertyChangeOptions,
     ) => Promise<boolean>
+    flushPendingChanges: () => void
     onAdopt: (node: LayerProjectionNode) => Promise<string | null>
     visualError: string | null
 }
@@ -70,7 +71,7 @@ function FontWeightControl({
     onChange,
 }: {
     field: VisualPropertyState
-    onChange: (value: VisualPropertyEditValue) => Promise<boolean>
+    onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => Promise<boolean>
 }) {
     const localOrEffective = field.localValue ?? field.value
     const supported = VISUAL_FONT_WEIGHTS.includes(localOrEffective as VisualFontWeight)
@@ -88,10 +89,13 @@ function FontWeightControl({
                 disabled={field.disabled}
                 value={supported ? localOrEffective : '400'}
                 options={VISUAL_FONT_WEIGHTS.map(value => ({value, label: value}))}
-                onValueChange={value => void onChange({kind: 'font-weight', value: String(value) as VisualFontWeight})}
+                onValueChange={value => void onChange(
+                    {kind: 'font-weight', value: String(value) as VisualFontWeight},
+                    {immediate: true},
+                )}
             />
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
                     清除本级设置
                 </Button>
             )}
@@ -105,6 +109,7 @@ export function PageDocumentPropertiesPanel({
     entryStyleCss,
     inspectComponent,
     applyKernelEntry,
+    flushPendingChanges,
     onAdopt,
     visualError,
 }: PageDocumentPropertiesPanelProps) {
@@ -114,6 +119,11 @@ export function PageDocumentPropertiesPanel({
         [entryStyleCss, inspectComponent, node],
     )
     const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
+    const selectedNodeId = node?.id ?? null
+    useEffect(
+        () => () => flushPendingChanges(),
+        [flushPendingChanges, selectedNodeId],
+    )
     const applyChanges = (
         changes: readonly VisualPropertyChange[],
         label: string,
@@ -166,7 +176,7 @@ export function PageDocumentPropertiesPanel({
                     {tab === 'text' && (
                         <>
                             <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
-                            <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={value => applyOne(fieldFor(fields, 'font-weight'), value)}/>
+                            <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-weight'), value, options)}/>
                             <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
                         </>
                     )}

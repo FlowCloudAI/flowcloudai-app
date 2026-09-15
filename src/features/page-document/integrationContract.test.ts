@@ -66,4 +66,31 @@ describe('page document editor integration boundary', () => {
         assert.match(adapter, /changes:\s*readonly VisualPropertyChange\[\]/u)
         assert.match(adapter, /serializeVisualPropertyValue\(change\.property, change\.value\)/u)
     })
+
+    it('连续属性交互经会话调度且结束与切换节点都会冲刷尾帧', () => {
+        const numeric = readFileSync(
+            join(currentDirectory, 'components/properties/NumericPropertyControl.tsx'),
+            'utf8',
+        )
+        const color = readFileSync(
+            join(currentDirectory, 'components/properties/ColorPropertyControl.tsx'),
+            'utf8',
+        )
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        const session = readFileSync(
+            join(currentDirectory, 'hooks/useEntryPageDocumentSession.ts'),
+            'utf8',
+        )
+
+        assert.match(session, /LIVE_VISUAL_COMMIT_DELAY_MS = 140/u)
+        assert.match(session, /createLiveVisualCommitScheduler<.*ScheduledKernelEntry>/u)
+        assert.match(numeric, /readonly immediate\?: boolean/u)
+        assert.match(numeric, /onPointerUp=\{finish\}/u)
+        assert.match(numeric, /onBlur=\{finish\}/u)
+        assert.match(color, /透明度[\s\S]*onPointerUp=\{finish\}/u)
+        assert.match(panel, /\(\) => \(\) => flushPendingChanges\(\)/u)
+    })
 })

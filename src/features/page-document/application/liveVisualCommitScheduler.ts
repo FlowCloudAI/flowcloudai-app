@@ -10,7 +10,7 @@ export interface LiveVisualScheduleOptions extends LiveVisualCommitMetadata {
 }
 
 export interface LiveVisualCommitScheduler<T> {
-    schedule: (value: T, options?: LiveVisualScheduleOptions) => void
+    schedule: (value: T, options?: LiveVisualScheduleOptions) => Promise<boolean>
     flush: () => void
     cancel: () => void
     dispose: () => void
@@ -48,6 +48,7 @@ export function createLiveVisualCommitScheduler<T>({
     let hasPendingValue = false
     let applying = false
     let flushAfterApply = false
+    let pendingCompletions: Array<(accepted: boolean) => void> = []
     let generation = 0
     let disposed = false
 
@@ -57,11 +58,18 @@ export function createLiveVisualCommitScheduler<T>({
         timerHandle = null
     }
 
+    const settle = (completions: readonly ((accepted: boolean) => void)[], accepted: boolean) => {
+        completions.forEach(complete => complete(accepted))
+    }
+
     const rejectPending = () => {
+        const completions = pendingCompletions
         pendingValue = undefined
         pendingMetadata = {}
         hasPendingValue = false
+        pendingCompletions = []
         clearTimer()
+        settle(completions, false)
         onRejected?.()
         onStatus('error')
     }
@@ -70,10 +78,12 @@ export function createLiveVisualCommitScheduler<T>({
         if (disposed || applying || !hasPendingValue) return
         const value = pendingValue as T
         const metadata = pendingMetadata
+        const completions = pendingCompletions
         const operationGeneration = generation
         pendingValue = undefined
         pendingMetadata = {}
         hasPendingValue = false
+        pendingCompletions = []
         applying = true
         onStatus('applying')
 
@@ -84,6 +94,7 @@ export function createLiveVisualCommitScheduler<T>({
             accepted = false
         }
         applying = false
+        settle(completions, accepted)
 
         if (disposed) return
         if (operationGeneration !== generation) {
@@ -116,7 +127,10 @@ export function createLiveVisualCommitScheduler<T>({
 
     return {
         schedule(value, options = {}) {
-            if (disposed) return
+            if (disposed) return Promise.resolve(false)
+            const completion = new Promise<boolean>(resolve => {
+                pendingCompletions.push(resolve)
+            })
             pendingValue = value
             pendingMetadata = {
                 historyGroupId: options.historyGroupId,
@@ -125,14 +139,15 @@ export function createLiveVisualCommitScheduler<T>({
             onStatus('pending')
             if (applying) {
                 flushAfterApply ||= options.immediate ?? false
-                return
+                return completion
             }
             if (options.immediate) {
                 clearTimer()
                 void applyLatest()
-                return
+                return completion
             }
             arm(delayMs)
+            return completion
         },
         flush() {
             if (disposed || !hasPendingValue) return
@@ -145,20 +160,26 @@ export function createLiveVisualCommitScheduler<T>({
         },
         cancel() {
             generation += 1
+            const completions = pendingCompletions
             pendingValue = undefined
             pendingMetadata = {}
             hasPendingValue = false
+            pendingCompletions = []
             flushAfterApply = false
             clearTimer()
+            settle(completions, false)
             onStatus('idle')
         },
         dispose() {
             disposed = true
             generation += 1
+            const completions = pendingCompletions
             pendingValue = undefined
             pendingMetadata = {}
             hasPendingValue = false
+            pendingCompletions = []
             clearTimer()
+            settle(completions, false)
         },
     }
 }

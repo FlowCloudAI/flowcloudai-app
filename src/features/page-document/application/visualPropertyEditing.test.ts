@@ -11,6 +11,7 @@ import {
     type DocumentDraftModel,
 } from './documentDraftModel.ts'
 import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
+import {createLiveVisualCommitScheduler} from './liveVisualCommitScheduler.ts'
 import {
     createVisualPropertyEditRequest,
     inspectVisualProperties,
@@ -142,6 +143,36 @@ describe('visual property editing', () => {
         assert.equal(second.entry.undo.length, 1)
         assert.match(second.entry.sources['style.css'], /font-size: 19px/u)
         assert.deepEqual(undoEntryDraft(second).model.entry.sources, initial.entry.sources)
+    })
+
+    it('连续调节在交互结束时提交尾帧且仍只产生一次撤销', async () => {
+        const source = snapshot()
+        const initial = createDocumentDraft(source)
+        let model = initial
+        let commitCount = 0
+        const scheduler = createLiveVisualCommitScheduler<VisualPropertyChange['value']>({
+            delayMs: 140,
+            commit: async (value, metadata) => {
+                commitCount += 1
+                model = apply(model, source, 'font-size', value, metadata.historyGroupId)
+                return true
+            },
+            onStatus: () => undefined,
+        })
+        const group = 'font-size-drag-tail'
+        const scheduled = [17, 19, 21].map(value => scheduler.schedule(
+            {kind: 'numeric', value, unit: 'px', numberText: String(value)},
+            {historyGroupId: group},
+        ))
+
+        scheduler.flush()
+        assert.deepEqual(await Promise.all(scheduled), [true, true, true])
+
+        assert.equal(commitCount, 1)
+        assert.match(model.entry.sources['style.css'], /font-size: 21px/u)
+        assert.equal(model.entry.undo.length, 1)
+        assert.deepEqual(undoEntryDraft(model).model.entry.sources, initial.entry.sources)
+        scheduler.dispose()
     })
 
     it('所有宽度修改会把其他区间覆盖交给调用方确认，取消前草稿不变', () => {

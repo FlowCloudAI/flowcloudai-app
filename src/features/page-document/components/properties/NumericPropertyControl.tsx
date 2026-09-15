@@ -20,6 +20,7 @@ import {
 
 export interface PropertyChangeOptions {
     readonly historyGroupId?: string
+    readonly immediate?: boolean
 }
 
 interface NumericPropertyControlProps {
@@ -46,6 +47,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
     const repeatDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const repeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const pointerSteppedRef = useRef(false)
+    const pendingFlushRef = useRef(false)
     const attemptRef = useRef(0)
     const currentSource = `${field.localValue ?? field.value}\u0000${field.property}`
 
@@ -61,16 +63,13 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSource])
 
-    const historyOptions = (): PropertyChangeOptions => ({
+    const historyOptions = (immediate = false): PropertyChangeOptions => ({
         historyGroupId: interactionRef.current ??= createInteractionId(),
+        immediate,
     })
-    const publish = (next: VisualNumericPropertyValue) => {
-        setCandidate(next)
-        candidateRef.current = next
-        setDraft(next.numberText)
-        setError(null)
+    const requestChange = (next: VisualNumericPropertyValue, options: PropertyChangeOptions) => {
         const attempt = ++attemptRef.current
-        void onChange(next, historyOptions()).then(applied => {
+        void onChange(next, options).then(applied => {
             if (applied || attempt !== attemptRef.current) return
             const persisted = readNumericPropertyEditorValue(field.localValue ?? field.value, definition)
             if (persisted.kind !== 'numeric') return
@@ -79,7 +78,24 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
             setDraft(persisted.candidate.numberText)
         })
     }
+    const publish = (next: VisualNumericPropertyValue, immediate = false) => {
+        setCandidate(next)
+        candidateRef.current = next
+        setDraft(next.numberText)
+        setError(null)
+        pendingFlushRef.current = !immediate
+        requestChange(next, historyOptions(immediate))
+    }
+    const flush = () => {
+        if (!interactionRef.current || !pendingFlushRef.current) return
+        pendingFlushRef.current = false
+        requestChange(candidateRef.current, {
+            historyGroupId: interactionRef.current,
+            immediate: true,
+        })
+    }
     const finish = () => {
+        flush()
         interactionRef.current = null
     }
     const stopRepeating = () => {
@@ -113,7 +129,10 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
             {customValue.kind === 'custom' && (
                 <div className="page-document-property__custom" role="status">
                     <span>复杂源码值会原样保留，请在代码模式调整。</span>
-                    <Button size="sm" variant="outline" disabled={field.disabled} onClick={() => publish(definition.defaultValue)}>
+                    <Button size="sm" variant="outline" disabled={field.disabled} onClick={() => {
+                        publish(definition.defaultValue, true)
+                        finish()
+                    }}>
                         改用调节控件
                     </Button>
                 </div>
@@ -129,6 +148,10 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                     onPointerDown={() => { interactionRef.current ??= createInteractionId() }}
                     onPointerUp={finish}
                     onPointerCancel={finish}
+                    onBlur={finish}
+                    onKeyUp={event => {
+                        if (event.key.startsWith('Arrow')) finish()
+                    }}
                     onValueChange={value => {
                         const numericValue = Array.isArray(value) ? value[1] : value
                         publish({...candidate, value: numericValue, numberText: String(numericValue)})
@@ -156,7 +179,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                         }}
                         onClick={() => {
                             if (pointerSteppedRef.current) return
-                            publish(stepNumericPropertyValue(candidateRef.current, -1, definition))
+                            publish(stepNumericPropertyValue(candidateRef.current, -1, definition), true)
                             finish()
                         }}
                     ><PageDocumentStepIcon direction={-1}/></Button>
@@ -184,6 +207,9 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                             event.preventDefault()
                             publish(stepNumericPropertyValue(candidate, event.key === 'ArrowUp' ? 1 : -1, definition))
                         }}
+                        onKeyUp={event => {
+                            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') flush()
+                        }}
                     />
                     <Select
                         aria-label={`${field.label}单位`}
@@ -191,7 +217,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                         value={candidate.unit}
                         options={definition.units.map(unit => ({value: unit, label: unit || '倍'}))}
                         onValueChange={value => {
-                            publish(changeNumericPropertyUnit(candidate, String(value) as VisualNumericPropertyValue['unit'], definition))
+                            publish(changeNumericPropertyUnit(candidate, String(value) as VisualNumericPropertyValue['unit'], definition), true)
                             finish()
                         }}
                     />
@@ -216,7 +242,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                         }}
                         onClick={() => {
                             if (pointerSteppedRef.current) return
-                            publish(stepNumericPropertyValue(candidateRef.current, 1, definition))
+                            publish(stepNumericPropertyValue(candidateRef.current, 1, definition), true)
                             finish()
                         }}
                     ><PageDocumentStepIcon direction={1}/></Button>
@@ -232,7 +258,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                             disabled={field.disabled}
                             aria-pressed={preset === item}
                             onClick={() => {
-                                publish({kind: 'numeric', value: item.value, unit: item.unit, numberText: String(item.value)})
+                                publish({kind: 'numeric', value: item.value, unit: item.unit, numberText: String(item.value)}, true)
                                 finish()
                             }}
                         >{item.label}</Button>
@@ -240,7 +266,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                 </div>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
                     清除本级设置
                 </Button>
             )}

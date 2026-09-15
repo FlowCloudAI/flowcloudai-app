@@ -15,6 +15,11 @@ import {
     type KernelDraftPreparationResult,
 } from '../application/documentKernelDraftRuntime.ts'
 import {createVisualOperationQueue} from '../application/visualOperationQueue.ts'
+import {
+    createLiveVisualCommitScheduler,
+    type LiveVisualCommitScheduler,
+    type LiveVisualScheduleOptions,
+} from '../application/liveVisualCommitScheduler.ts'
 import {createOpaqueElementAdoptionKernelRequest} from '../application/opaqueElementAdoption.ts'
 import {
     acceptEntryDocumentSave,
@@ -47,6 +52,13 @@ export interface UseEntryPageDocumentSessionInput {
     markdown: string
 }
 
+interface ScheduledKernelEntry {
+    readonly request: KernelDraftEditRequest
+    readonly label: string
+}
+
+const LIVE_VISUAL_COMMIT_DELAY_MS = 140
+
 export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionInput) {
     const {entryId, projectId, title, summary} = input
     const [loadStatus, setLoadStatus] = useState<EntryPageDocumentLoadStatus>('loading')
@@ -58,6 +70,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const inputRef = useRef(input)
     const kernelRuntimeRef = useRef(createDocumentKernelDraftRuntime())
     const visualQueueRef = useRef(createVisualOperationQueue())
+    const liveVisualSchedulerRef = useRef<LiveVisualCommitScheduler<ScheduledKernelEntry> | null>(null)
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -298,6 +311,38 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         [applyPreparedKernelEntry, prepareKernelEntry, reportVisualFailure],
     )
 
+    useEffect(() => {
+        const scheduler = createLiveVisualCommitScheduler<ScheduledKernelEntry>({
+            // 与实验仓的实时可视状态保持同一窗口，连续输入只把尾帧送进完整内核链路。
+            delayMs: LIVE_VISUAL_COMMIT_DELAY_MS,
+            commit: (entry, metadata) => applyKernelEntry(entry.request, entry.label, metadata),
+            onStatus: () => undefined,
+        })
+        liveVisualSchedulerRef.current = scheduler
+        return () => {
+            // 卸载时只冲刷而不立刻 dispose；这样提交中的更新仍能继续接上最后一帧。
+            scheduler.flush()
+            liveVisualSchedulerRef.current = null
+        }
+    }, [applyKernelEntry])
+
+    const applyVisualPropertyEntry = useCallback(
+        (
+            request: KernelDraftEditRequest,
+            label: string,
+            options: LiveVisualScheduleOptions = {},
+        ): Promise<boolean> => {
+            const scheduler = liveVisualSchedulerRef.current
+            if (!scheduler) return applyKernelEntry(request, label, options)
+            return scheduler.schedule({request, label}, options)
+        },
+        [applyKernelEntry],
+    )
+
+    const flushVisualPropertyEntry = useCallback(() => {
+        liveVisualSchedulerRef.current?.flush()
+    }, [])
+
     const adoptOpaqueElement = useCallback(
         async (node: LayerProjectionNode): Promise<string | null> => {
             const current = stateRef.current
@@ -345,6 +390,8 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         prepareKernelEntry,
         applyPreparedKernelEntry,
         applyKernelEntry,
+        applyVisualPropertyEntry,
+        flushVisualPropertyEntry,
         adoptOpaqueElement,
     }
 }
