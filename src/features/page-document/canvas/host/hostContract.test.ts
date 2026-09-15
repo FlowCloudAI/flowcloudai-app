@@ -78,6 +78,16 @@ test('画布 HTML 源文件只保留内联哈希构建所需的安全骨架和�
     assert.doesNotMatch(source, /type="module"|crossorigin|modulepreload/u)
 })
 
+test('跳过校验探针在画布上方说明原始片段没有模板与基础样式', () => {
+    const source = readFileSync(new URL('../development/PageDocumentPreviewSection.tsx', import.meta.url), 'utf8')
+    const notice = '跳过模式直接发送原始片段，不含项目模板与基础样式，排版简陋属正常'
+    const noticeIndex = source.indexOf(notice)
+    assert.match(source, /\{bypassIsolationProbe && \(/u)
+    assert.ok(noticeIndex >= 0)
+    assert.ok(noticeIndex < source.indexOf('<PageDocumentCanvas'))
+    assert.match(source.slice(0, noticeIndex), /className="page-document-preview-section__state" role="status">\s*$/u)
+})
+
 test('page-document 下 CSS 不含颜色字面量', () => {
     const colorLiteral = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch)\s*\(/iu
     for (const file of collectCss(featureRoot)) {

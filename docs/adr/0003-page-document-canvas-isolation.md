@@ -132,6 +132,18 @@ Refused to load tauri://localhost/canvas/runtime.js because it does not appear i
 兜底；该事件早于 iframe `load`，因此消息监听会先于宿主在 `load` 回调中发送首个 `render` 完成
 注册。由此增加一条构建不变量：内联脚本必须位于画布根节点之后。
 
+随后用户在同一 macOS 调试构建中用合法共享样例完成渲染截图：标题、摘要和表格边框均已出现，但
+页面仍为白底；项目 `style.css` 在 `@layer fc-project` 的 `:root` 中声明的
+`--fc-entry-surface: #f5f1e8` 与 `--fc-entry-text: #28241f` 没有生效。原因是运行时主题默认值和
+`html` / `body` 基线此前未分层；CSS 层叠规定未分层普通声明优先于所有分层普通声明，所以它们压过
+了后挂载的作者层。
+
+运行时现把可被作者覆盖的主题默认值与排版基线放入最先声明的 `@layer fc-canvas-defaults`。该层由
+runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`、`fc-project`、`fc-entry` 和
+`fc-node` 层之前建立，保持最低优先级。节点选中框与资产占位框仍是未分层安全规则，作者层不能将
+隔离状态隐藏。由此增加另一条运行时不变量：画布主题默认值必须位于最低优先级层，且 runtime style
+必须先于 author style 挂载。
+
 ## 依据
 
 - HTML Standard 的 [iframe sandbox 规则](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)

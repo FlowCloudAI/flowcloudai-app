@@ -9,10 +9,15 @@ import {createTextProjection} from './textProjection.ts'
 import {createTextBlocks, type DocumentTextBlock} from './textBlocks.ts'
 import {mergeEntryTemplate, type EntryMetadataInput} from './templateMerge.ts'
 
+// 画布是 opaque-origin 独立文档，无法继承宿主字体 token；这里有意使用系统字体字面栈作为渲染基线。
 const RENDERER_BASELINE_CSS = `@layer fc-renderer {
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; }
-  html { background: var(--fc-entry-surface, Canvas); }
+  html {
+    background: var(--fc-entry-surface, Canvas);
+    font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    line-height: 1.6;
+  }
   body { overflow-wrap: anywhere; }
   img { display: block; max-width: 100%; height: auto; }
   [data-fc-node-kind] { min-width: 0; margin: 0; padding: 0; }

@@ -47,7 +47,7 @@ test('非法链接被保留为无 href 文本，不能产生导航意图', () =>
     assert.match(result.artifact?.html ?? '', />危险</u)
 })
 
-test('运行时与作者样式均动态创建，作者 HTML 的合法 style 属性继续保留', () => {
+test('运行时样式先于作者样式挂载，且作者 HTML 的合法 style 属性继续保留', () => {
     const created: Array<{
         attributes: Map<string, string>
         textContent: string

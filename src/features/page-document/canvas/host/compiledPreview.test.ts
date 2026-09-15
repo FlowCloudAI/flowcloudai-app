@@ -27,6 +27,8 @@ test('Markdown 降级经模板合并后得到绑定标题、正文与基线 CSS'
     assert.match(result.html ?? '', /降级词条/)
     assert.match(result.html ?? '', /第一段/)
     assert.match(result.css ?? '', /@layer fc-renderer/)
+    assert.match(result.css ?? '', /font-family: system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;/u)
+    assert.match(result.css ?? '', /line-height: 1\.6;/u)
 })
 
 test('共享合法样例经 previewCompiler 后保留托管节点与链接', () => {

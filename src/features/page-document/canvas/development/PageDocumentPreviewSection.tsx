@@ -171,6 +171,12 @@ export function PageDocumentPreviewSection({
                 </div>
             </header>
 
+            {bypassIsolationProbe && (
+                <p className="page-document-preview-section__state" role="status">
+                    跳过模式直接发送原始片段，不含项目模板与基础样式，排版简陋属正常
+                </p>
+            )}
+
             {loading && probeId === CURRENT_DOCUMENT_ID ? (
                 <p className="page-document-preview-section__state" role="status">正在读取页面文档…</p>
             ) : authorErrors.length > 0 || canvasHtml === null || canvasCss === null ? (
