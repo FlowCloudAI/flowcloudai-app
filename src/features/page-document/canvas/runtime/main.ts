@@ -9,19 +9,13 @@ import {
 } from '../protocol/index.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
 import {measureCanvasContentSize} from './contentSize.ts'
-import {readCanvasSessionToken} from './sessionToken.ts'
 import {mountCanvasStyles} from './styleMount.ts'
+import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import runtimeCss from './runtime.css?inline'
 
-const tokenCandidate = readCanvasSessionToken(window.location.hash)
-const rootCandidate = document.querySelector<HTMLElement>('#page-document-canvas-root')
-
-if (!tokenCandidate || !rootCandidate) throw new Error('隔离画布缺少可信启动参数。')
-
-const token = tokenCandidate
-const root = rootCandidate
-const {authorStyle} = mountCanvasStyles(document, runtimeCss)
-
+let token: string
+let root: HTMLElement
+let authorStyle: HTMLStyleElement
 let outgoingSequence = 0
 let incomingSequence = 0
 let selectedNodeId: string | null = null
@@ -103,41 +97,50 @@ function render(requestId: string, html: string, css: string): void {
     }
 }
 
-window.addEventListener('message', event => {
-    if (event.source !== parent) return
-    const command = parseCanvasHostCommand(event.data, token)
-    if (!command || command.sequence <= incomingSequence) return
-    incomingSequence = command.sequence
-    if (command.type === 'render') render(command.requestId, command.html, command.css)
-    if (command.type === 'set-selection') setSelection(command.nodeId)
-    if (command.type === 'viewport') {
-        document.documentElement.style.setProperty('--fc-entry-viewport-width', `${command.width}px`)
-        document.documentElement.style.setProperty('--fc-entry-viewport-height', `${command.height}px`)
-        document.documentElement.style.setProperty('--fc-entry-device-pixel-ratio', String(command.pixelRatio))
-    }
-})
+function start(): void {
+    const startup = requireCanvasStartupContext(document, window)
+    token = startup.token
+    root = startup.root
+    authorStyle = mountCanvasStyles(document, runtimeCss).authorStyle
 
-document.addEventListener('click', event => {
-    const target = event.target
-    if (!(target instanceof Element)) return
-    const anchor = target.closest('[href]')
-    if (anchor) {
-        event.preventDefault()
-        const href = anchor.getAttribute('href')
-        const managed = anchor.closest('[data-fc-node-id]')
-        const nodeId = managed?.getAttribute('data-fc-node-id') ?? null
-        if (href) send({type: 'navigation-intent', href, nodeId: nodeId && RFC_9562_UUID_PATTERN.test(nodeId) ? nodeId : null})
-    }
-    const managed = target.closest('[data-fc-node-id]')
-    const nodeId = managed?.getAttribute('data-fc-node-id')
-    if (!nodeId || !RFC_9562_UUID_PATTERN.test(nodeId)) return
-    setSelection(nodeId)
-    send({type: 'selection', nodeId: nodeId.toLowerCase()})
-}, true)
+    window.addEventListener('message', event => {
+        if (event.source !== parent) return
+        const command = parseCanvasHostCommand(event.data, token)
+        if (!command || command.sequence <= incomingSequence) return
+        incomingSequence = command.sequence
+        if (command.type === 'render') render(command.requestId, command.html, command.css)
+        if (command.type === 'set-selection') setSelection(command.nodeId)
+        if (command.type === 'viewport') {
+            document.documentElement.style.setProperty('--fc-entry-viewport-width', `${command.width}px`)
+            document.documentElement.style.setProperty('--fc-entry-viewport-height', `${command.height}px`)
+            document.documentElement.style.setProperty('--fc-entry-device-pixel-ratio', String(command.pixelRatio))
+        }
+    })
 
-new ResizeObserver(reportSize).observe(root)
+    document.addEventListener('click', event => {
+        const target = event.target
+        if (!(target instanceof Element)) return
+        const anchor = target.closest('[href]')
+        if (anchor) {
+            event.preventDefault()
+            const href = anchor.getAttribute('href')
+            const managed = anchor.closest('[data-fc-node-id]')
+            const nodeId = managed?.getAttribute('data-fc-node-id') ?? null
+            if (href) send({type: 'navigation-intent', href, nodeId: nodeId && RFC_9562_UUID_PATTERN.test(nodeId) ? nodeId : null})
+        }
+        const managed = target.closest('[data-fc-node-id]')
+        const nodeId = managed?.getAttribute('data-fc-node-id')
+        if (!nodeId || !RFC_9562_UUID_PATTERN.test(nodeId)) return
+        setSelection(nodeId)
+        send({type: 'selection', nodeId: nodeId.toLowerCase()})
+    }, true)
 
-window.addEventListener('error', event => {
-    if (!latestRequestId) return
-    send({type: 'render-error', requestId: latestRequestId, code: 'runtime-error', message: event.message.slice(0, 2_048)})
-})
+    new ResizeObserver(reportSize).observe(root)
+
+    window.addEventListener('error', event => {
+        if (!latestRequestId) return
+        send({type: 'render-error', requestId: latestRequestId, code: 'runtime-error', message: event.message.slice(0, 2_048)})
+    })
+}
+
+startCanvasRuntimeWhenReady(document, start)

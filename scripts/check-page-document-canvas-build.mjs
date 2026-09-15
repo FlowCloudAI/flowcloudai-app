@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import {existsSync, readFileSync} from 'node:fs'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
+import {parse} from 'parse5'
 import {createInlineScriptCspSource} from './page-document-canvas-artifact.mjs'
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -14,25 +15,64 @@ const htmlPath = path.resolve(outputRoot, 'canvas.html')
 
 assert.equal(existsSync(htmlPath), true, '开关构建缺少 dist/canvas.html')
 const html = readFileSync(htmlPath, 'utf8')
-assert.doesNotMatch(html, /type\s*=\s*["']module["']/iu)
-assert.doesNotMatch(html, /crossorigin/iu)
-assert.doesNotMatch(html, /modulepreload/iu)
-assert.doesNotMatch(html, /<style\b/iu, '画布 HTML 不得含构建期会被 Tauri 注入 nonce 的 style 元素')
-assert.doesNotMatch(html, /<link\b[^>]*\brel\s*=\s*["']stylesheet["']/iu, '画布不得引用外部样式表')
+const parsed = parse(html)
+const elements = []
 
-const openingScripts = [...html.matchAll(/<script\b([^>]*)>/giu)]
-const inlineScripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu)]
-assert.equal(openingScripts.length, 1, 'canvas.html 必须恰有一个 script 元素')
-assert.equal(inlineScripts.length, 1, 'canvas.html 必须恰有一个完整的内联 script 元素')
-assert.doesNotMatch(openingScripts[0][1], /\bsrc\s*=/iu, '唯一脚本不得引用外部资源')
-const runtime = inlineScripts[0][2]
+function visit(node, parent = null) {
+    if (node.tagName) elements.push({node, parent})
+    for (const child of node.childNodes ?? []) visit(child, node)
+}
+
+function attribute(node, name) {
+    return node.attrs?.find(candidate => candidate.name.toLowerCase() === name)?.value ?? null
+}
+
+function textContent(node) {
+    if (node.nodeName === '#text') return node.value
+    return (node.childNodes ?? []).map(textContent).join('')
+}
+
+visit(parsed)
+
+const scripts = elements.filter(element => element.node.tagName === 'script')
+const bodies = elements.filter(element => element.node.tagName === 'body')
+const roots = elements.filter(element => element.node.tagName === 'main'
+    && attribute(element.node, 'id') === 'page-document-canvas-root')
+assert.equal(scripts.length, 1, 'canvas.html 必须恰有一个 script 元素')
+assert.equal(bodies.length, 1, 'canvas.html 必须恰有一个 body 元素')
+assert.equal(roots.length, 1, 'canvas.html 必须恰有一个 main#page-document-canvas-root')
+
+const script = scripts[0]
+const body = bodies[0].node
+const root = roots[0]
+assert.equal(script.parent, body, '唯一脚本必须位于 body 内')
+assert.equal(root.parent, body, '画布根节点必须直接位于 body 内')
+assert.ok(body.childNodes.indexOf(script.node) > body.childNodes.indexOf(root.node), '唯一脚本必须位于画布根节点之后')
+assert.equal(attribute(script.node, 'src'), null, '唯一脚本不得引用外部资源')
+assert.notEqual(attribute(script.node, 'type')?.toLowerCase(), 'module', '唯一脚本不得是模块脚本')
+
+for (const {node} of elements) {
+    assert.equal(attribute(node, 'crossorigin'), null, '画布资源不得带 crossorigin')
+    assert.notEqual(attribute(node, 'rel')?.toLowerCase(), 'modulepreload', '画布不得生成 modulepreload')
+    for (const name of ['src', 'srcset', 'poster', 'data']) {
+        if (node === script.node && name === 'src') continue
+        assert.equal(attribute(node, name), null, `画布不得通过 ${name} 引用外部资源`)
+    }
+    if (node.tagName === 'link') assert.equal(attribute(node, 'href'), null, '画布不得引用外部 link 资源')
+}
+assert.equal(elements.some(element => element.node.tagName === 'style'), false, '画布 HTML 不得含构建期会被 Tauri 注入 nonce 的 style 元素')
+
+const runtime = textContent(script.node)
 assert.notEqual(runtime.trim(), '', '唯一内联脚本不得为空')
 assert.doesNotMatch(runtime, /process\.env/u, '内联运行时不得保留 process.env 引用')
 assert.doesNotMatch(runtime, /<\/script/iu, '内联运行时必须转义 HTML script 结束标签')
 
-const cspMatch = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)">/iu.exec(html)
-assert.ok(cspMatch, 'canvas.html 缺少 meta CSP')
-const scriptDirective = cspMatch[1].split(';')
+const cspMetas = elements.filter(element => element.node.tagName === 'meta'
+    && attribute(element.node, 'http-equiv')?.toLowerCase() === 'content-security-policy')
+assert.equal(cspMetas.length, 1, 'canvas.html 必须恰有一个 meta CSP')
+const csp = attribute(cspMetas[0].node, 'content')
+assert.ok(csp, 'canvas.html 的 meta CSP 不得为空')
+const scriptDirective = csp.split(';')
     .map(directive => directive.trim())
     .find(directive => directive.startsWith('script-src '))
 assert.equal(scriptDirective, `script-src ${createInlineScriptCspSource(runtime)}`)

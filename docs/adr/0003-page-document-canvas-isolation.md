@@ -117,6 +117,21 @@ Refused to load tauri://localhost/canvas/runtime.js because it does not appear i
 运行时 CSS 一并进入脚本并动态创建 `style`。产物检查复算哈希，拒绝外链脚本、样式表、静态
 `style`、模块标记、`process.env` 和遗留的 `canvas/runtime.js`、`canvas/runtime.css`。
 
+同日用户用重新打包的 macOS 调试构建复核后，CSP 拒绝已经消失，但 Safari Web Inspector 连续两次
+记录了新的启动错误：
+
+```text
+[Error] Error: 隔离画布缺少可信启动参数。
+（匿名函数） (canvas.html:13126)
+全局代码 (canvas.html:13238)
+```
+
+原因是 `7eef3b9` 把运行时从带 `defer` 的外链经典脚本改成了 `head` 内的内联脚本。内联脚本不支持
+`defer`，执行时 `body` 尚未解析，因而找不到 `#page-document-canvas-root`。画布骨架现将唯一内联脚本
+放在 `body` 内的画布根节点之后，运行时仍以 `DOMContentLoaded` 作为 `readyState === 'loading'` 时的
+兜底；该事件早于 iframe `load`，因此消息监听会先于宿主在 `load` 回调中发送首个 `render` 完成
+注册。由此增加一条构建不变量：内联脚本必须位于画布根节点之后。
+
 ## 依据
 
 - HTML Standard 的 [iframe sandbox 规则](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)
