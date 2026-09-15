@@ -14,7 +14,7 @@ pub struct ValidationDiagnostic {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivedLinkTarget {
-    pub entry_id: Uuid,
+    pub entry_id: Option<Uuid>,
     pub title: String,
 }
 
@@ -90,15 +90,9 @@ fn validate_element(
         }
         if name.eq_ignore_ascii_case("href") {
             match parse_href(value, project_id) {
-                Ok(Some(entry_id)) => {
-                    if !link_targets
-                        .iter()
-                        .any(|target| target.entry_id == entry_id)
-                    {
-                        link_targets.push(DerivedLinkTarget {
-                            entry_id,
-                            title: String::new(),
-                        });
+                Ok(Some(target)) => {
+                    if !link_targets.contains(&target) {
+                        link_targets.push(target);
                     }
                 }
                 Ok(None) => {}
@@ -126,44 +120,172 @@ fn validate_element(
     }
 }
 
-fn parse_href(href: &str, project_id: Option<&str>) -> Result<Option<Uuid>, ()> {
-    let scheme_end = href.find(':').ok_or(())?;
-    let scheme = &href[..scheme_end];
-    if scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https") {
-        return href[scheme_end + 1..]
-            .starts_with("//")
-            .then_some(None)
-            .ok_or(());
-    }
-    if scheme.eq_ignore_ascii_case("mailto") || scheme.eq_ignore_ascii_case("tel") {
-        return Ok(None);
-    }
-    if !scheme.eq_ignore_ascii_case("fc") {
+fn parse_href(href: &str, project_id: Option<&str>) -> Result<Option<DerivedLinkTarget>, ()> {
+    if href.is_empty()
+        || href
+            .chars()
+            .any(|character| character <= '\u{20}' || character == '\u{7f}')
+        || has_invalid_percent_encoding(href)
+    {
         return Err(());
+    }
+    if let Some(anchor) = href.strip_prefix('#') {
+        return (!anchor.is_empty()).then_some(None).ok_or(());
     }
 
-    let mut parts = href[scheme_end + 1..]
+    let scheme_end = href.find(':').ok_or(())?;
+    let scheme = &href[..scheme_end];
+    if !is_valid_scheme(scheme) {
+        return Err(());
+    }
+    if scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https") {
+        return valid_absolute_url(href, scheme).then_some(None).ok_or(());
+    }
+    if scheme.eq_ignore_ascii_case("mailto") || scheme.eq_ignore_ascii_case("tel") {
+        return (href.len() > scheme.len() + 1).then_some(None).ok_or(());
+    }
+    if scheme.eq_ignore_ascii_case("fc") {
+        return parse_fc_entry_href(&href[scheme_end + 1..]).map(Some);
+    }
+    if scheme.eq_ignore_ascii_case("entry") {
+        return parse_legacy_entry_href(&href[scheme_end + 1..], project_id);
+    }
+    if scheme.eq_ignore_ascii_case("entry-title") {
+        return parse_entry_title_href(&href[scheme_end + 1..]).map(Some);
+    }
+    Err(())
+}
+
+fn has_invalid_percent_encoding(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%'
+            && (index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit())
+        {
+            return true;
+        }
+        index += 1;
+    }
+    false
+}
+
+fn is_valid_scheme(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'.' | b'-'))
+}
+
+fn valid_absolute_url(href: &str, scheme: &str) -> bool {
+    let remainder = &href[scheme.len() + 1..];
+    let Some(authority_and_path) = remainder.strip_prefix("//") else {
+        return false;
+    };
+    let authority_end = authority_and_path
+        .find(['/', '?', '#'])
+        .unwrap_or(authority_and_path.len());
+    let authority = &authority_and_path[..authority_end];
+    let host_and_port = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    if host_and_port.is_empty() {
+        return false;
+    }
+
+    if let Some(ipv6) = host_and_port.strip_prefix('[') {
+        let Some(closing_bracket) = ipv6.find(']') else {
+            return false;
+        };
+        if closing_bracket == 0 {
+            return false;
+        }
+        let port = &ipv6[closing_bracket + 1..];
+        return port.is_empty()
+            || port.strip_prefix(':').is_some_and(|value| {
+                !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+            });
+    }
+
+    let (hostname, port) = host_and_port
+        .rsplit_once(':')
+        .map_or((host_and_port, None), |(host, port)| (host, Some(port)));
+    !hostname.is_empty()
+        && !hostname
+            .chars()
+            .any(|character| matches!(character, '\\' | ':' | '@' | '[' | ']'))
+        && port.is_none_or(|value| {
+            !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
+fn parse_fc_entry_href(remainder: &str) -> Result<DerivedLinkTarget, ()> {
+    let parts = remainder
         .strip_prefix("//")
         .ok_or(())?
-        .split('/');
-    let owner = parts.next().ok_or(())?;
-    if parts.next() != Some("entry") {
+        .split('/')
+        .collect::<Vec<_>>();
+    if parts.len() != 3
+        || !parts[0].eq_ignore_ascii_case("self")
+        || !parts[1].eq_ignore_ascii_case("entry")
+    {
         return Err(());
     }
-    let entry_id = Uuid::parse_str(parts.next().ok_or(())?).map_err(|_| ())?;
-    if parts.next().is_some() {
+    Ok(id_target(Uuid::parse_str(parts[2]).map_err(|_| ())?))
+}
+
+fn parse_legacy_entry_href(
+    remainder: &str,
+    project_id: Option<&str>,
+) -> Result<Option<DerivedLinkTarget>, ()> {
+    let parts = remainder
+        .strip_prefix("//")
+        .ok_or(())?
+        .split('/')
+        .collect::<Vec<_>>();
+    match parts.as_slice() {
+        [entry] => Ok(Some(id_target(Uuid::parse_str(entry).map_err(|_| ())?))),
+        [project, entry] => {
+            let owner_id = Uuid::parse_str(project).map_err(|_| ())?;
+            let entry_id = Uuid::parse_str(entry).map_err(|_| ())?;
+            let current_project_id = project_id.and_then(|value| Uuid::parse_str(value).ok());
+            Ok((Some(owner_id) == current_project_id).then_some(id_target(entry_id)))
+        }
+        _ => Err(()),
+    }
+}
+
+fn parse_entry_title_href(remainder: &str) -> Result<DerivedLinkTarget, ()> {
+    let encoded_title = remainder.strip_prefix("//").ok_or(())?;
+    if encoded_title.is_empty()
+        || encoded_title
+            .chars()
+            .any(|character| matches!(character, '/' | '?' | '#'))
+    {
         return Err(());
     }
-    if owner == "self" {
-        return Ok(Some(entry_id));
+    let title = urlencoding::decode(encoded_title)
+        .map_err(|_| ())?
+        .into_owned();
+    if title.trim().is_empty()
+        || title
+            .chars()
+            .any(|character| character <= '\u{1f}' || character == '\u{7f}')
+    {
+        return Err(());
     }
-    let current_project_id = project_id
-        .and_then(|value| Uuid::parse_str(value).ok())
-        .ok_or(())?;
-    let owner_id = Uuid::parse_str(owner).map_err(|_| ())?;
-    (owner_id == current_project_id)
-        .then_some(Some(entry_id))
-        .ok_or(())
+    Ok(DerivedLinkTarget {
+        entry_id: None,
+        title,
+    })
+}
+
+fn id_target(entry_id: Uuid) -> DerivedLinkTarget {
+    DerivedLinkTarget {
+        entry_id: Some(entry_id),
+        title: String::new(),
+    }
 }
 
 fn is_managed_asset_url(value: &str) -> bool {
@@ -463,14 +585,27 @@ mod tests {
     #[test]
     fn derives_utf8_text_entities_and_internal_links_from_dom() {
         let result = validate(
-            &format!("<p>中文&amp;English <a href=\"fc://self/entry/{ENTRY_ID}\">链接</a></p>"),
+            &format!(
+                "<p>中文&amp;English <a href=\"fc://self/entry/{ENTRY_ID}\">链接</a> <a href=\"entry://{ENTRY_ID}\">旧链接</a> <a href=\"entry://{PROJECT_ID}/{ENTRY_ID}\">项目链接</a> <a href=\"entry://22222222-2222-4222-8222-222222222222/{ENTRY_ID}\">跨项目链接</a> <a href=\"entry-title://%E5%BE%85%E5%BB%BA%E8%AF%8D%E6%9D%A1\">标题链接</a></p>"
+            ),
             "",
             Some(PROJECT_ID),
         );
         assert!(result.valid, "{:?}", result.diagnostics);
-        assert_eq!(result.derived_text, "中文&English 链接");
-        assert_eq!(result.link_targets.len(), 1);
-        assert_eq!(result.link_targets[0].entry_id.to_string(), ENTRY_ID);
+        assert_eq!(
+            result.derived_text,
+            "中文&English 链接 旧链接 项目链接 跨项目链接 标题链接"
+        );
+        assert_eq!(
+            result.link_targets,
+            vec![
+                id_target(Uuid::parse_str(ENTRY_ID).unwrap()),
+                DerivedLinkTarget {
+                    entry_id: None,
+                    title: "待建词条".into(),
+                },
+            ]
+        );
     }
 
     #[test]

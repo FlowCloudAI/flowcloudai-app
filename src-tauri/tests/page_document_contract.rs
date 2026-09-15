@@ -25,6 +25,12 @@ struct Replacement {
     value: String,
 }
 
+#[derive(Deserialize)]
+struct HrefFixture {
+    accepted: Vec<String>,
+    rejected: Vec<String>,
+}
+
 fn fixture_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -72,6 +78,23 @@ fn every_shared_malicious_case_is_rejected() {
             validate_entry(&mutated, &base_css)
         };
         assert!(!result.valid, "恶意样例 {} 未被拒绝", case.id);
+    }
+}
+
+#[test]
+fn every_shared_href_case_matches_the_frontend_policy() {
+    let fixture: HrefFixture = serde_json::from_str(&read_fixture("href-cases.json")).unwrap();
+    for href in fixture.accepted {
+        let result = validate_entry(&format!("<a href=\"{href}\">链接</a>"), "");
+        assert!(
+            result.valid,
+            "合法 href {href:?} 被拒绝：{:?}",
+            result.diagnostics
+        );
+    }
+    for href in fixture.rejected {
+        let result = validate_entry(&format!("<a href=\"{href}\">链接</a>"), "");
+        assert!(!result.valid, "非法 href {href:?} 未被拒绝");
     }
 }
 

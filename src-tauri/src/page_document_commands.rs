@@ -112,7 +112,7 @@ async fn save_entry(
         .link_targets
         .iter()
         .map(|target| SaveEntryLinkTarget {
-            entry_id: Some(target.entry_id),
+            entry_id: target.entry_id,
             title: target.title.clone(),
         })
         .collect::<Vec<_>>();
@@ -174,7 +174,7 @@ mod tests {
     use std::collections::HashMap;
     use tempfile::tempdir;
     use tokio::sync::Mutex;
-    use worldflow_core::{SqliteDb, WorldStore};
+    use worldflow_core::{EntryLinkOps, SqliteDb, WorldStore};
 
     struct Fixture {
         _dir: tempfile::TempDir,
@@ -291,6 +291,71 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn title_link_resolves_after_target_entry_is_created_and_document_is_resaved() {
+        let fixture = setup().await;
+        let html =
+            "<p><a href=\"entry-title://%E5%BE%85%E5%BB%BA%E8%AF%8D%E6%9D%A1\">待建词条</a></p>";
+        let first = save_entry(
+            &fixture.state,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html: html.into(),
+                css: String::new(),
+                expected_revision: None,
+                request_key: "title-link-before-target".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(first.document.revision, 1);
+
+        let world = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert!(
+            world
+                .list_outgoing_links(&fixture.entry_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        let target_id = Uuid::new_v4();
+        sqlx::query("INSERT INTO entries(id,project_id,title,content) VALUES(?,?,?,?)")
+            .bind(target_id)
+            .bind(fixture.project_id)
+            .bind("待建词条")
+            .bind("")
+            .execute(&world.pool)
+            .await
+            .unwrap();
+
+        let second = save_entry(
+            &fixture.state,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html: html.into(),
+                css: String::new(),
+                expected_revision: Some(1),
+                request_key: "title-link-after-target".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(second.document.revision, 2);
+        let links = world.list_outgoing_links(&fixture.entry_id).await.unwrap();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].b_id, target_id);
     }
 
     #[test]
