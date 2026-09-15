@@ -1,0 +1,94 @@
+/* 图层树只使用宿主语义 token，并随项目左栏现有的手动收起行为一起隐藏。 */
+
+.page-document-layer-tree {
+    display: grid;
+    align-content: start;
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    margin: 0;
+    padding: var(--fc-space-sm);
+    overflow: auto;
+    list-style: none;
+}
+
+.page-document-layer-tree ul {
+    display: grid;
+    gap: var(--fc-space-xs);
+    margin: 0 0 0 var(--fc-space-md);
+    padding: 0 0 0 var(--fc-space-sm);
+    border-left: 1px solid var(--fc-color-border-light);
+    list-style: none;
+}
+
+.page-document-layer-node {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    align-items: center;
+    min-width: 0;
+    border-radius: var(--fc-radius-md);
+}
+
+.page-document-layer-node.is-selected {
+    background: var(--fc-color-primary-subtle);
+    color: var(--fc-color-primary);
+}
+
+.page-document-layer-node__toggle,
+.page-document-layer-node__select {
+    border: 0;
+    background: transparent;
+    color: inherit;
+}
+
+.page-document-layer-node__toggle {
+    align-self: stretch;
+    padding: 0;
+    color: var(--fc-color-text-tertiary);
+    cursor: pointer;
+}
+
+.page-document-layer-node__toggle:disabled {
+    cursor: default;
+}
+
+.page-document-layer-node__select {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    padding: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    text-align: left;
+    cursor: pointer;
+}
+
+.page-document-layer-node__select:hover:not(:disabled) {
+    color: var(--fc-color-text);
+}
+
+.page-document-layer-node__select:disabled {
+    color: var(--fc-color-text-tertiary);
+    cursor: default;
+}
+
+.page-document-layer-node__select > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page-document-layer-node__icon {
+    display: inline-grid;
+    width: 1.25rem;
+    height: 1.25rem;
+    place-items: center;
+    flex: none;
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-layer-tree__empty {
+    margin: 0;
+    padding: var(--fc-space-lg);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}

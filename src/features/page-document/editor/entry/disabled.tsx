@@ -1,10 +1,15 @@
 // 默认构建使用空入口，避免页面源码编辑器及其依赖进入发布产物。
 
+import type {ReactNode} from 'react'
 import type {PageDocumentEditorEntryProps} from './types.ts'
 
 export function PageDocumentEditorEntry(props: PageDocumentEditorEntryProps) {
     void props
     return null
+}
+
+export function PageDocumentProjectSidebar({children}: {projectId: string; children: ReactNode}) {
+    return <>{children}</>
 }
 
 export type {PageDocumentEditorEntryProps} from './types.ts'

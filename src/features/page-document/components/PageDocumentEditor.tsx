@@ -1,12 +1,20 @@
 // 本组件提供页面文档第一批编辑壳层；只编辑独立 HTML/CSS，并把保存交给页面文档会话。
 
 import {useEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
+import {createLayerProjection} from '../domain/layerProjection.ts'
+import {resolveVisualSelection, type VisualSelectionSource} from '../application/visualSelectionModel.ts'
 import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
+import {PageDocumentLayerTree} from './layers/PageDocumentLayerTree.tsx'
 import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
+import {
+    setActivePageDocumentWorkspace,
+    usePageDocumentWorkspace,
+} from '../editor/workspace/pageDocumentWorkspaceStore.ts'
 import {resolvePageDocumentEditorLoadView} from './pageDocumentEditorLoadState.ts'
 import './PageDocumentEditor.css'
 
@@ -36,7 +44,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         onDirtyChange,
         onNavigationIntent,
     } = props
-    const [mode, setMode] = useState<WorkspaceMode>('display')
+    const [mode, setMode] = useState<WorkspaceMode>('visual')
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
     const session = useEntryPageDocumentSession({
@@ -48,6 +57,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     })
     const {state} = session
     const {canSave, dirty, discard, save} = session
+    const {sidebarHost} = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
 
     useEffect(() => {
@@ -55,6 +65,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     }, [dirty, onDirtyChange])
 
     useEffect(() => () => onDirtyChange(false), [onDirtyChange])
+
+    useEffect(() => {
+        if (!active) return
+        return setActivePageDocumentWorkspace({projectId, entryId})
+    }, [active, entryId, projectId])
 
     useEffect(() => {
         if (resetVersion === appliedResetVersionRef.current) return
@@ -88,6 +103,21 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const canUndo = mode === 'code' ? sourceHistory.canUndo : session.canUndo
     const canRedo = mode === 'code' ? sourceHistory.canRedo : session.canRedo
     const loadView = resolvePageDocumentEditorLoadView(session.loadStatus, Boolean(state))
+    const layerProjection = useMemo(
+        () => createLayerProjection(state?.model.entry.sources['article.html'] ?? ''),
+        [state?.model.entry.sources],
+    )
+
+    useEffect(() => {
+        if (selectedNodeId === null) return
+        if (resolveVisualSelection(layerProjection.nodes, selectedNodeId, 'layer') === null) {
+            setSelectedNodeId(null)
+        }
+    }, [layerProjection.nodes, selectedNodeId])
+
+    const handleSelection = (nodeId: string, source: VisualSelectionSource) => {
+        setSelectedNodeId(resolveVisualSelection(layerProjection.nodes, nodeId, source))
+    }
 
     if (loadView === 'error') {
         return (
@@ -111,12 +141,26 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         : null
 
     return (
-        <section className="page-document-editor">
+        <>
+            {sidebarHost && createPortal(
+                <PageDocumentLayerTree
+                    nodes={layerProjection.nodes}
+                    selectedNodeId={selectedNodeId}
+                    onSelect={nodeId => handleSelection(nodeId, 'layer')}
+                />,
+                sidebarHost,
+            )}
+            <section className="page-document-editor">
             <header className="page-document-editor__workbar">
                 <strong>页面编辑</strong>
                 <span className="page-document-editor__separator" aria-hidden="true" />
                 <div className="page-document-editor__modes" role="group" aria-label="页面编辑模式">
-                    <button type="button" disabled title="下一批开放">可视</button>
+                    <button
+                        type="button"
+                        className={mode === 'visual' ? 'is-active' : ''}
+                        aria-pressed={mode === 'visual'}
+                        onClick={() => setMode('visual')}
+                    >可视</button>
                     <button
                         type="button"
                         className={mode === 'display' ? 'is-active' : ''}
@@ -134,7 +178,6 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         代码
                     </button>
                 </div>
-                <span className="page-document-editor__next-batch">可视模式下一批开放</span>
                 <Button
                     type="button"
                     size="sm"
@@ -172,7 +215,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             )}
 
             <div className="page-document-editor__workspace" data-mode={mode}>
-                {mode === 'display' ? (
+                {mode !== 'code' ? (
                     <div className="page-document-editor__canvas-stage">
                         <div className="page-document-editor__page-card">
                             {state.preview?.html != null && state.preview.css != null ? (
@@ -181,6 +224,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     html={state.preview.html}
                                     css={state.preview.css}
                                     minimumHeight={560}
+                                    selectedNodeId={mode === 'visual' ? selectedNodeId : null}
+                                    onSelectionChange={mode === 'visual'
+                                        ? nodeId => handleSelection(nodeId, 'canvas')
+                                        : undefined}
                                     onNavigationIntent={onNavigationIntent}
                                 />
                             ) : (
@@ -211,6 +258,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 <span>{dirty ? '草稿未保存' : state.persistedRevision ? '草稿已同步' : '新页面尚未保存'}</span>
                 <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
             </footer>
-        </section>
+            </section>
+        </>
     )
 }

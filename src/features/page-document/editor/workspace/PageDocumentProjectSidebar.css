@@ -1,0 +1,41 @@
+/* 页面编辑左栏复用项目面板尺寸，只在内部切换 portal 宿主与原项目树。 */
+
+.page-document-project-sidebar {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.page-document-project-sidebar__tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fc-space-xs);
+    padding: var(--fc-space-sm);
+    border-bottom: 1px solid var(--fc-color-border-light);
+}
+
+.page-document-project-sidebar__tabs button {
+    min-height: 2rem;
+    border: 1px solid transparent;
+    border-radius: var(--fc-radius-md);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+}
+
+.page-document-project-sidebar__tabs button.is-active {
+    border-color: var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.page-document-project-sidebar > .pe-tree-home-btn {
+    margin: var(--fc-space-sm) var(--fc-space-sm) 0;
+}
+
+.page-document-project-sidebar > .pe-tree-panel__tree {
+    flex: 1;
+    min-height: 0;
+}

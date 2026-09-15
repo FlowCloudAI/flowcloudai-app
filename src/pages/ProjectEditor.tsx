@@ -72,6 +72,7 @@ import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {buildProjectExportFileName} from '../features/projects/projectDisplay'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import {PROJECT_EDITOR_TOUR_ID, type TourDefinition, useTour} from '../features/onboarding'
+import {PageDocumentProjectSidebar} from '@page-document-editor-entry'
 import './ProjectEditor.css'
 
 const TREE_MIN_WIDTH = '15rem'
@@ -1197,7 +1198,7 @@ function ProjectEditorInner({
                     ) : isTimelinePanelActive ? (
                         <div className="pe-tool-sidebar-host" ref={setTimelineSidebarHost}/>
                     ) : (
-                        <>
+                        <PageDocumentProjectSidebar projectId={projectId}>
                             <button
                                 type="button"
                                 className={`pe-tree-home-btn${selectedKey === ROOT_ID ? ' is-active' : ''}`}
@@ -1228,7 +1229,7 @@ function ProjectEditorInner({
                                     indentSize={12}
                                 />
                             </div>
-                        </>
+                        </PageDocumentProjectSidebar>
                     )}
                 </div>
             </div>
