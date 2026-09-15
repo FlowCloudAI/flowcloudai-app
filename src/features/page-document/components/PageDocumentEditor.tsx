@@ -21,9 +21,12 @@ import {
     usePageDocumentWorkspace,
 } from '../editor/workspace/pageDocumentWorkspaceStore.ts'
 import {resolvePageDocumentEditorLoadView} from './pageDocumentEditorLoadState.ts'
+import {
+    shouldForwardPageDocumentNavigation,
+    shouldOccupyPageDocumentSharedHost,
+    type PageDocumentWorkspaceMode,
+} from './pageDocumentEditorWorkspacePolicy.ts'
 import './PageDocumentEditor.css'
-
-type WorkspaceMode = 'visual' | 'display' | 'code'
 
 function validationLabel(phase: string): string {
     if (phase === 'valid') return '校验通过'
@@ -49,7 +52,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         onDirtyChange,
         onNavigationIntent,
     } = props
-    const [mode, setMode] = useState<WorkspaceMode>('visual')
+    const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
@@ -62,7 +65,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     })
     const {state} = session
     const {canSave, dirty, discard, save} = session
-    const {sidebarHost, dockHost} = usePageDocumentWorkspace()
+    const {
+        active: activeWorkspace,
+        sidebarHost,
+        dockHost,
+    } = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
 
     useEffect(() => {
@@ -147,18 +154,33 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const selectedNode = selectedNodeId
         ? findManagedLayerNode(layerProjection.nodes, selectedNodeId)
         : null
+    const editorIdentity = {projectId, entryId}
+    // 词条标签会常驻挂载；共享宿主必须只由当前活动词条独占，避免后台草稿叠进同一 portal。
+    const sidebarPortalHost = shouldOccupyPageDocumentSharedHost({
+        active,
+        editor: editorIdentity,
+        workspace: activeWorkspace,
+        host: sidebarHost,
+    }) ? sidebarHost : null
+    const dockPortalHost = shouldOccupyPageDocumentSharedHost({
+        active,
+        editor: editorIdentity,
+        workspace: activeWorkspace,
+        host: dockHost,
+    }) ? dockHost : null
+    const forwardsNavigation = shouldForwardPageDocumentNavigation(mode)
 
     return (
         <>
-            {sidebarHost && createPortal(
+            {sidebarPortalHost && createPortal(
                 <PageDocumentLayerTree
                     nodes={layerProjection.nodes}
                     selectedNodeId={selectedNodeId}
                     onSelect={nodeId => handleSelection(nodeId, 'layer')}
                 />,
-                sidebarHost,
+                sidebarPortalHost,
             )}
-            {dockHost && createPortal(
+            {dockPortalHost && createPortal(
                 <PageDocumentPropertiesPanel
                     node={selectedNode}
                     entryStyleCss={scope.sources['style.css']}
@@ -166,7 +188,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     applyKernelEntry={session.applyKernelEntry}
                     visualError={session.visualError}
                 />,
-                dockHost,
+                dockPortalHost,
             )}
             <section className="page-document-editor">
             <header className="page-document-editor__workbar">
@@ -246,7 +268,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     onSelectionChange={mode === 'visual'
                                         ? nodeId => handleSelection(nodeId, 'canvas')
                                         : undefined}
-                                    onNavigationIntent={onNavigationIntent}
+                                    onNavigationIntent={forwardsNavigation ? onNavigationIntent : undefined}
                                 />
                             ) : (
                                 <p>当前没有可渲染的合法结果。</p>
