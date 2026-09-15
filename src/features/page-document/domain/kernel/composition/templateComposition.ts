@@ -20,8 +20,8 @@ import {
     type ParsedHtmlSource,
 } from '../syntax/htmlContract.ts'
 import {HtmlSourceMapBuilder, type HtmlComposition} from './htmlSourceMap.ts'
+import {RFC_9562_UUID_PATTERN} from '../../uuidPolicy.ts'
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const OPERATION_ATTRIBUTES = [
     'data-fc-fill',
     'data-fc-append',
@@ -172,7 +172,7 @@ function validatePatchIdentity(
     const entryId = getAttribute(root, 'data-fc-entry-id')
     if (
         !entryId ||
-        !UUID_PATTERN.test(entryId) ||
+        !RFC_9562_UUID_PATTERN.test(entryId) ||
         entryId.toLowerCase() !== metadata.id.toLowerCase()
     ) {
         diagnostics.push(

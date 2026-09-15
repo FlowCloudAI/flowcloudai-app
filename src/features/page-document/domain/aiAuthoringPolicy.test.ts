@@ -126,7 +126,7 @@ test('AI 样式策略拒绝破坏独立文本选区的首字和首行伪元素',
 })
 
 test('HTML 资源属性逐项限制为受管资产并覆盖共享恶意样例', () => {
-    const assetId = '22222222-2222-4222-8222-222222222222'
+    const assetId = '018f47a2-3b4c-7d5e-8f90-123456789abc'
     const legalHtml = `<map><area href="#section"></map><svg><image href="fcasset://${assetId}"></image><use xlink:href="fcasset://${assetId}"></use></svg><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" srcset="fcasset://${assetId} 1x, fcasset://${assetId} 2x"><video poster="fcasset://${assetId}"></video>`
     const legal = guardDocumentSources(
         [parseHtmlSource(legalHtml, {mode: 'fragment', scope: 'entry'})],
@@ -136,6 +136,7 @@ test('HTML 资源属性逐项限制为受管资产并覆盖共享恶意样例', 
     assert.deepEqual(legal.referencedAssetIds, [assetId])
 
     const requiredIds = [
+        'invalid-fcasset-uuid-version',
         'svg-image-external-href',
         'svg-use-external-xlink-href',
         'external-srcset',

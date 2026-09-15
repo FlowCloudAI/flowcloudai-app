@@ -2,6 +2,7 @@
 
 import {DOCUMENT_NODE_KINDS, type DocumentNodeKind} from './primitives.ts'
 import type {SourceOrigin} from './source.ts'
+import {RFC_9562_UUID_PATTERN} from '../../uuidPolicy.ts'
 
 declare const IDENTITY_BRAND: unique symbol
 
@@ -18,7 +19,6 @@ export type InteractionId = BrandedString<'InteractionId'>
 export type EditPlanId = BrandedString<'EditPlanId'>
 export type IdempotencyKey = BrandedString<'IdempotencyKey'>
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u
 
 function requireOpaqueId<Name extends string>(value: unknown, label: string): BrandedString<Name> {
@@ -29,7 +29,7 @@ function requireOpaqueId<Name extends string>(value: unknown, label: string): Br
 }
 
 export function nodeId(value: unknown): NodeId {
-    if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
+    if (typeof value !== 'string' || !RFC_9562_UUID_PATTERN.test(value)) {
         throw new TypeError('NodeId 必须是 UUID。')
     }
     return value.toLowerCase() as NodeId

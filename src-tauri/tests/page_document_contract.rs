@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 const PROJECT_ID: &str = "88888888-8888-4888-8888-888888888888";
 const ENTRY_ID: &str = "11111111-1111-4111-8111-111111111111";
 const ASSET_ID: &str = "22222222-2222-4222-8222-222222222222";
+const V7_ASSET_ID: &str = "018f47a2-3b4c-7d5e-8f90-123456789abc";
 
 #[derive(Deserialize)]
 struct MaliciousFixture {
@@ -105,7 +106,7 @@ fn every_shared_href_case_matches_the_frontend_policy() {
 #[test]
 fn managed_html_resource_attributes_are_accepted() {
     let html = format!(
-        "<svg><image href=\"fcasset://{ASSET_ID}\"></image><use xlink:href=\"fcasset://{ASSET_ID}\"></use></svg><img src=\"fcasset://{ASSET_ID}\" srcset=\"fcasset://{ASSET_ID} 1x, fcasset://{ASSET_ID} 2x\"><video poster=\"fcasset://{ASSET_ID}\"></video>"
+        "<svg><image href=\"fcasset://{V7_ASSET_ID}\"></image><use xlink:href=\"fcasset://{V7_ASSET_ID}\"></use></svg><img src=\"fcasset://{V7_ASSET_ID}\" srcset=\"fcasset://{V7_ASSET_ID} 1x, fcasset://{V7_ASSET_ID} 2x\"><video poster=\"fcasset://{V7_ASSET_ID}\"></video>"
     );
     let result = validate_entry(&html, "");
     assert!(

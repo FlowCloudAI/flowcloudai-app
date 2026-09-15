@@ -14,8 +14,8 @@ import {DOCUMENT_NODE_KINDS, type DocumentNodeKind} from '../contracts/primitive
 import {sourceKey} from '../contracts/source.ts'
 import {syntaxDocumentDiagnostic} from './diagnostics.ts'
 import {parseHtmlSyntax} from './htmlSyntax.ts'
+import {RFC_9562_UUID_PATTERN} from '../../uuidPolicy.ts'
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SLOT_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
 const ALLOWED_BINDINGS = new Set(['title', 'summary', 'tags'])
 
@@ -239,7 +239,7 @@ function validateManagedNodes(parsed: ParsedHtmlSource): void {
         const nodeId = getAttribute(element, 'data-fc-node-id')
         const nodeKind = getAttribute(element, 'data-fc-node-kind')
         const knownKind = DOCUMENT_NODE_KINDS.includes(nodeKind as DocumentNodeKind)
-        const validId = nodeId !== undefined && UUID_PATTERN.test(nodeId)
+        const validId = nodeId !== undefined && RFC_9562_UUID_PATTERN.test(nodeId)
 
         if (nodeId !== undefined && !validId) {
             parsed.diagnostics.push(
@@ -319,7 +319,7 @@ function validateManagedNodes(parsed: ParsedHtmlSource): void {
                 const ancestorKind = getAttribute(ancestor, 'data-fc-node-kind')
                 return (
                     DOCUMENT_NODE_KINDS.includes(ancestorKind as DocumentNodeKind) &&
-                    UUID_PATTERN.test(getAttribute(ancestor, 'data-fc-node-id') ?? '')
+                    RFC_9562_UUID_PATTERN.test(getAttribute(ancestor, 'data-fc-node-id') ?? '')
                 )
             })
             const ancestorKind = managedAncestor

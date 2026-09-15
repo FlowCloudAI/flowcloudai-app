@@ -36,6 +36,17 @@
       "expectedCategories": ["security"]
     },
     {
+      "id": "invalid-fcasset-uuid-version",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "fcasset://22222222-2222-4222-8222-222222222222",
+        "value": "fcasset://018f47a2-3b4c-9d5e-8f90-123456789abc"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
       "id": "svg-image-external-href",
       "file": "entry/article.html",
       "replace": {
@@ -62,7 +73,7 @@
       "file": "entry/article.html",
       "replace": {
         "needle": "data-fc-asset-id=\"22222222-2222-4222-8222-222222222222\"",
-        "value": "srcset=\"fcasset://22222222-2222-4222-8222-222222222222 1x, https://example.invalid/image@2x.png 2x\" data-fc-asset-id=\"22222222-2222-4222-8222-222222222222\""
+        "value": "srcset=\"fcasset://018f47a2-3b4c-7d5e-8f90-123456789abc 1x, https://example.invalid/image@2x.png 2x\" data-fc-asset-id=\"22222222-2222-4222-8222-222222222222\""
       },
       "expectedStatus": 422,
       "expectedCodes": ["invalid_asset_reference"],

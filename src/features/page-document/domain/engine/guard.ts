@@ -37,8 +37,8 @@ import {
     isSemanticallyHidden,
     visibleManagedParagraphs,
 } from './nodeVisibility.ts'
+import {RFC_9562_UUID_PATTERN} from '../uuidPolicy.ts'
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const LOGICAL_ASSET_PATTERN = /^fcasset:\/\/([0-9a-f-]+)$/i
 export const FORBIDDEN_HTML_TAGS = new Set([
     'script',
@@ -169,7 +169,7 @@ function registerAssetReference(
     file: 'article.html' | 'style.css',
 ): void {
     const match = LOGICAL_ASSET_PATTERN.exec(value)
-    if (!match || !UUID_PATTERN.test(match[1])) {
+    if (!match || !RFC_9562_UUID_PATTERN.test(match[1])) {
         diagnostics.push(
             cssDiagnostic(
                 'invalid_asset_reference',
@@ -385,7 +385,7 @@ function validateHtml(
                 }
             } else if (element.tagName === 'img' && name === 'src') {
                 const match = LOGICAL_ASSET_PATTERN.exec(attribute.value)
-                if (!match || !UUID_PATTERN.test(match[1])) {
+                if (!match || !RFC_9562_UUID_PATTERN.test(match[1])) {
                     diagnostics.push(
                         htmlDiagnostic(
                             'invalid_asset_reference',

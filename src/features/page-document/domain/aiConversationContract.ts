@@ -9,6 +9,7 @@ import {
 import {ENTRY_AI_PROMPT_MAX_CHARS} from './aiWorkflowContract.ts'
 import type {SourceFileSet} from './contract.ts'
 import type {ContractParseResult, ContractValidationIssue} from './validators.ts'
+import {RFC_9562_UUID_PATTERN} from './uuidPolicy.ts'
 
 export const ENTRY_AI_CONVERSATION_MAX_COUNT = 100
 export const ENTRY_AI_CONVERSATION_TITLE_MAX_CHARS = 80
@@ -43,7 +44,6 @@ export interface EntryAiConversationWriteRequest {
     messages: EntryAiConversationMessage[]
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
 const EMPTY_SOURCES: SourceFileSet = {'article.html': '', 'style.css': ''}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -181,7 +181,7 @@ function parseMessages(
         }
         issues.push(...exactKeys(rawMessage, ['id', 'role', 'content', 'result'], messagePath))
         const expectedRole = index % 2 === 0 ? 'user' : 'assistant'
-        if (typeof rawMessage.id !== 'string' || !UUID_PATTERN.test(rawMessage.id)) {
+        if (typeof rawMessage.id !== 'string' || !RFC_9562_UUID_PATTERN.test(rawMessage.id)) {
             issues.push(issue(`${messagePath}.id`, 'invalid_uuid', '消息 ID 必须是 UUID。'))
         }
         if (rawMessage.role !== expectedRole) {
@@ -300,9 +300,9 @@ export function parseEntryAiConversation(value: unknown): ContractParseResult<En
         ['id', 'entryId', 'title', 'createdAt', 'updatedAt', 'messageCount', 'preview', 'messages'],
         'conversation',
     )
-    if (typeof value.id !== 'string' || !UUID_PATTERN.test(value.id))
+    if (typeof value.id !== 'string' || !RFC_9562_UUID_PATTERN.test(value.id))
         issues.push(issue('conversation.id', 'invalid_uuid', '会话 ID 必须是 UUID。'))
-    if (typeof value.entryId !== 'string' || !UUID_PATTERN.test(value.entryId))
+    if (typeof value.entryId !== 'string' || !RFC_9562_UUID_PATTERN.test(value.entryId))
         issues.push(issue('conversation.entryId', 'invalid_uuid', '词条 ID 必须是 UUID。'))
     const title = parseTitle(value.title, 'conversation.title', issues)
     const createdAt = parseTimestamp(value.createdAt, 'conversation.createdAt', issues)
@@ -360,7 +360,7 @@ export function parseEntryAiConversationList(
                 path,
             ),
         )
-        if (typeof rawSummary.id !== 'string' || !UUID_PATTERN.test(rawSummary.id))
+        if (typeof rawSummary.id !== 'string' || !RFC_9562_UUID_PATTERN.test(rawSummary.id))
             issues.push(issue(`${path}.id`, 'invalid_uuid', '会话 ID 必须是 UUID。'))
         const title = parseTitle(rawSummary.title, `${path}.title`, issues)
         const createdAt = parseTimestamp(rawSummary.createdAt, `${path}.createdAt`, issues)

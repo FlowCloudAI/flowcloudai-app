@@ -1,8 +1,11 @@
 // 本模块定义文档内核唯一的作者链接白名单；它校验持久化 href，但不替代宿主点击时的导航审核。
+import {RFC_9562_UUID_SOURCE} from '../../uuidPolicy.ts'
 
-const UUID_SOURCE = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-const FC_ENTRY_HREF_PATTERN = new RegExp(`^fc://self/entry/${UUID_SOURCE}$`, 'iu')
-const LEGACY_ENTRY_HREF_PATTERN = new RegExp(`^entry://${UUID_SOURCE}(?:/${UUID_SOURCE})?$`, 'iu')
+const FC_ENTRY_HREF_PATTERN = new RegExp(`^fc://self/entry/${RFC_9562_UUID_SOURCE}$`, 'iu')
+const LEGACY_ENTRY_HREF_PATTERN = new RegExp(
+    `^entry://${RFC_9562_UUID_SOURCE}(?:/${RFC_9562_UUID_SOURCE})?$`,
+    'iu',
+)
 const HREF_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/iu
 const INVALID_PERCENT_ENCODING_PATTERN = /%(?![0-9a-f]{2})/iu
 const SAFE_EXTERNAL_SCHEMES = new Set(['http', 'https', 'mailto', 'tel'])

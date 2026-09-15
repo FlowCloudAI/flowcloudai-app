@@ -21,8 +21,8 @@ import {
     type SourceHashes,
     type SourceRange,
 } from './contract.ts'
+import {RFC_9562_UUID_PATTERN} from './uuidPolicy.ts'
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i
 
 export interface ContractValidationIssue {
@@ -154,7 +154,7 @@ function validateDiagnostic(
     if (value.nodeId !== undefined) {
         valid =
             validateString(value.nodeId, `${path}.nodeId`, issues, {
-                pattern: UUID_PATTERN,
+                pattern: RFC_9562_UUID_PATTERN,
                 code: 'invalid_uuid',
             }) && valid
     }
@@ -243,7 +243,7 @@ function validateEntryAssetSnapshot(
     }
     validateKnownKeys(value, ['id', 'mediaType', 'sizeBytes', 'sha256'], path, issues)
     let valid = validateString(value.id, `${path}.id`, issues, {
-        pattern: UUID_PATTERN,
+        pattern: RFC_9562_UUID_PATTERN,
         code: 'invalid_uuid',
     })
     if (
@@ -348,7 +348,7 @@ export function parseEntrySourceSnapshot(value: unknown): ContractParseResult<En
             issues,
         )
         validateString(value.entry.id, 'entrySource.entry.id', issues, {
-            pattern: UUID_PATTERN,
+            pattern: RFC_9562_UUID_PATTERN,
             code: 'invalid_uuid',
         })
         validateString(value.entry.title, 'entrySource.entry.title', issues)
@@ -466,7 +466,7 @@ export function parsePreviewArtifactResult(
     } else {
         value.referencedAssetIds.forEach((id, index) => {
             validateString(id, `preview.referencedAssetIds[${index}]`, issues, {
-                pattern: UUID_PATTERN,
+                pattern: RFC_9562_UUID_PATTERN,
                 code: 'invalid_uuid',
             })
         })
@@ -592,7 +592,7 @@ export function parseDocumentSaveBundleRequest(
     validateInteger(value.baseEntryRevision, 'request.baseEntryRevision', issues, 1)
     validateInteger(value.baseTemplateVersion, 'request.baseTemplateVersion', issues, 1)
     validateString(value.idempotencyKey, 'request.idempotencyKey', issues, {
-        pattern: UUID_PATTERN,
+        pattern: RFC_9562_UUID_PATTERN,
         code: 'invalid_uuid',
     })
     validateSourceFileSet(value.projectSources, 'request.projectSources', issues)

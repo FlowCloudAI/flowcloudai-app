@@ -255,7 +255,7 @@ fn parse_fc_entry_href(remainder: &str) -> Result<DerivedLinkTarget, ()> {
     {
         return Err(());
     }
-    Ok(id_target(Uuid::parse_str(parts[2]).map_err(|_| ())?))
+    Ok(id_target(parse_document_uuid(parts[2])?))
 }
 
 fn parse_legacy_entry_href(
@@ -268,10 +268,10 @@ fn parse_legacy_entry_href(
         .split('/')
         .collect::<Vec<_>>();
     match parts.as_slice() {
-        [entry] => Ok(Some(id_target(Uuid::parse_str(entry).map_err(|_| ())?))),
+        [entry] => Ok(Some(id_target(parse_document_uuid(entry)?))),
         [project, entry] => {
-            let owner_id = Uuid::parse_str(project).map_err(|_| ())?;
-            let entry_id = Uuid::parse_str(entry).map_err(|_| ())?;
+            let owner_id = parse_document_uuid(project)?;
+            let entry_id = parse_document_uuid(entry)?;
             let current_project_id = project_id.and_then(|value| Uuid::parse_str(value).ok());
             Ok((Some(owner_id) == current_project_id).then_some(id_target(entry_id)))
         }
@@ -311,11 +311,27 @@ fn id_target(entry_id: Uuid) -> DerivedLinkTarget {
     }
 }
 
+fn parse_document_uuid(value: &str) -> Result<Uuid, ()> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 36
+        || bytes.iter().enumerate().any(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => *byte != b'-',
+            _ => !byte.is_ascii_hexdigit(),
+        })
+        || !matches!(bytes[14], b'1'..=b'8')
+        || !matches!(bytes[19].to_ascii_lowercase(), b'8' | b'9' | b'a' | b'b')
+    {
+        return Err(());
+    }
+    let id = Uuid::parse_str(value).map_err(|_| ())?;
+    (!id.is_nil()).then_some(id).ok_or(())
+}
+
 fn is_managed_asset_url(value: &str) -> bool {
     let Some((scheme, id)) = value.split_once("://") else {
         return false;
     };
-    scheme.eq_ignore_ascii_case("fcasset") && Uuid::parse_str(id).is_ok()
+    scheme.eq_ignore_ascii_case("fcasset") && parse_document_uuid(id).is_ok()
 }
 
 fn validate_managed_resource(
