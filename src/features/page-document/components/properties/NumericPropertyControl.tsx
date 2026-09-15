@@ -57,7 +57,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
             setDraft(next.candidate.numberText)
         }
         setError(null)
-    // definition is derived from the property and intentionally stable for this mounted field.
+    // 控件定义只由当前属性派生；字段挂载期间保持不变。
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSource])
 
