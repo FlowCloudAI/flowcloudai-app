@@ -53,6 +53,7 @@ export const ErrorCode = {
     HttpTimeout: 'HTTP_TIMEOUT',
     ValidationMissingField: 'VALIDATION_MISSING_FIELD',
     ValidationFormatError: 'VALIDATION_FORMAT_ERROR',
+    DocumentRevisionConflict: 'DOCUMENT_REVISION_CONFLICT',
 } as const
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode]
