@@ -8,6 +8,7 @@ import {
     type CanvasRuntimeMessage,
 } from '../protocol/index.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
+import {measureCanvasContentSize} from './contentSize.ts'
 import {readCanvasSessionToken} from './sessionToken.ts'
 import './runtime.css'
 
@@ -55,11 +56,11 @@ function setSelection(nodeId: string | null): void {
 }
 
 function reportSize(): void {
-    const body = document.body
+    const size = measureCanvasContentSize(root)
     send({
         type: 'size',
-        width: Math.min(100_000, Math.max(body.scrollWidth, body.offsetWidth)),
-        height: Math.min(100_000, Math.max(body.scrollHeight, body.offsetHeight)),
+        width: size.width,
+        height: size.height,
     })
 }
 
@@ -134,7 +135,7 @@ document.addEventListener('click', event => {
     send({type: 'selection', nodeId: nodeId.toLowerCase()})
 }, true)
 
-new ResizeObserver(reportSize).observe(document.body)
+new ResizeObserver(reportSize).observe(root)
 
 window.addEventListener('error', event => {
     if (!latestRequestId) return
