@@ -63,10 +63,18 @@ function reportSize(): void {
     })
 }
 
+function clearRenderedDocument(): void {
+    authorStyle.textContent = ''
+    root.replaceChildren()
+    selectedNodeId = null
+    reportSize()
+}
+
 function render(requestId: string, html: string, css: string): void {
     latestRequestId = requestId
     const result = isolatePageDocument(html, css)
     if (!result.artifact) {
+        clearRenderedDocument()
         send({
             type: 'render-error',
             requestId,
@@ -84,6 +92,7 @@ function render(requestId: string, html: string, css: string): void {
         send({type: 'rendered', requestId, managedNodeCount: result.artifact.managedNodeCount})
         reportSize()
     } catch (error) {
+        clearRenderedDocument()
         send({
             type: 'render-error',
             requestId,

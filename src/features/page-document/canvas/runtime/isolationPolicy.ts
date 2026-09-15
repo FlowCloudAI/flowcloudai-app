@@ -7,7 +7,7 @@ import {
     FORBIDDEN_HTML_ATTRIBUTES,
     FORBIDDEN_HTML_ATTRIBUTE_PREFIXES,
     FORBIDDEN_HTML_TAGS,
-} from '../../domain/engine/guard.ts'
+} from '../../domain/engine/htmlPolicy.ts'
 import {validateAuthorHref} from '../../domain/engine/hrefPolicy.ts'
 import {RFC_9562_UUID_PATTERN} from '../../domain/uuidPolicy.ts'
 

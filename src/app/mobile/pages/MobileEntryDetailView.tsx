@@ -37,6 +37,7 @@ import {
 } from '../components/MobileTopControls'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {getImageLabel, type TagValueMap} from './MobileEntryDetailUtils'
+import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
 
 interface MobileEntryDetailViewProps {
     pageRef: RefObject<HTMLDivElement | null>
@@ -70,6 +71,7 @@ interface MobileEntryDetailViewProps {
     onOpenImage: (index: number) => void
     onOpenLinkedEntry: (entryId: string) => void
     onMarkdownClick: (event: ReactMouseEvent<HTMLDivElement>) => void
+    onPageDocumentNavigation: (href: string) => void
 }
 
 function getRelationIcon(direction: EntryRelationDraft['direction']) {
@@ -109,6 +111,7 @@ export function MobileEntryDetailView({
     onOpenImage,
     onOpenLinkedEntry,
     onMarkdownClick,
+    onPageDocumentNavigation,
 }: MobileEntryDetailViewProps) {
     const titleRef = useRef<HTMLHeadingElement>(null)
     const [showStickyTitle, setShowStickyTitle] = useState(false)
@@ -278,6 +281,16 @@ export function MobileEntryDetailView({
                     </div>
                 )}
             </section>
+
+            <PageDocumentCanvasEntry
+                entryId={entry.id}
+                projectId={entry.project_id}
+                title={entry.title}
+                summary={entry.summary ?? ''}
+                markdown={entry.content ?? ''}
+                compact
+                onNavigationIntent={onPageDocumentNavigation}
+            />
 
             {hasConnections && (
                 <section className="mobile-entry-detail__connections" aria-labelledby="mobile-entry-connections-heading">

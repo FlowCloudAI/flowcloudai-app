@@ -25,6 +25,12 @@ export default defineConfig({
     resolve: {
         dedupe: ['react', 'react-dom'],
         alias: {
+            '@page-document-canvas-entry': path.resolve(
+                rootDir,
+                pageDocumentCanvasEnabled
+                    ? 'src/features/page-document/canvas/entry/enabled.tsx'
+                    : 'src/features/page-document/canvas/entry/disabled.tsx',
+            ),
             react: path.resolve(rootDir, 'node_modules/react'),
             'react-dom': path.resolve(rootDir, 'node_modules/react-dom'),
             'react/jsx-runtime': path.resolve(rootDir, 'node_modules/react/jsx-runtime.js'),
@@ -82,8 +88,35 @@ export default defineConfig({
                         return 'vite-preload'
                     }
 
+                    if (pageDocumentCanvasEnabled && normalized.includes('/src/features/page-document/canvas/protocol/')) {
+                        return 'page-document-canvas-protocol'
+                    }
+
+                    if (pageDocumentCanvasEnabled && [
+                        '/src/features/page-document/domain/uuidPolicy.ts',
+                        '/src/features/page-document/domain/engine/assetReferences.ts',
+                        '/src/features/page-document/domain/engine/htmlPolicy.ts',
+                        '/src/features/page-document/domain/engine/hrefPolicy.ts',
+                        '/src/features/page-document/domain/kernel/policy/hrefPolicy.ts',
+                    ].some(modulePath => normalized.endsWith(modulePath))) {
+                        return 'page-document-canvas-policy'
+                    }
+
                     if (!normalized.includes('/node_modules/')) return
                     if (normalized.endsWith('.css')) return
+
+                    // 画布与宿主可共享纯解析器，但画布不得因此预加载 React 或 Markdown UI。
+                    if (pageDocumentCanvasEnabled && matchesNodeModulePrefix(normalized, [
+                        'parse5/',
+                        'entities/',
+                        'postcss/',
+                        'postcss-value-parser/',
+                        'nanoid/',
+                        'picocolors/',
+                        'source-map-js/',
+                    ])) {
+                        return 'page-document-parser-vendor'
+                    }
 
                     // React 基础运行时，几乎所有页面都会用到。
                     if (matchesNodeModulePrefix(normalized, [

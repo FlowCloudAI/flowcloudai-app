@@ -1,0 +1,48 @@
+/* 开关入口只组织宿主控件；所有视觉值来自 flowcloudai-ui 的 --fc-* token。 */
+.page-document-preview-section {
+    display: grid;
+    gap: var(--fc-space-3);
+    min-width: 0;
+    padding: var(--fc-space-4);
+    border: 1px solid var(--fc-border-color);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-bg-secondary);
+}
+
+.page-document-preview-section__header {
+    display: flex;
+    gap: var(--fc-space-3);
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.page-document-preview-section__header h2,
+.page-document-preview-section__header p,
+.page-document-preview-section__state,
+.page-document-preview-section__probe-note {
+    margin: 0;
+}
+
+.page-document-preview-section__header h2 {
+    color: var(--fc-text-primary);
+    font-size: var(--fc-font-size-md);
+}
+
+.page-document-preview-section__header p,
+.page-document-preview-section__state,
+.page-document-preview-section__probe-note {
+    color: var(--fc-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.page-document-preview-section__probe-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-2);
+    align-items: center;
+    max-width: min(100%, 42rem);
+}
+
+.page-document-preview-section.is-compact .page-document-preview-section__header {
+    flex-direction: column;
+}

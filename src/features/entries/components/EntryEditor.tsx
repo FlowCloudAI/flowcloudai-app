@@ -113,6 +113,7 @@ import {
 import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
+import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
 
 type EditorMode = 'edit' | 'browse'
 type EntrySaveSource = 'manual' | 'auto'
@@ -1379,6 +1380,21 @@ export default function EntryEditor({
         return parseInternalEntryHref(href, anchor.textContent ?? '')
     }
 
+    function handlePageDocumentNavigation(href: string) {
+        const internalLink = parseInternalEntryHref(href)
+        if (internalLink) {
+            void ensureProjectEntriesLoaded().then(() => {
+                linkPreview.handleOpenLinkedEntry(internalLink)
+            })
+            return
+        }
+        if (!isSafeExternalHref(href)) return
+        void openUrl(href).catch((openError) => {
+            logger.error('open page document external link failed', openError)
+            void showAlert('打开链接失败', 'error', 'nonInvasive', 1500)
+        })
+    }
+
     async function handleTagSchemaSaved(schema: TagSchema) {
         markUserEdited()
         const nextSchemas = entryTags.handleTagSchemaSaved(schema)
@@ -1680,6 +1696,16 @@ export default function EntryEditor({
                                     fields={recoveryNotice.fields}
                                     onRestore={handleRestoreRecovery}
                                     onDiscard={handleDiscardRecovery}
+                                />
+                            )}
+                            {editorMode === 'browse' && (
+                                <PageDocumentCanvasEntry
+                                    entryId={entryId}
+                                    projectId={projectId}
+                                    title={draft.title}
+                                    summary={draft.summary}
+                                    markdown={draft.content}
+                                    onNavigationIntent={handlePageDocumentNavigation}
                                 />
                             )}
                             {editorMode === 'edit' ? (

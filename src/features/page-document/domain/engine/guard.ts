@@ -38,40 +38,23 @@ import {
     visibleManagedParagraphs,
 } from './nodeVisibility.ts'
 import {RFC_9562_UUID_PATTERN} from '../uuidPolicy.ts'
+import {
+    FORBIDDEN_HTML_ATTRIBUTES,
+    FORBIDDEN_HTML_ATTRIBUTE_PREFIXES,
+    FORBIDDEN_HTML_TAGS,
+    MANAGED_RESOURCE_ATTRIBUTES,
+    URL_ATTRIBUTES,
+} from './htmlPolicy.ts'
+
+export {
+    FORBIDDEN_HTML_ATTRIBUTES,
+    FORBIDDEN_HTML_ATTRIBUTE_PREFIXES,
+    FORBIDDEN_HTML_TAGS,
+    MANAGED_RESOURCE_ATTRIBUTES,
+    URL_ATTRIBUTES,
+} from './htmlPolicy.ts'
 
 const LOGICAL_ASSET_PATTERN = /^fcasset:\/\/([0-9a-f-]+)$/i
-export const FORBIDDEN_HTML_TAGS = new Set([
-    'script',
-    'style',
-    'iframe',
-    'object',
-    'embed',
-    'form',
-    'input',
-    'textarea',
-    'select',
-    'button',
-    'base',
-    'link',
-    'meta',
-])
-export const FORBIDDEN_HTML_ATTRIBUTES = new Set([
-    'ping',
-    'action',
-    'formaction',
-    'background',
-])
-export const FORBIDDEN_HTML_ATTRIBUTE_PREFIXES = new Set(['on'])
-export const MANAGED_RESOURCE_ATTRIBUTES = {
-    allElements: new Set(['src', 'srcset', 'poster']),
-    nonLinkElements: new Set(['href', 'xlink:href']),
-    linkElements: new Set(['a', 'area']),
-}
-export const URL_ATTRIBUTES = new Set([
-    ...FORBIDDEN_HTML_ATTRIBUTES,
-    ...MANAGED_RESOURCE_ATTRIBUTES.allElements,
-    ...MANAGED_RESOURCE_ATTRIBUTES.nonLinkElements,
-])
 export const FORBIDDEN_AT_RULES = new Set(['import', 'font-face', 'namespace', 'document', 'page'])
 
 export interface DocumentGuardOptions {

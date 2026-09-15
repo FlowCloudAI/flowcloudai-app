@@ -74,6 +74,17 @@ WebView 是否实际加载 bridge、同时执行响应头与 meta 两条策略�
 开发源码映射和代理行为不等同发布产物。因此浏览器预览和普通 dev server 只能验证协议逻辑，不能
 作为发布 CSP 或原生隔离证据；macOS 与 Android 都必须用 debug 原生产物执行验收清单。
 
+显式探针构建沿用现有脚本的父进程环境，无需修改构建脚本：
+
+```sh
+VITE_PAGE_DOCUMENT_CANVAS=1 npm run macos:build:debug
+VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev
+```
+
+默认 `npm run build` 只把 `index.html` 设为入口，并把业务页导入解析到空组件；启用时才加入
+`canvas.html` 并解析真实入口。每次发布前应在默认 `dist/` 搜索“页面文档预览”“隔离探针”及
+`page-document-canvas`，三者都不得出现。
+
 ## 依据
 
 - HTML Standard 的 [iframe sandbox 规则](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)

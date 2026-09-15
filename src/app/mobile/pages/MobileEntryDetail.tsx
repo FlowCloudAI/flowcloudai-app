@@ -502,14 +502,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         })
     }, [entryId, projectEntries, projectId, push])
 
-    const handleMarkdownClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-        const anchor = resolveMarkdownAnchor(event.target)
-        if (!anchor) return
-
-        const href = anchor.getAttribute('href') ?? ''
-        const internalLink = parseInternalEntryHref(href, anchor.textContent ?? '')
+    const handleEntryNavigation = useCallback((href: string, title: string, reportInvalid: boolean) => {
+        const internalLink = parseInternalEntryHref(href, title)
         if (internalLink) {
-            event.preventDefault()
             if (internalLink.entryId) {
                 const targetProjectId = resolveInternalEntryProjectId(internalLink, projectId)
                 if (!targetProjectId) {
@@ -534,7 +529,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         }
 
         if (isSafeExternalHref(href)) {
-            event.preventDefault()
             void openUrl(href).catch((error) => {
                 logger.error('打开链接失败', error)
                 void showAlert('打开链接失败', 'error', 'nonInvasive', 1800)
@@ -542,11 +536,23 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             return
         }
 
-        if (href) {
-            event.preventDefault()
+        if (href && reportInvalid) {
             void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
         }
     }, [ensureProjectEntries, handleOpenLinkedEntry, projectId, showAlert])
+
+    const handleMarkdownClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+        const anchor = resolveMarkdownAnchor(event.target)
+        if (!anchor) return
+        const href = anchor.getAttribute('href') ?? ''
+        if (!href) return
+        event.preventDefault()
+        handleEntryNavigation(href, anchor.textContent ?? '', true)
+    }, [handleEntryNavigation])
+
+    const handlePageDocumentNavigation = useCallback((href: string) => {
+        handleEntryNavigation(href, '', false)
+    }, [handleEntryNavigation])
 
     /**
      * 编辑态内联预览里的链接：一律不做顶层导航。
@@ -773,6 +779,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 onOpenImage={imageActions.openImage}
                 onOpenLinkedEntry={handleOpenLinkedEntry}
                 onMarkdownClick={handleMarkdownClick}
+                onPageDocumentNavigation={handlePageDocumentNavigation}
             />
             <MobileImageViewer
                 open={imageActions.lightboxOpen}
