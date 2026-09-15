@@ -1,4 +1,4 @@
-/* 属性 Dock 使用宿主语义 token；原始值由内核校验，控件本身不截断或钳制数值。 */
+/* 属性 Dock 使用宿主语义 token；调节范围只约束控件，不改写超出范围的已有源码。 */
 
 .page-document-properties-dock-host,
 .page-document-properties-panel {
@@ -57,6 +57,13 @@
     gap: var(--fc-space-xs);
 }
 
+.page-document-property + .page-document-property,
+.page-document-spacing-group + .page-document-spacing-group,
+.page-document-spacing-group + .page-document-property {
+    padding-top: var(--fc-space-md);
+    border-top: 1px solid var(--fc-color-border-light);
+}
+
 .page-document-property__heading {
     display: flex;
     align-items: baseline;
@@ -79,20 +86,126 @@
     color: var(--fc-color-warning);
 }
 
-.page-document-property__control {
-    display: flex;
+.page-document-property__numeric {
+    display: grid;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-property__number-row {
+    display: grid;
+    grid-template-columns: auto minmax(4rem, 1fr) minmax(4.5rem, auto) auto;
     align-items: center;
     gap: var(--fc-space-xs);
 }
 
-.page-document-property__control > .fc-input-wrapper {
-    flex: 1;
-    min-width: 0;
+.page-document-property__number-row .fc-btn svg,
+.page-document-spacing-group__links .fc-btn svg,
+.page-document-color-trigger svg {
+    width: var(--fc-font-size-icon-lg);
+    height: var(--fc-font-size-icon-lg);
 }
 
-.page-document-property__color {
-    width: 2.25rem;
-    height: 2.25rem;
+.page-document-property__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-property__custom {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-property__custom span {
+    flex: 1;
+}
+
+.page-document-property__clear {
+    justify-self: start;
+}
+
+.page-document-spacing-group {
+    display: grid;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-spacing-group > header {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-spacing-group__links {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    margin-left: auto;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-spacing-group__fields {
+    display: grid;
+    gap: var(--fc-space-md);
+}
+
+.page-document-color-trigger {
+    justify-self: start;
+}
+
+.page-document-color-popover {
+    display: grid;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.page-document-color-popover > strong {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--fc-space-xs);
+}
+
+.page-document-color-cell.fc-btn {
+    min-width: 0;
+    padding: var(--fc-space-xs);
+}
+
+.page-document-color-cell > span {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    background: var(--page-document-color-preview);
+}
+
+.page-document-color-more {
+    display: grid;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-color-more label {
+    display: grid;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-color-more input[type="color"] {
+    width: 100%;
+    min-height: 2.5rem;
     padding: var(--fc-space-xs);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);

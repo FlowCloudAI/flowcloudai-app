@@ -14,7 +14,9 @@ import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {
     createVisualPropertyEditRequest,
     inspectVisualProperties,
-    validateVisualPropertyValue,
+    serializeVisualPropertyValue,
+    type VisualPropertyChange,
+    type VisualPropertyName,
 } from './visualPropertyEditing.ts'
 
 const ENTRY_ID = '11111111-1111-7111-8111-111111111111'
@@ -78,17 +80,16 @@ function paragraph(model: DocumentDraftModel) {
 function apply(
     model: DocumentDraftModel,
     source: EntrySourceSnapshot,
-    property: Parameters<typeof createVisualPropertyEditRequest>[1],
-    value: string,
+    property: VisualPropertyName,
+    value: VisualPropertyChange['value'],
     historyGroupId?: string,
 ): DocumentDraftModel {
     const runtime = createDocumentKernelDraftRuntime()
     const request = createVisualPropertyEditRequest(
         PARAGRAPH_ID,
-        property,
-        value,
+        [{property, value}],
         {historyGroupId},
-        () => `${property}:${value}`,
+        () => `${property}:${value.kind}`,
     )
     const prepared = runtime.prepare(model, source, request)
     assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
@@ -104,7 +105,7 @@ describe('visual property editing', () => {
     it('属性修改只改目标声明，未知合法源码与无关声明逐字保留并可在代码草稿看到', () => {
         const source = snapshot()
         const initial = createDocumentDraft(source)
-        const next = apply(initial, source, 'font-size', '18px')
+        const next = apply(initial, source, 'font-size', {kind: 'numeric', value: 18, unit: 'px', numberText: '18'})
 
         assert.equal(next.entry.sources['article.html'], source.articleHtml)
         assert.match(next.entry.sources['style.css'], /font-size: 18px/u)
@@ -121,7 +122,7 @@ describe('visual property editing', () => {
     it('属性修改后撤销与重做回到原源码', () => {
         const source = snapshot()
         const initial = createDocumentDraft(source)
-        const changed = apply(initial, source, 'line-height', '1.7')
+        const changed = apply(initial, source, 'line-height', {kind: 'numeric', value: 1.7, unit: '', numberText: '1.7'})
         const undone = undoEntryDraft(changed)
         const redone = redoEntryDraft(undone.model)
 
@@ -134,8 +135,8 @@ describe('visual property editing', () => {
     it('连续调整共用 historyGroupId 时只产生一次历史', () => {
         const source = snapshot()
         const initial = createDocumentDraft(source)
-        const first = apply(initial, source, 'font-size', '17px', 'font-size-drag-1')
-        const second = apply(first, source, 'font-size', '19px', 'font-size-drag-1')
+        const first = apply(initial, source, 'font-size', {kind: 'numeric', value: 17, unit: 'px', numberText: '17'}, 'font-size-drag-1')
+        const second = apply(first, source, 'font-size', {kind: 'numeric', value: 19, unit: 'px', numberText: '19'}, 'font-size-drag-1')
 
         assert.equal(second.entry.undo.length, 1)
         assert.match(second.entry.sources['style.css'], /font-size: 19px/u)
@@ -149,8 +150,7 @@ describe('visual property editing', () => {
         const runtime = createDocumentKernelDraftRuntime()
         const request = createVisualPropertyEditRequest(
             PARAGRAPH_ID,
-            'color',
-            '#112233',
+            [{property: 'color', value: {kind: 'color', value: '#112233', opacity: 100}}],
             {},
             () => 'color-with-breakpoint',
         )
@@ -183,13 +183,42 @@ describe('visual property editing', () => {
         assert.match(states.find(item => item.property === 'gap')?.statusText ?? '', /需要 Grid 或 Flex/u)
     })
 
-    it('非法数值保持原字符串并给出提示，不做静默截断', () => {
-        assert.deepEqual(validateVisualPropertyValue('font-size', '120'), {
-            valid: false,
-            normalized: '120',
-            message: '字号应为带 px、rem、em 或 % 单位的非负数值。',
-        })
-        assert.equal(validateVisualPropertyValue('font-weight', '1200').valid, false)
-        assert.equal(validateVisualPropertyValue('margin-inline-start', '-2rem').valid, true)
+    it('结构化属性值只序列化白名单形式并拒绝伪造结构', () => {
+        assert.equal(serializeVisualPropertyValue('font-size', {kind: 'numeric', value: 18, unit: 'px', numberText: '18'}), '18px')
+        assert.equal(serializeVisualPropertyValue('line-height', {kind: 'numeric', value: 1.6, unit: '', numberText: '1.6'}), '1.6')
+        assert.equal(serializeVisualPropertyValue('margin-inline-start', {kind: 'numeric', value: -2, unit: 'rem', numberText: '-2'}), '-2rem')
+        assert.equal(serializeVisualPropertyValue('font-weight', {kind: 'font-weight', value: '700'}), '700')
+        assert.equal(serializeVisualPropertyValue('color', {kind: 'color', value: '#112233', opacity: 50}), 'rgb(17 34 51 / 50%)')
+        assert.equal(serializeVisualPropertyValue('color', {kind: 'clear-override'}), null)
+        assert.throws(() => serializeVisualPropertyValue('font-size', {kind: 'numeric', value: 18, unit: '' as 'px', numberText: '18'}), /单位/u)
+        assert.throws(() => serializeVisualPropertyValue('padding-block-start', {kind: 'numeric', value: -1, unit: 'px', numberText: '-1'}), /负数/u)
+        assert.throws(() => serializeVisualPropertyValue('font-weight', {kind: 'color', value: '#112233', opacity: 100}), /颜色结构/u)
+    })
+
+    it('清除本级设置使用 clear-override 且可以撤销', () => {
+        const source = snapshot()
+        const initial = createDocumentDraft(source)
+        const cleared = apply(initial, source, 'color', {kind: 'clear-override'})
+
+        assert.doesNotMatch(cleared.entry.sources['style.css'], /color:\s*#334455/u)
+        assert.deepEqual(undoEntryDraft(cleared).model.entry.sources, initial.entry.sources)
+    })
+
+    it('四边联动在同一请求内原子写入两条白名单声明', () => {
+        const source = snapshot()
+        const initial = createDocumentDraft(source)
+        const runtime = createDocumentKernelDraftRuntime()
+        const request = createVisualPropertyEditRequest(PARAGRAPH_ID, [
+            {property: 'padding-block-start', value: {kind: 'numeric', value: 3, unit: 'px', numberText: '3'}},
+            {property: 'padding-block-end', value: {kind: 'numeric', value: 3, unit: 'px', numberText: '3'}},
+        ], {}, () => 'linked-padding')
+        const prepared = runtime.prepare(initial, source, request)
+
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const changed = runtime.applyPrepared(initial, source, prepared.edit, '调整内距')
+        assert.equal(changed.applied, true)
+        assert.match(changed.model.entry.sources['style.css'], /padding-block-start:\s*3px/u)
+        assert.match(changed.model.entry.sources['style.css'], /padding-block-end:\s*3px/u)
     })
 })

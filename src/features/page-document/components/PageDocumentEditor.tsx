@@ -14,6 +14,7 @@ import {
 import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
 import {PageDocumentLayerTree} from './layers/PageDocumentLayerTree.tsx'
+import {pageDocumentLayerLabel} from './layers/layerTreePresentation.ts'
 import {PageDocumentPropertiesPanel} from './properties/PageDocumentPropertiesPanel.tsx'
 import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
 import {
@@ -304,6 +305,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             <footer className="page-document-editor__statusbar">
                 <span>{validationLabel(scope.validationPhase)} · {diagnosticCount} 条诊断</span>
                 <span>{dirty ? '草稿未保存' : state.persistedRevision ? '草稿已同步' : '新页面尚未保存'}</span>
+                <span>修改生效范围：所有宽度</span>
+                <span>选中：{selectedNode ? pageDocumentLayerLabel(selectedNode) : '—'}</span>
                 <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
             </footer>
             </section>

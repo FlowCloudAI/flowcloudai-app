@@ -1,19 +1,26 @@
-// 本组件呈现“所有宽度”的安全属性子集；源码检查和改写都委托给文档内核适配层。
+// 本组件呈现“所有宽度”的有限调节控件；所有结构化修改均由内核适配层序列化和校验。
 
-import {useEffect, useMemo, useRef, useState} from 'react'
-import {Input} from 'flowcloudai-ui'
+import {useMemo, useState} from 'react'
+import {Button, Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 import type {
     InspectVisualComponent,
+    VisualFontWeight,
+    VisualPropertyChange,
+    VisualPropertyEditValue,
     VisualPropertyGroup,
+    VisualPropertyName,
     VisualPropertyState,
 } from '../../application/visualPropertyEditing.ts'
 import {
     createVisualPropertyEditRequest,
     inspectVisualProperties,
-    validateVisualPropertyValue,
+    VISUAL_FONT_WEIGHTS,
 } from '../../application/visualPropertyEditing.ts'
 import type {KernelDraftEditRequest} from '../../application/documentKernelDraftRuntime.ts'
+import {BoxSpacingControls} from './BoxSpacingControls.tsx'
+import {ColorPropertyControl} from './ColorPropertyControl.tsx'
+import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
 import './PageDocumentPropertiesPanel.css'
 
 interface PageDocumentPropertiesPanelProps {
@@ -34,11 +41,13 @@ const TABS: readonly {key: VisualPropertyGroup; label: string}[] = [
     {key: 'appearance', label: '颜色与效果'},
 ]
 
-const NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
+export const PAGE_DOCUMENT_NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     container: '容器',
     paragraph: '段落',
     heading: '标题',
     image: '图片',
+    asset: '图片',
+    gallery: '画廊',
     link: '链接',
     list: '列表',
     'list-item': '列表项',
@@ -48,101 +57,44 @@ const NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     divider: '分隔线',
 })
 
-function editableValue(field: VisualPropertyState): string {
-    return field.localValue ?? field.value
+function fieldFor(fields: readonly VisualPropertyState[], property: VisualPropertyName): VisualPropertyState {
+    const field = fields.find(item => item.property === property)
+    if (!field) throw new TypeError(`属性面板缺少 ${property}。`)
+    return field
 }
 
-function colorPickerValue(value: string): string {
-    return /^#[\da-f]{6}$/iu.test(value) ? value : '#000000'
-}
-
-function PropertyField({
+function FontWeightControl({
     field,
-    nodeId,
-    onApply,
+    onChange,
 }: {
     field: VisualPropertyState
-    nodeId: string
-    onApply: PageDocumentPropertiesPanelProps['applyKernelEntry']
+    onChange: (value: VisualPropertyEditValue) => void
 }) {
-    const initialValue = editableValue(field)
-    const [draft, setDraft] = useState(initialValue)
-    const [error, setError] = useState<string | null>(null)
-    const historyGroupRef = useRef<string | null>(null)
-
-    useEffect(() => {
-        setDraft(initialValue)
-        setError(null)
-    }, [field.property, initialValue, nodeId])
-
-    const beginInteraction = () => {
-        historyGroupRef.current ??= crypto.randomUUID()
-    }
-    const commit = async (value: string) => {
-        const validation = validateVisualPropertyValue(field.property, value)
-        setError(validation.message)
-        if (!validation.valid || field.disabled || value === initialValue) return
-        const historyGroupId = historyGroupRef.current ?? crypto.randomUUID()
-        const request = createVisualPropertyEditRequest(nodeId, field.property, value, {
-            historyGroupId,
-        })
-        const applied = await onApply(request, `调整${field.label}`, {historyGroupId})
-        if (!applied) setDraft(initialValue)
-    }
-    const finishInteraction = () => {
-        void commit(draft)
-        historyGroupRef.current = null
-    }
-    const isColor = field.property === 'color' || field.property === 'background-color'
-
+    const localOrEffective = field.localValue ?? field.value
+    const supported = VISUAL_FONT_WEIGHTS.includes(localOrEffective as VisualFontWeight)
     return (
-        <label className={`page-document-property${field.disabled ? ' is-disabled' : ''}`}>
-            <span className="page-document-property__heading">
+        <section className={`page-document-property${field.disabled ? ' is-disabled' : ''}`}>
+            <div className="page-document-property__heading">
                 <span>{field.label}</span>
                 <span data-source-state={field.sourceState}>{field.statusText}</span>
-            </span>
-            <span className="page-document-property__control">
-                {isColor && (
-                    <input
-                        className="page-document-property__color"
-                        type="color"
-                        aria-label={`${field.label}颜色选择`}
-                        value={colorPickerValue(draft)}
-                        disabled={field.disabled}
-                        onFocus={beginInteraction}
-                        onChange={event => {
-                            const next = event.target.value
-                            setDraft(next)
-                            void commit(next)
-                        }}
-                        onBlur={() => {
-                            historyGroupRef.current = null
-                        }}
-                    />
-                )}
-                <Input
-                    value={draft}
-                    size="sm"
-                    status={error ? 'error' : 'default'}
-                    disabled={field.disabled}
-                    placeholder="未设置"
-                    onFocus={beginInteraction}
-                    onValueChange={next => {
-                        setDraft(next)
-                        setError(validateVisualPropertyValue(field.property, next).message)
-                    }}
-                    onKeyDown={event => {
-                        if (event.key === 'Enter') event.currentTarget.blur()
-                    }}
-                    onBlur={finishInteraction}
-                />
-            </span>
-            {(error || field.reason) && (
-                <span className="page-document-property__message" role={error ? 'alert' : undefined}>
-                    {error ?? field.reason}
-                </span>
+            </div>
+            {!supported && localOrEffective && (
+                <p className="page-document-property__message">复杂源码值会原样保留，请在代码模式调整。</p>
             )}
-        </label>
+            <Select
+                aria-label="字重"
+                disabled={field.disabled}
+                value={supported ? localOrEffective : '400'}
+                options={VISUAL_FONT_WEIGHTS.map(value => ({value, label: value}))}
+                onValueChange={value => onChange({kind: 'font-weight', value: String(value) as VisualFontWeight})}
+            />
+            {field.localValue !== null && (
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => onChange({kind: 'clear-override'})}>
+                    清除本级设置
+                </Button>
+            )}
+            {field.reason && <p className="page-document-property__message">{field.reason}</p>}
+        </section>
     )
 }
 
@@ -158,11 +110,25 @@ export function PageDocumentPropertiesPanel({
         () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss) : [],
         [entryStyleCss, inspectComponent, node],
     )
+    const applyChanges = (
+        changes: readonly VisualPropertyChange[],
+        label: string,
+        options: PropertyChangeOptions = {},
+    ) => {
+        if (!node) return
+        const request = createVisualPropertyEditRequest(node.id, changes, options)
+        void applyKernelEntry(request, label, options)
+    }
+    const applyOne = (
+        field: VisualPropertyState,
+        value: VisualPropertyEditValue,
+        options?: PropertyChangeOptions,
+    ) => applyChanges([{property: field.property, value}], `调整${field.label}`, options)
 
     return (
         <section className="page-document-properties-panel">
             <header>
-                <strong>属性 · {node ? (NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
+                <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
                 <span>修改范围 · 所有宽度</span>
             </header>
             <div className="page-document-properties-panel__tabs" role="tablist" aria-label="属性分类">
@@ -181,14 +147,26 @@ export function PageDocumentPropertiesPanel({
                 <p className="page-document-properties-panel__empty">在画布或图层中选择一个元素</p>
             ) : (
                 <div className="page-document-properties-panel__fields">
-                    {fields.filter(field => field.group === tab).map(field => (
-                        <PropertyField
-                            key={`${node.id}:${field.property}`}
-                            field={field}
-                            nodeId={node.id}
-                            onApply={applyKernelEntry}
-                        />
-                    ))}
+                    {tab === 'text' && (
+                        <>
+                            <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
+                            <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={value => applyOne(fieldFor(fields, 'font-weight'), value)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
+                        </>
+                    )}
+                    {tab === 'layout' && (
+                        <>
+                            <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
+                            <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'gap'), value, options)}/>
+                        </>
+                    )}
+                    {tab === 'appearance' && (
+                        <>
+                            <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
+                            <ColorPropertyControl field={fieldFor(fields, 'background-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}/>
+                        </>
+                    )}
                 </div>
             )}
             {visualError && <p className="page-document-properties-panel__error" role="alert">{visualError}</p>}

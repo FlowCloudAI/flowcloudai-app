@@ -46,8 +46,23 @@ describe('page document editor integration boundary', () => {
             'page-document-editor',
             'page-properties',
             '属性 ·',
+            '修改生效范围：所有宽度',
+            '清除本级设置',
         ]) {
             assert.ok(checker.includes(marker), `默认产物扫描遗漏 ${marker}`)
         }
+    })
+
+    it('属性组件只把结构化白名单值交给编辑适配层', () => {
+        const propertiesRoot = join(currentDirectory, 'components/properties')
+        const componentSources = sourceFiles(propertiesRoot)
+            .map(file => readFileSync(file, 'utf8'))
+            .join('\n')
+        const adapter = readFileSync(join(currentDirectory, 'application/visualPropertyEditing.ts'), 'utf8')
+
+        assert.doesNotMatch(componentSources, /validateVisualPropertyValue|rawCssValue/u)
+        assert.doesNotMatch(adapter, /export function validateVisualPropertyValue/u)
+        assert.match(adapter, /changes:\s*readonly VisualPropertyChange\[\]/u)
+        assert.match(adapter, /serializeVisualPropertyValue\(change\.property, change\.value\)/u)
     })
 })

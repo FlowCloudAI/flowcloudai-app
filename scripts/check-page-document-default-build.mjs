@@ -14,6 +14,8 @@ const forbidden = [
     'page-document-editor',
     'page-properties',
     '属性 ·',
+    '修改生效范围：所有宽度',
+    '清除本级设置',
 ]
 
 function filesUnder(directory) {

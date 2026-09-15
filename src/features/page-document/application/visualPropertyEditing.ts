@@ -76,9 +76,9 @@ const ALL_WIDTHS_DESTINATION: WriteDestination = Object.freeze({
     channel: Object.freeze({kind: 'base-rule'}),
 })
 
-const LENGTH_PATTERN = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em|%)$/iu
-const NUMBER_PATTERN = /^[+]?(?:\d+(?:\.\d+)?|\.\d+)$/u
-const COLOR_PATTERN = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgb|rgba|hsl|hsla|oklch|oklab|lab|lch|color|var)\([^{};]+\))$/iu
+const CSS_NUMBER_PATTERN = /^[+-]?(?:(?:\d+\.\d+)|(?:\d+)|(?:\.\d+))(?:[eE][+-]?\d+)?$/u
+const HEX_COLOR_PATTERN = /^#[\da-f]{6}$/iu
+const ENTRY_THEME_COLOR_PATTERN = /^var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\)$/u
 
 function sameDestination(left: WriteDestination, right: WriteDestination): boolean {
     return left.scope === right.scope && left.channel.kind === right.channel.kind
@@ -277,73 +277,113 @@ function managedOtherViewportProperties(
     return properties
 }
 
-export interface VisualPropertyValueValidation {
-    readonly valid: boolean
-    readonly normalized: string
-    readonly message: string | null
+export const VISUAL_FONT_WEIGHTS = ['400', '500', '600', '700', '800', '900'] as const
+export type VisualFontWeight = (typeof VISUAL_FONT_WEIGHTS)[number]
+export type VisualLengthUnit = 'px' | 'rem' | 'em' | '%'
+export type VisualSpacingUnit = 'px' | 'rem' | 'em'
+export type VisualNumericUnit = VisualLengthUnit | VisualSpacingUnit | ''
+
+export interface VisualNumericPropertyValue {
+    readonly kind: 'numeric'
+    readonly value: number
+    readonly unit: VisualNumericUnit
+    readonly numberText: string
 }
 
-export function validateVisualPropertyValue(
+export interface VisualColorPropertyValue {
+    readonly kind: 'color'
+    readonly value: string
+    readonly opacity: number
+}
+
+export type VisualPropertyEditValue =
+    | VisualNumericPropertyValue
+    | {readonly kind: 'font-weight'; readonly value: VisualFontWeight}
+    | VisualColorPropertyValue
+    | {readonly kind: 'clear-override'}
+
+export interface VisualPropertyChange {
+    readonly property: VisualPropertyName
+    readonly value: VisualPropertyEditValue
+}
+
+function compactNumber(value: number): string {
+    return Number(value.toFixed(4)).toString()
+}
+
+function serializeColor(value: VisualColorPropertyValue): string {
+    if (
+        !HEX_COLOR_PATTERN.test(value.value) &&
+        !ENTRY_THEME_COLOR_PATTERN.test(value.value)
+    ) throw new TypeError('颜色只能使用完整十六进制值或页面主题色。')
+    if (!Number.isFinite(value.opacity) || value.opacity < 0 || value.opacity > 100) {
+        throw new TypeError('颜色透明度必须位于 0–100。')
+    }
+    if (value.opacity === 0) return 'transparent'
+    if (value.opacity === 100) return value.value.toLowerCase()
+    if (HEX_COLOR_PATTERN.test(value.value)) {
+        const red = Number.parseInt(value.value.slice(1, 3), 16)
+        const green = Number.parseInt(value.value.slice(3, 5), 16)
+        const blue = Number.parseInt(value.value.slice(5, 7), 16)
+        return `rgb(${red} ${green} ${blue} / ${compactNumber(value.opacity)}%)`
+    }
+    return `color-mix(in srgb, ${value.value} ${compactNumber(value.opacity)}%, transparent)`
+}
+
+function allowedNumericUnits(property: VisualPropertyName): readonly VisualNumericUnit[] {
+    if (property === 'line-height') return ['']
+    if (property === 'font-size') return ['px', 'rem', 'em', '%']
+    if (
+        property.startsWith('margin-') ||
+        property.startsWith('padding-') ||
+        property === 'gap'
+    ) return ['px', 'rem', 'em']
+    return []
+}
+
+export function serializeVisualPropertyValue(
     property: VisualPropertyName,
-    rawValue: string,
-): VisualPropertyValueValidation {
-    const value = rawValue.trim()
-    if (!value) return Object.freeze({valid: true, normalized: '', message: null})
-    const hasControl = [...value].some(character => {
-        const code = character.codePointAt(0) ?? 0
-        return code <= 31 || code === 127
-    })
-    if (hasControl || /[{};]/u.test(value) || /!important/iu.test(value)) {
-        return Object.freeze({valid: false, normalized: value, message: '值中含有不允许的 CSS 语法。'})
+    value: VisualPropertyEditValue,
+): string | null {
+    if (value.kind === 'clear-override') return null
+    if (value.kind === 'font-weight') {
+        if (property !== 'font-weight' || !VISUAL_FONT_WEIGHTS.includes(value.value)) {
+            throw new TypeError('字重结构与目标属性不匹配。')
+        }
+        return value.value
     }
-    if (property === 'font-weight') {
-        const numeric = NUMBER_PATTERN.test(value) ? Number(value) : null
-        const valid = ['normal', 'bold', 'bolder', 'lighter'].includes(value.toLowerCase()) ||
-            (numeric !== null && numeric >= 1 && numeric <= 1000)
-        return Object.freeze({
-            valid,
-            normalized: value,
-            message: valid ? null : '字重应为 1–1000 或 normal、bold、bolder、lighter。',
-        })
+    if (value.kind === 'color') {
+        if (property !== 'color' && property !== 'background-color') {
+            throw new TypeError('颜色结构与目标属性不匹配。')
+        }
+        return serializeColor(value)
     }
-    if (property === 'color' || property === 'background-color') {
-        const valid = COLOR_PATTERN.test(value)
-        return Object.freeze({
-            valid,
-            normalized: value,
-            message: valid ? null : '请输入完整 CSS 颜色值。',
-        })
+    const units = allowedNumericUnits(property)
+    if (!units.includes(value.unit)) throw new TypeError('数值单位不在该属性白名单内。')
+    if (!Number.isFinite(value.value) || !CSS_NUMBER_PATTERN.test(value.numberText)) {
+        throw new TypeError('数值结构必须包含有限数字。')
     }
-    if (property === 'line-height' && (value.toLowerCase() === 'normal' || NUMBER_PATTERN.test(value))) {
-        const valid = value.toLowerCase() === 'normal' || Number(value) >= 0
-        return Object.freeze({
-            valid,
-            normalized: value,
-            message: valid ? null : '行高不能为负数。',
-        })
+    if (Number(value.numberText) !== value.value) throw new TypeError('数值文本与数值不一致。')
+    if (!property.startsWith('margin-') && value.value < 0) {
+        throw new TypeError('该属性不接受负数。')
     }
-    const match = LENGTH_PATTERN.exec(value)
-    const numeric = match ? Number(match[1]) : Number.NaN
-    const permitsNegative = property.startsWith('margin-')
-    const valid = Boolean(match) && (permitsNegative || numeric >= 0)
-    return Object.freeze({
-        valid,
-        normalized: value,
-        message: valid
-            ? null
-            : `${VISUAL_PROPERTY_FIELDS.find(field => field.property === property)?.label ?? property}应为带 px、rem、em 或 % 单位的${permitsNegative ? '' : '非负'}数值。`,
-    })
+    return `${value.numberText}${value.unit}`
 }
 
 export function createVisualPropertyEditRequest(
     nodeId: string,
-    property: VisualPropertyName,
-    rawValue: string,
+    changes: readonly VisualPropertyChange[],
     history: DocumentHistoryOptions = {},
     allocateRequestId: () => string = () => crypto.randomUUID(),
 ): KernelDraftEditRequest {
-    const validation = validateVisualPropertyValue(property, rawValue)
-    if (!validation.valid) throw new TypeError(validation.message ?? '属性值无效。')
+    if (changes.length === 0) throw new TypeError('属性修改不能为空。')
+    const serialized = changes.map(change => Object.freeze({
+        property: change.property,
+        value: serializeVisualPropertyValue(change.property, change.value),
+    }))
+    if (new Set(serialized.map(change => change.property)).size !== serialized.length) {
+        throw new TypeError('同一请求不能重复修改属性。')
+    }
     const requestId = allocateRequestId()
     const interactionSeed = history.historyGroupId ?? requestId
     return Object.freeze({
@@ -353,21 +393,19 @@ export function createVisualPropertyEditRequest(
         authorizedScopes: Object.freeze(['entry'] as const),
         createIntents: (handles: KernelComponentBindings) => {
             const component = requireKernelComponentHandle(handles, nodeId)
-            return Object.freeze([
-                Object.freeze({
+            return Object.freeze(serialized.map(change => Object.freeze({
                     kind: 'edit-property' as const,
                     target: Object.freeze({kind: 'component-root' as const, component}),
-                    property,
-                    action: validation.normalized
-                        ? Object.freeze({kind: 'set-value' as const, value: validation.normalized})
+                    property: change.property,
+                    action: change.value !== null
+                        ? Object.freeze({kind: 'set-value' as const, value: change.value})
                         : Object.freeze({kind: 'clear-override' as const}),
                     readContext: ALL_WIDTHS_READ_CONTEXT,
                     destination: ALL_WIDTHS_DESTINATION,
-                    ...(validation.normalized
+                    ...(change.value !== null
                         ? {takeover: 'preserve-inline-effect' as const}
                         : {}),
-                }),
-            ])
+                })))
         },
     })
 }
