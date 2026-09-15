@@ -48,4 +48,14 @@ if (process.env.VITE_PAGE_DOCUMENT_CANVAS === '1') {
     if (check.status !== 0) {
         process.exit(check.status ?? 1)
     }
+} else {
+    const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+    const checkEntry = path.resolve(repositoryRoot, 'scripts/check-page-document-default-build.mjs')
+    const check = spawnSync(process.execPath, [checkEntry], {
+        cwd: repositoryRoot,
+        env: process.env,
+        stdio: 'inherit',
+    })
+    if (check.error) throw check.error
+    if (check.status !== 0) process.exit(check.status ?? 1)
 }

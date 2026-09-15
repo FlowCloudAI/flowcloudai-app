@@ -31,6 +31,12 @@ export default defineConfig({
                     ? 'src/features/page-document/canvas/entry/enabled.tsx'
                     : 'src/features/page-document/canvas/entry/disabled.tsx',
             ),
+            '@page-document-editor-entry': path.resolve(
+                rootDir,
+                pageDocumentCanvasEnabled
+                    ? 'src/features/page-document/editor/entry/enabled.tsx'
+                    : 'src/features/page-document/editor/entry/disabled.tsx',
+            ),
             react: path.resolve(rootDir, 'node_modules/react'),
             'react-dom': path.resolve(rootDir, 'node_modules/react-dom'),
             'react/jsx-runtime': path.resolve(rootDir, 'node_modules/react/jsx-runtime.js'),
@@ -121,6 +127,15 @@ export default defineConfig({
                         'pixi.js/',
                     ])) {
                         return 'pixi-vendor'
+                    }
+
+                    // 页面源码编辑器只在显式开关构建出现，保持独立分块便于核验默认产物。
+                    if (pageDocumentCanvasEnabled && matchesNodeModulePrefix(normalized, [
+                        '@codemirror/',
+                        'codemirror/',
+                        'diff/',
+                    ])) {
+                        return 'page-document-editor-vendor'
                     }
 
                     // Markdown 编辑器及其语法树链通常体积较大，适合和主工作台隔离。

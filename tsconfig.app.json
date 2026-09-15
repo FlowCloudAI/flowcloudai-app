@@ -12,7 +12,8 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@page-document-canvas-entry": ["src/features/page-document/canvas/entry/enabled.tsx"]
+      "@page-document-canvas-entry": ["src/features/page-document/canvas/entry/enabled.tsx"],
+      "@page-document-editor-entry": ["src/features/page-document/editor/entry/enabled.tsx"]
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

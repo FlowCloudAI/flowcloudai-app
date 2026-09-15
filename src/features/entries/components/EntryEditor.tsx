@@ -114,8 +114,12 @@ import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
 import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
+import {
+    PAGE_DOCUMENT_EDITOR_ENABLED,
+    PageDocumentEditorEntry,
+} from '@page-document-editor-entry'
 
-type EditorMode = 'edit' | 'browse'
+type EditorMode = 'edit' | 'browse' | 'page'
 type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
     plugins: PluginInfo[]
@@ -249,6 +253,8 @@ export default function EntryEditor({
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
+    const [pageDocumentDirty, setPageDocumentDirty] = useState(false)
+    const [pageDocumentResetVersion, setPageDocumentResetVersion] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [projectEntryDetailsById, setProjectEntryDetailsById] = useState<Record<string, Entry>>({})
 
@@ -330,9 +336,36 @@ export default function EntryEditor({
     const lastSuccessfulSaveAtRef = useRef(0)
     const userEditVersionRef = useRef(0)
     const projectIdRef = useRef(projectId)
+    const wasActiveRef = useRef(active)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
+    const confirmDiscardPageDocument = useCallback(async () => {
+        if (!pageDocumentDirty) return true
+        const result = await showAlert(
+            '页面草稿尚未保存。选择取消继续编辑，选择确定放弃修改。',
+            'warning',
+            'confirm',
+        )
+        return result === 'yes'
+    }, [pageDocumentDirty, showAlert])
+    const requestEditorMode = useCallback(async (nextMode: EditorMode) => {
+        if (nextMode === editorMode) return
+        if (editorMode === 'page' && !(await confirmDiscardPageDocument())) return
+        if (editorMode === 'page') {
+            setPageDocumentDirty(false)
+            setPageDocumentResetVersion(current => current + 1)
+        }
+        setEditorMode(nextMode)
+    }, [confirmDiscardPageDocument, editorMode])
+    const handleBack = useCallback(async () => {
+        if (editorMode === 'page' && !(await confirmDiscardPageDocument())) return
+        if (editorMode === 'page') {
+            setPageDocumentDirty(false)
+            setPageDocumentResetVersion(current => current + 1)
+        }
+        await onBack?.()
+    }, [confirmDiscardPageDocument, editorMode, onBack])
     const markUserEdited = useCallback(() => {
         userEditVersionRef.current += 1
         setHasUserEdited(true)
@@ -387,6 +420,20 @@ export default function EntryEditor({
     useEffect(() => {
         lastSuccessfulSaveAtRef.current = Date.now()
     }, [])
+
+    useEffect(() => {
+        const wasActive = wasActiveRef.current
+        wasActiveRef.current = active
+        if (!wasActive || active || editorMode !== 'page' || !pageDocumentDirty) return
+        void confirmDiscardPageDocument().then(discard => {
+            if (discard) {
+                setPageDocumentDirty(false)
+                setPageDocumentResetVersion(current => current + 1)
+                return
+            }
+            if (entry) onOpenEntry?.({id: entry.id, title: entry.title})
+        })
+    }, [active, confirmDiscardPageDocument, editorMode, entry, onOpenEntry, pageDocumentDirty])
 
     useEffect(() => {
         projectEntriesRef.current = projectEntries
@@ -924,8 +971,8 @@ export default function EntryEditor({
     ])
     useEffect(() => {
         hasChangesRef.current = hasChanges
-        onDirtyChangeRef.current?.(hasChanges)
-    }, [hasChanges])
+        onDirtyChangeRef.current?.(hasChanges || pageDocumentDirty)
+    }, [hasChanges, pageDocumentDirty])
 
     const saveStatus = useEntrySaveStatus({
         entryLoaded: Boolean(entry),
@@ -943,7 +990,7 @@ export default function EntryEditor({
     }, [draft.content, editorMode, editorSplitView])
 
     const previewSourceContent = resolveMarkdownPreviewSourceContent(
-        editorMode,
+        editorMode === 'page' ? 'browse' : editorMode,
         editorSplitView,
         draft.content,
         debouncedContent,
@@ -1544,7 +1591,7 @@ export default function EntryEditor({
                 <div className="entry-editor-shell">
                     <section
                         ref={workspaceRef}
-                        className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}
+                        className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}${editorMode === 'page' ? ' is-page-mode' : ''}`}
                     >
                         <div ref={workspaceHeaderRef} className="entry-editor-workspace__header">
                             <div className="entry-editor-workspace__toolbar" data-mobile-horizontal-scroll>
@@ -1552,7 +1599,7 @@ export default function EntryEditor({
                                     <button
                                         type="button"
                                         className="entry-editor-back-button"
-                                        onClick={onBack}
+                                        onClick={() => void handleBack()}
                                         disabled={!onBack}
                                     >
                                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1572,7 +1619,7 @@ export default function EntryEditor({
                                             type="button"
                                             className={`entry-editor-mode-chip${editorMode === 'browse' ? ' active' : ''}`}
                                             aria-pressed={editorMode === 'browse'}
-                                            onClick={() => setEditorMode('browse')}
+                                            onClick={() => void requestEditorMode('browse')}
                                         >
                                             浏览
                                         </button>
@@ -1580,10 +1627,20 @@ export default function EntryEditor({
                                             type="button"
                                             className={`entry-editor-mode-chip${editorMode === 'edit' ? ' active' : ''}`}
                                             aria-pressed={editorMode === 'edit'}
-                                            onClick={() => setEditorMode('edit')}
+                                            onClick={() => void requestEditorMode('edit')}
                                         >
                                             编辑
                                         </button>
+                                        {PAGE_DOCUMENT_EDITOR_ENABLED && (
+                                            <button
+                                                type="button"
+                                                className={`entry-editor-mode-chip${editorMode === 'page' ? ' active' : ''}`}
+                                                aria-pressed={editorMode === 'page'}
+                                                onClick={() => void requestEditorMode('page')}
+                                            >
+                                                页面
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="entry-editor-workspace__toolbar-actions">
@@ -1648,48 +1705,50 @@ export default function EntryEditor({
                         </div>
 
                         <div className="entry-editor-workspace__body">
-                            <EntryEditorMetaPanel
-                                entryId={entryId}
-                                entry={entry}
-                                draft={draft}
-                                status={{
-                                    editorMode,
-                                    loading,
-                                    saving: savingSource === 'manual',
-                                    generatingSummary,
-                                }}
-                                projectContext={{
-                                    projectName,
-                                    categories,
-                                    entryTypes,
-                                }}
-                                tagUi={{
-                                    localTagSchemas: entryTags.localTagSchemas,
-                                    visibleTagSchemas: entryTags.visibleTagSchemas,
-                                    browseVisibleTagSchemas: entryTags.browseVisibleTagSchemas,
-                                    implantedTagSchemaIdSet: entryTags.implantedTagSchemaIdSet,
-                                    availableTagSchemaOptions: entryTags.availableTagSchemaOptions,
-                                    tagSchemaPickerValue: entryTags.tagSchemaPickerValue,
-                                }}
-                                ttsVoice={ttsVoiceState}
-                                actions={{
-                                    onDraftChange: updateDraftFromUser,
-                                    onOpenImageAddModal: () => openImageAddModal('add'),
-                                    onViewImageSet: () => {
-                                        const coverIndex = draft.images.findIndex((image) => image.is_cover)
-                                        setLightboxIndex(Math.max(0, coverIndex))
-                                        setLightboxOpen(true)
-                                    },
-                                    onGenerateSummary: handleGenerateSummary,
-                                    onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema,
-                                    onRemoveVisibleTagSchema: (schema) => {
-                                        markUserEdited()
-                                        entryTags.handleRemoveVisibleTagSchema(schema)
-                                    },
-                                    onOpenTagCreator: () => setTagCreatorOpen(true),
-                                }}
-                            />
-                            {recoveryNotice && (
+                            {editorMode !== 'page' && (
+                                <EntryEditorMetaPanel
+                                    entryId={entryId}
+                                    entry={entry}
+                                    draft={draft}
+                                    status={{
+                                        editorMode,
+                                        loading,
+                                        saving: savingSource === 'manual',
+                                        generatingSummary,
+                                    }}
+                                    projectContext={{
+                                        projectName,
+                                        categories,
+                                        entryTypes,
+                                    }}
+                                    tagUi={{
+                                        localTagSchemas: entryTags.localTagSchemas,
+                                        visibleTagSchemas: entryTags.visibleTagSchemas,
+                                        browseVisibleTagSchemas: entryTags.browseVisibleTagSchemas,
+                                        implantedTagSchemaIdSet: entryTags.implantedTagSchemaIdSet,
+                                        availableTagSchemaOptions: entryTags.availableTagSchemaOptions,
+                                        tagSchemaPickerValue: entryTags.tagSchemaPickerValue,
+                                    }}
+                                    ttsVoice={ttsVoiceState}
+                                    actions={{
+                                        onDraftChange: updateDraftFromUser,
+                                        onOpenImageAddModal: () => openImageAddModal('add'),
+                                        onViewImageSet: () => {
+                                            const coverIndex = draft.images.findIndex((image) => image.is_cover)
+                                            setLightboxIndex(Math.max(0, coverIndex))
+                                            setLightboxOpen(true)
+                                        },
+                                        onGenerateSummary: handleGenerateSummary,
+                                        onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema,
+                                        onRemoveVisibleTagSchema: (schema) => {
+                                            markUserEdited()
+                                            entryTags.handleRemoveVisibleTagSchema(schema)
+                                        },
+                                        onOpenTagCreator: () => setTagCreatorOpen(true),
+                                    }}
+                                />
+                            )}
+                            {editorMode !== 'page' && recoveryNotice && (
                                 <EntryDraftRecoveryBanner
                                     record={recoveryNotice.record}
                                     kind={recoveryNotice.kind}
@@ -1708,7 +1767,19 @@ export default function EntryEditor({
                                     onNavigationIntent={handlePageDocumentNavigation}
                                 />
                             )}
-                            {editorMode === 'edit' ? (
+                            {editorMode === 'page' ? (
+                                <PageDocumentEditorEntry
+                                    entryId={entryId}
+                                    projectId={projectId}
+                                    active={active}
+                                    title={draft.title}
+                                    summary={draft.summary}
+                                    markdown={draft.content}
+                                    resetVersion={pageDocumentResetVersion}
+                                    onDirtyChange={setPageDocumentDirty}
+                                    onNavigationIntent={handlePageDocumentNavigation}
+                                />
+                            ) : editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">
                                     <EntryMarkdownToolbar
                                         canUndo={undoRedo.canUndo}
@@ -1955,21 +2026,23 @@ export default function EntryEditor({
                         </div>
                     </section>
 
-                    <EntryEditorSidebar
-                        entryId={entryId}
-                        entry={entry}
-                        editorMode={editorMode}
-                        saving={savingSource === 'manual'}
-                        projectDataLoading={projectDataLoading}
-                        relationDrafts={relationDrafts}
-                        outgoingLinks={outgoingLinks}
-                        backlinks={backlinks}
-                        projectEntries={projectEntries}
-                        entryDetailsById={projectEntryDetailsById}
-                        categories={categories}
-                        onOpenEntry={onOpenEntry}
-                        onRelationDraftsChange={updateRelationDraftsFromUser}
-                    />
+                    {editorMode !== 'page' && (
+                        <EntryEditorSidebar
+                            entryId={entryId}
+                            entry={entry}
+                            editorMode={editorMode}
+                            saving={savingSource === 'manual'}
+                            projectDataLoading={projectDataLoading}
+                            relationDrafts={relationDrafts}
+                            outgoingLinks={outgoingLinks}
+                            backlinks={backlinks}
+                            projectEntries={projectEntries}
+                            entryDetailsById={projectEntryDetailsById}
+                            categories={categories}
+                            onOpenEntry={onOpenEntry}
+                            onRelationDraftsChange={updateRelationDraftsFromUser}
+                        />
+                    )}
 
                     {(error || loading) && (
                         <div className={`entry-editor-feedback ${error ? 'is-error' : ''}`}>

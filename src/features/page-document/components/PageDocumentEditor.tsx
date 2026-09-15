@@ -1,0 +1,204 @@
+// 本组件提供页面文档第一批编辑壳层；只编辑独立 HTML/CSS，并把保存交给页面文档会话。
+
+import {useEffect, useMemo, useRef, useState} from 'react'
+import {Button} from 'flowcloudai-ui'
+import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
+import type {SourceFileSet} from '../domain/contract.ts'
+import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
+import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
+import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
+import './PageDocumentEditor.css'
+
+type WorkspaceMode = 'visual' | 'display' | 'code'
+
+function validationLabel(phase: string): string {
+    if (phase === 'valid') return '校验通过'
+    if (phase === 'pending') return '等待校验'
+    if (phase === 'validating') return '正在校验…'
+    if (phase === 'invalid') return '存在阻断诊断'
+    return '校验失败'
+}
+
+function sourceSetFromConflict(html: string, css: string): SourceFileSet {
+    return {'article.html': html, 'style.css': css}
+}
+
+export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
+    const {
+        entryId,
+        projectId,
+        active,
+        title,
+        summary,
+        markdown,
+        resetVersion,
+        onDirtyChange,
+        onNavigationIntent,
+    } = props
+    const [mode, setMode] = useState<WorkspaceMode>('display')
+    const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
+    const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
+    const session = useEntryPageDocumentSession({
+        entryId,
+        projectId,
+        title,
+        summary,
+        markdown,
+    })
+    const {state} = session
+    const {canSave, dirty, discard, save} = session
+    const appliedResetVersionRef = useRef(resetVersion)
+
+    useEffect(() => {
+        onDirtyChange(dirty)
+    }, [dirty, onDirtyChange])
+
+    useEffect(() => () => onDirtyChange(false), [onDirtyChange])
+
+    useEffect(() => {
+        if (resetVersion === appliedResetVersionRef.current) return
+        appliedResetVersionRef.current = resetVersion
+        discard()
+    }, [discard, resetVersion])
+
+    useEffect(() => {
+        if (!active) return
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (
+                event.isComposing || event.altKey || event.shiftKey ||
+                !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's'
+            ) return
+            event.preventDefault()
+            if (canSave) void save()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [active, canSave, save])
+
+    const saveStatus = useMemo(() => {
+        if (!state) return '正在读取页面文档…'
+        if (state.model.entry.phase === 'saving') return '保存中…'
+        if (state.model.entry.phase === 'conflict') return '版本冲突'
+        if (state.model.entry.phase === 'failed') return '保存失败'
+        if (state.persistedRevision === undefined) return '未保存'
+        if (dirty) return '未保存'
+        return `已保存 · r${state.persistedRevision}`
+    }, [dirty, state])
+    const canUndo = mode === 'code' ? sourceHistory.canUndo : session.canUndo
+    const canRedo = mode === 'code' ? sourceHistory.canRedo : session.canRedo
+
+    if (session.loadStatus === 'loading' || !state) {
+        return <div className="page-document-editor-state" role="status">正在建立页面编辑会话…</div>
+    }
+    if (session.loadStatus === 'error') {
+        return <div className="page-document-editor-state is-error" role="alert">{session.loadError}</div>
+    }
+
+    const scope = state.model.entry
+    const diagnosticCount = scope.diagnostics.length
+    const conflict = state.conflict
+    const conflictSources = conflict?.latestDocument
+        ? sourceSetFromConflict(conflict.latestDocument.html, conflict.latestDocument.css)
+        : null
+
+    return (
+        <section className="page-document-editor">
+            <header className="page-document-editor__workbar">
+                <strong>页面编辑</strong>
+                <span className="page-document-editor__separator" aria-hidden="true" />
+                <div className="page-document-editor__modes" role="group" aria-label="页面编辑模式">
+                    <button type="button" disabled title="下一批开放">可视</button>
+                    <button
+                        type="button"
+                        className={mode === 'display' ? 'is-active' : ''}
+                        aria-pressed={mode === 'display'}
+                        onClick={() => setMode('display')}
+                    >
+                        展示
+                    </button>
+                    <button
+                        type="button"
+                        className={mode === 'code' ? 'is-active' : ''}
+                        aria-pressed={mode === 'code'}
+                        onClick={() => setMode('code')}
+                    >
+                        代码
+                    </button>
+                </div>
+                <span className="page-document-editor__next-batch">可视模式下一批开放</span>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={!canUndo}
+                    onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.undo() : session.undo()}
+                >撤销</Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={!canRedo}
+                    onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
+                >重做</Button>
+                <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
+                <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void save()}>
+                    {scope.phase === 'saving' ? '保存中…' : '保存'}
+                </Button>
+            </header>
+
+            {conflict && !conflict.dismissed && (
+                <section className="page-document-editor__conflict" role="alert">
+                    <div>
+                        <strong>磁盘版本已更新到 {conflict.currentRevision ? `r${conflict.currentRevision}` : '未知 revision'}。</strong>
+                        <span>本地草稿仍被保留；代码模式的差异会改为对比磁盘最新版本。</span>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={session.keepDraft}>保留草稿</Button>
+                    <Button type="button" size="sm" disabled={!conflict.latestDocument} onClick={session.loadLatest}>
+                        载入最新版本（放弃本地修改）
+                    </Button>
+                </section>
+            )}
+
+            <div className="page-document-editor__workspace" data-mode={mode}>
+                {mode === 'display' ? (
+                    <div className="page-document-editor__canvas-stage">
+                        <div className="page-document-editor__page-card">
+                            {state.preview?.html != null && state.preview.css != null ? (
+                                <PageDocumentCanvas
+                                    documentKey={entryId}
+                                    html={state.preview.html}
+                                    css={state.preview.css}
+                                    minimumHeight={560}
+                                    onNavigationIntent={onNavigationIntent}
+                                />
+                            ) : (
+                                <p>当前没有可渲染的合法结果。</p>
+                            )}
+                            {state.previewStale && <span className="page-document-editor__preview-stale">预览未更新</span>}
+                        </div>
+                    </div>
+                ) : (
+                    <SourceWorkspace
+                        ref={sourceWorkspaceRef}
+                        documentKey={entryId}
+                        sources={scope.sources}
+                        baseSources={scope.baseSources}
+                        conflictSources={conflictSources}
+                        diagnostics={scope.diagnostics}
+                        preview={state.preview}
+                        previewStale={state.previewStale}
+                        onSourceChange={session.updateSource}
+                        onNavigationIntent={onNavigationIntent}
+                        onHistoryChange={setSourceHistory}
+                    />
+                )}
+            </div>
+
+            <footer className="page-document-editor__statusbar">
+                <span>{validationLabel(scope.validationPhase)} · {diagnosticCount} 条诊断</span>
+                <span>{dirty ? '草稿未保存' : state.persistedRevision ? '草稿已同步' : '新页面尚未保存'}</span>
+                <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
+            </footer>
+        </section>
+    )
+}

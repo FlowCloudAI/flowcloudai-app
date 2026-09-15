@@ -821,6 +821,12 @@
     flex: 0 0 auto;
 }
 
+.entry-editor-workspace.is-page-mode .entry-editor-workspace__body {
+    min-height: 44rem;
+    gap: 0;
+    padding: 0;
+}
+
 .entry-editor-meta-layout {
     display: grid;
     grid-template-columns: minmax(15rem, 18.75rem) minmax(34rem, 1fr) minmax(18rem, 21.25rem);
