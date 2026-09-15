@@ -1,6 +1,6 @@
 # ADR 0003：页面文档隔离画布
 
-- 状态：提议，待原生验证
+- 状态：提议；macOS 已原生验收，Android、Windows 待验证
 - 日期：2026-09-15
 
 ## 决策
@@ -144,6 +144,24 @@ runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`�
 隔离状态隐藏。由此增加另一条运行时不变量：画布主题默认值必须位于最低优先级层，且 runtime style
 必须先于 author style 挂载。
 
+## macOS 原生验收
+
+2026-09-15，用户使用 `1f28a56` 的 `VITE_PAGE_DOCUMENT_CANVAS=1` macOS 调试构建完成五项原生
+验收，结果全部通过：
+
+1. 合法共享样例在正常路径显示米色背景、深棕文字和无衬线字体，标题、摘要与表格边框正常；启用
+   跳过模式时，宿主显示原始片段不含项目模板与基础样式的说明。
+2. `forbidden-script` 与 `external-css-url` 在正常路径显示“作者侧校验已阻止”；启用跳过模式后显示
+   “隔离层拒绝渲染”，且画布为空。
+3. HTTPS 链接交给系统浏览器打开，本页锚点无动作，不存在的词条显示提示或无反应；全程没有白屏
+   或宿主顶层跳转。
+4. 切换样例及拖动窗口宽度后，画布高度随内容变化；停止操作后高度不再增长，且没有内部滚动条。
+5. 当前词条能显示标题与 Markdown 安全降级正文。
+
+这次验收没有覆盖作者行内 `style` 属性，也没有使用 Safari Web Inspector 网络面板确认隔离层拒绝
+恶意内容时未发起外部请求。开发探针已增加“合法：行内样式”，供下一次原生复核使用；上述两个
+缺口继续保留为 macOS 待验项。
+
 ## 依据
 
 - HTML Standard 的 [iframe sandbox 规则](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)
@@ -172,12 +190,27 @@ runtime style 在 author style 之前挂载，因此在作者的 `fc-renderer`�
 
 ## 待原生验证
 
-- Windows WebView2、Android WebView 是否也把打包子页面置为 opaque origin、让 `'self'` 不匹配
-  应用协议资源，且 `event.origin` 为不可用于鉴权的值。
-- Android WebView 与 Windows WebView2 是否让 Tauri 响应头和画布 meta CSP 取交集，并接受同一
-  内联脚本哈希。
-- 经过隔离层保留的作者行内 `style` 属性在 macOS、Android 和 Windows 打包版中是否生效。
-- 三端是否在拒绝作者网络、表单和导航时不产生请求、不替换画布页面，也不触发宿主顶层导航。
+macOS WKWebView：
+
+- “合法：行内样式”探针经过隔离层保留的 `style` 属性在打包版中是否实际生效。
+- 使用 Safari Web Inspector 网络面板确认拦截恶意内容时没有发起任何外部请求。
+
+Android WebView：
+
+- 打包子页面是否成为 opaque origin、让 `'self'` 不匹配应用协议资源，且 `event.origin` 不可用于
+  鉴权。
+- Tauri 响应头与画布 meta CSP 是否取交集，并接受同一内联脚本哈希。
+- 经过隔离层保留的作者行内 `style` 属性是否在打包版中生效。
+- 拒绝作者网络、表单和导航时是否不产生请求、不替换画布页面，也不触发宿主顶层导航。
 - iframe 销毁、重建、旋转和后台恢复时，Window 身份与消息时序是否符合协议生命周期假设。
 
-这些项目未通过前，本 ADR 保持“提议，待原生验证”，M6 不能写成原生验收完成。
+Windows WebView2：
+
+- 打包子页面是否成为 opaque origin、让 `'self'` 不匹配应用协议资源，且 `event.origin` 不可用于
+  鉴权。
+- Tauri 响应头与画布 meta CSP 是否取交集，并接受同一内联脚本哈希。
+- 经过隔离层保留的作者行内 `style` 属性是否在打包版中生效。
+- 拒绝作者网络、表单和导航时是否不产生请求、不替换画布页面，也不触发宿主顶层导航。
+- iframe 销毁、重建、旋转和后台恢复时，Window 身份与消息时序是否符合协议生命周期假设。
+
+三端全部通过前，本 ADR 不写为“接受”，M6 也不写为“三端原生验收完成”。
