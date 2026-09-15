@@ -70,7 +70,7 @@ function FontWeightControl({
     onChange,
 }: {
     field: VisualPropertyState
-    onChange: (value: VisualPropertyEditValue) => void
+    onChange: (value: VisualPropertyEditValue) => Promise<boolean>
 }) {
     const localOrEffective = field.localValue ?? field.value
     const supported = VISUAL_FONT_WEIGHTS.includes(localOrEffective as VisualFontWeight)
@@ -88,10 +88,10 @@ function FontWeightControl({
                 disabled={field.disabled}
                 value={supported ? localOrEffective : '400'}
                 options={VISUAL_FONT_WEIGHTS.map(value => ({value, label: value}))}
-                onValueChange={value => onChange({kind: 'font-weight', value: String(value) as VisualFontWeight})}
+                onValueChange={value => void onChange({kind: 'font-weight', value: String(value) as VisualFontWeight})}
             />
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
                     清除本级设置
                 </Button>
             )}
@@ -119,9 +119,9 @@ export function PageDocumentPropertiesPanel({
         label: string,
         options: PropertyChangeOptions = {},
     ) => {
-        if (!node) return
+        if (!node) return Promise.resolve(false)
         const request = createVisualPropertyEditRequest(node.id, changes, options)
-        void applyKernelEntry(request, label, options)
+        return applyKernelEntry(request, label, options)
     }
     const applyOne = (
         field: VisualPropertyState,

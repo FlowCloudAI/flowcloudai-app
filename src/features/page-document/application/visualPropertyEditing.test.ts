@@ -14,6 +14,7 @@ import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {
     createVisualPropertyEditRequest,
     inspectVisualProperties,
+    parseSerializedVisualColor,
     serializeVisualPropertyValue,
     type VisualPropertyChange,
     type VisualPropertyName,
@@ -193,6 +194,15 @@ describe('visual property editing', () => {
         assert.throws(() => serializeVisualPropertyValue('font-size', {kind: 'numeric', value: 18, unit: '' as 'px', numberText: '18'}), /单位/u)
         assert.throws(() => serializeVisualPropertyValue('padding-block-start', {kind: 'numeric', value: -1, unit: 'px', numberText: '-1'}), /负数/u)
         assert.throws(() => serializeVisualPropertyValue('font-weight', {kind: 'color', value: '#112233', opacity: 100}), /颜色结构/u)
+    })
+
+    it('半透明标准色与主题色写回后仍能由调节控件精确回读', () => {
+        const standard = {kind: 'color' as const, value: '#112233', opacity: 50}
+        const theme = {kind: 'color' as const, value: 'var(--fc-entry-accent)', opacity: 75}
+
+        assert.deepEqual(parseSerializedVisualColor(serializeVisualPropertyValue('color', standard) ?? ''), standard)
+        assert.deepEqual(parseSerializedVisualColor(serializeVisualPropertyValue('background-color', theme) ?? ''), theme)
+        assert.equal(parseSerializedVisualColor('linear-gradient(red, blue)'), null)
     })
 
     it('清除本级设置使用 clear-override 且可以撤销', () => {

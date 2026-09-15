@@ -7,6 +7,7 @@ import type {
     VisualPropertyEditValue,
     VisualPropertyState,
 } from '../../application/visualPropertyEditing.ts'
+import {parseSerializedVisualColor} from '../../application/visualPropertyEditing.ts'
 import {PageDocumentColorIcon} from '../icons/PageDocumentPropertyIcons.tsx'
 import type {PropertyChangeOptions} from './NumericPropertyControl.tsx'
 
@@ -34,14 +35,6 @@ const STANDARD_COLORS: readonly ColorOption[] = [
 const MAXIMUM_RECENT_COLORS = 8
 let recentColors: string[] = []
 
-function readColor(raw: string): VisualColorPropertyValue | null {
-    const value = raw.trim().toLowerCase()
-    if (/^#[\da-f]{6}$/u.test(value) || /^var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\)$/u.test(value)) {
-        return {kind: 'color', value, opacity: 100}
-    }
-    return null
-}
-
 function rememberColor(value: string): void {
     recentColors = [value, ...recentColors.filter(item => item !== value)].slice(0, MAXIMUM_RECENT_COLORS)
 }
@@ -51,17 +44,18 @@ export function ColorPropertyControl({
     onChange,
 }: {
     field: VisualPropertyState
-    onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => void
+    onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => Promise<boolean>
 }) {
-    const sourceColor = readColor(field.localValue ?? field.value)
+    const sourceColor = parseSerializedVisualColor(field.localValue ?? field.value)
     const [open, setOpen] = useState(false)
     const [moreOpen, setMoreOpen] = useState(false)
     const [color, setColor] = useState<VisualColorPropertyValue>(sourceColor ?? {kind: 'color', value: '#000000', opacity: 100})
     const [hexDraft, setHexDraft] = useState(color.value.startsWith('#') ? color.value : '#000000')
     const [error, setError] = useState<string | null>(null)
     const interactionRef = useRef<string | null>(null)
+    const attemptRef = useRef(0)
     useEffect(() => {
-        const next = readColor(field.localValue ?? field.value)
+        const next = parseSerializedVisualColor(field.localValue ?? field.value)
         if (next) {
             setColor(next)
             if (next.value.startsWith('#')) setHexDraft(next.value)
@@ -77,7 +71,14 @@ export function ColorPropertyControl({
         if (next.value.startsWith('#')) setHexDraft(next.value)
         setError(null)
         rememberColor(next.value)
-        onChange(next, options())
+        const attempt = ++attemptRef.current
+        void onChange(next, options()).then(applied => {
+            if (applied || attempt !== attemptRef.current) return
+            const persisted = parseSerializedVisualColor(field.localValue ?? field.value)
+            if (!persisted) return
+            setColor(persisted)
+            setHexDraft(persisted.value.startsWith('#') ? persisted.value : '#000000')
+        })
     }
     const cell = (option: ColorOption) => (
         <Button
@@ -175,7 +176,7 @@ export function ColorPropertyControl({
                 </div>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
                     清除本级设置
                 </Button>
             )}

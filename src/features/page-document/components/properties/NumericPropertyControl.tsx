@@ -25,7 +25,7 @@ export interface PropertyChangeOptions {
 interface NumericPropertyControlProps {
     field: VisualPropertyState
     compact?: boolean
-    onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => void
+    onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => Promise<boolean>
 }
 
 function createInteractionId(): string {
@@ -46,6 +46,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
     const repeatDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const repeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const pointerSteppedRef = useRef(false)
+    const attemptRef = useRef(0)
     const currentSource = `${field.localValue ?? field.value}\u0000${field.property}`
 
     useEffect(() => {
@@ -68,7 +69,15 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
         candidateRef.current = next
         setDraft(next.numberText)
         setError(null)
-        onChange(next, historyOptions())
+        const attempt = ++attemptRef.current
+        void onChange(next, historyOptions()).then(applied => {
+            if (applied || attempt !== attemptRef.current) return
+            const persisted = readNumericPropertyEditorValue(field.localValue ?? field.value, definition)
+            if (persisted.kind !== 'numeric') return
+            candidateRef.current = persisted.candidate
+            setCandidate(persisted.candidate)
+            setDraft(persisted.candidate.numberText)
+        })
     }
     const finish = () => {
         interactionRef.current = null
@@ -231,7 +240,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                 </div>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => onChange({kind: 'clear-override'})}>
+                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'})}>
                     清除本级设置
                 </Button>
             )}

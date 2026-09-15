@@ -17,7 +17,7 @@ interface BoxSpacingControlsProps {
         changes: readonly {property: VisualPropertyName; value: VisualPropertyEditValue}[],
         label: string,
         options?: PropertyChangeOptions,
-    ) => void
+    ) => Promise<boolean>
 }
 
 function fieldFor(fields: readonly VisualPropertyState[], property: VisualPropertyName): VisualPropertyState {
@@ -52,7 +52,7 @@ export function BoxSpacingControls({label, fields, onChange}: BoxSpacingControls
             {property, value},
         ]
         if (partner !== null) changes.push({property: partner, value})
-        onChange(changes, `调整${label}`, options)
+        return onChange(changes, `调整${label}`, options)
     }
 
     return (

@@ -296,6 +296,33 @@ export interface VisualColorPropertyValue {
     readonly opacity: number
 }
 
+function byteHex(value: number): string {
+    return Math.round(value).toString(16).padStart(2, '0')
+}
+
+/** 只回读本适配层可能产出的颜色形式，其他合法作者值仍保持为复杂源码。 */
+export function parseSerializedVisualColor(rawValue: string): VisualColorPropertyValue | null {
+    const raw = rawValue.trim().toLowerCase()
+    if (HEX_COLOR_PATTERN.test(raw) || ENTRY_THEME_COLOR_PATTERN.test(raw)) {
+        return {kind: 'color', value: raw, opacity: 100}
+    }
+    if (raw === 'transparent') return {kind: 'color', value: '#000000', opacity: 0}
+    const rgb = /^rgb\((\d{1,3}) (\d{1,3}) (\d{1,3}) \/ (\d+(?:\.\d+)?)%\)$/u.exec(raw)
+    if (rgb) {
+        const channels = rgb.slice(1, 4).map(Number)
+        const opacity = Number(rgb[4])
+        if (channels.every(channel => channel >= 0 && channel <= 255) && opacity >= 0 && opacity <= 100) {
+            return {kind: 'color', value: `#${channels.map(byteHex).join('')}`, opacity}
+        }
+    }
+    const mixed = /^color-mix\(in srgb, (var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\)) (\d+(?:\.\d+)?)%, transparent\)$/u.exec(raw)
+    if (mixed) {
+        const opacity = Number(mixed[2])
+        if (opacity >= 0 && opacity <= 100) return {kind: 'color', value: mixed[1], opacity}
+    }
+    return null
+}
+
 export type VisualPropertyEditValue =
     | VisualNumericPropertyValue
     | {readonly kind: 'font-weight'; readonly value: VisualFontWeight}
