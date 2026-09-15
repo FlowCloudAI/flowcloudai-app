@@ -85,17 +85,34 @@ fn every_shared_malicious_case_is_rejected() {
 fn every_shared_href_case_matches_the_frontend_policy() {
     let fixture: HrefFixture = serde_json::from_str(&read_fixture("href-cases.json")).unwrap();
     for href in fixture.accepted {
-        let result = validate_entry(&format!("<a href=\"{href}\">链接</a>"), "");
-        assert!(
-            result.valid,
-            "合法 href {href:?} 被拒绝：{:?}",
-            result.diagnostics
-        );
+        for tag in ["a", "area"] {
+            let result = validate_entry(&format!("<{tag} href=\"{href}\">链接</{tag}>"), "");
+            assert!(
+                result.valid,
+                "{tag} 的合法 href {href:?} 被拒绝：{:?}",
+                result.diagnostics
+            );
+        }
     }
     for href in fixture.rejected {
-        let result = validate_entry(&format!("<a href=\"{href}\">链接</a>"), "");
-        assert!(!result.valid, "非法 href {href:?} 未被拒绝");
+        for tag in ["a", "area"] {
+            let result = validate_entry(&format!("<{tag} href=\"{href}\">链接</{tag}>"), "");
+            assert!(!result.valid, "{tag} 的非法 href {href:?} 未被拒绝");
+        }
     }
+}
+
+#[test]
+fn managed_html_resource_attributes_are_accepted() {
+    let html = format!(
+        "<svg><image href=\"fcasset://{ASSET_ID}\"></image><use xlink:href=\"fcasset://{ASSET_ID}\"></use></svg><img src=\"fcasset://{ASSET_ID}\" srcset=\"fcasset://{ASSET_ID} 1x, fcasset://{ASSET_ID} 2x\"><video poster=\"fcasset://{ASSET_ID}\"></video>"
+    );
+    let result = validate_entry(&html, "");
+    assert!(
+        result.valid,
+        "受管 HTML 资源被拒绝：{:?}",
+        result.diagnostics
+    );
 }
 
 #[test]

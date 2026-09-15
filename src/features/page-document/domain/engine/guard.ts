@@ -56,6 +56,7 @@ export const FORBIDDEN_HTML_TAGS = new Set([
 ])
 export const URL_ATTRIBUTES = new Set([
     'href',
+    'xlink:href',
     'src',
     'srcset',
     'action',
@@ -194,6 +195,62 @@ function registerAssetReference(
     }
 }
 
+function qualifiedAttributeName(attribute: HtmlElement['attrs'][number]): string {
+    const name = attribute.name.toLowerCase()
+    return attribute.prefix ? `${attribute.prefix.toLowerCase()}:${name}` : name
+}
+
+function registerHtmlAssetReference(
+    element: HtmlElement,
+    attributeName: string,
+    value: string,
+    diagnostics: DocumentDiagnostic[],
+    referenced: Set<string>,
+    knownAssets: ReadonlySet<string> | undefined,
+): void {
+    registerAssetReference(
+        value,
+        diagnostics,
+        referenced,
+        attributeRange(element, attributeName) ?? elementRange(element),
+        knownAssets,
+        'article.html',
+    )
+}
+
+function validateHtmlSrcset(
+    element: HtmlElement,
+    attributeName: string,
+    value: string,
+    diagnostics: DocumentDiagnostic[],
+    referenced: Set<string>,
+    knownAssets: ReadonlySet<string> | undefined,
+): void {
+    const candidates = value.split(',')
+    if (candidates.some(candidate => candidate.trim().length === 0)) {
+        diagnostics.push(
+            htmlDiagnostic(
+                'invalid_asset_reference',
+                'srcset 必须包含非空的 fcasset://<uuid> 候选地址。',
+                element,
+                attributeName,
+            ),
+        )
+        return
+    }
+    for (const candidate of candidates) {
+        const [url] = candidate.trim().split(/\s+/u)
+        registerHtmlAssetReference(
+            element,
+            attributeName,
+            url,
+            diagnostics,
+            referenced,
+            knownAssets,
+        )
+    }
+}
+
 function validateResourceFunctions(
     value: string,
     diagnostics: DocumentDiagnostic[],
@@ -286,7 +343,7 @@ function validateHtml(
         }
 
         for (const attribute of element.attrs) {
-            const name = attribute.name.toLowerCase()
+            const name = qualifiedAttributeName(attribute)
             if (name.startsWith('data-fc-preview-')) {
                 diagnostics.push(
                     htmlDiagnostic(
@@ -319,7 +376,7 @@ function validateHtml(
             }
             if (!URL_ATTRIBUTES.has(name)) continue
 
-            if (element.tagName === 'a' && name === 'href') {
+            if ((element.tagName === 'a' || element.tagName === 'area') && name === 'href') {
                 const validation = validateAuthorHref(attribute.value)
                 if (!validation.allowed) {
                     diagnostics.push(
@@ -364,6 +421,24 @@ function validateHtml(
                         )
                     }
                 }
+            } else if (name === 'href' || name === 'xlink:href' || name === 'poster') {
+                registerHtmlAssetReference(
+                    element,
+                    name,
+                    attribute.value,
+                    diagnostics,
+                    referenced,
+                    knownAssets,
+                )
+            } else if (name === 'srcset') {
+                validateHtmlSrcset(
+                    element,
+                    name,
+                    attribute.value,
+                    diagnostics,
+                    referenced,
+                    knownAssets,
+                )
             } else {
                 diagnostics.push(
                     htmlDiagnostic(

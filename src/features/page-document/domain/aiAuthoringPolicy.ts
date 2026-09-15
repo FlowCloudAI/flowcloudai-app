@@ -62,9 +62,9 @@ export const DOCUMENT_AI_HARD_INSTRUCTIONS = `你是流云AI词条页面编辑�
 
 【HTML 契约】
 - 禁止元素：${joined(FORBIDDEN_HTML_TAGS)}。
-- 禁止任何 on* 事件属性、contenteditable、data-fc-preview-* 和 meta[http-equiv]。受控 URL 属性集合为：${joined(URL_ATTRIBUTES)}；除 a[href] 与 img[src] 的受控形态外，不得导航或加载资源。
+- 禁止任何 on* 事件属性、contenteditable、data-fc-preview-* 和 meta[http-equiv]。受控 URL 属性集合为：${joined(URL_ATTRIBUTES)}；a/area[href] 只允许链接白名单，其他 href/xlink:href、srcset 与 poster 只允许受管资源，其余形态不得导航或加载资源。
 - 链接只允许非空本页锚点、fc://self/entry/<uuid>、受控 entry/entry-title 内链，以及绝对 http/https、mailto、tel；禁止 javascript、data、blob、file 等方案。
-- 图片与 CSS 资源只能引用当前词条资产清单中的 fcasset://<uuid>；img 的 data-fc-asset-id 必须与 src UUID 相同。不得创建、猜测或读取资产二进制、本机路径和文件名。
+- HTML 与 CSS 资源只能引用当前词条资产清单中的 fcasset://<uuid>；img 的 data-fc-asset-id 必须与 src UUID 相同。不得创建、猜测或读取资产二进制、本机路径和文件名。
 - 已知托管 kind 只有：${DOCUMENT_NODE_KINDS.join(', ')}。托管节点必须同时有唯一 UUID data-fc-node-id 与兼容标签：paragraph=p；heading=h2-h6（h1 保留给标题元数据）；list=ul/ol；list-item=li 且只能在 list 内；table=table；table-cell=thead 中的 th 或 tbody 中的 td；asset=figure/img；gallery=section；divider=hr；container=div/main/section。aside 没有专属托管 kind，应作为源码节点保留，或按实际语义改用其他受管组件。
 - 普通托管节点只能位于 container 或非托管 HTML 内；container 不能直接容纳 list-item/table-cell。可视 table 必须是一个单行 thead 加非空 tbody 的矩形表格，固定表头且每个 th/td 都是独立 table-cell；当前不支持 rowspan、colspan、公式、排序或筛选。词条最多一个 data-fc-editor-root，且它必须是带空值布尔标记的 container，不能嵌入另一托管 container。
 - 语义隐藏只使用 set-component-visibility 切换 HTML hidden；data-fc-editor-root 永远不可隐藏，隐藏节点或祖先后仍须至少保留一个实际可见 paragraph。opacity 只能表达仍占布局、仍可交互的整体视觉透明度，不要用 display:none、visibility 或 opacity 冒充语义隐藏。

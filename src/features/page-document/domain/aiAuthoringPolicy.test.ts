@@ -1,13 +1,32 @@
 // 这些测试确保硬提示覆盖运行时关键常量，防止安全边界与模型说明各自漂移。
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
+import {fileURLToPath} from 'node:url'
 import {
     DOCUMENT_AI_HARD_INSTRUCTIONS,
     validateAiStyleEditingCompatibility,
 } from './aiAuthoringPolicy.ts'
 import {CSS_LAYER_ORDER, parseCssSource} from './engine/cssParser.ts'
 import {guardDocumentSources, FORBIDDEN_AT_RULES, FORBIDDEN_HTML_TAGS} from './engine/guard.ts'
+import {parseHtmlSource} from './engine/htmlParser.ts'
 import {DOCUMENT_LIMITS} from './engine/limits.ts'
+
+interface MaliciousFixture {
+    cases: Array<{
+        id: string
+        file: string
+        replace: {needle: string; value: string}
+    }>
+}
+
+const FIXTURE_ROOT = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../../../tests/fixtures/page-document/v1',
+)
+const readFixture = (relative: string): string =>
+    readFileSync(path.join(FIXTURE_ROOT, relative), 'utf8')
 
 test('AI 硬提示由文档 guard 与资源上限生成', () => {
     for (const tag of FORBIDDEN_HTML_TAGS) {
@@ -104,4 +123,42 @@ test('AI 样式策略拒绝破坏独立文本选区的首字和首行伪元素',
         ),
         [],
     )
+})
+
+test('HTML 资源属性逐项限制为受管资产并覆盖共享恶意样例', () => {
+    const assetId = '22222222-2222-4222-8222-222222222222'
+    const legalHtml = `<map><area href="#section"></map><svg><image href="fcasset://${assetId}"></image><use xlink:href="fcasset://${assetId}"></use></svg><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" srcset="fcasset://${assetId} 1x, fcasset://${assetId} 2x"><video poster="fcasset://${assetId}"></video>`
+    const legal = guardDocumentSources(
+        [parseHtmlSource(legalHtml, {mode: 'fragment', scope: 'entry'})],
+        [],
+    )
+    assert.deepEqual(legal.diagnostics, [])
+    assert.deepEqual(legal.referencedAssetIds, [assetId])
+
+    const requiredIds = [
+        'svg-image-external-href',
+        'svg-use-external-xlink-href',
+        'external-srcset',
+        'external-poster',
+    ]
+    const fixture = JSON.parse(readFixture('malicious-cases.json')) as MaliciousFixture
+    const cases = fixture.cases.filter(item => requiredIds.includes(item.id))
+    assert.deepEqual(
+        cases.map(item => item.id),
+        requiredIds,
+        '共享恶意资源样例不得缺项',
+    )
+    const baseHtml = readFixture('entry/article.html')
+    for (const item of cases) {
+        assert.ok(baseHtml.includes(item.replace.needle), `${item.id} 的替换锚点不存在`)
+        const html = baseHtml.replace(item.replace.needle, item.replace.value)
+        const result = guardDocumentSources(
+            [parseHtmlSource(html, {mode: 'fragment', scope: 'entry'})],
+            [],
+        )
+        assert.ok(
+            result.diagnostics.some(diagnostic => diagnostic.code === 'invalid_asset_reference'),
+            `${item.id} 未被资源 guard 拒绝`,
+        )
+    }
 })

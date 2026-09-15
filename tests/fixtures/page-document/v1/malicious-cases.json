@@ -36,6 +36,50 @@
       "expectedCategories": ["security"]
     },
     {
+      "id": "svg-image-external-href",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</figure>",
+        "value": "</figure>\n      <svg><image href=\"https://example.invalid/image.png\"></image></svg>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "svg-use-external-xlink-href",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</figure>",
+        "value": "</figure>\n      <svg><use xlink:href=\"https://example.invalid/sprite.svg#icon\"></use></svg>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "external-srcset",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "data-fc-asset-id=\"22222222-2222-4222-8222-222222222222\"",
+        "value": "srcset=\"fcasset://22222222-2222-4222-8222-222222222222 1x, https://example.invalid/image@2x.png 2x\" data-fc-asset-id=\"22222222-2222-4222-8222-222222222222\""
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
+      "id": "external-poster",
+      "file": "entry/article.html",
+      "replace": {
+        "needle": "</figure>",
+        "value": "</figure>\n      <video poster=\"https://example.invalid/poster.png\"></video>"
+      },
+      "expectedStatus": 422,
+      "expectedCodes": ["invalid_asset_reference"],
+      "expectedCategories": ["security"]
+    },
+    {
       "id": "external-css-url",
       "file": "entry/style.css",
       "replace": {

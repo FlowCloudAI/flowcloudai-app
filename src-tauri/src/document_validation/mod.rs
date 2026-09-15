@@ -81,14 +81,24 @@ fn validate_element(
         diagnostics.push(d("element", format!("禁止元素 {tag_name}")));
     }
 
-    for (name, value) in element.value().attrs() {
+    for (qualified_name, value) in &element.value().attrs {
+        let name = qualified_name.local.as_ref();
+        let prefix = qualified_name.prefix.as_ref().map(AsRef::as_ref);
+        let display_name =
+            prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}:{name}"));
         if name
             .get(..2)
             .is_some_and(|prefix| prefix.eq_ignore_ascii_case("on"))
         {
-            diagnostics.push(d("attribute", format!("禁止事件属性 {name}")));
+            diagnostics.push(d("attribute", format!("禁止事件属性 {display_name}")));
         }
-        if name.eq_ignore_ascii_case("href") {
+        let unqualified_href = prefix.is_none() && name.eq_ignore_ascii_case("href");
+        let xlink_href = (prefix.is_some_and(|prefix| prefix.eq_ignore_ascii_case("xlink"))
+            && name.eq_ignore_ascii_case("href"))
+            || name.eq_ignore_ascii_case("xlink:href");
+        if unqualified_href
+            && (tag_name.eq_ignore_ascii_case("a") || tag_name.eq_ignore_ascii_case("area"))
+        {
             match parse_href(value, project_id) {
                 Ok(Some(target)) => {
                     if !link_targets.contains(&target) {
@@ -99,8 +109,21 @@ fn validate_element(
                 Err(()) => diagnostics.push(d("href", format!("不允许的 href: {value}"))),
             }
         }
+        if (unqualified_href
+            && !tag_name.eq_ignore_ascii_case("a")
+            && !tag_name.eq_ignore_ascii_case("area"))
+            || xlink_href
+        {
+            validate_managed_resource(value, &display_name, diagnostics);
+        }
         if name.eq_ignore_ascii_case("src") && !is_managed_asset_url(value) {
             diagnostics.push(d("resource", format!("不允许的资源地址: {value}")));
+        }
+        if name.eq_ignore_ascii_case("poster") {
+            validate_managed_resource(value, &display_name, diagnostics);
+        }
+        if name.eq_ignore_ascii_case("srcset") {
+            validate_srcset(value, diagnostics);
         }
         if name.eq_ignore_ascii_case("style") {
             validate_css_tokens(
@@ -289,10 +312,38 @@ fn id_target(entry_id: Uuid) -> DerivedLinkTarget {
 }
 
 fn is_managed_asset_url(value: &str) -> bool {
-    value
-        .strip_prefix("fcasset://")
-        .and_then(|id| Uuid::parse_str(id).ok())
-        .is_some()
+    let Some((scheme, id)) = value.split_once("://") else {
+        return false;
+    };
+    scheme.eq_ignore_ascii_case("fcasset") && Uuid::parse_str(id).is_ok()
+}
+
+fn validate_managed_resource(
+    value: &str,
+    attribute: &str,
+    diagnostics: &mut Vec<ValidationDiagnostic>,
+) {
+    if !is_managed_asset_url(value) {
+        diagnostics.push(d(
+            "resource",
+            format!("{attribute} 只允许 fcasset://<uuid>: {value}"),
+        ));
+    }
+}
+
+fn validate_srcset(value: &str, diagnostics: &mut Vec<ValidationDiagnostic>) {
+    let mut candidate_count = 0;
+    for candidate in value.split(',') {
+        let Some(url) = candidate.split_whitespace().next() else {
+            diagnostics.push(d("resource", "srcset 包含空候选地址"));
+            continue;
+        };
+        candidate_count += 1;
+        validate_managed_resource(url, "srcset", diagnostics);
+    }
+    if candidate_count == 0 {
+        diagnostics.push(d("resource", "srcset 必须包含候选地址"));
+    }
 }
 
 fn derive_text(document: &Html) -> String {
