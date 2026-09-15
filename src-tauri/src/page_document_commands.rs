@@ -9,10 +9,10 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
-use worldflow_core::PageDocumentOps;
 use worldflow_core::models::{
     PageDocument, ProjectHomeDocument, SaveEntryLinkTarget, SavePageDocumentResult,
 };
+use worldflow_core::{PageDocumentOps, WorldflowError};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,22 +72,43 @@ pub async fn page_document_save_project_home(
     modified_by: Option<String>,
 ) -> Result<SavePageDocumentResult<ProjectHomeDocument>, ApiError> {
     let project_id = parse_uuid("projectId", &project_id)?;
-    let validation = document_validation::validate(&html, &css, Some(&project_id.to_string()));
-    require_valid(&validation)?;
-    let db = open_project_db(state.inner(), &project_id)
-        .await
-        .map_err(ApiError::internal)?;
-    db.save_project_home_document(
+    save_project_home(
+        state.inner(),
         &project_id,
         &html,
         &css,
-        &validation.derived_text,
         expected_revision,
         &request_key,
-        modified_by.as_deref().unwrap_or("local"),
+        modified_by.as_deref(),
     )
     .await
-    .map_err(ApiError::from_display)
+}
+
+async fn save_project_home(
+    state: &AppState,
+    project_id: &Uuid,
+    html: &str,
+    css: &str,
+    expected_revision: Option<i64>,
+    request_key: &str,
+    modified_by: Option<&str>,
+) -> Result<SavePageDocumentResult<ProjectHomeDocument>, ApiError> {
+    let validation = document_validation::validate(&html, &css, Some(&project_id.to_string()));
+    require_valid(&validation)?;
+    let db = open_project_db(state, project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    db.save_project_home_document(
+        project_id,
+        html,
+        css,
+        &validation.derived_text,
+        expected_revision,
+        request_key,
+        modified_by.unwrap_or("local"),
+    )
+    .await
+    .map_err(|error| map_save_error(error, "项目首页"))
 }
 
 async fn read_entry(state: &AppState, entry_id: &Uuid) -> Result<Option<PageDocument>, ApiError> {
@@ -131,7 +152,7 @@ async fn save_entry(
         input.modified_by.as_deref().unwrap_or("local"),
     )
     .await
-    .map_err(ApiError::from_display)
+    .map_err(|error| map_save_error(error, "词条页面"))
 }
 
 async fn read_project_home(
@@ -166,6 +187,17 @@ fn require_valid(result: &document_validation::ValidationResult) -> Result<(), A
         ApiError::new(ErrorCode::ValidationFormatError, "页面文档校验失败")
             .with_kv("diagnostics", diagnostics),
     )
+}
+
+fn map_save_error(error: WorldflowError, target: &str) -> ApiError {
+    match error {
+        WorldflowError::DocumentRevisionConflict { current_revision } => ApiError::new(
+            ErrorCode::DocumentRevisionConflict,
+            format!("{target} revision 冲突"),
+        )
+        .with_kv("currentRevision", serde_json::json!(current_revision)),
+        other => ApiError::from_display(other),
+    }
 }
 
 #[cfg(test)]
@@ -356,6 +388,96 @@ mod tests {
         let links = world.list_outgoing_links(&fixture.entry_id).await.unwrap();
         assert_eq!(links.len(), 1);
         assert_eq!(links[0].b_id, target_id);
+    }
+
+    #[tokio::test]
+    async fn stale_entry_revision_returns_conflict_code_and_current_revision() {
+        let fixture = setup().await;
+        let input = SaveInput {
+            entry_id: fixture.entry_id.to_string(),
+            project_id: fixture.project_id.to_string(),
+            html: "<p>第一版</p>".into(),
+            css: String::new(),
+            expected_revision: None,
+            request_key: "entry-conflict-first".into(),
+            modified_by: None,
+        };
+        let first = save_entry(&fixture.state, &input).await.unwrap();
+        assert_eq!(first.revision, 1);
+
+        let error = save_entry(
+            &fixture.state,
+            &SaveInput {
+                html: "<p>过期写入</p>".into(),
+                expected_revision: None,
+                request_key: "entry-conflict-stale".into(),
+                ..input
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::DocumentRevisionConflict.as_str());
+        assert_eq!(error.detail["currentRevision"], 1);
+    }
+
+    #[tokio::test]
+    async fn stale_project_home_revision_returns_conflict_code_and_current_revision() {
+        let fixture = setup().await;
+        let first = save_project_home(
+            &fixture.state,
+            &fixture.project_id,
+            "<main>第一版</main>",
+            "",
+            None,
+            "project-conflict-first",
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(first.revision, 1);
+
+        let error = save_project_home(
+            &fixture.state,
+            &fixture.project_id,
+            "<main>过期写入</main>",
+            "",
+            None,
+            "project-conflict-stale",
+            None,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::DocumentRevisionConflict.as_str());
+        assert_eq!(error.detail["currentRevision"], 1);
+    }
+
+    #[tokio::test]
+    async fn idempotent_replay_and_key_mismatch_are_not_revision_conflicts() {
+        let fixture = setup().await;
+        let input = SaveInput {
+            entry_id: fixture.entry_id.to_string(),
+            project_id: fixture.project_id.to_string(),
+            html: "<p>幂等正文</p>".into(),
+            css: String::new(),
+            expected_revision: None,
+            request_key: "entry-idempotent".into(),
+            modified_by: None,
+        };
+        let first = save_entry(&fixture.state, &input).await.unwrap();
+        let replay = save_entry(&fixture.state, &input).await.unwrap();
+        assert_eq!(replay.revision, first.revision);
+        assert_eq!(replay.request_key, first.request_key);
+
+        let error = save_entry(
+            &fixture.state,
+            &SaveInput {
+                html: "<p>不同正文</p>".into(),
+                ..input
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_ne!(error.code, ErrorCode::DocumentRevisionConflict.as_str());
     }
 
     #[test]
