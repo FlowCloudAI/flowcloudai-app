@@ -21,6 +21,15 @@ export function createCanvasSessionToken(randomValues: (bytes: Uint8Array) => Ui
     return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
+export function createCanvasRequestId(randomValues: (bytes: Uint8Array) => Uint8Array = bytes => crypto.getRandomValues(bytes)): string {
+    const bytes = randomValues(new Uint8Array(16))
+    if (bytes.byteLength !== 16) throw new Error('画布请求 ID 必须使用 16 字节随机值。')
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export function createCanvasHostCommandFactory(sessionToken: string): (payload: CanvasHostCommandPayload) => CanvasHostCommand {
     let sequence = 0
     return payload => ({

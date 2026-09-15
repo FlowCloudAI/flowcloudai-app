@@ -1,0 +1,38 @@
+/* 画布只定义词条主题变量与不参与布局的运行时标记；作者 CSS 由隔离层另行挂载。 */
+:root {
+    --fc-entry-surface: Canvas;
+    --fc-entry-text: CanvasText;
+    --fc-entry-accent: Highlight;
+    --fc-entry-accent-contrast: HighlightText;
+    --fc-entry-muted: GrayText;
+    color: var(--fc-entry-text);
+    background: var(--fc-entry-surface);
+    color-scheme: light dark;
+}
+
+html,
+body {
+    min-width: 0;
+    margin: 0;
+    background: var(--fc-entry-surface);
+}
+
+body {
+    overflow-wrap: anywhere;
+}
+
+#page-document-canvas-root {
+    min-width: 0;
+}
+
+[data-fc-node-id][data-fc-canvas-selected] {
+    outline: 2px solid var(--fc-entry-accent);
+    outline-offset: -2px;
+}
+
+[data-fc-asset-placeholder] {
+    min-block-size: 4rem;
+    border: 1px dashed var(--fc-entry-muted);
+    background: var(--fc-entry-surface);
+    color: var(--fc-entry-muted);
+}

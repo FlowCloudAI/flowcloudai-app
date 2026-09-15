@@ -1,0 +1,31 @@
+/* 宿主只控制 iframe 几何和状态；画布内主题由独立页面的 --fc-entry-* 变量负责。 */
+.page-document-canvas {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--fc-border-color);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-bg-primary);
+}
+
+.page-document-canvas__frame {
+    display: block;
+    width: 100%;
+    min-height: 10rem;
+    border: 0;
+    background: transparent;
+}
+
+.page-document-canvas__status {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--fc-space-4);
+    color: var(--fc-text-secondary);
+    pointer-events: none;
+}
+
+.page-document-canvas[data-canvas-status="ready"] .page-document-canvas__status {
+    display: none;
+}

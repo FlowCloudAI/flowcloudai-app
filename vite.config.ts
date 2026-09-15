@@ -8,6 +8,7 @@ const devHost = process.env.TAURI_DEV_HOST || process.env.HOST || '127.0.0.1'
 const isAndroid = process.env.TAURI_ENV_PLATFORM === 'android'
 const devPort = isAndroid ? 5176 : 5175
 const hmrPort = isAndroid ? 1422 : 1421
+const pageDocumentCanvasEnabled = process.env.VITE_PAGE_DOCUMENT_CANVAS === '1'
 
 function normalizeModuleId(id: string): string {
     return id.replace(/\\/g, '/')
@@ -67,6 +68,12 @@ export default defineConfig({
         // 在 debug 构建中生成 sourcemap
         sourcemap: !!process.env.TAURI_ENV_DEBUG,
         rollupOptions: {
+            input: pageDocumentCanvasEnabled
+                ? {
+                    main: path.resolve(rootDir, 'index.html'),
+                    canvas: path.resolve(rootDir, 'canvas.html'),
+                }
+                : path.resolve(rootDir, 'index.html'),
             output: {
                 manualChunks(id) {
                     const normalized = normalizeModuleId(id)
