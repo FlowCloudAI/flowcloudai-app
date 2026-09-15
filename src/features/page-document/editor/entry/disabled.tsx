@@ -12,5 +12,9 @@ export function PageDocumentProjectSidebar({children}: {projectId: string; child
     return <>{children}</>
 }
 
+export function PageDocumentPropertiesDockHost() {
+    return null
+}
+
 export type {PageDocumentEditorEntryProps} from './types.ts'
 export const PAGE_DOCUMENT_EDITOR_ENABLED = false

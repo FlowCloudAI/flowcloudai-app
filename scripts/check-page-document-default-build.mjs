@@ -8,7 +8,13 @@ import {fileURLToPath} from 'node:url'
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outputRoot = path.resolve(repositoryRoot, 'dist')
-const forbidden = ['页面编辑', 'codemirror', 'page-document-editor']
+const forbidden = [
+    '页面编辑',
+    'codemirror',
+    'page-document-editor',
+    'page-properties',
+    '属性 ·',
+]
 
 function filesUnder(directory) {
     return readdirSync(directory, {withFileTypes: true}).flatMap(entry => {
@@ -32,4 +38,4 @@ for (const file of filesUnder(outputRoot).filter(file => /\.(?:css|html|js|json|
     }
 }
 
-console.log('页面文档默认构建检查通过：无 canvas.html、页面编辑、codemirror、page-document-editor。')
+console.log('页面文档默认构建检查通过：无 canvas.html、页面编辑、CodeMirror、页面属性入口。')

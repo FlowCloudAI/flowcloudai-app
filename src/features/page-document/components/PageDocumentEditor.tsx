@@ -6,10 +6,15 @@ import {Button} from 'flowcloudai-ui'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
 import {createLayerProjection} from '../domain/layerProjection.ts'
-import {resolveVisualSelection, type VisualSelectionSource} from '../application/visualSelectionModel.ts'
+import {
+    findManagedLayerNode,
+    resolveVisualSelection,
+    type VisualSelectionSource,
+} from '../application/visualSelectionModel.ts'
 import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
 import {PageDocumentLayerTree} from './layers/PageDocumentLayerTree.tsx'
+import {PageDocumentPropertiesPanel} from './properties/PageDocumentPropertiesPanel.tsx'
 import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
 import {
     setActivePageDocumentWorkspace,
@@ -57,7 +62,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     })
     const {state} = session
     const {canSave, dirty, discard, save} = session
-    const {sidebarHost} = usePageDocumentWorkspace()
+    const {sidebarHost, dockHost} = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
 
     useEffect(() => {
@@ -139,6 +144,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const conflictSources = conflict?.latestDocument
         ? sourceSetFromConflict(conflict.latestDocument.html, conflict.latestDocument.css)
         : null
+    const selectedNode = selectedNodeId
+        ? findManagedLayerNode(layerProjection.nodes, selectedNodeId)
+        : null
 
     return (
         <>
@@ -149,6 +157,16 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     onSelect={nodeId => handleSelection(nodeId, 'layer')}
                 />,
                 sidebarHost,
+            )}
+            {dockHost && createPortal(
+                <PageDocumentPropertiesPanel
+                    node={selectedNode}
+                    entryStyleCss={scope.sources['style.css']}
+                    inspectComponent={session.inspectComponent}
+                    applyKernelEntry={session.applyKernelEntry}
+                    visualError={session.visualError}
+                />,
+                dockHost,
             )}
             <section className="page-document-editor">
             <header className="page-document-editor__workbar">

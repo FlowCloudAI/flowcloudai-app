@@ -37,6 +37,12 @@ export default defineConfig({
                     ? 'src/features/page-document/editor/entry/enabled.tsx'
                     : 'src/features/page-document/editor/entry/disabled.tsx',
             ),
+            '@page-document-editor-runtime': path.resolve(
+                rootDir,
+                pageDocumentCanvasEnabled
+                    ? 'src/features/page-document/editor/runtime/enabled.ts'
+                    : 'src/features/page-document/editor/runtime/disabled.ts',
+            ),
             react: path.resolve(rootDir, 'node_modules/react'),
             'react-dom': path.resolve(rootDir, 'node_modules/react-dom'),
             'react/jsx-runtime': path.resolve(rootDir, 'node_modules/react/jsx-runtime.js'),

@@ -1,16 +1,22 @@
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import test from 'node:test'
+import {URL} from 'node:url'
 
-import {getSidePanelMinWidth, normalizeSidePanelLayout} from './sidePanelLayout.ts'
+import {
+    getSidePanelMinWidth,
+    normalizeSidePanelLayout,
+    shouldCollapseRetiredPagePanel,
+} from './sidePanelLayout.ts'
 
 const contents = [
     {key: 'ai-chat', minWidth: 500, scope: 'global'},
     {key: 'help', minWidth: 420, scope: 'global'},
-    {key: 'properties', minWidth: 620, scope: 'page'},
+    {key: 'page-properties', minWidth: 272, scope: 'page'},
 ]
 const splitPairs = [
-    ['ai-chat', 'properties'],
-    ['properties', 'help'],
+    ['ai-chat', 'page-properties'],
+    ['page-properties', 'help'],
 ]
 
 test('单栏原样通过', () => {
@@ -52,7 +58,7 @@ test('配对不允许时移除下格', () => {
 test('页面作用域的下格失活时被逐出', () => {
     assert.deepEqual(
         normalizeSidePanelLayout(
-            {primary: 'ai-chat', secondary: 'properties'},
+            {primary: 'ai-chat', secondary: 'page-properties'},
             contents,
             splitPairs,
             () => false,
@@ -64,7 +70,7 @@ test('页面作用域的下格失活时被逐出', () => {
 test('页面作用域的上格失活后下格升级', () => {
     assert.deepEqual(
         normalizeSidePanelLayout(
-            {primary: 'properties', secondary: 'help'},
+            {primary: 'page-properties', secondary: 'help'},
             contents,
             splitPairs,
             () => false,
@@ -76,7 +82,7 @@ test('页面作用域的上格失活后下格升级', () => {
 test('上格失活且没有下格时回落到 AI', () => {
     assert.deepEqual(
         normalizeSidePanelLayout(
-            {primary: 'properties', secondary: null},
+            {primary: 'page-properties', secondary: null},
             contents,
             splitPairs,
             () => false,
@@ -88,9 +94,38 @@ test('上格失活且没有下格时回落到 AI', () => {
 test('分栏最小宽度取上下格较大值', () => {
     assert.equal(
         getSidePanelMinWidth(
-            {primary: 'ai-chat', secondary: 'properties'},
+            {primary: 'ai-chat', secondary: 'page-properties'},
             contents,
         ),
-        620,
+        500,
+    )
+})
+
+test('页面属性只注册在页面作用域且正式分栏配对表保持为空', () => {
+    const registry = readFileSync(new URL('./sidePanelContents.ts', import.meta.url), 'utf8')
+    const enabledEntry = readFileSync(
+        new URL('../../features/page-document/editor/runtime/enabled.ts', import.meta.url),
+        'utf8',
+    )
+    assert.match(enabledEntry, /key: 'page-properties', minWidth: 272, scope: 'page'/)
+    assert.match(registry, /SIDE_PANEL_SPLIT_PAIRS[\s\S]*= \[\]/)
+})
+
+test('页面作用域退位时要求收起 Dock，不把内容改回 AI', () => {
+    assert.equal(
+        shouldCollapseRetiredPagePanel(
+            'page-properties',
+            false,
+            key => key === 'page-properties',
+        ),
+        true,
+    )
+    assert.equal(
+        shouldCollapseRetiredPagePanel(
+            'ai-chat',
+            false,
+            key => key === 'page-properties',
+        ),
+        false,
     )
 })

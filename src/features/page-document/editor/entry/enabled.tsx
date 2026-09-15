@@ -2,5 +2,6 @@
 
 export {PageDocumentEditor as PageDocumentEditorEntry} from '../../components/PageDocumentEditor.tsx'
 export {PageDocumentProjectSidebar} from '../workspace/PageDocumentProjectSidebar.tsx'
+export {PageDocumentPropertiesDockHost} from '../workspace/PageDocumentPropertiesDockHost.tsx'
 export type {PageDocumentEditorEntryProps} from './types.ts'
 export const PAGE_DOCUMENT_EDITOR_ENABLED = true

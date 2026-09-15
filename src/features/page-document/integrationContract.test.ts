@@ -40,7 +40,13 @@ describe('page document editor integration boundary', () => {
         assert.match(vite, /@page-document-editor-entry/)
         assert.match(vite, /pageDocumentCanvasEnabled[\s\S]*editor\/entry\/enabled\.tsx[\s\S]*editor\/entry\/disabled\.tsx/)
         assert.match(build, /check-page-document-default-build\.mjs/)
-        for (const marker of ['页面编辑', 'codemirror', 'page-document-editor']) {
+        for (const marker of [
+            '页面编辑',
+            'codemirror',
+            'page-document-editor',
+            'page-properties',
+            '属性 ·',
+        ]) {
             assert.ok(checker.includes(marker), `默认产物扫描遗漏 ${marker}`)
         }
     })

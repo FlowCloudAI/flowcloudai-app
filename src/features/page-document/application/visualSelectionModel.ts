@@ -4,10 +4,16 @@ import type {LayerProjectionNode} from '../domain/layerProjection.ts'
 
 export type VisualSelectionSource = 'canvas' | 'layer'
 
-function containsManagedNode(nodes: readonly LayerProjectionNode[], nodeId: string): boolean {
-    return nodes.some(node =>
-        (node.managed && node.id === nodeId) || containsManagedNode(node.children, nodeId),
-    )
+export function findManagedLayerNode(
+    nodes: readonly LayerProjectionNode[],
+    nodeId: string,
+): LayerProjectionNode | null {
+    for (const node of nodes) {
+        if (node.managed && node.id === nodeId) return node
+        const nested = findManagedLayerNode(node.children, nodeId)
+        if (nested) return nested
+    }
+    return null
 }
 
 export function resolveVisualSelection(
@@ -18,5 +24,5 @@ export function resolveVisualSelection(
     void source
     if (nodeId === null) return null
     const normalized = nodeId.toLowerCase()
-    return containsManagedNode(nodes, normalized) ? normalized : null
+    return findManagedLayerNode(nodes, normalized) ? normalized : null
 }

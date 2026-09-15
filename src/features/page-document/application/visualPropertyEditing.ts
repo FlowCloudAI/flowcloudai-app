@@ -192,9 +192,7 @@ function fieldState(
                     normalizeManagedCondition(declaration.media) !== null,
             ),
         )
-    const inherited = inspection.effectiveValue?.origin.source?.scope === 'project'
-        ? '本级未设置 · 继承自项目样式'
-        : '本级未设置 · 继承自词条样式'
+    const inherited = '本级未设置 · 继承自词条样式'
     return Object.freeze({
         ...base,
         value: localValue ?? effectiveValue(inspection),

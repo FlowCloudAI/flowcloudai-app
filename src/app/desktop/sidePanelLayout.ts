@@ -58,3 +58,11 @@ export function getSidePanelMinWidth<Key extends string>(
         : descriptors.get(layout.secondary)?.minWidth ?? 0
     return Math.max(primaryMinWidth, secondaryMinWidth)
 }
+
+export function shouldCollapseRetiredPagePanel<Key extends string>(
+    key: Key,
+    pageScopeActive: boolean,
+    isPagePanelKey: (candidate: Key) => boolean,
+): boolean {
+    return !pageScopeActive && isPagePanelKey(key)
+}

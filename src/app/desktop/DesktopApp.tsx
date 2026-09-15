@@ -42,7 +42,17 @@ import {
     SIDE_PANEL_SPLIT_PAIRS,
     type SidePanelContentKey,
 } from './sidePanelContents'
-import {getSidePanelMinWidth, normalizeSidePanelLayout} from './sidePanelLayout'
+import {
+    getSidePanelMinWidth,
+    normalizeSidePanelLayout,
+    shouldCollapseRetiredPagePanel,
+} from './sidePanelLayout'
+import {PageDocumentPropertiesDockHost} from '@page-document-editor-entry'
+import {
+    getPageDocumentEditorSideBarItems,
+    isPageDocumentPropertiesKey,
+    usePageDocumentEditorActive,
+} from '@page-document-editor-runtime'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
@@ -448,12 +458,13 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
     const [sidePanelSecondaryKey, setSidePanelSecondaryKey] = useState<SidePanelContentKey | null>(null)
     const [splitRatio, setSplitRatio] = useState(0.45)
     const [projectReloadTokens, setProjectReloadTokens] = useState<Record<string, number>>({})
+    const pageDocumentEditorActive = usePageDocumentEditorActive()
     const normalizedSidePanelLayout = useMemo(() => normalizeSidePanelLayout(
         {primary: sidePanelContentKey, secondary: sidePanelSecondaryKey},
         SIDE_PANEL_CONTENTS,
         SIDE_PANEL_SPLIT_PAIRS,
-        () => false,
-    ), [sidePanelContentKey, sidePanelSecondaryKey])
+        key => isPageDocumentPropertiesKey(key) && pageDocumentEditorActive,
+    ), [pageDocumentEditorActive, sidePanelContentKey, sidePanelSecondaryKey])
     const sidePanelMinWidth = useMemo(
         () => getSidePanelMinWidth(normalizedSidePanelLayout, SIDE_PANEL_CONTENTS),
         [normalizedSidePanelLayout],
@@ -477,7 +488,8 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
 
     const clearSidePanelSelection = useCallback(() => {
         setSelectedKey(prev => (
-            prev === 'idea' || prev === 'ai-chat' || prev === 'snapshot' || prev === 'help'
+            prev === 'idea' || prev === 'ai-chat' || prev === 'snapshot' || prev === 'help' ||
+            isPageDocumentPropertiesKey(prev)
                 ? ''
                 : prev
         ))
@@ -506,6 +518,16 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         setAiPanelWidth(sidePanelMinWidth)
         setAiPanelCollapsed(false)
     }, [sidePanelMinWidth])
+
+    useEffect(() => {
+        if (!shouldCollapseRetiredPagePanel(
+            sidePanelContentKey,
+            pageDocumentEditorActive,
+            isPageDocumentPropertiesKey,
+        )) return
+        setAiPanelCollapsed(true)
+        clearSidePanelSelection()
+    }, [clearSidePanelSelection, pageDocumentEditorActive, sidePanelContentKey])
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
@@ -907,7 +929,10 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             openWorldCheckTaskMonitor(latestWorldCheckTask.projectId)
             return
         }
-        if (key === 'idea' || key === 'ai-chat' || key === 'snapshot' || key === 'help') {
+        if (
+            key === 'idea' || key === 'ai-chat' || key === 'snapshot' || key === 'help' ||
+            (pageDocumentEditorActive && isPageDocumentPropertiesKey(key))
+        ) {
             if (!aiPanelCollapsed && normalizedSidePanelLayout.primary === key && !options?.forceOpen) {
                 collapseAiPanel()
                 setSelectedKey('')
@@ -925,7 +950,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         if (key === 'settings') {
             openSettings()
         }
-    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, handleOpenProjectTool, latestWorldCheckTask, normalizedSidePanelLayout.primary, openSettings])
+    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, handleOpenProjectTool, latestWorldCheckTask, normalizedSidePanelLayout.primary, openSettings, pageDocumentEditorActive])
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
         openSettings({tab: 'plugins', pluginKind: kind})
@@ -1150,6 +1175,8 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
         if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.main
         if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.main
         if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.main
+        const pagePropertiesKey = mountedSidePanelKeys.find(isPageDocumentPropertiesKey)
+        if (pagePropertiesKey) out[pagePropertiesKey] = <PageDocumentPropertiesDockHost/>
         return out
     }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main, helpSlots.main])
     const handleSplitCollapse = useCallback((which: 'primary' | 'secondary') => {
@@ -1267,6 +1294,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
     ) : null
 
     const menuItems: SideBarItem[] = [
+        ...getPageDocumentEditorSideBarItems(pageDocumentEditorActive),
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
         {key: 'snapshot', label: '历史版本', icon: SnapshotIcon},

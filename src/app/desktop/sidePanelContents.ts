@@ -3,6 +3,8 @@
  * 布局规整与渲染只消费这些描述，不在业务组件里复制内容能力判断。
  */
 
+import {PAGE_DOCUMENT_EDITOR_SIDE_PANEL_CONTENTS} from '@page-document-editor-runtime'
+
 export type SidePanelContentScope = 'global' | 'page'
 
 export interface SidePanelContentDescriptor<Key extends string = string> {
@@ -16,6 +18,7 @@ export const SIDE_PANEL_CONTENTS = [
     {key: 'ai-chat', minWidth: 500, scope: 'global'},
     {key: 'snapshot', minWidth: 500, scope: 'global'},
     {key: 'help', minWidth: 500, scope: 'global'},
+    ...PAGE_DOCUMENT_EDITOR_SIDE_PANEL_CONTENTS,
 ] as const satisfies readonly SidePanelContentDescriptor[]
 
 export type SidePanelContentKey = typeof SIDE_PANEL_CONTENTS[number]['key']
