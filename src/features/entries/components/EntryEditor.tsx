@@ -351,23 +351,21 @@ export default function EntryEditor({
         )
         return result === 'yes'
     }, [pageDocumentDirty, showAlert])
+    const requestLeavePageDocument = useCallback(async (): Promise<boolean> => {
+        if (!(await confirmDiscardPageDocument())) return false
+        setPageDocumentDirty(false)
+        setPageDocumentResetVersion(current => current + 1)
+        return true
+    }, [confirmDiscardPageDocument])
     const requestEditorMode = useCallback(async (nextMode: EntryEditorMode) => {
         if (nextMode === editorMode) return
-        if (editorMode === 'page' && !(await confirmDiscardPageDocument())) return
-        if (editorMode === 'page') {
-            setPageDocumentDirty(false)
-            setPageDocumentResetVersion(current => current + 1)
-        }
+        if (editorMode === 'page' && !(await requestLeavePageDocument())) return
         setEditorMode(nextMode)
-    }, [confirmDiscardPageDocument, editorMode])
+    }, [editorMode, requestLeavePageDocument])
     const handleBack = useCallback(async () => {
-        if (editorMode === 'page' && !(await confirmDiscardPageDocument())) return
-        if (editorMode === 'page') {
-            setPageDocumentDirty(false)
-            setPageDocumentResetVersion(current => current + 1)
-        }
+        if (editorMode === 'page' && !(await requestLeavePageDocument())) return
         await onBack?.()
-    }, [confirmDiscardPageDocument, editorMode, onBack])
+    }, [editorMode, onBack, requestLeavePageDocument])
     const markUserEdited = useCallback(() => {
         userEditVersionRef.current += 1
         setHasUserEdited(true)
@@ -1762,6 +1760,7 @@ export default function EntryEditor({
                                 <PageDocumentEditorEntry
                                     entryId={entryId}
                                     projectId={projectId}
+                                    categoryId={entry?.category_id ?? null}
                                     active={active}
                                     title={draft.title}
                                     summary={draft.summary}
@@ -1769,6 +1768,7 @@ export default function EntryEditor({
                                     resetVersion={pageDocumentResetVersion}
                                     onDirtyChange={setPageDocumentDirty}
                                     onNavigationIntent={handlePageDocumentNavigation}
+                                    onRequestLeave={requestLeavePageDocument}
                                 />
                             ) : editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">

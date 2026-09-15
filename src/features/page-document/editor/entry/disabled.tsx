@@ -12,6 +12,23 @@ export function PageDocumentProjectSidebar({children}: {projectId: string; child
     return <>{children}</>
 }
 
+export function PageDocumentProjectSidebarHeader({
+    defaultLabel,
+    onDefaultBack,
+}: {
+    projectId: string
+    defaultLabel: string
+    onDefaultBack: () => void
+    onReturnCategory: (categoryId: string) => void
+    onReturnProject: () => void
+}) {
+    return (
+        <button type="button" className="pe-tree-header-btn" onClick={onDefaultBack}>
+            {defaultLabel}
+        </button>
+    )
+}
+
 export function PageDocumentPropertiesDockHost() {
     return null
 }

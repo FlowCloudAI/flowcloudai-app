@@ -245,7 +245,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             history: {historyGroupId?: string} = {},
         ): Promise<boolean> => {
             if (preparation.status === 'needs-decision') {
-                const impacts = [...new Set(preparation.decisions.map(item => `• ${item.message}`))]
+                const impacts = [...new Set(preparation.decisions.map(item => item.message))]
                 const confirmed = await showAlert(
                     `“${label}”会影响其他规则：\n\n${impacts.join('\n')}\n\n确认后才会写入当前草稿。`,
                     'warning',

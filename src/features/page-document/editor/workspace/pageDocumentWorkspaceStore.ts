@@ -5,6 +5,9 @@ import {useSyncExternalStore} from 'react'
 export interface ActivePageDocumentWorkspace {
     projectId: string
     entryId: string
+    categoryId: string | null
+    dirty: boolean
+    requestLeave: () => Promise<boolean>
 }
 
 export interface PageDocumentWorkspaceSnapshot {
@@ -26,6 +29,9 @@ function publish(next: PageDocumentWorkspaceSnapshot): void {
     if (
         next.active?.projectId === snapshot.active?.projectId &&
         next.active?.entryId === snapshot.active?.entryId &&
+        next.active?.categoryId === snapshot.active?.categoryId &&
+        next.active?.dirty === snapshot.active?.dirty &&
+        next.active?.requestLeave === snapshot.active?.requestLeave &&
         next.sidebarHost === snapshot.sidebarHost &&
         next.dockHost === snapshot.dockHost
     ) return

@@ -1,7 +1,12 @@
-// 本组件把领域层的只读投影呈现为可折叠图层树；只有托管节点可以送回画布选中。
+// 本组件把领域层投影呈现为可折叠组件树；未纳入节点也可选中，后续由属性面板决定可用操作。
 
 import {useState} from 'react'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
+import {
+    PageDocumentDisclosureIcon,
+    PageDocumentLayerKindIcon,
+} from '../icons/PageDocumentLayerIcons.tsx'
+import {pageDocumentLayerLabel} from './layerTreePresentation.ts'
 import './PageDocumentLayerTree.css'
 
 interface PageDocumentLayerTreeProps {
@@ -9,22 +14,6 @@ interface PageDocumentLayerTreeProps {
     selectedNodeId: string | null
     onSelect: (nodeId: string) => void
 }
-
-const KIND_ICON: Readonly<Record<string, string>> = Object.freeze({
-    container: '▣',
-    paragraph: '¶',
-    heading: 'H',
-    image: '▧',
-    link: '↗',
-    list: '≡',
-    'list-item': '•',
-    table: '▦',
-    'table-cell': '▫',
-    quote: '❞',
-    divider: '—',
-    operation: '◇',
-    source: '⌘',
-})
 
 function LayerNode({
     node,
@@ -39,7 +28,7 @@ function LayerNode({
     const hasChildren = node.children.length > 0
     return (
         <li role="treeitem" aria-expanded={hasChildren ? expanded : undefined}>
-            <div className={`page-document-layer-node${node.id === selectedNodeId ? ' is-selected' : ''}`}>
+            <div className={`page-document-layer-node${node.id === selectedNodeId ? ' is-selected' : ''}${node.managed ? '' : ' is-unmanaged'}`}>
                 <button
                     type="button"
                     className="page-document-layer-node__toggle"
@@ -47,19 +36,18 @@ function LayerNode({
                     aria-label={expanded ? '收起图层' : '展开图层'}
                     onClick={() => setExpanded(current => !current)}
                 >
-                    {hasChildren ? (expanded ? '⌄' : '›') : ''}
+                    {hasChildren && <PageDocumentDisclosureIcon expanded={expanded}/>}
                 </button>
                 <button
                     type="button"
                     className="page-document-layer-node__select"
-                    disabled={!node.managed}
-                    title={node.managed ? node.label : '源码结构只读，不可在画布中选中'}
-                    onClick={() => node.managed && onSelect(node.id)}
+                    title={node.managed ? '可视编辑组件' : node.kind === 'operation' ? '模板生成节点' : '该元素尚未纳入可视编辑'}
+                    onClick={() => onSelect(node.id)}
                 >
                     <span className="page-document-layer-node__icon" aria-hidden="true">
-                        {KIND_ICON[node.kind] ?? '□'}
+                        <PageDocumentLayerKindIcon kind={node.kind}/>
                     </span>
-                    <span>{node.label}</span>
+                    <span>{pageDocumentLayerLabel(node)}</span>
                 </button>
             </div>
             {hasChildren && expanded && (

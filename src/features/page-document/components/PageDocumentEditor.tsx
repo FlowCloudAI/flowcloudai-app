@@ -7,7 +7,7 @@ import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.
 import type {SourceFileSet} from '../domain/contract.ts'
 import {createLayerProjection} from '../domain/layerProjection.ts'
 import {
-    findManagedLayerNode,
+    findLayerNode,
     resolveVisualSelection,
     type VisualSelectionSource,
 } from '../application/visualSelectionModel.ts'
@@ -44,6 +44,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const {
         entryId,
         projectId,
+        categoryId,
         active,
         title,
         summary,
@@ -51,6 +52,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         resetVersion,
         onDirtyChange,
         onNavigationIntent,
+        onRequestLeave,
     } = props
     const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -80,8 +82,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
 
     useEffect(() => {
         if (!active) return
-        return setActivePageDocumentWorkspace({projectId, entryId})
-    }, [active, entryId, projectId])
+        return setActivePageDocumentWorkspace({
+            projectId,
+            entryId,
+            categoryId,
+            dirty,
+            requestLeave: onRequestLeave,
+        })
+    }, [active, categoryId, dirty, entryId, onRequestLeave, projectId])
 
     useEffect(() => {
         if (resetVersion === appliedResetVersionRef.current) return
@@ -152,7 +160,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         ? sourceSetFromConflict(conflict.latestDocument.html, conflict.latestDocument.css)
         : null
     const selectedNode = selectedNodeId
-        ? findManagedLayerNode(layerProjection.nodes, selectedNodeId)
+        ? findLayerNode(layerProjection.nodes, selectedNodeId)
         : null
     const editorIdentity = {projectId, entryId}
     // 词条标签会常驻挂载；共享宿主必须只由当前活动词条独占，避免后台草稿叠进同一 portal。

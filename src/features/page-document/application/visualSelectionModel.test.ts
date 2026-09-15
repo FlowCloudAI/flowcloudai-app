@@ -23,3 +23,9 @@ test('图层投影外的画布身份不能污染宿主选中态', () => {
         null,
     )
 })
+
+test('未纳入节点在组件树中可选中但不能伪造成画布托管身份', () => {
+    const unmanaged = createLayerProjection('<p>旧段落</p>').nodes[0]
+    assert.equal(resolveVisualSelection([unmanaged], unmanaged.id, 'layer'), unmanaged.id)
+    assert.equal(resolveVisualSelection([unmanaged], unmanaged.id, 'canvas'), null)
+})

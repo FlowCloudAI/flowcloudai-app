@@ -72,7 +72,10 @@ import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {buildProjectExportFileName} from '../features/projects/projectDisplay'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import {PROJECT_EDITOR_TOUR_ID, type TourDefinition, useTour} from '../features/onboarding'
-import {PageDocumentProjectSidebar} from '@page-document-editor-entry'
+import {
+    PageDocumentProjectSidebar,
+    PageDocumentProjectSidebarHeader,
+} from '@page-document-editor-entry'
 import './ProjectEditor.css'
 
 const TREE_MIN_WIDTH = '15rem'
@@ -1172,13 +1175,13 @@ function ProjectEditorInner({
             <FcworldProgressDialog progress={fcworldProgress} />
             <div className="pe-tree-panel" data-tour-id="project-editor-tree">
                 <div className="pe-tree-panel__header">
-                    <button
-                        type="button"
-                        className="pe-tree-header-btn"
-                        onClick={handleTreeHeaderBackClick}
-                    >
-                        {hasToolSidebar ? '返回' : '返回主页'}
-                    </button>
+                    <PageDocumentProjectSidebarHeader
+                        projectId={projectId}
+                        defaultLabel={hasToolSidebar ? '返回' : '返回主页'}
+                        onDefaultBack={handleTreeHeaderBackClick}
+                        onReturnCategory={handleBreadcrumbCategoryClick}
+                        onReturnProject={handleBreadcrumbProjectClick}
+                    />
                     <button
                         type="button"
                         className="pe-tree-toggle"

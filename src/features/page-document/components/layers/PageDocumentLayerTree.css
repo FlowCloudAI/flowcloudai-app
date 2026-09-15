@@ -33,6 +33,10 @@
     color: var(--fc-color-primary);
 }
 
+.page-document-layer-node.is-unmanaged:not(.is-selected) {
+    color: var(--fc-color-text-tertiary);
+}
+
 .page-document-layer-node__toggle,
 .page-document-layer-node__select {
     border: 0;
@@ -51,6 +55,13 @@
     cursor: default;
 }
 
+.page-document-layer-node__toggle svg,
+.page-document-layer-node__icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
 .page-document-layer-node__select {
     display: flex;
     align-items: center;
@@ -64,11 +75,6 @@
 
 .page-document-layer-node__select:hover:not(:disabled) {
     color: var(--fc-color-text);
-}
-
-.page-document-layer-node__select:disabled {
-    color: var(--fc-color-text-tertiary);
-    cursor: default;
 }
 
 .page-document-layer-node__select > span:last-child {

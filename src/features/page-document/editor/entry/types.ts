@@ -3,6 +3,7 @@
 export interface PageDocumentEditorEntryProps {
     entryId: string
     projectId: string
+    categoryId: string | null
     active: boolean
     title: string
     summary: string
@@ -10,4 +11,5 @@ export interface PageDocumentEditorEntryProps {
     resetVersion: number
     onDirtyChange: (dirty: boolean) => void
     onNavigationIntent: (href: string) => void
+    onRequestLeave: () => Promise<boolean>
 }
