@@ -29,17 +29,22 @@ const beforeInputTypes = new Set<string>([
     'deleteWordForward',
 ] satisfies readonly CanvasInputType[])
 
+const nativeCompositionInputTypes = new Set([
+    'insertCompositionText',
+    'deleteCompositionText',
+    'insertFromComposition',
+    'deleteByComposition',
+])
+
 export function canvasBeforeInputDecision(input: {
     editingEnabled: boolean
     isComposing: boolean
     inputType: string
 }): CanvasBeforeInputDecision {
     if (!input.editingEnabled) return 'ignore'
-    if (input.isComposing) {
-        return input.inputType === 'insertCompositionText' || input.inputType === 'deleteCompositionText'
-            ? 'native-composition'
-            : 'block'
-    }
+    // WebKit 的旧式组合事件可能晚于 compositionend；各内核时序不同，不能以当前 isComposing 判定。
+    if (nativeCompositionInputTypes.has(input.inputType)) return 'native-composition'
+    if (input.isComposing) return 'block'
     return beforeInputTypes.has(input.inputType) ? 'submit' : 'block'
 }
 

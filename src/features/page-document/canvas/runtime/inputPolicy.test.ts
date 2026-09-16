@@ -9,6 +9,7 @@ import {
     expandCollapsedCanvasDeletion,
     shouldDeferCanvasRender,
 } from './inputPolicy.ts'
+import {CANVAS_INPUT_TYPES} from '../protocol/index.ts'
 
 const snapshot = {
     nodeId: '018f47a2-3b4c-7d5e-8f90-123456789abc',
@@ -29,9 +30,11 @@ test('未收到开启命令时不处理输入，开启后只提交本批六种 b
         'deleteWordForward',
     ]) {
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'submit')
+        assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
     }
     for (const inputType of ['insertParagraph', 'insertLineBreak', 'insertFromPaste', 'insertFromDrop', 'formatBold', 'historyUndo']) {
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'block')
+        assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
     }
     assert.deepEqual(canvasBlockedInputDetail('insertParagraph', 'unsupported-input-type', snapshot.nodeId), {
         inputType: 'insertParagraph',
@@ -40,10 +43,23 @@ test('未收到开启命令时不处理输入，开启后只提交本批六种 b
     })
 })
 
-test('组合期间只让浏览器维护中间态并延迟宿主渲染', () => {
-    assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType: 'insertCompositionText'}), 'native-composition')
-    assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType: 'deleteCompositionText'}), 'native-composition')
-    assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType: 'insertParagraph'}), 'block')
+test('四种组合专用 beforeinput 不依赖当前 composing 状态且 WebKit 类型不进入提交白名单', () => {
+    const compositionInputTypes = [
+        'insertCompositionText',
+        'deleteCompositionText',
+        'insertFromComposition',
+        'deleteByComposition',
+    ]
+    for (const inputType of compositionInputTypes) {
+        assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'native-composition')
+        assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'native-composition')
+    }
+    const submitTypes = new Set<string>(CANVAS_INPUT_TYPES)
+    assert.equal(submitTypes.has('insertFromComposition'), false)
+    assert.equal(submitTypes.has('deleteByComposition'), false)
+})
+
+test('组合期间延迟宿主渲染', () => {
     assert.equal(shouldDeferCanvasRender(true, 0), true)
     assert.equal(shouldDeferCanvasRender(false, 1), true)
     assert.equal(shouldDeferCanvasRender(false, 0), false)

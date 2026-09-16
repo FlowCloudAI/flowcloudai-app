@@ -187,6 +187,13 @@ Inspector 在画布执行环境中得到 `window.origin === "null"`，访问 `pa
 `svg-image-external-href` 时，网络面板均没有 `example.invalid` 请求，只有重建画布产生的
 `canvas.html`。
 
+2026-09-16，用户在 macOS 打包版 WKWebView 中补验中文组合输入时发现：正文和保存结果正确，但
+每次提交候选词都会提示阻止 `insertFromComposition`。WebKit 会发送 Chromium 验证未覆盖的
+`insertFromComposition` / `deleteByComposition` 旧式组合专用 `beforeinput`，且事件可能晚于
+`compositionend`，所以此前依赖当前 `isComposing` 的判断将其误报为不支持输入。运行时现将这两种
+事件与 `insertCompositionText` / `deleteCompositionText` 一样交给浏览器维护，不阻止、不回报、
+也不生成输入意图；最终纯文本仍只由 `compositionstart` / `compositionend` 链路提交一次。
+
 2026-09-15，用户使用
 `VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev` 生成的 aarch64 Android 真机 debug APK
 完成原生验收，结果全部通过：
