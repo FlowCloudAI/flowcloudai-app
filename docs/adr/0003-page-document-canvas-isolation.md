@@ -33,6 +33,18 @@ HTML 只保留安全骨架与占位，不含外链脚本、样式表或 `style` 
 满足同一信封约束的命令。销毁画布或切换文档即轮换 token，旧 Window、旧 token、重放和乱序消息
 全部失效。
 
+画布默认保持只读，只有收到通过上述信封、来源 Window 与序号校验的 `set-editing` 命令后，运行时
+才为 paragraph、heading、list-item 和 table-cell 四类受管节点增加
+`contenteditable="plaintext-only"`。作者源码中的 `contenteditable` 仍由隔离层拒绝；运行时授予的
+属性在每次安全挂载后重新生成。画布只回报节点 ID、UTF-16 区间、区间原文和替换纯文本，不回报
+HTML。宿主再以当前受管投影和 expected 文本复核后交给文档内核，因此 contenteditable 自生成的
+临时 DOM 不是文档真值，拒绝的输入会由当前草稿重新渲染回滚。
+
+中文输入组合期沿用同一不变量：`compositionstart` 保存起点与原节点，组合中不提交输入、不应用
+宿主渲染，`compositionend` 先恢复起点 DOM，再把最终候选作为一次纯文本意图提交；空结果按取消
+处理。普通连续输入以 140ms 窗口合并为一个顺序内核批次，组合结束与失焦立即冲刷尾帧。当前只开放
+单节点内的打字、替换和向前/向后字符或词删除；换行、粘贴、拖放、富文本和跨节点操作均明确拒绝。
+
 ## 方案比较
 
 ### A：`srcdoc` iframe
@@ -215,7 +227,7 @@ WebView 已由 `window.origin` 与跨文档访问实测确认画布使用 opaque
 
 ## 待原生验证
 
-仅剩 Windows WebView2：
+基础隔离与只读画布仅剩 Windows WebView2：
 
 - 打包子页面是否成为 opaque origin、让 `'self'` 不匹配应用协议资源，且 `event.origin` 不可用于
   鉴权。
@@ -223,5 +235,14 @@ WebView 已由 `window.origin` 与跨文档访问实测确认画布使用 opaque
 - 经过隔离层保留的作者行内 `style` 属性是否在打包版中生效。
 - 拒绝作者网络、表单和导航时是否不产生请求、不替换画布页面，也不触发宿主顶层导航。
 - iframe 销毁、重建、旋转和后台恢复时，Window 身份与消息时序是否符合协议生命周期假设。
+
+第四批 4a 的文本输入尚未做任何原生验收，三端分别待验证：
+
+- macOS WKWebView：连续中文输入、候选词切换、取消组合、长文末尾输入与失焦提交是否不吞字、不重复，
+  拒绝输入时是否回滚到草稿，连续输入是否只产生一次撤销。
+- Android WebView：除上述输入与历史外，软键盘出现、候选栏变化和长文末尾光标是否不触发外壳二次
+  缩放或平移；本批没有新增移动端专用 caret reveal。
+- Windows WebView2：上述全部输入行为，以及 `plaintext-only`、beforeinput 目标区间和组合事件顺序
+  是否与协议假设一致。
 
 三端全部通过前，本 ADR 不写为“接受”，M6 也不写为“三端原生验收完成”。
