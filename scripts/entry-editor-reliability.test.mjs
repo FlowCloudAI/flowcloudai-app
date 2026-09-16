@@ -1,12 +1,10 @@
 /**
- * 验证正文编辑器在防抖窗口内仍可撤销，并保持明确的保存状态。
+ * 验证共享撤销、元数据保存状态与词条详情加载等仍使用的辅助逻辑。
  */
 import assert from 'node:assert/strict'
 import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
 import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
-import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
 import {ensureEntryDetailLoaded} from '../src/features/entries/lib/entryDetailLoading.ts'
-import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
 import {resolveSavedState, shouldAutoSave} from '../src/features/entries/lib/entrySaveState.ts'
 import {resolveEditableNumberTagValue} from '../src/features/entries/lib/entryTagInput.ts'
 import {
@@ -75,27 +73,6 @@ assert.equal(
     'dirty',
 )
 
-assert.equal(resolveSelectionToolbarPlacement({
-    selectionTop: 120,
-    selectionBottom: 180,
-    visibleTop: 0,
-    visibleBottom: 400,
-    pointerY: 170,
-}), 'below')
-assert.equal(resolveSelectionToolbarPlacement({
-    selectionTop: 120,
-    selectionBottom: 380,
-    visibleTop: 0,
-    visibleBottom: 400,
-    pointerY: 370,
-}), 'above')
-assert.equal(resolveSelectionToolbarPlacement({
-    selectionTop: 30,
-    selectionBottom: 380,
-    visibleTop: 0,
-    visibleBottom: 400,
-}), null)
-
 const loadedEntryDetailIds = new Set()
 const pendingEntryDetailLoads = new Map()
 let entryDetailLoadCount = 0
@@ -123,10 +100,6 @@ assert.equal(entryDetailLoadCount, 1)
 finishEntryDetailLoad()
 await firstEntryDetailLoad
 assert.equal(pendingEntryDetailLoads.size, 0)
-
-assert.equal(resolveMarkdownPreviewSourceContent('edit', false, '新内容', '旧内容'), null)
-assert.equal(resolveMarkdownPreviewSourceContent('edit', true, '新内容', '旧内容'), '旧内容')
-assert.equal(resolveMarkdownPreviewSourceContent('browse', false, '新内容', '旧内容'), '新内容')
 
 const submittedDraft = {content: '已提交'}
 const refreshedDraft = {content: '数据库结果'}
