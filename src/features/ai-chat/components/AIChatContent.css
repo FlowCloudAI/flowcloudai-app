@@ -684,7 +684,7 @@
 }
 
 .ai-messages-container > .fc-roll__content {
-    padding: var(--fc-space-lg) var(--fc-space-xl);
+    padding: var(--fc-space-md) var(--fc-space-lg);
 }
 
 /* 空状态 */
@@ -1064,12 +1064,12 @@
 /* ========== 悬浮输入框 ========== */
 .ai-floating-input-wrapper {
     --ai-conversation-settings-input-overlap: 1.1rem;
-    --ai-floating-input-bottom-gap: 24px;
+    --ai-floating-input-bottom-gap: var(--fc-space-lg);
     position: absolute;
     bottom: var(--ai-floating-input-bottom-gap);
     left: 50%;
     transform: translateX(-50%);
-    width: min(var(--ai-chat-content-max-width), calc(100% - 40px));
+    width: min(var(--ai-chat-content-max-width), calc(100% - (var(--fc-space-lg) * 2)));
     z-index: 100;
     isolation: isolate;
 }
@@ -1080,7 +1080,7 @@
     backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     border-radius: var(--fc-radius-xl);
-    padding: var(--fc-space-md) var(--fc-space-lg);
+    padding: var(--fc-space-sm) var(--fc-space-md);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--dock-panel-border-color);
@@ -1242,7 +1242,7 @@
     width: 100%;
     min-height: calc(var(--fc-space-3xl) + var(--fc-space-md));
     max-height: 12.5rem;
-    padding: var(--fc-space-sm) 0;
+    padding: var(--fc-space-xs) 0;
     border: none;
     background: transparent;
     color: var(--fc-color-text);
@@ -1657,7 +1657,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fc-space-sm);
-    margin-top: var(--fc-space-sm);
+    margin-top: var(--fc-space-xs);
     pointer-events: auto;
 }
 
@@ -1894,7 +1894,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: var(--fc-space-sm);
+    gap: var(--fc-space-xs);
 }
 
 .ai-floating-char-count {
@@ -1904,10 +1904,10 @@
 }
 
 .ai-floating-send-btn {
-    width: 40px;
-    height: 40px;
+    width: var(--fc-control-height-sm);
+    height: var(--fc-control-height-sm);
     border: none;
-    border-radius: 50%;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
     cursor: pointer;
@@ -1928,10 +1928,10 @@
 }
 
 .ai-floating-attach-btn {
-    width: 40px;
-    height: 40px;
+    width: var(--fc-control-height-sm);
+    height: var(--fc-control-height-sm);
     border: 1px solid var(--fc-color-border);
-    border-radius: 50%;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -1953,11 +1953,18 @@
     cursor: not-allowed;
 }
 
+.ai-floating-send-btn svg,
+.ai-floating-attach-btn svg,
+.ai-floating-stop-btn svg {
+    width: var(--fc-font-size-icon-lg);
+    height: var(--fc-font-size-icon-lg);
+}
+
 .ai-floating-stop-btn {
-    width: 40px;
-    height: 40px;
+    width: var(--fc-control-height-sm);
+    height: var(--fc-control-height-sm);
     border: none;
-    border-radius: 50%;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
     cursor: pointer;
