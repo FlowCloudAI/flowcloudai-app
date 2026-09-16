@@ -9,7 +9,7 @@ import {parseHtmlSource} from '../../domain/engine/htmlParser.ts'
 
 export const CANVAS_BASE_PROJECT_HTML = `<!doctype html>
 <html lang="zh-CN" data-fc-document-version="1" data-fc-template-version="1">
-<head><meta charset="utf-8"><title data-fc-bind="title">词条</title></head>
+<head><title data-fc-bind="title">词条</title></head>
 <body>
   <main class="fc-entry" data-fc-slot="entry-root">
     <header class="fc-entry__header" data-fc-slot="entry-header"></header>
