@@ -114,12 +114,10 @@
 
 .page-document-editor__page-card {
     position: relative;
-    box-sizing: border-box;
     width: 100%;
     max-width: 760px;
     min-height: 32rem;
     margin: 0 auto;
-    padding: var(--fc-space-lg);
     overflow: hidden;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -236,7 +234,7 @@
 .page-document-source-workspace__preview-canvas {
     min-height: 0;
     overflow: auto;
-    padding: var(--fc-space-lg);
+    padding: var(--fc-space-md);
 }
 
 .page-document-source-workspace__preview-canvas > .page-document-canvas {
