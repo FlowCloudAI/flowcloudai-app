@@ -21,6 +21,9 @@ export const CANVAS_EDITABLE_KINDS = Object.freeze([
 export const CANVAS_INPUT_TYPES = [
     'insertText',
     'insertReplacementText',
+    'insertParagraph',
+    'insertLineBreak',
+    'insertFromPaste',
     // 组合输入只由 compositionend 生成，beforeinput 不会直接提交中间态。
     'insertCompositionText',
     'deleteContentBackward',

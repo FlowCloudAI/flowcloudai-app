@@ -102,9 +102,20 @@ export function parseCanvasHostCommand(value: unknown, token: string): CanvasHos
             : null
     }
     if (value.type === 'resolve-input') {
-        return hasOnlyKeys(value, [...envelopeKeys, 'intentId', 'accepted'])
+        const selection = value.selection
+        const validSelection = selection === null || (
+            isRecord(selection)
+            && hasOnlyKeys(selection, ['nodeId', 'offset'])
+            && isUuid(selection.nodeId)
+            && Number.isInteger(selection.offset)
+            && (selection.offset as number) >= 0
+            && (selection.offset as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
+        )
+        return hasOnlyKeys(value, [...envelopeKeys, 'intentId', 'accepted', 'selection'])
             && isUuid(value.intentId)
             && typeof value.accepted === 'boolean'
+            && validSelection
+            && (value.accepted || selection === null)
             ? value as unknown as CanvasHostCommand
             : null
     }
@@ -124,6 +135,11 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
     ]
     const from = value.from
     const to = value.to
+    const validTypePayload = value.inputType === 'insertParagraph'
+        ? from === to && value.expected === '' && value.text === ''
+        : value.inputType === 'insertLineBreak'
+          ? value.text === '\n'
+          : true
     return hasOnlyKeys(value, keys)
         && isUuid(value.intentId)
         && isUuid(value.nodeId)
@@ -136,6 +152,7 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
         && (to as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
         && isBoundedString(value.expected, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
         && isBoundedString(value.text, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
+        && validTypePayload
         ? value as unknown as CanvasRuntimeMessage
         : null
 }

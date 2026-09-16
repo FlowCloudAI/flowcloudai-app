@@ -11,7 +11,11 @@ import {
     prepareEntryDocumentSave,
     undoEntryDocumentSession,
 } from './entryDocumentSessionModel.ts'
-import {createCanvasInputKernelRequest} from './canvasInputOperation.ts'
+import {
+    createCanvasInputKernelOperation,
+    createCanvasInputKernelRequest,
+    readCanvasInputTarget,
+} from './canvasInputOperation.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
     PAGE_DOCUMENT_CANVAS_CHANNEL,
@@ -26,6 +30,7 @@ const PROJECT_ID = '11111111-1111-7111-8111-111111111111'
 const ROOT_ID = '22222222-2222-7222-8222-222222222222'
 const PARAGRAPH_ID = '33333333-3333-7333-8333-333333333333'
 const ADOPTED_ID = '44444444-4444-7444-8444-444444444444'
+const SPLIT_ID = '81111111-1111-7111-8111-111111111111'
 
 const identity = {
     entryId: ENTRY_ID,
@@ -232,5 +237,186 @@ describe('页面编辑生产项目基线', () => {
             assert.equal(save.input.html, changedHtml)
             assert.equal(save.input.expectedRevision, 2)
         }
+    })
+
+    it('真实会话按 Enter 分段后立即输入落在宿主新节点，两个交互可依次撤销并保存', () => {
+        const initial = createEntryDocumentSessionState(identity, document())
+        let state = initial
+        const runtime = createDocumentKernelDraftRuntime()
+        const splitMessage: CanvasInputIntentMessage = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent',
+            intentId: '81111111-1111-7111-8111-111111111112',
+            nodeId: PARAGRAPH_ID,
+            inputType: 'insertParagraph',
+            from: 2,
+            to: 2,
+            expected: '',
+            text: '',
+        }
+        const splitOperation = createCanvasInputKernelOperation(
+            [splitMessage],
+            'canvas-input-history:enter',
+            'paragraph',
+            () => SPLIT_ID,
+        )
+        const splitPrepared = runtime.prepare(state.model, state.snapshot, splitOperation.request)
+        assert.equal(splitPrepared.status, 'ready', JSON.stringify(splitPrepared))
+        if (splitPrepared.status !== 'ready') return
+        const splitUpdate = runtime.applyPrepared(
+            state.model,
+            state.snapshot,
+            splitPrepared.edit,
+            '画布分段',
+            {historyGroupId: 'canvas-input-history:enter'},
+        )
+        assert.equal(splitUpdate.applied, true, JSON.stringify(splitUpdate.diagnostics))
+        state = acceptEntryDocumentVisualUpdate(state, splitUpdate)
+        assert.deepEqual(splitOperation.resolution.selection, {nodeId: SPLIT_ID, offset: 0})
+        assert.equal(
+            state.model.entry.sources['article.html'],
+            initial.model.entry.sources['article.html'].replace(
+                '>受管正文</p>',
+                `>受管</p>\n<p data-fc-node-id="${SPLIT_ID}" data-fc-node-kind="paragraph">正文</p>`,
+            ),
+        )
+        assert.equal(
+            state.model.entry.sources['style.css'],
+            initial.model.entry.sources['style.css'],
+        )
+
+        const typeMessage: CanvasInputIntentMessage = {
+            ...splitMessage,
+            sequence: 2,
+            intentId: '82222222-2222-7222-8222-222222222222',
+            nodeId: SPLIT_ID,
+            inputType: 'insertText',
+            from: 0,
+            to: 0,
+            text: '新',
+        }
+        const nextTarget = readCanvasInputTarget(state.model.entry.sources['article.html'], SPLIT_ID)
+        assert.deepEqual(nextTarget, {kind: 'paragraph', text: '正文'})
+        const typeOperation = createCanvasInputKernelOperation(
+            [typeMessage],
+            'canvas-input-history:after-enter',
+            nextTarget?.kind ?? '',
+        )
+        const typePrepared = runtime.prepare(state.model, state.snapshot, typeOperation.request)
+        assert.equal(typePrepared.status, 'ready', JSON.stringify(typePrepared))
+        if (typePrepared.status !== 'ready') return
+        const typeUpdate = runtime.applyPrepared(
+            state.model,
+            state.snapshot,
+            typePrepared.edit,
+            '画布输入文本',
+            {historyGroupId: 'canvas-input-history:after-enter'},
+        )
+        assert.equal(typeUpdate.applied, true, JSON.stringify(typeUpdate.diagnostics))
+        state = acceptEntryDocumentVisualUpdate(state, typeUpdate)
+        assert.match(state.model.entry.sources['article.html'], />受管<\/p>\s*<p[^>]+>新正文<\/p>/u)
+        assert.equal(state.model.entry.undo.length, 2)
+
+        const undoTyping = undoEntryDocumentSession(state)
+        assert.match(undoTyping.model.entry.sources['article.html'], />受管<\/p>\s*<p[^>]+>正文<\/p>/u)
+        const undoSplit = undoEntryDocumentSession(undoTyping)
+        assert.equal(undoSplit.model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
+        const save = prepareEntryDocumentSave(state, () => '83333333-3333-7333-8333-333333333333')
+        assert.equal(save.status, 'ready')
+        if (save.status === 'ready') assert.equal(save.input.html, state.model.entry.sources['article.html'])
+    })
+
+    it('真实会话多段纯文本粘贴生成多个块且一次撤销全部退回', () => {
+        const initial = createEntryDocumentSessionState(identity, document())
+        const runtime = createDocumentKernelDraftRuntime()
+        const createdIds = [
+            '84444444-4444-7444-8444-444444444444',
+            '85555555-5555-7555-8555-555555555555',
+        ]
+        const message: CanvasInputIntentMessage = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent',
+            intentId: '86666666-6666-7666-8666-666666666666',
+            nodeId: PARAGRAPH_ID,
+            inputType: 'insertFromPaste',
+            from: 4,
+            to: 4,
+            expected: '',
+            text: '首行\n软换行\n\n第二段\n\n末段',
+        }
+        let allocated = 0
+        const operation = createCanvasInputKernelOperation(
+            [message],
+            'canvas-input-history:paste',
+            'paragraph',
+            () => createdIds[allocated++],
+        )
+        const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const update = runtime.applyPrepared(
+            initial.model,
+            initial.snapshot,
+            prepared.edit,
+            '画布粘贴纯文本',
+            {historyGroupId: 'canvas-input-history:paste'},
+        )
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        const state = acceptEntryDocumentVisualUpdate(initial, update)
+        const html = state.model.entry.sources['article.html']
+        assert.match(html, /受管正文首行<br>软换行<\/p>/u)
+        assert.match(html, new RegExp(`${createdIds[0]}[^>]*>第二段<\\/p>`, 'u'))
+        assert.match(html, new RegExp(`${createdIds[1]}[^>]*>末段<\\/p>`, 'u'))
+        assert.equal(
+            [PARAGRAPH_ID, ...createdIds].every(id => readCanvasInputTarget(html, id) !== null),
+            true,
+        )
+        assert.equal(state.model.entry.undo.length, 1)
+        assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
+    })
+
+    it('真实会话拒绝在 table-cell 分段且草稿保持不变', () => {
+        const cellId = '87777777-7777-7777-8777-777777777777'
+        const cellDocument = {
+            ...document(),
+            html: articleHtml().replace(
+                '<p class="legacy">旧段落</p>',
+                `<table><tbody><tr><td data-fc-node-id="${cellId}" data-fc-node-kind="table-cell">单元格</td></tr></tbody></table><p class="legacy">旧段落</p>`,
+            ),
+        }
+        const state = createEntryDocumentSessionState(identity, cellDocument)
+        const before = state.model.entry.sources['article.html']
+        const message: CanvasInputIntentMessage = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent',
+            intentId: '88888888-8888-7888-8888-888888888888',
+            nodeId: cellId,
+            inputType: 'insertParagraph',
+            from: 2,
+            to: 2,
+            expected: '',
+            text: '',
+        }
+        assert.deepEqual(readCanvasInputTarget(before, cellId), {kind: 'table-cell', text: '单元格'})
+        assert.throws(
+            () => createCanvasInputKernelOperation(
+                [message],
+                'canvas-input-history:table-enter',
+                'table-cell',
+                () => '89999999-9999-7999-8999-999999999999',
+            ),
+            /不支持创建后续文本块/u,
+        )
+        assert.equal(state.model.entry.sources['article.html'], before)
+        assert.equal(state.model.entry.undo.length, 0)
     })
 })

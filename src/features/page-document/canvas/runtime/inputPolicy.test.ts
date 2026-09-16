@@ -5,8 +5,10 @@ import test from 'node:test'
 import {
     canvasBeforeInputDecision,
     canvasBlockedInputDetail,
+    canvasPasteDecision,
     createCanvasCompositionTracker,
     expandCollapsedCanvasDeletion,
+    isCanvasSplittableKind,
     shouldDeferCanvasRender,
 } from './inputPolicy.ts'
 import {CANVAS_INPUT_TYPES} from '../protocol/index.ts'
@@ -19,11 +21,14 @@ const snapshot = {
     collapsed: true,
 }
 
-test('未收到开启命令时不处理输入，开启后只提交本批六种 beforeinput', () => {
+test('未收到开启命令时不处理输入，开启后只提交受控 beforeinput', () => {
     assert.equal(canvasBeforeInputDecision({editingEnabled: false, isComposing: false, inputType: 'insertText'}), 'ignore')
     for (const inputType of [
         'insertText',
         'insertReplacementText',
+        'insertParagraph',
+        'insertLineBreak',
+        'insertFromPaste',
         'deleteContentBackward',
         'deleteContentForward',
         'deleteWordBackward',
@@ -32,7 +37,7 @@ test('未收到开启命令时不处理输入，开启后只提交本批六种 b
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'submit')
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
     }
-    for (const inputType of ['insertParagraph', 'insertLineBreak', 'insertFromPaste', 'insertFromDrop', 'formatBold', 'historyUndo']) {
+    for (const inputType of ['insertFromDrop', 'formatBold', 'historyUndo']) {
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'block')
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
     }
@@ -41,6 +46,51 @@ test('未收到开启命令时不处理输入，开启后只提交本批六种 b
         reason: 'unsupported-input-type',
         nodeId: snapshot.nodeId,
     })
+})
+
+test('纯文本粘贴在未编辑或组合期拒绝提交，并规范换行与大小上限', () => {
+    assert.deepEqual(canvasPasteDecision({
+        editingEnabled: false,
+        editableTarget: true,
+        isComposing: false,
+        selectionValid: true,
+        plainText: '正文',
+    }), {kind: 'ignore'})
+    assert.deepEqual(canvasPasteDecision({
+        editingEnabled: true,
+        editableTarget: true,
+        isComposing: true,
+        selectionValid: true,
+        plainText: '正文',
+    }), {kind: 'block', reason: 'unsupported-input-type'})
+    assert.deepEqual(canvasPasteDecision({
+        editingEnabled: true,
+        editableTarget: true,
+        isComposing: false,
+        selectionValid: false,
+        plainText: '正文',
+    }), {kind: 'block', reason: 'invalid-selection'})
+    assert.deepEqual(canvasPasteDecision({
+        editingEnabled: true,
+        editableTarget: true,
+        isComposing: false,
+        selectionValid: true,
+        plainText: '第一行\r\n第二行',
+    }), {kind: 'submit', text: '第一行\n第二行'})
+    assert.deepEqual(canvasPasteDecision({
+        editingEnabled: true,
+        editableTarget: true,
+        isComposing: false,
+        selectionValid: true,
+        plainText: '你'.repeat(65_537),
+    }), {kind: 'block', reason: 'input-too-large'})
+})
+
+test('分段只开放 paragraph、heading 与 list-item', () => {
+    assert.equal(isCanvasSplittableKind('paragraph'), true)
+    assert.equal(isCanvasSplittableKind('heading'), true)
+    assert.equal(isCanvasSplittableKind('list-item'), true)
+    assert.equal(isCanvasSplittableKind('table-cell'), false)
 })
 
 test('四种组合专用 beforeinput 不依赖当前 composing 状态且 WebKit 类型不进入提交白名单', () => {

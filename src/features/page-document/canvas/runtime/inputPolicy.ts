@@ -23,6 +23,9 @@ export function canvasBlockedInputDetail(
 const beforeInputTypes = new Set<string>([
     'insertText',
     'insertReplacementText',
+    'insertParagraph',
+    'insertLineBreak',
+    'insertFromPaste',
     'deleteContentBackward',
     'deleteContentForward',
     'deleteWordBackward',
@@ -35,6 +38,36 @@ const nativeCompositionInputTypes = new Set([
     'insertFromComposition',
     'deleteByComposition',
 ])
+
+const splittableKinds = new Set(['paragraph', 'heading', 'list-item'])
+
+export function isCanvasSplittableKind(kind: string | null): boolean {
+    return kind !== null && splittableKinds.has(kind)
+}
+
+export type CanvasPasteDecision =
+    | {readonly kind: 'ignore'}
+    | {readonly kind: 'block'; readonly reason: CanvasInputBlockedReason}
+    | {readonly kind: 'submit'; readonly text: string}
+
+/** paste 只读取纯文本；富文本、图片和文件没有进入协议的字段。 */
+export function canvasPasteDecision(input: {
+    editingEnabled: boolean
+    editableTarget: boolean
+    isComposing: boolean
+    selectionValid: boolean
+    plainText: string | null
+}): CanvasPasteDecision {
+    if (!input.editingEnabled || !input.editableTarget) return {kind: 'ignore'}
+    if (input.isComposing) return {kind: 'block', reason: 'unsupported-input-type'}
+    if (!input.selectionValid || input.plainText === null || input.plainText.length === 0) {
+        return {kind: 'block', reason: 'invalid-selection'}
+    }
+    const text = input.plainText.replace(/\r\n?/gu, '\n')
+    return text.length > 65_536
+        ? {kind: 'block', reason: 'input-too-large'}
+        : {kind: 'submit', text}
+}
 
 export function canvasBeforeInputDecision(input: {
     editingEnabled: boolean

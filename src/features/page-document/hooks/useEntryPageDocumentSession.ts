@@ -22,7 +22,9 @@ import {
 import {
     canvasInputBlockedFeedback,
     canvasInputHistoryLabel,
-    createCanvasInputKernelRequest,
+    createCanvasInputKernelOperation,
+    planCanvasPlainTextPaste,
+    readCanvasInputTarget,
     readCanvasInputTargetText,
 } from '../application/canvasInputOperation.ts'
 import {
@@ -54,6 +56,7 @@ import type {LayerProjectionNode} from '../domain/layerProjection.ts'
 import {
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
+    type CanvasInputResolution,
 } from '../canvas/protocol/index.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
@@ -86,6 +89,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const visualQueueRef = useRef(createVisualOperationQueue())
     const liveVisualSchedulerRef = useRef<LiveVisualCommitScheduler<ScheduledKernelEntry> | null>(null)
     const canvasInputSchedulerRef = useRef<CanvasInputCommitScheduler | null>(null)
+    const canvasInputResolutionRef = useRef(new Map<string, CanvasInputResolution>())
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -361,6 +365,8 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     }, [])
 
     useEffect(() => {
+        let active = true
+        const resolutionByIntent = canvasInputResolutionRef.current
         const scheduler = createCanvasInputCommitScheduler({
             delayMs: LIVE_VISUAL_COMMIT_DELAY_MS,
             readNodeText: nodeId => {
@@ -376,40 +382,78 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                 if (!last) return Promise.resolve(false)
                 const historyGroupId = metadata.historyGroupId
                 if (!historyGroupId) return Promise.resolve(false)
+                const current = stateRef.current
+                const target = current
+                    ? readCanvasInputTarget(
+                          current.model.entry.sources['article.html'],
+                          last.nodeId,
+                      )
+                    : null
+                if (!target) return Promise.resolve(false)
+                const operation = createCanvasInputKernelOperation(
+                    messages,
+                    historyGroupId,
+                    target.kind,
+                    () => crypto.randomUUID(),
+                )
                 return applyKernelEntry(
-                    createCanvasInputKernelRequest(messages, historyGroupId),
+                    operation.request,
                     canvasInputHistoryLabel(last.inputType),
                     metadata,
-                )
+                ).then(accepted => {
+                    if (accepted && active) {
+                        resolutionByIntent.set(last.intentId, operation.resolution)
+                    }
+                    return accepted
+                })
             },
         })
         canvasInputSchedulerRef.current = scheduler
         return () => {
+            active = false
             // 与属性调度相同，卸载只冲刷尾帧；提交中的更新仍可完成当前词条草稿写入。
             void scheduler.endInteraction()
             canvasInputSchedulerRef.current = null
+            resolutionByIntent.clear()
         }
     }, [applyKernelEntry])
 
     const applyCanvasInputIntent = useCallback(
-        async (message: CanvasInputIntentMessage): Promise<boolean> => {
+        async (message: CanvasInputIntentMessage): Promise<CanvasInputResolution> => {
             const current = stateRef.current
-            if (!current) return reportVisualFailure('当前页面文档草稿不可用，无法接收画布输入。')
-            if (readCanvasInputTargetText(
+            const reject = async (feedback: string): Promise<CanvasInputResolution> => {
+                await reportVisualFailure(feedback)
+                return {accepted: false, selection: null}
+            }
+            if (!current) return reject('当前页面文档草稿不可用，无法接收画布输入。')
+            const target = readCanvasInputTarget(
                 current.model.entry.sources['article.html'],
                 message.nodeId,
-            ) === null) {
-                return reportVisualFailure('画布输入目标不属于当前可编辑的受管投影，已拒绝写入。')
+            )
+            if (!target) {
+                return reject('画布输入目标不属于当前可编辑的受管投影，已拒绝写入。')
+            }
+            const createsBlocks = message.inputType === 'insertParagraph'
+                || (message.inputType === 'insertFromPaste'
+                    && planCanvasPlainTextPaste(message.text, message.from).splitOffsets.length > 0)
+            if (createsBlocks && !['paragraph', 'heading', 'list-item'].includes(target.kind)) {
+                return reject('表格单元格不支持分段。')
             }
             const scheduler = canvasInputSchedulerRef.current
-            if (!scheduler) return reportVisualFailure('画布输入调度尚未就绪。')
+            if (!scheduler) return reject('画布输入调度尚未就绪。')
+            const structural = message.inputType === 'insertParagraph' || message.inputType === 'insertFromPaste'
             const accepted = await scheduler.schedule(message, {
-                immediate: message.inputType === 'insertCompositionText',
+                immediate: message.inputType === 'insertCompositionText' || structural,
+                separate: structural,
             })
             if (!accepted && stateRef.current?.identity.entryId === current.identity.entryId) {
                 setVisualError('画布文本范围已经变化，本次输入未写入页面草稿。')
             }
+            const resolution = canvasInputResolutionRef.current.get(message.intentId)
+            canvasInputResolutionRef.current.delete(message.intentId)
             return accepted
+                ? resolution ?? {accepted: true, selection: null}
+                : {accepted: false, selection: null}
         },
         [reportVisualFailure],
     )

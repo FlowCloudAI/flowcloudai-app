@@ -68,10 +68,26 @@ test('宿主命令严格校验渲染、选择、编辑权限、输入回执与�
     )
     assert.equal(parseCanvasHostCommand(message('set-editing', {enabled: 'yes'}), TOKEN), null)
     assert.equal(
-        parseCanvasHostCommand(message('resolve-input', {intentId: REQUEST_ID, accepted: false}), TOKEN)?.type,
+        parseCanvasHostCommand(message('resolve-input', {
+            intentId: REQUEST_ID,
+            accepted: false,
+            selection: null,
+        }), TOKEN)?.type,
         'resolve-input',
     )
-    assert.equal(parseCanvasHostCommand(message('resolve-input', {intentId: 'latest', accepted: true}), TOKEN), null)
+    assert.equal(
+        parseCanvasHostCommand(message('resolve-input', {
+            intentId: REQUEST_ID,
+            accepted: true,
+            selection: {nodeId: NODE_ID, offset: 2},
+        }), TOKEN)?.type,
+        'resolve-input',
+    )
+    assert.equal(parseCanvasHostCommand(message('resolve-input', {
+        intentId: 'latest',
+        accepted: true,
+        selection: null,
+    }), TOKEN), null)
 })
 
 test('运行时只读消息只接受当前 token、版本与有界字段', () => {
@@ -108,6 +124,20 @@ test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单'
     assert.equal(parseCanvasRuntimeMessage({...intent, inputType: 'formatBold'}, TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage({...intent, from: 4}, TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage({...intent, html: '<b>禁止</b>'}, TOKEN), null)
+    assert.equal(
+        parseCanvasRuntimeMessage({...intent, inputType: 'insertLineBreak', text: '\n'}, TOKEN)?.type,
+        'input-intent',
+    )
+    assert.equal(
+        parseCanvasRuntimeMessage({...intent, inputType: 'insertParagraph', from: 1, to: 1, expected: '', text: ''}, TOKEN)?.type,
+        'input-intent',
+    )
+    assert.equal(
+        parseCanvasRuntimeMessage({...intent, inputType: 'insertFromPaste', text: '<b>只作为纯文本</b>'}, TOKEN)?.type,
+        'input-intent',
+    )
+    assert.equal(parseCanvasRuntimeMessage({...intent, newNodeId: NODE_ID}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, inputType: 'insertParagraph', text: '\n'}, TOKEN), null)
     assert.equal(
         parseCanvasRuntimeMessage(message('input-blocked', {
             nodeId: NODE_ID,

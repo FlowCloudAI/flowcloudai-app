@@ -15,7 +15,7 @@ interface CanvasInputBatch {
 }
 
 export interface CanvasInputCommitScheduler {
-    schedule(message: CanvasInputIntentMessage, options?: {immediate?: boolean}): Promise<boolean>
+    schedule(message: CanvasInputIntentMessage, options?: {immediate?: boolean; separate?: boolean}): Promise<boolean>
     flush(): Promise<boolean>
     endInteraction(): Promise<boolean>
     cancel(): void
@@ -79,9 +79,20 @@ export function createCanvasInputCommitScheduler({
 
     const schedule = (
         message: CanvasInputIntentMessage,
-        options: {immediate?: boolean} = {},
+        options: {immediate?: boolean; separate?: boolean} = {},
     ): Promise<boolean> => {
         const nodeId = message.nodeId.toLowerCase()
+        if (options.separate && (pendingBatch || activeNodeId !== null)) {
+            scheduler.flush()
+            const previous = latestCompletion
+            const previousNodeId = activeNodeId
+            activeNodeId = null
+            historyGroupId = null
+            return previous.then(accepted => {
+                if (previousNodeId) stagedText.delete(previousNodeId)
+                return accepted ? schedule(message, {...options, separate: false}) : false
+            })
+        }
         if (pendingBatch && pendingBatch.nodeId !== nodeId) {
             scheduler.flush()
             const previous = latestCompletion

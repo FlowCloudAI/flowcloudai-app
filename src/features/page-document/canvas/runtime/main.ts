@@ -15,8 +15,10 @@ import {applyCanvasEditingState, isCanvasEditableElement} from './editingState.t
 import {
     canvasBeforeInputDecision,
     canvasBlockedInputDetail,
+    canvasPasteDecision,
     createCanvasCompositionTracker,
     expandCollapsedCanvasDeletion,
+    isCanvasSplittableKind,
     shouldDeferCanvasRender,
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
@@ -37,6 +39,7 @@ let pendingRender: CanvasRenderCommand | null = null
 let rejectedInputPending = false
 let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
+let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
 
@@ -94,10 +97,13 @@ function clearRenderedDocument(): void {
     reportSize()
 }
 
-function applyRender(command: CanvasRenderCommand): void {
+function applyRender(
+    command: CanvasRenderCommand,
+    resolvedSelection: {nodeId: string; offset: number} | null = null,
+): void {
     latestRequestId = command.requestId
     // 晚于输入回执到达的规范化预览仍需挂载；先记住纯文本选区，避免全量安全挂载打断连续输入。
-    const textSelection = editingEnabled ? captureSelection() : null
+    const textSelection = editingEnabled && !resolvedSelection ? captureSelection() : null
     const result = isolatePageDocument(command.html, command.css)
     if (!result.artifact) {
         clearRenderedDocument()
@@ -115,8 +121,18 @@ function applyRender(command: CanvasRenderCommand): void {
         authorStyle.textContent = result.artifact.css
         root.replaceChildren(template.content.cloneNode(true))
         applyCanvasEditingState(root, editingEnabled)
-        setSelection(selectedNodeId)
-        if (textSelection) restoreTextSelection(textSelection)
+        setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
+        if (resolvedSelection) {
+            // 结构提交会替换原 contenteditable；重新聚焦宿主指定的新块，下一次输入才不会落回旧节点。
+            findManagedNode(resolvedSelection.nodeId)?.focus({preventScroll: true})
+            restoreTextSelection({
+                nodeId: resolvedSelection.nodeId,
+                from: resolvedSelection.offset,
+                to: resolvedSelection.offset,
+                expected: '',
+                collapsed: true,
+            })
+        } else if (textSelection) restoreTextSelection(textSelection)
         send({
             type: 'rendered',
             requestId: command.requestId,
@@ -139,7 +155,9 @@ function render(command: CanvasRenderCommand): void {
         pendingRender = command
         return
     }
-    applyRender(command)
+    const resolvedSelection = pendingResolvedSelection
+    pendingResolvedSelection = null
+    applyRender(command, resolvedSelection)
 }
 
 function semanticLength(value: Node): number {
@@ -271,7 +289,14 @@ function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: st
     range.setStart(start.node, start.offset)
     range.setEnd(end.node, end.offset)
     range.deleteContents()
-    if (text.length > 0) range.insertNode(document.createTextNode(text))
+    if (text.length > 0) {
+        const fragment = document.createDocumentFragment()
+        for (const [index, part] of text.split('\n').entries()) {
+            if (index > 0) fragment.append(document.createElement('br'))
+            if (part.length > 0) fragment.append(document.createTextNode(part))
+        }
+        range.insertNode(fragment)
+    }
     node.normalize()
     const caret = snapshot.from + text.length
     restoreTextSelection({
@@ -350,13 +375,22 @@ function setEditing(enabled: boolean): void {
     applyCanvasEditingState(root, editingEnabled)
 }
 
-function resolveInput(intentId: string, accepted: boolean): void {
+function resolveInput(
+    intentId: string,
+    accepted: boolean,
+    selection: {nodeId: string; offset: number} | null,
+): void {
     if (!pendingInputIds.delete(intentId.toLowerCase())) return
     if (!accepted) rejectedInputPending = true
+    if (accepted && selection) pendingResolvedSelection = selection
     if (pendingInputIds.size > 0 || composition.isComposing) return
     const next = pendingRender
     pendingRender = null
-    if (rejectedInputPending && next) applyRender(next)
+    if (next && (rejectedInputPending || pendingResolvedSelection)) {
+        const resolvedSelection = rejectedInputPending ? null : pendingResolvedSelection
+        pendingResolvedSelection = null
+        applyRender(next, resolvedSelection)
+    }
     rejectedInputPending = false
 }
 
@@ -386,6 +420,36 @@ function installInputListeners(): void {
         let text = ''
         if (inputType.startsWith('delete')) {
             snapshot = expandCollapsedCanvasDeletion(semanticText(node), snapshot, inputType as CanvasInputType)
+        } else if (inputType === 'insertParagraph') {
+            if (!isCanvasSplittableKind(node.getAttribute('data-fc-node-kind'))) {
+                event.preventDefault()
+                reportBlockedInput(inputType, 'unsupported-input-type', nodeId)
+                return
+            }
+            if (!snapshot.collapsed) {
+                event.preventDefault()
+                reportBlockedInput(inputType, 'invalid-selection', nodeId)
+                return
+            }
+        } else if (inputType === 'insertLineBreak') {
+            text = '\n'
+        } else if (inputType === 'insertFromPaste') {
+            const transferred = event.dataTransfer?.getData('text/plain')
+            const decision = canvasPasteDecision({
+                editingEnabled,
+                editableTarget: true,
+                isComposing: composition.isComposing,
+                selectionValid: true,
+                plainText: typeof transferred === 'string' && transferred.length > 0
+                    ? transferred
+                    : typeof event.data === 'string' ? event.data : null,
+            })
+            if (decision.kind !== 'submit') {
+                event.preventDefault()
+                reportBlockedInput(inputType, decision.kind === 'block' ? decision.reason : 'invalid-selection', nodeId)
+                return
+            }
+            text = decision.text
         } else if (typeof event.data === 'string') {
             text = event.data
         } else {
@@ -424,9 +488,29 @@ function installInputListeners(): void {
 
     document.addEventListener('paste', event => {
         const node = managedNode(event.target)
-        if (!editingEnabled || !isCanvasEditableElement(node)) return
+        const editableTarget = isCanvasEditableElement(node)
+        if (!editingEnabled || !editableTarget) return
         event.preventDefault()
-        reportBlockedInput('insertFromPaste', 'unsupported-input-type', managedNodeId(node))
+        const nodeId = managedNodeId(node)
+        const snapshot = captureSelection()
+        const types = event.clipboardData ? [...event.clipboardData.types] : []
+        const plainText = types.includes('text/plain')
+            ? event.clipboardData?.getData('text/plain') ?? null
+            : null
+        const decision = canvasPasteDecision({
+            editingEnabled,
+            editableTarget,
+            isComposing: composition.isComposing,
+            selectionValid: Boolean(snapshot && nodeId && snapshot.nodeId === nodeId),
+            plainText,
+        })
+        if (decision.kind === 'block') {
+            reportBlockedInput('insertFromPaste', decision.reason, nodeId)
+            return
+        }
+        if (decision.kind === 'submit' && snapshot) {
+            submitInputIntent(snapshot, 'insertFromPaste', decision.text)
+        }
     })
 
     document.addEventListener('drop', event => {
@@ -459,7 +543,9 @@ function start(): void {
         if (command.type === 'render') render(command)
         if (command.type === 'set-selection') setSelection(command.nodeId)
         if (command.type === 'set-editing') setEditing(command.enabled)
-        if (command.type === 'resolve-input') resolveInput(command.intentId, command.accepted)
+        if (command.type === 'resolve-input') {
+            resolveInput(command.intentId, command.accepted, command.selection)
+        }
         if (command.type === 'viewport') {
             document.documentElement.style.setProperty('--fc-entry-viewport-width', `${command.width}px`)
             document.documentElement.style.setProperty('--fc-entry-viewport-height', `${command.height}px`)

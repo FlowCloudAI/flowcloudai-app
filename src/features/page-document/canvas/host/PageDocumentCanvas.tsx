@@ -10,6 +10,7 @@ import {
     type CanvasHostCommandPayload,
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
+    type CanvasInputResolution,
 } from '../protocol/index.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
@@ -26,7 +27,9 @@ export interface PageDocumentCanvasProps {
     editingEnabled?: boolean
     onSelectionChange?: (nodeId: string) => void
     onNavigationIntent?: (href: string) => void
-    onInputIntent?: (message: CanvasInputIntentMessage) => boolean | Promise<boolean>
+    onInputIntent?: (
+        message: CanvasInputIntentMessage,
+    ) => CanvasInputResolution | Promise<CanvasInputResolution>
     onInputBlocked?: (message: CanvasInputBlockedMessage) => void
     onInputFlush?: (nodeId: string) => void
     onRenderError?: (message: string) => void
@@ -142,16 +145,25 @@ export function PageDocumentCanvas({
             if (message.type === 'input-intent') {
                 const intent = {...message, intentId: message.intentId.toLowerCase(), nodeId: message.nodeId.toLowerCase()}
                 void (async () => {
-                    let accepted = false
+                    let resolution: CanvasInputResolution = {accepted: false, selection: null}
                     try {
-                        accepted = (await latest.current.onInputIntent?.(intent)) ?? false
+                        resolution = (await latest.current.onInputIntent?.(intent)) ?? resolution
                     } catch {
-                        accepted = false
+                        resolution = {accepted: false, selection: null}
                     }
                     if (!active) return
+                    const selection = resolution.accepted ? resolution.selection : null
                     // 拒绝时先把当前草稿排进画布的 pendingRender，再解除意图以原子回滚临时 DOM。
-                    if (!accepted) sendLatestRender()
-                    send({type: 'resolve-input', intentId: intent.intentId, accepted})
+                    if (!resolution.accepted) sendLatestRender()
+                    if (selection) {
+                        latest.current.onSelectionChange?.(selection.nodeId)
+                    }
+                    send({
+                        type: 'resolve-input',
+                        intentId: intent.intentId,
+                        accepted: resolution.accepted,
+                        selection,
+                    })
                 })()
             }
             if (message.type === 'rendered') {

@@ -45,6 +45,8 @@ export interface CanvasResolveInputCommand extends CanvasEnvelope {
     type: 'resolve-input'
     intentId: string
     accepted: boolean
+    /** 结构修改后的可信落点只由宿主返回；画布输入意图没有分配节点身份的权限。 */
+    selection: {nodeId: string; offset: number} | null
 }
 
 export type CanvasHostCommand =
@@ -93,6 +95,11 @@ export interface CanvasInputIntentMessage extends CanvasEnvelope {
     to: number
     expected: string
     text: string
+}
+
+export interface CanvasInputResolution {
+    readonly accepted: boolean
+    readonly selection: {readonly nodeId: string; readonly offset: number} | null
 }
 
 export interface CanvasInputBlockedMessage extends CanvasEnvelope {

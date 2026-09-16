@@ -1,4 +1,4 @@
-// 本测试固定画布输入只映射为文本范围意图，并验证连续调度、立即提交与尾帧语义。
+// 本测试固定画布纯文本输入到文本替换或宿主分段意图的映射，并验证连续调度、立即提交与尾帧语义。
 
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
@@ -12,7 +12,11 @@ import type {ComponentHandle} from '../domain/kernel/index.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
     applyCanvasInputToText,
+    canvasInputHistoryLabel,
+    createCanvasInputKernelOperation,
     createCanvasInputKernelRequest,
+    planCanvasPlainTextPaste,
+    readCanvasInputTarget,
     readCanvasInputTargetText,
 } from './canvasInputOperation.ts'
 
@@ -64,6 +68,100 @@ describe('canvas input operation', () => {
         assert.equal('html' in message, false)
     })
 
+    it('insertParagraph 映射为宿主分配身份的 split-text-block，insertLineBreak 映射为换行替换', () => {
+        const createdId = '77777777-7777-7777-8777-777777777777'
+        const split = intent('12111111-1111-7111-8111-111111111111', 'insertParagraph', 2, 2, '', '')
+        const splitOperation = createCanvasInputKernelOperation(
+            [split],
+            'canvas-input-history:split',
+            'paragraph',
+            () => createdId,
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        assert.deepEqual(splitOperation.request.createIntents(new Map([[NODE_ID, handle]])), [{
+            kind: 'split-text-block',
+            target: {
+                kind: 'text-range',
+                component: handle,
+                range: {unit: 'utf16-code-unit', from: 2, to: 2},
+                expected: '',
+            },
+            coordinateSpace: 'current-candidate',
+            newNodeId: createdId,
+        }])
+        assert.deepEqual(splitOperation.resolution, {
+            accepted: true,
+            selection: {nodeId: createdId, offset: 0},
+        })
+
+        const lineBreak = intent('13111111-1111-7111-8111-111111111111', 'insertLineBreak', 2, 2, '', '\n')
+        const lineBreakOperation = createCanvasInputKernelOperation(
+            [lineBreak],
+            'canvas-input-history:line-break',
+            'table-cell',
+        )
+        assert.deepEqual(lineBreakOperation.request.createIntents(new Map([[NODE_ID, handle]])), [{
+            kind: 'replace-text',
+            target: {
+                kind: 'text-range',
+                component: handle,
+                range: {unit: 'utf16-code-unit', from: 2, to: 2},
+                expected: '',
+            },
+            coordinateSpace: 'current-candidate',
+            text: '\n',
+        }])
+        assert.equal(canvasInputHistoryLabel('insertParagraph'), '画布分段')
+        assert.equal(canvasInputHistoryLabel('insertLineBreak'), '画布软换行')
+    })
+
+    it('多段纯文本粘贴去掉空行边界并从后向前拆块，一次请求不携带 HTML', () => {
+        const createdIds = [
+            '71111111-1111-7111-8111-111111111111',
+            '72222222-2222-7222-8222-222222222222',
+        ]
+        const paste = intent(
+            '14111111-1111-7111-8111-111111111111',
+            'insertFromPaste',
+            2,
+            4,
+            '旧文',
+            '首行\n软换行\n\n第二段\n\n末段',
+        )
+        let index = 0
+        const operation = createCanvasInputKernelOperation(
+            [paste],
+            'canvas-input-history:paste',
+            'paragraph',
+            () => createdIds[index++],
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const intents = operation.request.createIntents(new Map([[NODE_ID, handle]]))
+        assert.deepEqual(planCanvasPlainTextPaste(paste.text, paste.from), {
+            insertedText: '首行\n软换行第二段末段',
+            splitOffsets: [8, 11],
+            finalOffset: 2,
+        })
+        assert.equal(intents[0].kind, 'replace-text')
+        if (intents[0].kind === 'replace-text') {
+            assert.equal(intents[0].text, '首行\n软换行第二段末段')
+        }
+        assert.deepEqual(intents.slice(1).map(item => (
+            item.kind === 'split-text-block'
+                ? {at: item.target.range.from, newNodeId: item.newNodeId}
+                : null
+        )), [
+            {at: 11, newNodeId: createdIds[1]},
+            {at: 8, newNodeId: createdIds[0]},
+        ])
+        assert.deepEqual(operation.resolution.selection, {nodeId: createdIds[1], offset: 2})
+        assert.equal('html' in paste, false)
+        assert.throws(
+            () => createCanvasInputKernelOperation([paste], 'canvas-input-history:table', 'table-cell'),
+            /不支持创建后续文本块/u,
+        )
+    })
+
     it('区间、expected 或 UTF-16 边界不匹配时拒绝暂存文本', () => {
         const drifted = intent('22222222-2222-7222-8222-222222222222', 'insertText', 1, 2, '错', '中')
         assert.deepEqual(applyCanvasInputToText('正文', drifted), {
@@ -78,8 +176,44 @@ describe('canvas input operation', () => {
     it('节点不在当前受管可编辑投影时宿主拒绝且不读取 iframe 文本', () => {
         const html = `<template data-fc-entry-patch><template data-fc-fill="entry-body"><p data-fc-node-id="${NODE_ID}" data-fc-node-kind="paragraph">正文</p><div data-fc-node-id="77777777-7777-7777-8777-777777777777" data-fc-node-kind="container">容器</div></template></template>`
         assert.equal(readCanvasInputTargetText(html, NODE_ID), '正文')
+        assert.deepEqual(readCanvasInputTarget(html, NODE_ID), {kind: 'paragraph', text: '正文'})
         assert.equal(readCanvasInputTargetText(html, '77777777-7777-7777-8777-777777777777'), null)
         assert.equal(readCanvasInputTargetText(html, '88888888-8888-7888-8888-888888888888'), null)
+    })
+
+    it('分段立即冲刷此前输入并开启新历史组，尾帧不会混入旧节点批次', async () => {
+        let sourceText = '原'
+        const commits: Array<{types: CanvasInputType[]; group: string | undefined}> = []
+        let group = 0
+        const scheduler = createCanvasInputCommitScheduler({
+            delayMs: 10_000,
+            readNodeText: () => sourceText,
+            commit: async (messages, metadata) => {
+                commits.push({types: messages.map(message => message.inputType), group: metadata.historyGroupId})
+                for (const message of messages) {
+                    if (message.inputType === 'insertParagraph') continue
+                    const update = applyCanvasInputToText(sourceText, message)
+                    assert.equal(update.accepted, true)
+                    sourceText = update.text
+                }
+                return true
+            },
+            createHistoryGroupId: () => `canvas-input-history:${++group}`,
+        })
+        const typed = scheduler.schedule(
+            intent('15111111-1111-7111-8111-111111111111', 'insertText', 1, 1, '', '中'),
+        )
+        const split = scheduler.schedule(
+            intent('16111111-1111-7111-8111-111111111111', 'insertParagraph', 2, 2, '', ''),
+            {immediate: true, separate: true},
+        )
+
+        assert.deepEqual(await Promise.all([typed, split]), [true, true])
+        assert.deepEqual(commits, [
+            {types: ['insertText'], group: 'canvas-input-history:1'},
+            {types: ['insertParagraph'], group: 'canvas-input-history:2'},
+        ])
+        assert.equal(sourceText, '原中')
     })
 
     it('连续非立即输入在一个窗口只提交一次且冲刷时不丢尾帧', async () => {
