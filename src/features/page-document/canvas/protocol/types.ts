@@ -86,6 +86,21 @@ export interface CanvasNavigationIntentMessage extends CanvasEnvelope {
     nodeId: string | null
 }
 
+/** 画布视口坐标；离开时 href、nodeId 和 rect 均为 null。 */
+export interface CanvasLinkHoverRect {
+    top: number
+    left: number
+    width: number
+    height: number
+}
+
+export interface CanvasLinkHoverMessage extends CanvasEnvelope {
+    type: 'link-hover'
+    href: string | null
+    nodeId: string | null
+    rect: CanvasLinkHoverRect | null
+}
+
 export interface CanvasInputIntentMessage extends CanvasEnvelope {
     type: 'input-intent'
     intentId: string
@@ -121,6 +136,7 @@ export type CanvasRuntimeMessage =
     | CanvasSizeMessage
     | CanvasSelectionMessage
     | CanvasNavigationIntentMessage
+    | CanvasLinkHoverMessage
     | CanvasInputIntentMessage
     | CanvasInputBlockedMessage
     | CanvasInputFlushMessage

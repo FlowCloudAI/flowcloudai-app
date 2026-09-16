@@ -110,6 +110,36 @@ test('运行时只读消息只接受当前 token、版本与有界字段', () =>
     assert.equal(parseCanvasRuntimeMessage(message('size', {width: Number.NaN, height: 1}), TOKEN), null)
 })
 
+test('link-hover 只接受成对的进入或离开状态以及有界画布矩形', () => {
+    const rect = {top: -12, left: 30, width: 90, height: 18}
+    const enter = message('link-hover', {href: `entry://${NODE_ID}`, nodeId: NODE_ID, rect})
+    assert.equal(parseCanvasRuntimeMessage(enter, TOKEN)?.type, 'link-hover')
+    assert.equal(parseCanvasRuntimeMessage(message('link-hover', {href: null, nodeId: null, rect: null}), TOKEN)?.type, 'link-hover')
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, top: Number.NaN}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, left: Number.POSITIVE_INFINITY}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, width: 100_001}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, height: -1}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, left: -100_001}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, rect: {...rect, extra: 1}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, href: null}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...enter, href: 'x'.repeat(2_049)}, TOKEN), null)
+})
+
+test('link-hover 同样拒绝伪造来源、旧 token、重放与超限信封', () => {
+    const source = {}
+    const gate = createCanvasRuntimeMessageGate(source, TOKEN)
+    const enter = message('link-hover', {
+        href: `entry://${NODE_ID}`, nodeId: null,
+        rect: {top: 1, left: 2, width: 3, height: 4},
+    }, 2)
+    assert.equal(gate.accept({source: {}, data: enter}), null)
+    assert.equal(gate.accept({source, data: {...enter, sessionToken: OTHER_TOKEN}}), null)
+    assert.equal(gate.accept({source, data: enter})?.type, 'link-hover')
+    assert.equal(gate.accept({source, data: enter}), null)
+    assert.equal(gate.accept({source, data: message('link-hover', {href: null, nodeId: null, rect: null}, 1)}), null)
+    assert.equal(gate.accept({source, data: {...enter, sequence: 3, href: '你'.repeat(CANVAS_MESSAGE_MAX_BYTES)}}), null)
+})
+
 test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单', () => {
     const intent = message('input-intent', {
         intentId: REQUEST_ID,

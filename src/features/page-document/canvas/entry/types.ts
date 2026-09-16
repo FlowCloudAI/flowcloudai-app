@@ -7,6 +7,7 @@ export interface PageDocumentCanvasEntryProps {
     summary: string
     markdown: string
     onNavigationIntent: (href: string) => void
+    onLinkHover?: (hover: {href: string | null; nodeId: string | null; rect: import('../protocol/index.ts').CanvasLinkHoverRect | null}) => void
     compact?: boolean
     convertLegacyMarkdown?: boolean
 }

@@ -14,7 +14,7 @@ import {
     PAGE_DOCUMENT_CANVAS_CHANNEL,
     PAGE_DOCUMENT_CANVAS_VERSION,
 } from './constants.ts'
-import type {CanvasHostCommand, CanvasRuntimeMessage} from './types.ts'
+import type {CanvasHostCommand, CanvasLinkHoverRect, CanvasRuntimeMessage} from './types.ts'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -42,6 +42,15 @@ function isDimension(value: unknown): value is number {
         && Number.isFinite(value)
         && value >= 0
         && value <= CANVAS_DIMENSION_MAX
+}
+
+export function isCanvasLinkHoverRect(value: unknown): value is CanvasLinkHoverRect {
+    if (!isRecord(value) || !hasOnlyKeys(value, ['top', 'left', 'width', 'height'])) return false
+    return typeof value.top === 'number' && Number.isFinite(value.top)
+        && Math.abs(value.top) <= CANVAS_DIMENSION_MAX
+        && typeof value.left === 'number' && Number.isFinite(value.left)
+        && Math.abs(value.left) <= CANVAS_DIMENSION_MAX
+        && isDimension(value.width) && isDimension(value.height)
 }
 
 function isEnvelope(value: Record<string, unknown>, token: string): boolean {
@@ -192,6 +201,16 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
         return hasOnlyKeys(value, [...envelopeKeys, 'href', 'nodeId'])
             && isBoundedString(value.href, CANVAS_HREF_MAX_CODE_UNITS, false)
             && (value.nodeId === null || isUuid(value.nodeId))
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
+    if (value.type === 'link-hover') {
+        const validLeave = value.href === null && value.nodeId === null && value.rect === null
+        const validEnter = isBoundedString(value.href, CANVAS_HREF_MAX_CODE_UNITS, false)
+            && (value.nodeId === null || isUuid(value.nodeId))
+            && isCanvasLinkHoverRect(value.rect)
+        return hasOnlyKeys(value, [...envelopeKeys, 'href', 'nodeId', 'rect'])
+            && (validLeave || validEnter)
             ? value as unknown as CanvasRuntimeMessage
             : null
     }

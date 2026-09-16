@@ -12,5 +12,6 @@ export interface PageDocumentEditorEntryProps {
     onDirtyChange: (dirty: boolean) => void
     onSavedDerivedText?: (derivedText: string) => void
     onNavigationIntent: (href: string) => void
+    onLinkHover?: (hover: {href: string | null; nodeId: string | null; rect: import('../../canvas/protocol/index.ts').CanvasLinkHoverRect | null}) => void
     onRequestLeave: () => Promise<boolean>
 }

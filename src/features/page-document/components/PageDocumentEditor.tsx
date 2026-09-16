@@ -54,6 +54,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         onDirtyChange,
         onSavedDerivedText,
         onNavigationIntent,
+        onLinkHover,
         onRequestLeave,
     } = props
     const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
@@ -295,6 +296,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                         ? nodeId => handleSelection(nodeId, 'canvas')
                                         : undefined}
                                     onNavigationIntent={forwardsNavigation ? onNavigationIntent : undefined}
+                                    onLinkHover={onLinkHover}
                                     onInputIntent={mode === 'visual'
                                         ? session.applyCanvasInputIntent
                                         : undefined}
@@ -323,6 +325,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         previewStale={state.previewStale}
                         onSourceChange={session.updateSource}
                         onNavigationIntent={onNavigationIntent}
+                        onLinkHover={onLinkHover}
                         onHistoryChange={setSourceHistory}
                     />
                 )}

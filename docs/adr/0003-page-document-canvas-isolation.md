@@ -33,6 +33,10 @@ HTML 只保留安全骨架与占位，不含外链脚本、样式表或 `style` 
 满足同一信封约束的命令。销毁画布或切换文档即轮换 token，旧 Window、旧 token、重放和乱序消息
 全部失效。
 
+只读 `link-hover` 消息沿用同一信封校验，只回报已通过作者链接白名单的 `href`、可空的受管节点 ID
+与画布坐标系中的有界矩形；离开锚点时回报空状态。宿主把矩形换算到页面坐标，且只为词条内链
+展示既有信息浮窗。该消息不携带作者 HTML，不授予画布新的导航、存储或网络能力。
+
 画布默认保持只读，只有收到通过上述信封、来源 Window 与序号校验的 `set-editing` 命令后，运行时
 才为 paragraph、heading、list-item 和 table-cell 四类受管节点增加
 `contenteditable="plaintext-only"`。作者源码中的 `contenteditable` 仍由隔离层拒绝；运行时授予的

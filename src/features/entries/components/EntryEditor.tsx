@@ -38,6 +38,7 @@ import EntryImageLightbox from './EntryImageLightbox'
 import TagCreator from './TagCreator'
 import EntryEditorMetaPanel from './EntryEditorMetaPanel'
 import EntryImageAddModal from './EntryImageAddModal'
+import EntryEditorLinkPreview from './EntryEditorLinkPreview'
 import EntryDraftRecoveryBanner from './EntryDraftRecoveryBanner'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
@@ -67,6 +68,7 @@ import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {buildRelationDraft,} from '../lib/entryRelation'
 import {syncEntryRelationDrafts} from '../lib/entryRelationPersistence.ts'
 import {ensureEntryDetailLoaded} from '../lib/entryDetailLoading'
+import {parseCanvasHoverEntryTarget} from '../lib/entryCanvasHoverTarget.ts'
 import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
     buildTagValueMap,
@@ -244,6 +246,7 @@ export default function EntryEditor({
     const pageScrollRef = useRef<HTMLDivElement | null>(null)
     const workspaceRef = useRef<HTMLElement | null>(null)
     const workspaceHeaderRef = useRef<HTMLDivElement | null>(null)
+    const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
     const onDirtyChangeRef = useRef(onDirtyChange)
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
@@ -401,6 +404,12 @@ export default function EntryEditor({
             void showAlert(message, 'warning', 'nonInvasive', 1800)
         },
     })
+
+    const closePageLinkPreview = linkPreview.closeLinkPreview
+    // 词条标签常驻挂载；切换活动标签或模式时不得留下后台词条的 fixed 浮窗。
+    useEffect(() => {
+        closePageLinkPreview()
+    }, [active, editorMode, entryId, closePageLinkPreview])
 
 
     useEffect(() => {
@@ -1068,6 +1077,23 @@ export default function EntryEditor({
         })
     }
 
+    function handlePageDocumentLinkHover(hover: {href: string | null; rect: {top: number; left: number; width: number; height: number} | null}) {
+        if (!active) {
+            linkPreview.closeLinkPreview()
+            return
+        }
+        if (hover.href === null) {
+            linkPreview.scheduleLinkPreviewClose()
+            return
+        }
+        const target = parseCanvasHoverEntryTarget(hover.href)
+        if (!target || !hover.rect) {
+            linkPreview.closeLinkPreview()
+            return
+        }
+        linkPreview.openLinkPreviewAtRect(hover.rect, target)
+    }
+
     async function handleTagSchemaSaved(schema: TagSchema) {
         markUserEdited()
         const nextSchemas = entryTags.handleTagSchemaSaved(schema)
@@ -1244,6 +1270,7 @@ export default function EntryEditor({
                                     markdown={draft.content}
                                     convertLegacyMarkdown
                                     onNavigationIntent={handlePageDocumentNavigation}
+                                    onLinkHover={handlePageDocumentLinkHover}
                                 />
                             )}
                             {editorMode === 'edit' && (
@@ -1259,6 +1286,7 @@ export default function EntryEditor({
                                     onDirtyChange={setPageDocumentDirty}
                                     onSavedDerivedText={setPageDocumentDerivedText}
                                     onNavigationIntent={handlePageDocumentNavigation}
+                                    onLinkHover={handlePageDocumentLinkHover}
                                     onRequestLeave={requestLeavePageDocument}
                                 />
                             )}
@@ -1288,6 +1316,16 @@ export default function EntryEditor({
                     )}
                 </div>
             </RollingBox>
+
+            <EntryEditorLinkPreview
+                linkPreview={linkPreview.linkPreview}
+                linkPreviewPosition={linkPreview.linkPreviewPosition}
+                linkPreviewEntry={linkPreview.linkPreviewEntry}
+                panelRef={linkPreviewPanelRef}
+                anchorRef={linkPreview.linkPreviewAnchorRef}
+                onClearCloseTimer={linkPreview.clearLinkPreviewCloseTimer}
+                onScheduleClose={linkPreview.scheduleLinkPreviewClose}
+            />
 
             <ActionMenu
                 open={actionMenuOpen}

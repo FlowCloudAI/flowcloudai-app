@@ -23,6 +23,7 @@ import {
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
+import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import {mountCanvasStyles} from './styleMount.ts'
 import runtimeCss from './runtime.css?inline'
@@ -42,6 +43,7 @@ let compositionNodeId: string | null = null
 let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
+const linkHover = createCanvasLinkHoverTracker()
 
 type RuntimePayload = CanvasRuntimeMessage extends infer Message
     ? Message extends CanvasRuntimeMessage
@@ -91,6 +93,8 @@ function reportSize(): void {
 }
 
 function clearRenderedDocument(): void {
+    const leave = linkHover.clear()
+    if (leave) send(leave)
     authorStyle.textContent = ''
     root.replaceChildren()
     selectedNodeId = null
@@ -101,6 +105,8 @@ function applyRender(
     command: CanvasRenderCommand,
     resolvedSelection: {nodeId: string; offset: number} | null = null,
 ): void {
+    const leave = linkHover.clear()
+    if (leave) send(leave)
     latestRequestId = command.requestId
     // 晚于输入回执到达的规范化预览仍需挂载；先记住纯文本选区，避免全量安全挂载打断连续输入。
     const textSelection = editingEnabled && !resolvedSelection ? captureSelection() : null
@@ -366,6 +372,10 @@ function releasePendingRenderAfterComposition(submitted: boolean): void {
 }
 
 function setEditing(enabled: boolean): void {
+    if (editingEnabled !== enabled) {
+        const leave = linkHover.clear()
+        if (leave) send(leave)
+    }
     editingEnabled = enabled
     if (!enabled && composition.isComposing) {
         composition.cancel()
@@ -462,6 +472,8 @@ function installInputListeners(): void {
     })
 
     document.addEventListener('compositionstart', event => {
+        const leave = linkHover.clear()
+        if (leave) send(leave)
         if (!editingEnabled || composition.isComposing) return
         const node = managedNode(event.target)
         const nodeId = managedNodeId(node)
@@ -568,6 +580,35 @@ function start(): void {
         setSelection(nodeId)
         send({type: 'selection', nodeId})
     }, true)
+
+    document.addEventListener('mouseover', event => {
+        const anchor = event.target instanceof Element
+            ? event.target.closest('a[href], area[href]') : null
+        if (!anchor) return
+        if (event.relatedTarget instanceof Node && anchor.contains(event.relatedTarget)) return
+        const href = anchor.getAttribute('href') ?? ''
+        const bounds = anchor.getBoundingClientRect()
+        const hover = linkHover.enter(anchor, href, managedNodeId(anchor.closest('[data-fc-node-id]')), {
+            top: bounds.top, left: bounds.left, width: bounds.width, height: bounds.height,
+        }, composition.isComposing)
+        if (hover) send(hover)
+    })
+    document.addEventListener('mouseout', event => {
+        const anchor = event.target instanceof Element
+            ? event.target.closest('a[href], area[href]') : null
+        if (!anchor) return
+        if (event.relatedTarget instanceof Node && anchor.contains(event.relatedTarget)) return
+        const leave = linkHover.leave(anchor)
+        if (leave) send(leave)
+    })
+    window.addEventListener('scroll', () => {
+        const leave = linkHover.clear()
+        if (leave) send(leave)
+    }, true)
+    window.addEventListener('blur', () => {
+        const leave = linkHover.clear()
+        if (leave) send(leave)
+    })
 
     installInputListeners()
     new ResizeObserver(reportSize).observe(root)

@@ -11,9 +11,12 @@ import {
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
     type CanvasInputResolution,
+    type CanvasLinkHoverRect,
 } from '../protocol/index.ts'
+import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
+import {canvasRectToHostViewport} from './linkHoverGeometry.ts'
 import './PageDocumentCanvas.css'
 
 export interface PageDocumentCanvasProps {
@@ -27,6 +30,7 @@ export interface PageDocumentCanvasProps {
     editingEnabled?: boolean
     onSelectionChange?: (nodeId: string) => void
     onNavigationIntent?: (href: string) => void
+    onLinkHover?: (hover: {href: string | null; nodeId: string | null; rect: CanvasLinkHoverRect | null}) => void
     onInputIntent?: (
         message: CanvasInputIntentMessage,
     ) => CanvasInputResolution | Promise<CanvasInputResolution>
@@ -47,6 +51,7 @@ export function PageDocumentCanvas({
     editingEnabled = false,
     onSelectionChange,
     onNavigationIntent,
+    onLinkHover,
     onInputIntent,
     onInputBlocked,
     onInputFlush,
@@ -60,6 +65,7 @@ export function PageDocumentCanvas({
         css,
         onSelectionChange,
         onNavigationIntent,
+        onLinkHover,
         onInputIntent,
         onInputBlocked,
         onInputFlush,
@@ -80,13 +86,14 @@ export function PageDocumentCanvas({
             css,
             onSelectionChange,
             onNavigationIntent,
+            onLinkHover,
             onInputIntent,
             onInputBlocked,
             onInputFlush,
             onRenderError,
             onRendered,
         }
-    }, [css, html, onInputBlocked, onInputFlush, onInputIntent, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
+    }, [css, html, onInputBlocked, onInputFlush, onInputIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
@@ -104,6 +111,7 @@ export function PageDocumentCanvas({
     }, [send])
 
     const sendRender = useCallback(() => {
+        latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
         send({
             type: 'render',
             requestId: createCanvasRequestId(),
@@ -113,6 +121,7 @@ export function PageDocumentCanvas({
     }, [css, html, send])
 
     const sendLatestRender = useCallback(() => {
+        latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
         send({
             type: 'render',
             requestId: createCanvasRequestId(),
@@ -139,6 +148,18 @@ export function PageDocumentCanvas({
             if (message.type === 'selection') latest.current.onSelectionChange?.(message.nodeId)
             if (message.type === 'navigation-intent' && canForwardCanvasNavigationIntent(message.href)) {
                 latest.current.onNavigationIntent?.(message.href)
+            }
+            if (message.type === 'link-hover') {
+                if (message.href === null) {
+                    latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
+                } else if (message.rect && validateAuthorHref(message.href).allowed) {
+                    const frameRect = frameRef.current?.getBoundingClientRect()
+                    if (frameRect) latest.current.onLinkHover?.({
+                        href: message.href,
+                        nodeId: message.nodeId,
+                        rect: canvasRectToHostViewport(frameRect, message.rect),
+                    })
+                }
             }
             if (message.type === 'input-blocked') latest.current.onInputBlocked?.(message)
             if (message.type === 'input-flush') latest.current.onInputFlush?.(message.nodeId)
@@ -178,6 +199,7 @@ export function PageDocumentCanvas({
         window.addEventListener('message', handleMessage)
         return () => {
             active = false
+            latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
             gate.destroy()
             window.removeEventListener('message', handleMessage)
         }
