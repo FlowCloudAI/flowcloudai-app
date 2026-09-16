@@ -130,6 +130,12 @@ export interface CanvasInputFlushMessage extends CanvasEnvelope {
     nodeId: string
 }
 
+/** 画布内快捷键触发的历史操作意图；宿主负责执行并重新渲染。 */
+export interface CanvasHistoryIntentMessage extends CanvasEnvelope {
+    type: 'history-intent'
+    action: 'undo' | 'redo'
+}
+
 export type CanvasRuntimeMessage =
     | CanvasRenderedMessage
     | CanvasRenderErrorMessage
@@ -140,6 +146,7 @@ export type CanvasRuntimeMessage =
     | CanvasInputIntentMessage
     | CanvasInputBlockedMessage
     | CanvasInputFlushMessage
+    | CanvasHistoryIntentMessage
 
 export interface CanvasMessageEventLike {
     data: unknown

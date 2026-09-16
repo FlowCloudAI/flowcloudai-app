@@ -532,6 +532,20 @@ function installInputListeners(): void {
         reportBlockedInput('insertFromDrop', 'unsupported-input-type', managedNodeId(node))
     })
 
+    document.addEventListener('keydown', event => {
+        if (event.defaultPrevented || event.isComposing) return
+        if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+        const key = event.key.toLowerCase()
+        if (key === 'z') {
+            event.preventDefault()
+            send({type: 'history-intent', action: event.shiftKey ? 'redo' : 'undo'})
+        } else if (key === 'y' && !event.shiftKey) {
+            // Windows 习惯：Ctrl+Y 也触发 redo
+            event.preventDefault()
+            send({type: 'history-intent', action: 'redo'})
+        }
+    })
+
     document.addEventListener('focusout', event => {
         const node = managedNode(event.target)
         const nodeId = managedNodeId(node)

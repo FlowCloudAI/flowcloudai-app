@@ -36,6 +36,7 @@ export interface PageDocumentCanvasProps {
     ) => CanvasInputResolution | Promise<CanvasInputResolution>
     onInputBlocked?: (message: CanvasInputBlockedMessage) => void
     onInputFlush?: (nodeId: string) => void
+    onHistoryIntent?: (action: 'undo' | 'redo') => void
     onRenderError?: (message: string) => void
     onRendered?: () => void
 }
@@ -55,6 +56,7 @@ export function PageDocumentCanvas({
     onInputIntent,
     onInputBlocked,
     onInputFlush,
+    onHistoryIntent,
     onRenderError,
     onRendered,
 }: PageDocumentCanvasProps) {
@@ -69,6 +71,7 @@ export function PageDocumentCanvas({
         onInputIntent,
         onInputBlocked,
         onInputFlush,
+        onHistoryIntent,
         onRenderError,
         onRendered,
     })
@@ -90,10 +93,11 @@ export function PageDocumentCanvas({
             onInputIntent,
             onInputBlocked,
             onInputFlush,
+            onHistoryIntent,
             onRenderError,
             onRendered,
         }
-    }, [css, html, onInputBlocked, onInputFlush, onInputIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
+    }, [css, html, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
@@ -163,6 +167,7 @@ export function PageDocumentCanvas({
             }
             if (message.type === 'input-blocked') latest.current.onInputBlocked?.(message)
             if (message.type === 'input-flush') latest.current.onInputFlush?.(message.nodeId)
+            if (message.type === 'history-intent') latest.current.onHistoryIntent?.(message.action)
             if (message.type === 'input-intent') {
                 const intent = {...message, intentId: message.intentId.toLowerCase(), nodeId: message.nodeId.toLowerCase()}
                 void (async () => {

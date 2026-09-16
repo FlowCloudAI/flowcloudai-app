@@ -106,16 +106,25 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     useEffect(() => {
         if (!active) return
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (
-                event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey ||
-                !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's'
-            ) return
-            event.preventDefault()
-            if (canSave) void handleSave()
+            if (event.defaultPrevented || event.isComposing || event.altKey) return
+            if (!(event.metaKey || event.ctrlKey)) return
+            const key = event.key.toLowerCase()
+            if (key === 's' && !event.shiftKey) {
+                event.preventDefault()
+                if (canSave) void handleSave()
+            } else if (key === 'z' && !event.shiftKey) {
+                event.preventDefault()
+                if (mode === 'code') sourceWorkspaceRef.current?.undo()
+                else session.undo()
+            } else if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) {
+                event.preventDefault()
+                if (mode === 'code') sourceWorkspaceRef.current?.redo()
+                else session.redo()
+            }
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [active, canSave, handleSave])
+    }, [active, canSave, handleSave, mode, session])
 
     const saveStatus = useMemo(() => {
         if (!state) return '正在读取页面文档…'
@@ -303,6 +312,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                         : undefined}
                                     onInputFlush={mode === 'visual'
                                         ? flushCanvasInput
+                                        : undefined}
+                                    onHistoryIntent={mode === 'visual'
+                                        ? action => action === 'undo' ? session.undo() : session.redo()
                                         : undefined}
                                 />
                             ) : (
