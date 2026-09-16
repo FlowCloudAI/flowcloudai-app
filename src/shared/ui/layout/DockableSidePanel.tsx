@@ -135,9 +135,9 @@ export default function DockableSidePanel({
             const delta = dragStartXRef.current - event.clientX
             const rawWidth = dragStartWidthRef.current + delta
             const collapseThreshold = dragStartWidthRef.current * PANEL_COLLAPSE_THRESHOLD_RATIO
-            const nextWidth = Math.min(
-                window.innerWidth * maxWidthRatio,
-                Math.max(minWidth, rawWidth),
+            const nextWidth = Math.max(
+                minWidth,
+                Math.min(window.innerWidth * maxWidthRatio, rawWidth),
             )
             const shouldCollapse = rawWidth <= collapseThreshold
             const wasCollapsePreview = isCollapsePreviewRef.current
@@ -187,9 +187,9 @@ export default function DockableSidePanel({
 
             const currentWidthValue = el?.style.getPropertyValue('--dsp-width')
             const currentWidth = currentWidthValue ? parseFloat(currentWidthValue) : dragStartWidthRef.current
-            const finalWidth = Math.min(
-                window.innerWidth * maxWidthRatio,
-                Math.max(minWidth, currentWidth),
+            const finalWidth = Math.max(
+                minWidth,
+                Math.min(window.innerWidth * maxWidthRatio, currentWidth),
             )
             onCollapsedChange?.(false)
             onWidthChange(finalWidth)

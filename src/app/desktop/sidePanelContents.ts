@@ -15,7 +15,7 @@ export interface SidePanelContentDescriptor<Key extends string = string> {
 
 export const SIDE_PANEL_CONTENTS = [
     {key: 'idea', minWidth: 500, scope: 'global'},
-    {key: 'ai-chat', minWidth: 500, scope: 'global'},
+    {key: 'ai-chat', minWidth: 450, scope: 'global'},
     {key: 'snapshot', minWidth: 500, scope: 'global'},
     {key: 'help', minWidth: 500, scope: 'global'},
     ...PAGE_DOCUMENT_EDITOR_SIDE_PANEL_CONTENTS,

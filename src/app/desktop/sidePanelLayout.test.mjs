@@ -111,6 +111,11 @@ test('页面属性只注册在页面作用域且正式分栏配对表保持为�
     assert.match(registry, /SIDE_PANEL_SPLIT_PAIRS[\s\S]*= \[\]/)
 })
 
+test('AI 聊天 Dock 注册 450 像素宽度下限', () => {
+    const registry = readFileSync(new URL('./sidePanelContents.ts', import.meta.url), 'utf8')
+    assert.match(registry, /key: 'ai-chat', minWidth: 450, scope: 'global'/)
+})
+
 test('页面作用域退位时要求收起 Dock，不把内容改回 AI', () => {
     assert.equal(
         shouldCollapseRetiredPagePanel(

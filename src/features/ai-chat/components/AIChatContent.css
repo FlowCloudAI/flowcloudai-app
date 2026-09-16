@@ -1894,7 +1894,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: var(--fc-space-xs);
+    gap: var(--fc-space-sm);
 }
 
 .ai-floating-char-count {
