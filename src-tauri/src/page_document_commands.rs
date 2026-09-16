@@ -206,7 +206,7 @@ mod tests {
     use std::collections::HashMap;
     use tempfile::tempdir;
     use tokio::sync::Mutex;
-    use worldflow_core::{EntryLinkOps, SqliteDb, WorldStore};
+    use worldflow_core::{EntryLinkOps, EntryOps, SqliteDb, WorldStore};
 
     struct Fixture {
         _dir: tempfile::TempDir,
@@ -293,6 +293,77 @@ mod tests {
                 .await
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn legacy_ai_content_write_is_rejected_after_page_document_exists() {
+        let fixture = setup().await;
+        save_entry(
+            &fixture.state,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html: "<p>页面正文</p>".into(),
+                css: String::new(),
+                expected_revision: None,
+                request_key: "ai-guard".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            crate::tools::ensure_legacy_content_write_allowed(
+                &fixture.state,
+                &fixture.entry_id.to_string(),
+            )
+            .await
+            .unwrap_err()
+            .contains("请使用页面编辑")
+        );
+        let error = crate::tools::update_entry_content(
+            &fixture.state,
+            &fixture.entry_id.to_string(),
+            Some("旧正文覆盖".into()),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains("请使用页面编辑"));
+        let db = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(db.get_entry(&fixture.entry_id).await.unwrap().content, "");
+    }
+
+    #[tokio::test]
+    async fn legacy_ai_content_write_still_works_without_page_document() {
+        let fixture = setup().await;
+        crate::tools::ensure_legacy_content_write_allowed(
+            &fixture.state,
+            &fixture.entry_id.to_string(),
+        )
+        .await
+        .unwrap();
+        crate::tools::update_entry_content(
+            &fixture.state,
+            &fixture.entry_id.to_string(),
+            Some("旧正文可编辑".into()),
+        )
+        .await
+        .unwrap();
+        let db = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            db.get_entry(&fixture.entry_id).await.unwrap().content,
+            "旧正文可编辑"
         );
     }
 

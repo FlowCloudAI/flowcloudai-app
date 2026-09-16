@@ -59,6 +59,18 @@ fn shared_legal_entry_fixture_is_accepted() {
 }
 
 #[test]
+fn markdown_conversion_output_is_accepted_by_rust_validation() {
+    let result = validate_entry(&read_fixture("markdown-converted-article.html"), "");
+    assert!(
+        result.valid,
+        "旧正文转换结果被拒绝：{:?}",
+        result.diagnostics
+    );
+    assert!(result.derived_text.contains("标题"));
+    assert!(result.derived_text.contains("段落 内链"));
+}
+
+#[test]
 fn every_shared_malicious_case_is_rejected() {
     let fixture: MaliciousFixture =
         serde_json::from_str(&read_fixture("malicious-cases.json")).unwrap();

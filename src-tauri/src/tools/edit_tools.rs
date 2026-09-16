@@ -56,6 +56,9 @@ async fn dispatch_edit_op(
             }
 
             let (entry_title, before_content) = {
+                tools::ensure_legacy_content_write_allowed(app_state.as_ref(), &entry_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 let entry = tools::get_entry(app_state.as_ref(), &entry_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
@@ -145,6 +148,9 @@ async fn dispatch_edit_op(
             new_content,
         } => {
             let (entry_title, before_content) = {
+                tools::ensure_legacy_content_write_allowed(app_state.as_ref(), &entry_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 let entry = tools::get_entry(app_state.as_ref(), &entry_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;

@@ -11,8 +11,8 @@ use crate::apis::worldflow::entries::sync_outgoing_links_from_content;
 use std::collections::BTreeSet;
 use uuid::Uuid;
 use worldflow_core::{
-    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, SqliteDb, TagSchemaOps,
-    models::*,
+    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, PageDocumentOps, ProjectOps, SqliteDb,
+    TagSchemaOps, models::*,
 };
 
 pub mod category_tools;
@@ -1682,6 +1682,7 @@ pub async fn update_entry_content(
 ) -> Result<(Entry, BTreeSet<Uuid>), String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let db = open_entry_db(state, &entry_id, None).await?;
+    ensure_legacy_entry_writable(&db, &entry_id).await?;
     let entry = db
         .update_entry(
             &entry_id,
@@ -1700,6 +1701,31 @@ pub async fn update_entry_content(
         .map_err(|e| e.to_string())?;
     let affected_entry_ids = sync_outgoing_links_or_log(&db, &entry).await;
     Ok((entry, affected_entry_ids))
+}
+
+async fn ensure_legacy_entry_writable(db: &SqliteDb, entry_id: &Uuid) -> Result<(), String> {
+    // 两个 AI 旧正文工具共用此边界；确认前检查体验，落库前复查防止确认期间已迁移。
+    if db
+        .get_entry_page_document(entry_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .is_some()
+    {
+        return Err(
+            "该词条已有页面文档，不能用旧正文工具修改；请使用页面编辑，或等待 AI 语义化写入。"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+pub async fn ensure_legacy_content_write_allowed(
+    state: &AppState,
+    entry_id: &str,
+) -> Result<(), String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let db = open_entry_db(state, &entry_id, None).await?;
+    ensure_legacy_entry_writable(&db, &entry_id).await
 }
 
 /// 向词条添加单个标签（如 schema_id 已存在则覆盖其 value）
