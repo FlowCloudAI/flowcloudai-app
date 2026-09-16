@@ -85,27 +85,34 @@ Tauri 2.11.5 的资源服务会按所请求的 HTML 资产路径附加 CSP 响�
 
 ## 开发与发布差异
 
-开关构建中，独立 Vite 配置先生成临时 IIFE，随后 `scripts/build-page-document-canvas.mjs` 把运行时
+每次正式构建都由独立 Vite 配置先生成临时 IIFE，随后 `scripts/build-page-document-canvas.mjs` 把运行时
 内嵌进 `canvas.html`、写入精确 meta CSP 哈希并删除临时 JS/CSS。Tauri 再把整个 `dist` 作为嵌入
 资产处理，并为这个 HTML 的同一内联脚本向响应头追加哈希。这条路径由依赖源码和构建产物检查
-证明；Android WebView 已由带开关的 debug APK 实测接受响应头和 meta 两条策略，Windows WebView2
+证明；Android WebView 已由 debug APK 实测接受响应头和 meta 两条策略，Windows WebView2
 仍待原生验证。
 
-开发模式不支持画布。`devUrl` 直接或经移动端代理读取 Vite 资源，既不执行上述追加构建脚本，也不
-经过 Tauri 的嵌入资产与页面专属哈希处理，所以启用开关的普通 Vite dev server 不会生成可加载的
-`canvas.html`。协议逻辑由 Node 测试覆盖；发布 CSP 与隔离行为只能使用带开关的 debug 原生产物
-验收。
+上述“开发模式不支持画布”的结论现已作废。主 Vite 配置在 `configureServer` 阶段先于内部 HTML
+中间件注册 `/canvas.html` 响应：它调用独立画布配置生成不写盘的 IIFE，再复用
+`scripts/page-document-canvas-artifact.mjs` 的唯一转义、换行归一化、SHA-256 和占位替换逻辑组装完整
+HTML，最后直接向响应流写入 UTF-8 字节。该路径不调用 `transformIndexHtml`，不注入
+`/@vite/client` 或 HMR 脚本，meta `script-src` 仍只含唯一内联脚本的精确哈希。源码变化会将内存缓存
+标记为过期，下次刷新 iframe 时惰性重建；不对隔离页开启 HMR。桌面的 5175 与 Android 的
+5176 都走同一插件和现有 `devHost` 逻辑。开发响应没有 Tauri 打包协议添加的 CSP 响应头，因此它能
+证明独立 meta CSP 与 bridge 运行，不能替代打包产物对响应头与 meta 取交集的原生验收。
+开发时使用现有 `npm run dev` 或 `npm run tauri dev`，无需页面文档环境变量。
 
-显式探针构建沿用现有脚本的父进程环境，无需修改构建脚本：
+画布与页面编辑器默认启用；只有带共享恶意样例和绕过作者校验按钮的隔离探针需要显式开关：
 
 ```sh
-VITE_PAGE_DOCUMENT_CANVAS=1 npm run macos:build:debug
-VITE_PAGE_DOCUMENT_CANVAS=1 npm run android:build:dev
+npm run macos:build:debug
+npm run android:build:dev
+VITE_PAGE_DOCUMENT_PROBE=1 npm run macos:build:debug
 ```
 
-默认 `npm run build` 只把 `index.html` 设为入口，并把业务页导入解析到空组件；启用时先构建宿主，
-再由独立配置和组装脚本向 `dist/` 追加只含单个内联 IIFE 的 `canvas.html`。每次发布前应在默认
-`dist/` 搜索“页面文档预览”“隔离探针”及 `page-document-canvas`，三者都不得出现。
+默认 `npm run build` 先构建含页面预览与编辑入口的宿主，再由独立配置和组装脚本向
+`dist/` 追加只含单个内联 IIFE 的 `canvas.html`，并同时执行画布制品与应用产物检查。默认产物
+必须能找到“页面编辑”与独立 CodeMirror 分块，同时不得出现“隔离探针”、“跳过作者侧校验”、
+共享恶意样例 ID 或 fixture 路径。
 
 ## CORS 与 opaque origin
 
@@ -127,7 +134,7 @@ Refused to load tauri://localhost/canvas/runtime.js because it does not appear i
 ```
 
 这证明 WKWebView 中 opaque-origin 画布的 `'self'` 不匹配 `tauri://localhost`。最终方案不再发起
-运行时子资源请求：开关构建把 IIFE 写成唯一内联脚本，meta `script-src` 只保留该脚本的哈希；
+运行时子资源请求：正式构建把 IIFE 写成唯一内联脚本，meta `script-src` 只保留该脚本的哈希；
 运行时 CSS 一并进入脚本并动态创建 `style`。产物检查复算哈希，拒绝外链脚本、样式表、静态
 `style`、模块标记、`process.env` 和遗留的 `canvas/runtime.js`、`canvas/runtime.css`。
 

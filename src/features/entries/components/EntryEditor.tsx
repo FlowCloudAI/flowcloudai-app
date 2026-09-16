@@ -114,10 +114,7 @@ import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
 import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
-import {
-    PAGE_DOCUMENT_EDITOR_ENABLED,
-    PageDocumentEditorEntry,
-} from '@page-document-editor-entry'
+import {PageDocumentEditorEntry} from '@page-document-editor-entry'
 import {
     shouldHandleEntryEditorShortcut,
     type EntryEditorMode,
@@ -1620,16 +1617,14 @@ export default function EntryEditor({
                                         >
                                             编辑
                                         </button>
-                                        {PAGE_DOCUMENT_EDITOR_ENABLED && (
-                                            <button
-                                                type="button"
-                                                className={`entry-editor-mode-chip${editorMode === 'page' ? ' active' : ''}`}
-                                                aria-pressed={editorMode === 'page'}
-                                                onClick={() => void requestEditorMode('page')}
-                                            >
-                                                页面
-                                            </button>
-                                        )}
+                                        <button
+                                            type="button"
+                                            className={`entry-editor-mode-chip${editorMode === 'page' ? ' active' : ''}`}
+                                            aria-pressed={editorMode === 'page'}
+                                            onClick={() => void requestEditorMode('page')}
+                                        >
+                                            页面
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="entry-editor-workspace__toolbar-actions">

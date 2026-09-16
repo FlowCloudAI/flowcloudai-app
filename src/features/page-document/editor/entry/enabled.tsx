@@ -1,4 +1,4 @@
-// 只有显式打开页面文档画布构建开关时，Vite 才把真实编辑实现接入词条页。
+// 页面文档编辑已是正式能力；本入口默认向词条页与桌面宿主导出真实实现。
 
 export {PageDocumentEditor as PageDocumentEditorEntry} from '../../components/PageDocumentEditor.tsx'
 export {
@@ -7,4 +7,3 @@ export {
 } from '../workspace/PageDocumentProjectSidebar.tsx'
 export {PageDocumentPropertiesDockHost} from '../workspace/PageDocumentPropertiesDockHost.tsx'
 export type {PageDocumentEditorEntryProps} from './types.ts'
-export const PAGE_DOCUMENT_EDITOR_ENABLED = true

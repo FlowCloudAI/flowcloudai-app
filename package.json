@@ -61,7 +61,8 @@
     "android:build:debug:x86_64": "set \"CARGO_PROFILE_DEV_DEBUG=0\" && set \"CARGO_PROFILE_DEV_STRIP=debuginfo\" && npm run tauri -- android build --debug --apk --target x86_64",
     "test:page-document": "node --test --experimental-strip-types \"src/features/page-document/**/*.test.ts\"",
     "test:page-document-canvas-build": "node ./scripts/check-page-document-canvas-build.mjs",
-    "test:page-document-default-build": "node ./scripts/check-page-document-default-build.mjs"
+    "test:page-document-app-build": "node ./scripts/check-page-document-app-build.mjs",
+    "test:page-document-dev-canvas": "node ./scripts/check-page-document-dev-canvas.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.0.0",

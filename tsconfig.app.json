@@ -14,7 +14,8 @@
     "paths": {
       "@page-document-canvas-entry": ["src/features/page-document/canvas/entry/enabled.tsx"],
       "@page-document-editor-entry": ["src/features/page-document/editor/entry/enabled.tsx"],
-      "@page-document-editor-runtime": ["src/features/page-document/editor/runtime/enabled.ts"]
+      "@page-document-editor-runtime": ["src/features/page-document/editor/runtime/enabled.ts"],
+      "@page-document-probe-entry": ["src/features/page-document/canvas/development/entry/disabled.tsx"]
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

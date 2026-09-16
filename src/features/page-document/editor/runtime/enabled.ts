@@ -1,4 +1,4 @@
-// 本模块只在页面文档构建开关开启时向桌面壳注册属性 Dock 能力。
+// 本模块向桌面壳注册正式页面编辑的属性 Dock 能力。
 
 import {createElement} from 'react'
 import type {SideBarItem} from 'flowcloudai-ui'

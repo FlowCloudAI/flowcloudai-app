@@ -8,8 +8,8 @@ Tauri 2 + React 19 主应用，一套代码承载 Windows、Linux、macOS、Andr
 
 - 前端改动跑 `npm run lint && npm run build`；`src-tauri/` 有改动再跑 `cargo check` / `cargo test`。
 - Windows 上 `cargo test` 可能报 `STATUS_ENTRYPOINT_NOT_FOUND`：测试 exe 缺 common-controls v6 清单，是清单/链接问题，`cargo clean` 无效（根 `docs/devlog/2026-06-02-cargo-test-入口点缺失.md`）。
-- 浏览器预览不加载 Tauri 后端，依赖真实数据的界面只能用原生应用或 debug APK + ADB 验证；静态布局例外，详见根 `AGENTS.md`「验证」。
-- 打包、发布或原生配置（窗口、CSP、capability、签名）改动：构建成功不等于可用，要实际运行产物，验收清单在对应平台手册里。
+- 浏览器预览不加载 Tauri 后端，不能证明依赖真实数据的界面可用；需要人工操作的验证按根 `AGENTS.md`「验证」列验收清单，不自行操作原生应用或设备。
+- 打包、发布或原生配置（窗口、CSP、capability、签名）改动：构建成功不等于可用，交付时附上对应平台手册里的验收项，由用户在实际产物上执行。
 
 ## 平台
 
@@ -31,7 +31,7 @@ Tauri 2 + React 19 主应用，一套代码承载 Windows、Linux、macOS、Andr
 - 新增横向滚动区域加 `data-mobile-horizontal-scroll`，侧边抽屉手势据此放行横滑。不要为 Android 纵向压扁问题恢复 `translateZ(0)` 强制合成层：2026-07-13 起暂停，Chromium 148 模拟器持续 tile 内存超限、可能触发 renderer OOM，而真机未复现压扁。
 - 跨页或跨端共享状态走 store（参考 `projectListStore` 的 `useSyncExternalStore` 模式），不新增 `CustomEvent` 事件名做长期同步。
 - **软键盘布局只有一个 owner**：WebView 与应用外壳几何保持稳定，Android / iOS 各自的原生适配器发布遮挡量 `--fc-kb`，前端只压缩 AI 消息区、灵感正文等内部空间。不写根高度、不整壳平移、不预测键盘高度；`visualViewport` 只用于判断输入态。消费公式、已接入页面与验收边界见 `docs/mobile_keyboard_layout.md`。已实测无效、不要再试：Tauri Android WebView 的 `navigator.virtualKeyboard` 可写但 `env(keyboard-inset-height)` 恒为 0、`geometrychange` 不触发；viewport meta 的 `interactive-widget` 三个取值在 iOS 与 Android 上都无差异。
-- 侧边抽屉拖动态 `is-drawer-dragging` 与页面边缘返回 `is-edge-back-direct` 必须分开，不能重新引入同时命中外壳与页面层的 `is-dragging`，否则 Android WebView 在手势开始和回弹结束时各闪一次。改这组状态或 selector 时运行 `mobilePageTransition.test.mjs`；真机慢拖与取消回弹需要用户验证，交付时说明。
+- 侧边抽屉拖动态 `is-drawer-dragging` 与页面边缘返回 `is-edge-back-direct` 必须分开，不能重新引入同时命中外壳与页面层的 `is-dragging`，否则 Android WebView 在手势开始和回弹结束时各闪一次。改这组状态或 selector 时运行 `mobilePageTransition.test.mjs`；真机慢拖与取消回弹列入验收清单。
 
 ## 桌面布局
 

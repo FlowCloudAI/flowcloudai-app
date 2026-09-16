@@ -1,4 +1,4 @@
-// 本模块只定义业务页面与可选画布入口之间的窄接口，使关闭构建能替换为空实现。
+// 本模块限定词条查看态与默认页面文档预览之间的窄接口。
 
 export interface PageDocumentCanvasEntryProps {
     entryId: string

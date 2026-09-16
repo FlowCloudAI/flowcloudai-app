@@ -26,3 +26,12 @@ export function replaceExactlyOnce(source, marker, replacement) {
     }
     return `${source.slice(0, firstIndex)}${replacement}${source.slice(firstIndex + marker.length)}`
 }
+
+/** 生产构建与开发中间件共用同一组装入口，避免转义文本与 CSP 哈希发生分叉。 */
+export function assemblePageDocumentCanvasHtml(skeleton, runtimeSource) {
+    const runtime = escapeInlineScript(runtimeSource)
+    const cspSource = createInlineScriptCspSource(runtime)
+    let html = replaceExactlyOnce(skeleton, CANVAS_CSP_PLACEHOLDER, cspSource)
+    html = replaceExactlyOnce(html, CANVAS_RUNTIME_PLACEHOLDER, `<script>${runtime}</script>`)
+    return Object.freeze({html, runtime, cspSource})
+}

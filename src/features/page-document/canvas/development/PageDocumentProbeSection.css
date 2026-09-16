@@ -1,5 +1,5 @@
-/* 开关入口只组织宿主控件；所有视觉值来自 flowcloudai-ui 的 --fc-* token。 */
-.page-document-preview-section {
+/* 隔离探针只在显式开关构建中存在；样式不进入默认产物。 */
+.page-document-probe-section {
     display: grid;
     gap: var(--fc-space-md);
     min-width: 0;
@@ -9,33 +9,31 @@
     background: var(--fc-color-bg-secondary);
 }
 
-.page-document-preview-section__header {
+.page-document-probe-section__header {
     display: flex;
     gap: var(--fc-space-md);
     align-items: flex-start;
     justify-content: space-between;
 }
 
-.page-document-preview-section__header h2,
-.page-document-preview-section__header p,
-.page-document-preview-section__state,
-.page-document-preview-section__probe-note {
+.page-document-probe-section__header h2,
+.page-document-probe-section__header p,
+.page-document-probe-section__state {
     margin: 0;
 }
 
-.page-document-preview-section__header h2 {
+.page-document-probe-section__header h2 {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
 }
 
-.page-document-preview-section__header p,
-.page-document-preview-section__state,
-.page-document-preview-section__probe-note {
+.page-document-probe-section__header p,
+.page-document-probe-section__state {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
 }
 
-.page-document-preview-section__probe-controls {
+.page-document-probe-section__controls {
     display: flex;
     flex-wrap: wrap;
     gap: var(--fc-space-sm);
@@ -43,6 +41,6 @@
     max-width: min(100%, 42rem);
 }
 
-.page-document-preview-section.is-compact .page-document-preview-section__header {
+.page-document-probe-section.is-compact .page-document-probe-section__header {
     flex-direction: column;
 }

@@ -1,4 +1,4 @@
-// 本模块限定词条编辑器与可选页面编辑入口的接口，默认构建可替换为空实现。
+// 本模块限定词条编辑器与正式页面编辑入口之间的接口。
 
 export interface PageDocumentEditorEntryProps {
     entryId: string

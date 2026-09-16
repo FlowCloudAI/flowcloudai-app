@@ -2,13 +2,14 @@ import path from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
+import {pageDocumentCanvasDevPlugin} from './scripts/page-document-canvas-dev-plugin.mjs'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 const devHost = process.env.TAURI_DEV_HOST || process.env.HOST || '127.0.0.1'
 const isAndroid = process.env.TAURI_ENV_PLATFORM === 'android'
 const devPort = isAndroid ? 5176 : 5175
 const hmrPort = isAndroid ? 1422 : 1421
-const pageDocumentCanvasEnabled = process.env.VITE_PAGE_DOCUMENT_CANVAS === '1'
+const pageDocumentProbeEnabled = process.env.VITE_PAGE_DOCUMENT_PROBE === '1'
 
 function normalizeModuleId(id: string): string {
     return id.replace(/\\/g, '/')
@@ -21,27 +22,30 @@ function matchesNodeModulePrefix(id: string, prefixes: string[]): boolean {
 
 // https://vite.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [
+        pageDocumentCanvasDevPlugin(rootDir),
+        react(),
+    ],
     resolve: {
         dedupe: ['react', 'react-dom'],
         alias: {
             '@page-document-canvas-entry': path.resolve(
                 rootDir,
-                pageDocumentCanvasEnabled
-                    ? 'src/features/page-document/canvas/entry/enabled.tsx'
-                    : 'src/features/page-document/canvas/entry/disabled.tsx',
+                'src/features/page-document/canvas/entry/enabled.tsx',
             ),
             '@page-document-editor-entry': path.resolve(
                 rootDir,
-                pageDocumentCanvasEnabled
-                    ? 'src/features/page-document/editor/entry/enabled.tsx'
-                    : 'src/features/page-document/editor/entry/disabled.tsx',
+                'src/features/page-document/editor/entry/enabled.tsx',
             ),
             '@page-document-editor-runtime': path.resolve(
                 rootDir,
-                pageDocumentCanvasEnabled
-                    ? 'src/features/page-document/editor/runtime/enabled.ts'
-                    : 'src/features/page-document/editor/runtime/disabled.ts',
+                'src/features/page-document/editor/runtime/enabled.ts',
+            ),
+            '@page-document-probe-entry': path.resolve(
+                rootDir,
+                pageDocumentProbeEnabled
+                    ? 'src/features/page-document/canvas/development/entry/enabled.tsx'
+                    : 'src/features/page-document/canvas/development/entry/disabled.tsx',
             ),
             react: path.resolve(rootDir, 'node_modules/react'),
             'react-dom': path.resolve(rootDir, 'node_modules/react-dom'),
@@ -135,8 +139,8 @@ export default defineConfig({
                         return 'pixi-vendor'
                     }
 
-                    // 页面源码编辑器只在显式开关构建出现，保持独立分块便于核验默认产物。
-                    if (pageDocumentCanvasEnabled && matchesNodeModulePrefix(normalized, [
+                    // 页面源码编辑器默认启用，但 CodeMirror 仍独立分块，不进入主工作台。
+                    if (matchesNodeModulePrefix(normalized, [
                         '@codemirror/',
                         'codemirror/',
                         'diff/',

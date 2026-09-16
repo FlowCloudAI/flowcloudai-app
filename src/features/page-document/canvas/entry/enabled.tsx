@@ -1,4 +1,4 @@
-// 只有 VITE_PAGE_DOCUMENT_CANVAS=1 时，Vite 才把此实现替换到业务页面入口。
+// 页面文档画布已是默认能力；本入口只导出不含共享恶意样例的生产预览。
 
-export {PageDocumentPreviewSection as PageDocumentCanvasEntry} from '../development/PageDocumentPreviewSection.tsx'
+export {PageDocumentCanvasEntry} from './PageDocumentCanvasEntry.tsx'
 export type {PageDocumentCanvasEntryProps} from './types.ts'

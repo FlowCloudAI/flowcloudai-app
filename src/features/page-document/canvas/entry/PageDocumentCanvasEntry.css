@@ -1,0 +1,36 @@
+/* 生产只读预览只组织宿主骨架；画布内的主题仍由页面文档自身提供。 */
+.page-document-canvas-entry {
+    display: grid;
+    gap: var(--fc-space-md);
+    min-width: 0;
+    padding: var(--fc-space-lg);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-color-bg-secondary);
+}
+
+.page-document-canvas-entry__header {
+    display: grid;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-canvas-entry__header h2,
+.page-document-canvas-entry__header p,
+.page-document-canvas-entry__state {
+    margin: 0;
+}
+
+.page-document-canvas-entry__header h2 {
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+}
+
+.page-document-canvas-entry__header p,
+.page-document-canvas-entry__state {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.page-document-canvas-entry.is-compact {
+    padding: var(--fc-space-md);
+}

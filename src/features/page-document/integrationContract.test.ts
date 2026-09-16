@@ -1,4 +1,4 @@
-// 本测试锁定页面编辑器的持久化边界与构建开关，避免以后误接词条 Markdown 保存链路。
+// 本测试锁定页面编辑器的持久化边界、默认入口与探针裁剪。
 
 import assert from 'node:assert/strict'
 import {readdirSync, readFileSync} from 'node:fs'
@@ -30,16 +30,78 @@ describe('page document editor integration boundary', () => {
         }
     })
 
-    it('默认构建接入产物扫描并把编辑实现置于同一开关后', () => {
+    it('画布与编辑器默认指向真实实现，只有隔离探针保留独立开关', () => {
         const vite = readFileSync(join(repositoryRoot, 'vite.config.ts'), 'utf8')
         const build = readFileSync(join(repositoryRoot, 'scripts/build-page-document-canvas.mjs'), 'utf8')
         const checker = readFileSync(
-            join(repositoryRoot, 'scripts/check-page-document-default-build.mjs'),
+            join(repositoryRoot, 'scripts/check-page-document-app-build.mjs'),
+            'utf8',
+        )
+        const devPlugin = readFileSync(
+            join(repositoryRoot, 'scripts/page-document-canvas-dev-plugin.mjs'),
             'utf8',
         )
         assert.match(vite, /@page-document-editor-entry/)
-        assert.match(vite, /pageDocumentCanvasEnabled[\s\S]*editor\/entry\/enabled\.tsx[\s\S]*editor\/entry\/disabled\.tsx/)
-        assert.match(build, /check-page-document-default-build\.mjs/)
+        assert.match(vite, /@page-document-canvas-entry[\s\S]*canvas\/entry\/enabled\.tsx/u)
+        assert.match(vite, /@page-document-editor-entry[\s\S]*editor\/entry\/enabled\.tsx/u)
+        assert.match(vite, /@page-document-editor-runtime[\s\S]*editor\/runtime\/enabled\.ts/u)
+        assert.match(vite, /VITE_PAGE_DOCUMENT_PROBE/u)
+        assert.doesNotMatch(vite, /VITE_PAGE_DOCUMENT_CANVAS|pageDocumentCanvasEnabled/u)
+        assert.match(vite, /const devPort = isAndroid \? 5176 : 5175/u)
+        assert.match(devPlugin, /configureServer\(server\)/u)
+        assert.match(devPlugin, /assemblePageDocumentCanvasHtml/u)
+        assert.doesNotMatch(devPlugin, /transformIndexHtml/u)
+        assert.match(build, /check-page-document-canvas-build\.mjs/u)
+        assert.match(build, /check-page-document-app-build\.mjs/u)
+        assert.match(checker, /canvas\.html/u)
+        assert.match(checker, /页面编辑/u)
+        assert.match(checker, /page-document-editor-vendor/u)
+        for (const marker of [
+            '隔离探针',
+            '跳过作者侧校验，仅用于验证隔离',
+            'forbidden-script',
+            'external-css-url',
+            'svg-image-external-href',
+            'tests/fixtures/page-document',
+            'malicious-cases.json',
+        ]) {
+            assert.ok(checker.includes(marker), `默认产物扫描遗漏探针标记 ${marker}`)
+        }
+    })
+
+    it('生产预览不导入共享样例，探针样例只能从新开关别名到达', () => {
+        const production = readFileSync(
+            join(currentDirectory, 'canvas/entry/PageDocumentCanvasEntry.tsx'),
+            'utf8',
+        )
+        const probeEntry = readFileSync(
+            join(currentDirectory, 'canvas/development/entry/enabled.tsx'),
+            'utf8',
+        )
+        const vite = readFileSync(join(repositoryRoot, 'vite.config.ts'), 'utf8')
+
+        for (const marker of [
+            'tests/fixtures',
+            'malicious-cases.json',
+            'probeFixtures',
+            'CANVAS_PROBE_CASES',
+        ]) {
+            assert.doesNotMatch(production, new RegExp(marker.replace('.', '\\.'), 'u'))
+        }
+        assert.match(production, /@page-document-probe-entry/u)
+        assert.match(probeEntry, /PageDocumentProbeSection/u)
+        assert.match(vite, /pageDocumentProbeEnabled[\s\S]*development\/entry\/enabled\.tsx[\s\S]*development\/entry\/disabled\.tsx/u)
+    })
+
+    it('默认产物检查不再把正式编辑标记当成禁止项', () => {
+        const checker = readFileSync(
+            join(repositoryRoot, 'scripts/check-page-document-app-build.mjs'),
+            'utf8',
+        )
+        const probeMarkersStart = checker.indexOf('const probeMarkers')
+        const probeMarkersEnd = checker.indexOf('\n]', probeMarkersStart)
+        assert.ok(probeMarkersStart >= 0 && probeMarkersEnd > probeMarkersStart)
+        const probeMarkersBlock = checker.slice(probeMarkersStart, probeMarkersEnd)
         for (const marker of [
             '页面编辑',
             'codemirror',
@@ -50,7 +112,7 @@ describe('page document editor integration boundary', () => {
             '清除本级设置',
             '该元素尚未纳入可视编辑',
         ]) {
-            assert.ok(checker.includes(marker), `默认产物扫描遗漏 ${marker}`)
+            assert.equal(probeMarkersBlock.includes(`'${marker}'`), false)
         }
     })
 
