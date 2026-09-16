@@ -16,6 +16,16 @@ import {
 } from '../application/documentKernelDraftRuntime.ts'
 import {createVisualOperationQueue} from '../application/visualOperationQueue.ts'
 import {
+    createCanvasInputCommitScheduler,
+    type CanvasInputCommitScheduler,
+} from '../application/canvasInputCommitScheduler.ts'
+import {
+    canvasInputBlockedFeedback,
+    canvasInputHistoryLabel,
+    createCanvasInputKernelRequest,
+    readCanvasInputTargetText,
+} from '../application/canvasInputOperation.ts'
+import {
     createLiveVisualCommitScheduler,
     type LiveVisualCommitScheduler,
     type LiveVisualScheduleOptions,
@@ -41,6 +51,10 @@ import {
 } from '../application/entryDocumentSessionModel.ts'
 import type {SourceFileName} from '../domain/contract.ts'
 import type {LayerProjectionNode} from '../domain/layerProjection.ts'
+import {
+    type CanvasInputBlockedMessage,
+    type CanvasInputIntentMessage,
+} from '../canvas/protocol/index.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -71,6 +85,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const kernelRuntimeRef = useRef(createDocumentKernelDraftRuntime())
     const visualQueueRef = useRef(createVisualOperationQueue())
     const liveVisualSchedulerRef = useRef<LiveVisualCommitScheduler<ScheduledKernelEntry> | null>(null)
+    const canvasInputSchedulerRef = useRef<CanvasInputCommitScheduler | null>(null)
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -143,6 +158,8 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     )
 
     const save = useCallback(async (): Promise<boolean> => {
+        const inputFlushed = await (canvasInputSchedulerRef.current?.endInteraction() ?? Promise.resolve(true))
+        if (!inputFlushed) return false
         const current = stateRef.current
         if (!current) return false
         const preparation = prepareEntryDocumentSave(current, () => crypto.randomUUID())
@@ -343,6 +360,73 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         liveVisualSchedulerRef.current?.flush()
     }, [])
 
+    useEffect(() => {
+        const scheduler = createCanvasInputCommitScheduler({
+            delayMs: LIVE_VISUAL_COMMIT_DELAY_MS,
+            readNodeText: nodeId => {
+                const current = stateRef.current
+                if (!current) return null
+                return readCanvasInputTargetText(
+                    current.model.entry.sources['article.html'],
+                    nodeId,
+                )
+            },
+            commit: (messages, metadata) => {
+                const last = messages.at(-1)
+                if (!last) return Promise.resolve(false)
+                const historyGroupId = metadata.historyGroupId
+                if (!historyGroupId) return Promise.resolve(false)
+                return applyKernelEntry(
+                    createCanvasInputKernelRequest(messages, historyGroupId),
+                    canvasInputHistoryLabel(last.inputType),
+                    metadata,
+                )
+            },
+        })
+        canvasInputSchedulerRef.current = scheduler
+        return () => {
+            // 与属性调度相同，卸载只冲刷尾帧；提交中的更新仍可完成当前词条草稿写入。
+            void scheduler.endInteraction()
+            canvasInputSchedulerRef.current = null
+        }
+    }, [applyKernelEntry])
+
+    const applyCanvasInputIntent = useCallback(
+        async (message: CanvasInputIntentMessage): Promise<boolean> => {
+            const current = stateRef.current
+            if (!current) return reportVisualFailure('当前页面文档草稿不可用，无法接收画布输入。')
+            if (readCanvasInputTargetText(
+                current.model.entry.sources['article.html'],
+                message.nodeId,
+            ) === null) {
+                return reportVisualFailure('画布输入目标不属于当前可编辑的受管投影，已拒绝写入。')
+            }
+            const scheduler = canvasInputSchedulerRef.current
+            if (!scheduler) return reportVisualFailure('画布输入调度尚未就绪。')
+            const accepted = await scheduler.schedule(message, {
+                immediate: message.inputType === 'insertCompositionText',
+            })
+            if (!accepted && stateRef.current?.identity.entryId === current.identity.entryId) {
+                setVisualError('画布文本范围已经变化，本次输入未写入页面草稿。')
+            }
+            return accepted
+        },
+        [reportVisualFailure],
+    )
+
+    const reportCanvasInputBlocked = useCallback(
+        (message: CanvasInputBlockedMessage) => {
+            const feedback = canvasInputBlockedFeedback(message.reason, message.inputType)
+            setVisualError(feedback)
+            void showAlert(feedback, 'warning', 'nonInvasive', 2200)
+        },
+        [showAlert],
+    )
+
+    const flushCanvasInput = useCallback(() => {
+        void canvasInputSchedulerRef.current?.endInteraction()
+    }, [])
+
     const adoptOpaqueElement = useCallback(
         async (node: LayerProjectionNode): Promise<string | null> => {
             const current = stateRef.current
@@ -392,6 +476,9 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         applyKernelEntry,
         applyVisualPropertyEntry,
         flushVisualPropertyEntry,
+        applyCanvasInputIntent,
+        reportCanvasInputBlocked,
+        flushCanvasInput,
         adoptOpaqueElement,
     }
 }

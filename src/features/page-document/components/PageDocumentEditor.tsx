@@ -67,7 +67,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         markdown,
     })
     const {state} = session
-    const {canSave, dirty, discard, save} = session
+    const {canSave, dirty, discard, flushCanvasInput, save} = session
     const {
         active: activeWorkspace,
         sidebarHost,
@@ -135,6 +135,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             setSelectedNodeId(null)
         }
     }, [layerProjection.nodes, selectedNodeId])
+
+    useEffect(
+        () => () => flushCanvasInput(),
+        [flushCanvasInput, mode, selectedNodeId],
+    )
 
     const handleSelection = (nodeId: string, source: VisualSelectionSource) => {
         setSelectedNodeId(resolveVisualSelection(layerProjection.nodes, nodeId, source))
@@ -279,11 +284,21 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     html={state.preview.html}
                                     css={state.preview.css}
                                     minimumHeight={560}
+                                    editingEnabled={mode === 'visual'}
                                     selectedNodeId={mode === 'visual' ? selectedNodeId : null}
                                     onSelectionChange={mode === 'visual'
                                         ? nodeId => handleSelection(nodeId, 'canvas')
                                         : undefined}
                                     onNavigationIntent={forwardsNavigation ? onNavigationIntent : undefined}
+                                    onInputIntent={mode === 'visual'
+                                        ? session.applyCanvasInputIntent
+                                        : undefined}
+                                    onInputBlocked={mode === 'visual'
+                                        ? session.reportCanvasInputBlocked
+                                        : undefined}
+                                    onInputFlush={mode === 'visual'
+                                        ? flushCanvasInput
+                                        : undefined}
                                 />
                             ) : (
                                 <p>当前没有可渲染的合法结果。</p>

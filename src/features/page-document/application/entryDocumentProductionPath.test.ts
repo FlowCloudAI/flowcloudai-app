@@ -8,7 +8,16 @@ import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {
     acceptEntryDocumentVisualUpdate,
     createEntryDocumentSessionState,
+    prepareEntryDocumentSave,
+    undoEntryDocumentSession,
 } from './entryDocumentSessionModel.ts'
+import {createCanvasInputKernelRequest} from './canvasInputOperation.ts'
+import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
+import {
+    PAGE_DOCUMENT_CANVAS_CHANNEL,
+    PAGE_DOCUMENT_CANVAS_VERSION,
+    type CanvasInputIntentMessage,
+} from '../canvas/protocol/index.ts'
 import {createOpaqueElementAdoptionKernelRequest} from './opaqueElementAdoption.ts'
 import {createVisualPropertyEditRequest} from './visualPropertyEditing.ts'
 
@@ -134,5 +143,94 @@ describe('页面编辑生产项目基线', () => {
             adoptionApplied.model.entry.sources['article.html'],
             new RegExp(`<p class="legacy" data-fc-node-id="${ADOPTED_ID}" data-fc-node-kind="paragraph">旧段落<\\/p>`, 'u'),
         )
+    })
+
+    it('真实会话的连续中文输入在交互结束落下尾帧，只改目标文本、可撤销并保存', async () => {
+        const initial = createEntryDocumentSessionState(identity, document())
+        let state = initial
+        const runtime = createDocumentKernelDraftRuntime()
+        const originalHtml = initial.model.entry.sources['article.html']
+        const base = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent' as const,
+            nodeId: PARAGRAPH_ID,
+        }
+        const messages: CanvasInputIntentMessage[] = [
+            {
+                ...base,
+                intentId: '55555555-5555-7555-8555-555555555555',
+                inputType: 'insertText',
+                from: 4,
+                to: 4,
+                expected: '',
+                text: '中',
+            },
+            {
+                ...base,
+                sequence: 2,
+                intentId: '66666666-6666-7666-8666-666666666666',
+                inputType: 'insertText',
+                from: 5,
+                to: 5,
+                expected: '',
+                text: '文',
+            },
+        ]
+        const scheduler = createCanvasInputCommitScheduler({
+            delayMs: 10_000,
+            readNodeText: nodeId => {
+                const projection = createLayerProjection(state.model.entry.sources['article.html'])
+                const pending = [...projection.nodes]
+                let node = pending.shift()
+                while (node && node.id !== nodeId) {
+                    pending.unshift(...node.children)
+                    node = pending.shift()
+                }
+                return node?.managed ? node.textContent : null
+            },
+            commit: async (batch, metadata) => {
+                const historyGroupId = metadata.historyGroupId
+                assert.ok(historyGroupId)
+                const request = createCanvasInputKernelRequest(batch, historyGroupId)
+                const prepared = runtime.prepare(state.model, state.snapshot, request)
+                assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+                if (prepared.status !== 'ready') return false
+                const update = runtime.applyPrepared(
+                    state.model,
+                    state.snapshot,
+                    prepared.edit,
+                    '画布输入文本',
+                    metadata,
+                )
+                assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+                state = acceptEntryDocumentVisualUpdate(state, update)
+                return true
+            },
+            createHistoryGroupId: () => 'canvas-input-history:production',
+        })
+        const scheduled = messages.map(message => scheduler.schedule(message))
+        const flushed = scheduler.endInteraction()
+        assert.deepEqual(await Promise.all([...scheduled, flushed]), [true, true, true])
+
+        const changedHtml = state.model.entry.sources['article.html']
+        assert.equal(
+            changedHtml,
+            originalHtml.replace('>受管正文</p>', '>受管正文中文</p>'),
+        )
+        assert.match(changedHtml, /<p class="legacy">旧段落<\/p>/u)
+        assert.equal(state.model.entry.undo.length, 1)
+
+        const undone = undoEntryDocumentSession(state)
+        assert.equal(undone.model.entry.sources['article.html'], originalHtml)
+
+        const save = prepareEntryDocumentSave(state, () => '77777777-7777-7777-8777-777777777777')
+        assert.equal(save.status, 'ready')
+        if (save.status === 'ready') {
+            assert.equal(save.input.html, changedHtml)
+            assert.equal(save.input.expectedRevision, 2)
+        }
     })
 })
