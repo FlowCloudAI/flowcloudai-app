@@ -1078,7 +1078,7 @@ export default function EntryEditor({
     }
 
     function handlePageDocumentLinkHover(hover: {href: string | null; rect: {top: number; left: number; width: number; height: number} | null}) {
-        if (!active) {
+        if (!active || editorMode !== 'browse') {
             linkPreview.closeLinkPreview()
             return
         }
@@ -1286,7 +1286,6 @@ export default function EntryEditor({
                                     onDirtyChange={setPageDocumentDirty}
                                     onSavedDerivedText={setPageDocumentDerivedText}
                                     onNavigationIntent={handlePageDocumentNavigation}
-                                    onLinkHover={handlePageDocumentLinkHover}
                                     onRequestLeave={requestLeavePageDocument}
                                 />
                             )}

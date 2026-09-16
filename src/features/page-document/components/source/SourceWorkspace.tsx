@@ -27,7 +27,6 @@ interface SourceWorkspaceProps {
     previewStale: boolean
     onSourceChange: (file: SourceFileName, value: string) => void
     onNavigationIntent: (href: string) => void
-    onLinkHover?: (hover: {href: string | null; nodeId: string | null; rect: import('../../canvas/protocol/index.ts').CanvasLinkHoverRect | null}) => void
     onHistoryChange: (history: CodeSourceEditorHistory) => void
 }
 
@@ -47,7 +46,6 @@ function SourceWorkspace({
     previewStale,
     onSourceChange,
     onNavigationIntent,
-    onLinkHover,
     onHistoryChange,
 }, ref) {
     const [activeFile, setActiveFile] = useState<SourceFileName>('article.html')
@@ -148,7 +146,6 @@ function SourceWorkspace({
                             css={preview.css}
                             minimumHeight={420}
                             onNavigationIntent={onNavigationIntent}
-                            onLinkHover={onLinkHover}
                         />
                     ) : (
                         <p>当前没有可渲染的合法结果。</p>
