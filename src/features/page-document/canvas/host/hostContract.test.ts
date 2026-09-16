@@ -60,6 +60,14 @@ test('React 宿主固定使用独立 src 与最小 allow-scripts 沙箱', () => 
     assert.doesNotMatch(source, /srcDoc|allow-same-origin|allow-top-navigation|allow-popups|allow-forms/u)
 })
 
+test('双链候选消息只经已鉴权 gate 转交给宿主回调', () => {
+    const source = readFileSync(new URL('./PageDocumentCanvas.tsx', import.meta.url), 'utf8')
+    const gateIndex = source.indexOf('const message = gate.accept(event)')
+    const callbackIndex = source.indexOf("if (message.type === 'link-candidate-intent')")
+    assert.ok(gateIndex >= 0 && callbackIndex > gateIndex)
+    assert.match(source.slice(callbackIndex), /latest\.current\.onLinkCandidateIntent\?\.\(message\)/u)
+})
+
 test('画布 HTML 源文件只保留内联哈希构建所需的安全骨架和占位', () => {
     const source = readFileSync(new URL('../../../../../canvas.html', import.meta.url), 'utf8')
     assert.match(source, /default-src 'none'/u)

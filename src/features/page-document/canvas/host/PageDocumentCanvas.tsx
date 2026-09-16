@@ -11,6 +11,7 @@ import {
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
     type CanvasInputResolution,
+    type CanvasLinkCandidateIntentMessage,
     type CanvasLinkHoverRect,
 } from '../protocol/index.ts'
 import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
@@ -37,6 +38,7 @@ export interface PageDocumentCanvasProps {
     onInputBlocked?: (message: CanvasInputBlockedMessage) => void
     onInputFlush?: (nodeId: string) => void
     onHistoryIntent?: (action: 'undo' | 'redo') => void
+    onLinkCandidateIntent?: (message: CanvasLinkCandidateIntentMessage) => void
     onRenderError?: (message: string) => void
     onRendered?: () => void
 }
@@ -57,6 +59,7 @@ export function PageDocumentCanvas({
     onInputBlocked,
     onInputFlush,
     onHistoryIntent,
+    onLinkCandidateIntent,
     onRenderError,
     onRendered,
 }: PageDocumentCanvasProps) {
@@ -72,6 +75,7 @@ export function PageDocumentCanvas({
         onInputBlocked,
         onInputFlush,
         onHistoryIntent,
+        onLinkCandidateIntent,
         onRenderError,
         onRendered,
     })
@@ -94,10 +98,11 @@ export function PageDocumentCanvas({
             onInputBlocked,
             onInputFlush,
             onHistoryIntent,
+            onLinkCandidateIntent,
             onRenderError,
             onRendered,
         }
-    }, [css, html, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
+    }, [css, html, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkCandidateIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
@@ -168,6 +173,7 @@ export function PageDocumentCanvas({
             if (message.type === 'input-blocked') latest.current.onInputBlocked?.(message)
             if (message.type === 'input-flush') latest.current.onInputFlush?.(message.nodeId)
             if (message.type === 'history-intent') latest.current.onHistoryIntent?.(message.action)
+            if (message.type === 'link-candidate-intent') latest.current.onLinkCandidateIntent?.(message)
             if (message.type === 'input-intent') {
                 const intent = {...message, intentId: message.intentId.toLowerCase(), nodeId: message.nodeId.toLowerCase()}
                 void (async () => {
