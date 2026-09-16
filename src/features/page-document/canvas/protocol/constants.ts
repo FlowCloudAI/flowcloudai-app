@@ -11,24 +11,22 @@ export const CANVAS_ERROR_MAX_CODE_UNITS = 2_048
 export const CANVAS_DIMENSION_MAX = 100_000
 export const CANVAS_PIXEL_RATIO_MAX = 16
 
+export const CANVAS_EDITABLE_KINDS = Object.freeze([
+    'paragraph',
+    'heading',
+    'list-item',
+    'table-cell',
+] as const)
+
 export const CANVAS_INPUT_TYPES = [
     'insertText',
     'insertReplacementText',
-    'insertFromPaste',
+    // 组合输入只由 compositionend 生成，beforeinput 不会直接提交中间态。
     'insertCompositionText',
-    'insertParagraph',
-    'insertLineBreak',
     'deleteContentBackward',
     'deleteContentForward',
     'deleteWordBackward',
     'deleteWordForward',
-    'deleteSoftLineBackward',
-    'deleteSoftLineForward',
-    'deleteHardLineBackward',
-    'deleteHardLineForward',
-    'deleteByCut',
-    'deleteContent',
-    'deleteParagraphIndent',
 ] as const
 
 export const CANVAS_INPUT_BLOCKED_REASONS = [

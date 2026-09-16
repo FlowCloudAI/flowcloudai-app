@@ -43,7 +43,7 @@ test('宿主命令工厂绑定随机会话并生成单调序号', () => {
     assert.equal(first.sessionToken, token)
 })
 
-test('宿主命令严格校验 render、set-selection 与 viewport', () => {
+test('宿主命令严格校验渲染、选择、编辑权限、输入回执与视口', () => {
     const render = message('render', {requestId: REQUEST_ID, html: '<p>正文</p>', css: ''})
     assert.equal(parseCanvasHostCommand(render, TOKEN)?.type, 'render')
     assert.equal(parseCanvasHostCommand({...render, requestId: 'latest'}, TOKEN), null)
@@ -62,6 +62,16 @@ test('宿主命令严格校验 render、set-selection 与 viewport', () => {
         parseCanvasHostCommand(message('viewport', {width: 390, height: -1, pixelRatio: 3}), TOKEN),
         null,
     )
+    assert.equal(
+        parseCanvasHostCommand(message('set-editing', {enabled: true}), TOKEN)?.type,
+        'set-editing',
+    )
+    assert.equal(parseCanvasHostCommand(message('set-editing', {enabled: 'yes'}), TOKEN), null)
+    assert.equal(
+        parseCanvasHostCommand(message('resolve-input', {intentId: REQUEST_ID, accepted: false}), TOKEN)?.type,
+        'resolve-input',
+    )
+    assert.equal(parseCanvasHostCommand(message('resolve-input', {intentId: 'latest', accepted: true}), TOKEN), null)
 })
 
 test('运行时只读消息只接受当前 token、版本与有界字段', () => {
@@ -106,6 +116,15 @@ test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单'
         }), TOKEN)?.type,
         'input-blocked',
     )
+    assert.equal(
+        parseCanvasRuntimeMessage(message('input-flush', {nodeId: NODE_ID}), TOKEN)?.type,
+        'input-flush',
+    )
+    assert.equal(parseCanvasRuntimeMessage(message('input-flush', {nodeId: 'source'}), TOKEN), null)
+    assert.equal(
+        parseCanvasRuntimeMessage({...intent, text: '你'.repeat(65_537)}, TOKEN),
+        null,
+    )
 })
 
 test('消息超过统一字节预算时拒绝', () => {
@@ -128,6 +147,26 @@ test('伪造来源、重放、乱序与销毁后的消息被拒绝', () => {
     assert.equal(gate.accept({source, data: {...first, sessionToken: OTHER_TOKEN, sequence: 3}}), null)
     gate.destroy()
     assert.equal(gate.accept({source, data: message('size', {width: 1, height: 1}, 4)}), null)
+})
+
+test('输入意图同样受来源 Window、token、序号与统一大小上限约束', () => {
+    const source = {}
+    const gate = createCanvasRuntimeMessageGate(source, TOKEN)
+    const intent = message('input-intent', {
+        intentId: REQUEST_ID,
+        nodeId: NODE_ID,
+        inputType: 'insertText',
+        from: 0,
+        to: 0,
+        expected: '',
+        text: '中',
+    }, 4)
+
+    assert.equal(gate.accept({source: {}, data: intent}), null)
+    assert.equal(gate.accept({source, data: {...intent, sessionToken: OTHER_TOKEN}}), null)
+    assert.equal(gate.accept({source, data: intent})?.type, 'input-intent')
+    assert.equal(gate.accept({source, data: intent}), null)
+    assert.equal(gate.accept({source, data: {...intent, sequence: 5, text: '你'.repeat(65_537)}}), null)
 })
 
 test('切换文档后旧 token 即使沿用同一 Window 也失效', () => {

@@ -95,6 +95,19 @@ export function parseCanvasHostCommand(value: unknown, token: string): CanvasHos
             ? value as unknown as CanvasHostCommand
             : null
     }
+    if (value.type === 'set-editing') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'enabled'])
+            && typeof value.enabled === 'boolean'
+            ? value as unknown as CanvasHostCommand
+            : null
+    }
+    if (value.type === 'resolve-input') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'intentId', 'accepted'])
+            && isUuid(value.intentId)
+            && typeof value.accepted === 'boolean'
+            ? value as unknown as CanvasHostCommand
+            : null
+    }
     return null
 }
 
@@ -172,6 +185,11 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
             && isBoundedString(value.inputType, 64, false)
             && typeof value.reason === 'string'
             && CANVAS_INPUT_BLOCKED_REASONS.includes(value.reason as never)
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
+    if (value.type === 'input-flush') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'nodeId']) && isUuid(value.nodeId)
             ? value as unknown as CanvasRuntimeMessage
             : null
     }

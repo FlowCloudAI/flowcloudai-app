@@ -1,4 +1,4 @@
-// 本模块声明隔离画布信封和消息形状；只读运行时不会处理已保留的输入意图消息。
+// 本模块声明隔离画布信封和消息形状；输入消息只携带纯文本范围，不携带或回传画布 DOM。
 
 import type {
     CANVAS_INPUT_BLOCKED_REASONS,
@@ -36,10 +36,23 @@ export interface CanvasViewportCommand extends CanvasEnvelope {
     pixelRatio: number
 }
 
+export interface CanvasSetEditingCommand extends CanvasEnvelope {
+    type: 'set-editing'
+    enabled: boolean
+}
+
+export interface CanvasResolveInputCommand extends CanvasEnvelope {
+    type: 'resolve-input'
+    intentId: string
+    accepted: boolean
+}
+
 export type CanvasHostCommand =
     | CanvasRenderCommand
     | CanvasSetSelectionCommand
     | CanvasViewportCommand
+    | CanvasSetEditingCommand
+    | CanvasResolveInputCommand
 
 export interface CanvasRenderedMessage extends CanvasEnvelope {
     type: 'rendered'
@@ -71,7 +84,6 @@ export interface CanvasNavigationIntentMessage extends CanvasEnvelope {
     nodeId: string | null
 }
 
-/** 只迁移并校验形状；M6 只读宿主不会消费这个消息。 */
 export interface CanvasInputIntentMessage extends CanvasEnvelope {
     type: 'input-intent'
     intentId: string
@@ -83,12 +95,17 @@ export interface CanvasInputIntentMessage extends CanvasEnvelope {
     text: string
 }
 
-/** 只迁移并校验形状；M6 只读宿主不会消费这个消息。 */
 export interface CanvasInputBlockedMessage extends CanvasEnvelope {
     type: 'input-blocked'
     nodeId: string | null
     inputType: string
     reason: CanvasInputBlockedReason
+}
+
+/** 编辑节点失焦时要求宿主立即冲刷连续输入的尾帧。 */
+export interface CanvasInputFlushMessage extends CanvasEnvelope {
+    type: 'input-flush'
+    nodeId: string
 }
 
 export type CanvasRuntimeMessage =
@@ -99,6 +116,7 @@ export type CanvasRuntimeMessage =
     | CanvasNavigationIntentMessage
     | CanvasInputIntentMessage
     | CanvasInputBlockedMessage
+    | CanvasInputFlushMessage
 
 export interface CanvasMessageEventLike {
     data: unknown

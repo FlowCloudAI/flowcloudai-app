@@ -40,6 +40,15 @@ test('脚本、事件、外部资源、表单能力与危险 CSS 在挂载前被
     }
 })
 
+test('作者 contenteditable 仍由隔离层拒绝，不能自行取得运行时编辑权限', () => {
+    const result = isolatePageDocument(
+        `<p data-fc-node-id="${V7_ASSET_ID}" data-fc-node-kind="paragraph" contenteditable="true">越权编辑</p>`,
+        '',
+    )
+    assert.equal(result.artifact, null)
+    assert.ok(result.errors.some(error => error.includes('contenteditable')))
+})
+
 test('非法链接被保留为无 href 文本，不能产生导航意图', () => {
     const result = isolatePageDocument('<p><a href="javascript:alert(1)">危险</a></p>', '')
     assert.ok(result.artifact)

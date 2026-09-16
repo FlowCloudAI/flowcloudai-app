@@ -8,6 +8,8 @@ import {
     createCanvasRuntimeMessageGate,
     createCanvasSessionToken,
     type CanvasHostCommandPayload,
+    type CanvasInputBlockedMessage,
+    type CanvasInputIntentMessage,
 } from '../protocol/index.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
@@ -21,8 +23,12 @@ export interface PageDocumentCanvasProps {
     title?: string
     className?: string
     minimumHeight?: number
+    editingEnabled?: boolean
     onSelectionChange?: (nodeId: string) => void
     onNavigationIntent?: (href: string) => void
+    onInputIntent?: (message: CanvasInputIntentMessage) => boolean | Promise<boolean>
+    onInputBlocked?: (message: CanvasInputBlockedMessage) => void
+    onInputFlush?: (nodeId: string) => void
     onRenderError?: (message: string) => void
     onRendered?: () => void
 }
@@ -35,14 +41,28 @@ export function PageDocumentCanvas({
     title = '页面文档预览',
     className,
     minimumHeight = 160,
+    editingEnabled = false,
     onSelectionChange,
     onNavigationIntent,
+    onInputIntent,
+    onInputBlocked,
+    onInputFlush,
     onRenderError,
     onRendered,
 }: PageDocumentCanvasProps) {
     const frameRef = useRef<HTMLIFrameElement>(null)
     const loadedRef = useRef(false)
-    const latest = useRef({onSelectionChange, onNavigationIntent, onRenderError, onRendered})
+    const latest = useRef({
+        html,
+        css,
+        onSelectionChange,
+        onNavigationIntent,
+        onInputIntent,
+        onInputBlocked,
+        onInputFlush,
+        onRenderError,
+        onRendered,
+    })
     const session = useMemo(() => {
         const token = createCanvasSessionToken()
         return {documentKey, token, createCommand: createCanvasHostCommandFactory(token)}
@@ -52,8 +72,18 @@ export function PageDocumentCanvas({
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
     useEffect(() => {
-        latest.current = {onSelectionChange, onNavigationIntent, onRenderError, onRendered}
-    }, [onNavigationIntent, onRenderError, onRendered, onSelectionChange])
+        latest.current = {
+            html,
+            css,
+            onSelectionChange,
+            onNavigationIntent,
+            onInputIntent,
+            onInputBlocked,
+            onInputFlush,
+            onRenderError,
+            onRendered,
+        }
+    }, [css, html, onInputBlocked, onInputFlush, onInputIntent, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
@@ -71,8 +101,22 @@ export function PageDocumentCanvas({
     }, [send])
 
     const sendRender = useCallback(() => {
-        send({type: 'render', requestId: createCanvasRequestId(), html, css})
+        send({
+            type: 'render',
+            requestId: createCanvasRequestId(),
+            html,
+            css,
+        })
     }, [css, html, send])
+
+    const sendLatestRender = useCallback(() => {
+        send({
+            type: 'render',
+            requestId: createCanvasRequestId(),
+            html: latest.current.html,
+            css: latest.current.css,
+        })
+    }, [send])
 
     useEffect(() => {
         loadedRef.current = false
@@ -84,6 +128,7 @@ export function PageDocumentCanvas({
         const expectedSource = frameRef.current?.contentWindow
         if (!expectedSource) return
         const gate = createCanvasRuntimeMessageGate(expectedSource, session.token)
+        let active = true
         const handleMessage = (event: MessageEvent) => {
             const message = gate.accept(event)
             if (!message) return
@@ -91,6 +136,23 @@ export function PageDocumentCanvas({
             if (message.type === 'selection') latest.current.onSelectionChange?.(message.nodeId)
             if (message.type === 'navigation-intent' && canForwardCanvasNavigationIntent(message.href)) {
                 latest.current.onNavigationIntent?.(message.href)
+            }
+            if (message.type === 'input-blocked') latest.current.onInputBlocked?.(message)
+            if (message.type === 'input-flush') latest.current.onInputFlush?.(message.nodeId)
+            if (message.type === 'input-intent') {
+                const intent = {...message, intentId: message.intentId.toLowerCase(), nodeId: message.nodeId.toLowerCase()}
+                void (async () => {
+                    let accepted = false
+                    try {
+                        accepted = (await latest.current.onInputIntent?.(intent)) ?? false
+                    } catch {
+                        accepted = false
+                    }
+                    if (!active) return
+                    // 拒绝时先把当前草稿排进画布的 pendingRender，再解除意图以原子回滚临时 DOM。
+                    if (!accepted) sendLatestRender()
+                    send({type: 'resolve-input', intentId: intent.intentId, accepted})
+                })()
             }
             if (message.type === 'rendered') {
                 setStatus('ready')
@@ -100,14 +162,14 @@ export function PageDocumentCanvas({
                 setStatus('error')
                 latest.current.onRenderError?.(message.message)
             }
-            // 输入类消息虽有协议形状，但 M6 只读宿主有意不处理。
         }
         window.addEventListener('message', handleMessage)
         return () => {
+            active = false
             gate.destroy()
             window.removeEventListener('message', handleMessage)
         }
-    }, [minimumHeight, session.token])
+    }, [minimumHeight, send, sendLatestRender, session.token])
 
     useEffect(() => {
         if (loadedRef.current) sendRender()
@@ -116,6 +178,10 @@ export function PageDocumentCanvas({
     useEffect(() => {
         if (loadedRef.current) send({type: 'set-selection', nodeId: selectedNodeId})
     }, [selectedNodeId, send])
+
+    useEffect(() => {
+        if (loadedRef.current) send({type: 'set-editing', enabled: editingEnabled})
+    }, [editingEnabled, send])
 
     useEffect(() => {
         const frame = frameRef.current
@@ -131,6 +197,7 @@ export function PageDocumentCanvas({
         loadedRef.current = true
         sendRender()
         send({type: 'set-selection', nodeId: selectedNodeId})
+        send({type: 'set-editing', enabled: editingEnabled})
         sendViewport()
     }
 
