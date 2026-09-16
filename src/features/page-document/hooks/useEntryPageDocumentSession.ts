@@ -161,21 +161,21 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         [publish],
     )
 
-    const save = useCallback(async (): Promise<boolean> => {
+    const save = useCallback(async () => {
         const inputFlushed = await (canvasInputSchedulerRef.current?.endInteraction() ?? Promise.resolve(true))
-        if (!inputFlushed) return false
+        if (!inputFlushed) return null
         const current = stateRef.current
-        if (!current) return false
+        if (!current) return null
         const preparation = prepareEntryDocumentSave(current, () => crypto.randomUUID())
-        if (preparation.status === 'blocked') return false
+        if (preparation.status === 'blocked') return null
         publish(preparation.state)
         const entryId = preparation.input.entryId
         try {
             const result = await pageDocumentSaveEntry(preparation.input)
             const latest = stateRef.current
-            if (!latest || latest.identity.entryId !== entryId) return false
+            if (!latest || latest.identity.entryId !== entryId) return null
             publish(acceptEntryDocumentSave(latest, result))
-            return true
+            return result
         } catch (caught) {
             const error = parsePageDocumentSaveError(caught)
             let latestDocument = null
@@ -187,9 +187,9 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                 }
             }
             const latest = stateRef.current
-            if (!latest || latest.identity.entryId !== entryId) return false
+            if (!latest || latest.identity.entryId !== entryId) return null
             publish(rejectEntryDocumentSave(latest, error, latestDocument))
-            return false
+            return null
         }
     }, [publish])
 

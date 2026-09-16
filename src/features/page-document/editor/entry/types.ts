@@ -10,6 +10,7 @@ export interface PageDocumentEditorEntryProps {
     markdown: string
     resetVersion: number
     onDirtyChange: (dirty: boolean) => void
+    onSavedDerivedText?: (derivedText: string) => void
     onNavigationIntent: (href: string) => void
     onRequestLeave: () => Promise<boolean>
 }

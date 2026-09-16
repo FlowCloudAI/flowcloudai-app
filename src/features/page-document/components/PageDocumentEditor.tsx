@@ -1,6 +1,6 @@
 // 本组件提供页面文档第一批编辑壳层；只编辑独立 HTML/CSS，并把保存交给页面文档会话。
 
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
@@ -52,6 +52,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         markdown,
         resetVersion,
         onDirtyChange,
+        onSavedDerivedText,
         onNavigationIntent,
         onRequestLeave,
     } = props
@@ -74,6 +75,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         dockHost,
     } = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
+    const handleSave = useCallback(async () => {
+        const result = await save()
+        if (result) onSavedDerivedText?.(result.document.derivedText)
+    }, [onSavedDerivedText, save])
 
     useEffect(() => {
         onDirtyChange(dirty)
@@ -106,11 +111,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's'
             ) return
             event.preventDefault()
-            if (canSave) void save()
+            if (canSave) void handleSave()
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [active, canSave, save])
+    }, [active, canSave, handleSave])
 
     const saveStatus = useMemo(() => {
         if (!state) return '正在读取页面文档…'
@@ -253,7 +258,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
                 >重做</Button>
                 <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
-                <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void save()}>
+                <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void handleSave()}>
                     {scope.phase === 'saving' ? '保存中…' : '保存'}
                 </Button>
             </header>

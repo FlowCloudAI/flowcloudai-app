@@ -1,22 +1,22 @@
 import {logger} from '../../../shared/logger'
-import {rehypeSanitizeRawHtml} from '../../../shared/markdown/rehypeSanitizeRawHtml'
 import {openFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
-import type {ICommand} from '@uiw/react-md-editor'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_generate_entry_summary,
     ai_list_plugins,
     type Category,
-    db_create_entry,
     db_delete_entry,
     db_get_entry,
     db_list_entries,
     db_list_incoming_links,
     db_list_outgoing_links,
     db_list_relations_for_entry,
-    db_save_entry_bundle,
+    db_create_relation,
+    db_delete_relation,
+    db_update_entry,
+    db_update_relation,
     type Entry,
     ENTRY_DELETED,
     ENTRY_UPDATED,
@@ -32,41 +32,13 @@ import {
     type TagSchema,
 } from '../../../api'
 import {openUrl} from '../../../api/opener'
+import {pageDocumentReadEntry} from '../../../api/pageDocument.ts'
 import EntryEditorSidebar from './EntryEditorSidebar'
-import {MarkdownEditor, type MarkdownEditorRef} from './MarkdownEditor/MarkdownEditor'
 import EntryImageLightbox from './EntryImageLightbox'
 import TagCreator from './TagCreator'
 import EntryEditorMetaPanel from './EntryEditorMetaPanel'
 import EntryImageAddModal from './EntryImageAddModal'
-import EntryEditorWikiLink from './EntryEditorWikiLink'
-import EntryEditorLinkPreview from './EntryEditorLinkPreview'
-import EntryMarkdownToolbar, {
-    EntryMarkdownSelectionToolbar,
-} from './EntryMarkdownToolbar'
-import EntryMarkdownFindBar, {
-    type EntryMarkdownFindBarRef,
-} from './EntryMarkdownFindBar'
-import EntryMarkdownOutline from './EntryMarkdownOutline'
 import EntryDraftRecoveryBanner from './EntryDraftRecoveryBanner'
-import {
-    buildListEnterEdit,
-    resolveMarkdownBlockStyle,
-    type MarkdownBlockStyle,
-} from './entryMarkdownToolbarCommands'
-import {
-    type MarkdownTextMatch,
-    replaceMarkdownTextMatch,
-    replaceMarkdownTextMatches,
-} from './entryMarkdownSearch'
-import {
-    resolveSelectionToolbarPlacement,
-    type SelectionToolbarPlacement,
-} from './entrySelectionToolbar'
-import {
-    buildMarkdownOutline,
-    type MarkdownOutlineItem,
-} from './entryMarkdownOutlineUtils'
-import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
 import useEntryImageState from '../hooks/useEntryImageState'
@@ -77,14 +49,10 @@ import ActionMenu from '../../../shared/ui/overlay/ActionMenu'
 
 import './EntryEditor.css'
 import {
-    buildMarkdownPreviewSource,
-    type InternalEntryLink,
     isSafeExternalHref,
     parseInternalEntryHref,
-    resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
-import {resolveMarkdownPreviewSourceContent} from '../lib/entryMarkdownPreviewState'
-import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
+import {type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
 import {removeEntryImages} from '../lib/entryImageCollection'
 import {
     deleteEntryDraftRecovery,
@@ -97,13 +65,11 @@ import {
 } from '../lib/entryDraftRecovery'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {buildRelationDraft,} from '../lib/entryRelation'
+import {syncEntryRelationDrafts} from '../lib/entryRelationPersistence.ts'
 import {ensureEntryDetailLoaded} from '../lib/entryDetailLoading'
-import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
 import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
     buildTagValueMap,
-    findCategoryDuplicatedEntry,
-    getTextareaCaretOffset,
     normalizeComparableContent,
     normalizeComparableText,
     normalizeComparableType,
@@ -115,10 +81,8 @@ import type {EntryRelationDraft} from '../../project-editor/components/EntryRela
 import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
 import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
 import {PageDocumentEditorEntry} from '@page-document-editor-entry'
-import {
-    shouldHandleEntryEditorShortcut,
-    type EntryEditorMode,
-} from '../lib/entryEditorShortcutModel'
+import {type EntryEditorMode} from '../lib/entryEditorShortcutModel'
+import {convertMarkdownToPageDocument} from '../../page-document/application/markdownDocumentConversion.ts'
 
 type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
@@ -163,15 +127,6 @@ interface EntryDraft {
     images: EntryImage[]
 }
 
-interface EditorHistory {
-    draft: EntryDraft
-    relationDrafts: EntryRelationDraft[]
-    selection?: {
-        start: number
-        end: number
-    }
-}
-
 const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
     plugins: [],
     defaultPluginId: null,
@@ -179,9 +134,6 @@ const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
     hint: '请先在设置中选择默认 AI 语音插件',
 }
 
-const ENTRY_MARKDOWN_PREVIEW_OPTIONS = {
-    rehypePlugins: [rehypeSanitizeRawHtml],
-}
 const AUTO_SAVE_IDLE_MS = 30_000
 
 function buildDraft(entry: Entry): EntryDraft {
@@ -205,10 +157,6 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
             && image.alt === target.alt
             && Boolean(image.is_cover) === Boolean(target.is_cover)
     })
-}
-
-function escapeMarkdownImageAlt(value: string): string {
-    return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export default function EntryEditor({
@@ -250,11 +198,11 @@ export default function EntryEditor({
     const saving = savingSource !== null
     const [error, setError] = useState<string | null>(null)
     const [saveError, setSaveError] = useState<string | null>(null)
-    const [editorFontSize, setEditorFontSize] = useState(14)
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EntryEditorMode>(initialEditorMode)
     const [pageDocumentDirty, setPageDocumentDirty] = useState(false)
     const [pageDocumentResetVersion, setPageDocumentResetVersion] = useState(0)
+    const [pageDocumentDerivedText, setPageDocumentDerivedText] = useState<string | null>(null)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [projectEntryDetailsById, setProjectEntryDetailsById] = useState<Record<string, Entry>>({})
 
@@ -264,15 +212,6 @@ export default function EntryEditor({
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
-    const [editorSplitView, setEditorSplitView] = useState(false)
-    const [debouncedContent, setDebouncedContent] = useState('')
-    const [findBarOpen, setFindBarOpen] = useState(false)
-    const [markdownSearchHighlights, setMarkdownSearchHighlights] = useState<{
-        matches: MarkdownTextMatch[]
-        activeIndex: number
-    } | null>(null)
-    const [outlineOpen, setOutlineOpen] = useState(false)
-    const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [hasUserEdited, setHasUserEdited] = useState(false)
     const [recoveryReady, setRecoveryReady] = useState(false)
     const [relationsReady, setRelationsReady] = useState(false)
@@ -280,11 +219,6 @@ export default function EntryEditor({
         record: EntryDraftRecoveryRecord
         kind: ReturnType<typeof resolveEntryDraftRecoveryKind>
         fields: EntryDraftRecoveryField[]
-    } | null>(null)
-    const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
-        left: number
-        top: number
-        placement: SelectionToolbarPlacement
     } | null>(null)
     const {
         setEntryRelations,
@@ -310,34 +244,22 @@ export default function EntryEditor({
     const pageScrollRef = useRef<HTMLDivElement | null>(null)
     const workspaceRef = useRef<HTMLElement | null>(null)
     const workspaceHeaderRef = useRef<HTMLDivElement | null>(null)
-    const markdownContainerRef = useRef<HTMLDivElement | null>(null)
-    const findBarRef = useRef<EntryMarkdownFindBarRef>(null)
-    const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
-    const previewContainerRef = useRef<HTMLDivElement | null>(null)
-    const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
     const onDirtyChangeRef = useRef(onDirtyChange)
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const loadedDetailIdsRef = useRef(new Set<string>())
     const entryDetailLoadPromisesRef = useRef(new Map<string, Promise<void>>())
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
-    const canSaveRef = useRef(false)
-    const saveActionRef = useRef<((source: EntrySaveSource) => void) | null>(null)
-    const editorRef = useRef<MarkdownEditorRef>(null)
     const recoveryLoadKeyRef = useRef<string | null>(null)
     const recoveryWriteTimerRef = useRef<number | null>(null)
-    const isApplyingHistoryRef = useRef(false)
-    const historyInitializedRef = useRef<string | null>(null)
     const entryRef = useRef<Entry | null>(null)
     const hasChangesRef = useRef(false)
     const saveSourceIdRef = useRef(globalThis.crypto.randomUUID())
     const onSavedRef = useRef(onSaved)
     const onTitleChangeRef = useRef(onTitleChange)
-    const lastSuccessfulSaveAtRef = useRef(0)
     const userEditVersionRef = useRef(0)
     const projectIdRef = useRef(projectId)
 
-    const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
     const confirmDiscardPageDocument = useCallback(async () => {
         if (!pageDocumentDirty) return true
@@ -356,11 +278,11 @@ export default function EntryEditor({
     }, [confirmDiscardPageDocument])
     const requestEditorMode = useCallback(async (nextMode: EntryEditorMode) => {
         if (nextMode === editorMode) return
-        if (editorMode === 'page' && !(await requestLeavePageDocument())) return
+        if (editorMode === 'edit' && !(await requestLeavePageDocument())) return
         setEditorMode(nextMode)
     }, [editorMode, requestLeavePageDocument])
     const handleBack = useCallback(async () => {
-        if (editorMode === 'page' && !(await requestLeavePageDocument())) return
+        if (editorMode === 'edit' && !(await requestLeavePageDocument())) return
         await onBack?.()
     }, [editorMode, onBack, requestLeavePageDocument])
     const markUserEdited = useCallback(() => {
@@ -375,20 +297,6 @@ export default function EntryEditor({
         markUserEdited()
         setRelationDrafts(next)
     }, [markUserEdited, setRelationDrafts])
-    const buildEditorHistory = useCallback((
-        nextDraft: EntryDraft,
-        nextRelationDrafts: EntryRelationDraft[],
-    ): EditorHistory => {
-        const textarea = editorRef.current?.getTextareaElement()
-        return {
-            draft: nextDraft,
-            relationDrafts: nextRelationDrafts,
-            selection: textarea
-                ? {start: textarea.selectionStart, end: textarea.selectionEnd}
-                : undefined,
-        }
-    }, [])
-
     useLayoutEffect(() => {
         projectIdRef.current = projectId
     }, [projectId])
@@ -407,17 +315,6 @@ export default function EntryEditor({
         return () => observer.disconnect()
     }, [])
 
-    useEffect(() => {
-        setSelectionToolbarPosition(null)
-        setFindBarOpen(false)
-        setOutlineOpen(false)
-        setActiveBlockStyle('paragraph')
-    }, [entryId, editorMode])
-
-    useEffect(() => {
-        lastSuccessfulSaveAtRef.current = Date.now()
-    }, [])
-
     // ProjectEditor 会常驻挂载已打开的词条标签；切换 active 不会丢草稿，因此无需确认。
 
     useEffect(() => {
@@ -427,31 +324,6 @@ export default function EntryEditor({
         onSavedRef.current = onSaved
         onTitleChangeRef.current = onTitleChange
     }, [projectEntries, onDirtyChange, entry, onSaved, onTitleChange])
-
-    useEffect(() => {
-        let cancelled = false
-
-        void setting_get_settings()
-            .then((settings) => {
-                if (cancelled) return
-                setEditorFontSize(settings.editor_font_size ?? 14)
-            })
-            .catch((loadError) => {
-                logger.error('加载编辑器字体设置失败', loadError)
-            })
-
-        function handleFontSizeChange(event: Event) {
-            const fontSize = (event as CustomEvent<{ fontSize: number }>).detail.fontSize
-            setEditorFontSize(fontSize ?? 14)
-        }
-
-        window.addEventListener('fc:editor-font-size-change', handleFontSizeChange)
-
-        return () => {
-            cancelled = true
-            window.removeEventListener('fc:editor-font-size-change', handleFontSizeChange)
-        }
-    }, [])
 
     useEffect(() => {
         let cancelled = false
@@ -497,61 +369,6 @@ export default function EntryEditor({
         )),
     })
 
-    const wikiLink = useWikiLink({
-        projectId,
-        entryId,
-        entryCategoryId: entry?.category_id,
-        projectEntries,
-        content: draft.content,
-        containerRef: markdownContainerRef,
-        popoverRef: wikiPopoverRef,
-        onContentChange: (nextContent) => updateDraftFromUser((current) => (
-            current.content === nextContent ? current : {...current, content: nextContent}
-        )),
-        onCreateEntry: async (title) => {
-            const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, entry?.category_id ?? null, title)
-            if (duplicatedEntry) {
-                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'nonInvasive', 1800)
-                return null
-            }
-            const created = await db_create_entry({
-                projectId,
-                categoryId: entry?.category_id ?? null,
-                title,
-                summary: null,
-                content: null,
-                type: null,
-                tags: null,
-                images: null,
-            })
-            const brief: EntryBrief = {
-                id: created.id,
-                project_id: created.project_id,
-                category_id: created.category_id ?? null,
-                title: created.title,
-                summary: created.summary ?? null,
-                type: created.type ?? null,
-                cover: null,
-                updated_at: String(created.updated_at ?? ''),
-            }
-            setProjectEntries((current) => {
-                const next = [brief, ...current]
-                projectEntriesRef.current = next
-                return next
-            })
-            loadedDetailIdsRef.current.add(created.id)
-            setProjectEntryDetailsById((current) => ({...current, [created.id]: created}))
-            return {id: created.id, title: created.title}
-        },
-        onShowAlert: (message, type) => {
-            if (type === 'success') {
-                void showAlert(message, type, 'nonInvasive')
-                return
-            }
-            void showAlert(message, type, 'nonInvasive', 1000)
-        },
-    })
-
     const ensureEntryDetails = useCallback(async (ids: string[]) => {
         await Promise.all([...new Set(ids)]
             .filter((targetEntryId) => targetEntryId !== entryId)
@@ -588,7 +405,6 @@ export default function EntryEditor({
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
-        lastSuccessfulSaveAtRef.current = Date.now()
         userEditVersionRef.current = 0
         setHasUserEdited(false)
         recoveryLoadKeyRef.current = null
@@ -598,13 +414,7 @@ export default function EntryEditor({
             window.clearTimeout(recoveryWriteTimerRef.current)
             recoveryWriteTimerRef.current = null
         }
-        // 切换词条时重置历史追踪
-        historyInitializedRef.current = null
-        undoRedo.reset(buildEditorHistory(
-            {title: '', summary: '', content: '', type: null, categoryId: null, tags: {}, images: []},
-            [],
-        ))
-    }, [entryId]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [entryId])
 
     useEffect(() => {
         let cancelled = false
@@ -613,7 +423,6 @@ export default function EntryEditor({
         setError(null)
         setSaveError(null)
         linkPreview.closeLinkPreview()
-        wikiLink.setWikiDraft?.(null)
         setOutgoingLinks([])
         setIncomingLinks([])
         clearRelations()
@@ -625,7 +434,6 @@ export default function EntryEditor({
                 setEntry(result)
                 setDraft(buildDraft(result))
                 setEditorMode(initialEditorMode)
-                lastSuccessfulSaveAtRef.current = Date.now()
             })
             .catch((e) => {
                 if (cancelled) return
@@ -655,7 +463,20 @@ export default function EntryEditor({
             cancelled = true
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [linkPreview.closeLinkPreview, wikiLink.setWikiDraft, entryId, clearRelations, applySavedRelations])
+    }, [linkPreview.closeLinkPreview, entryId, clearRelations, applySavedRelations])
+
+    useEffect(() => {
+        let cancelled = false
+        setPageDocumentDerivedText(null)
+        void pageDocumentReadEntry(entryId)
+            .then(document => {
+                if (!cancelled) setPageDocumentDerivedText(document?.derivedText ?? null)
+            })
+            .catch(readError => logger.warn('读取页面文档派生文本失败', readError))
+        return () => {
+            cancelled = true
+        }
+    }, [entryId])
 
     // projectId 变化时重置词条列表状态
     useEffect(() => {
@@ -675,25 +496,6 @@ export default function EntryEditor({
         entryTags.setPinnedTagSchemaIds((current) => (current.length === 0 ? initialVisibleTagSchemaIds : current))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [entry, entryId, entryTags.localTagSchemas, entryTags.setPinnedTagSchemaIds])
-
-    // 每次加载词条时初始化历史记录（词条和关联都就绪后触发）
-    useEffect(() => {
-        if (!entry || entry.id !== entryId || !relationsReady) return
-        if (historyInitializedRef.current === entryId) return
-        historyInitializedRef.current = entryId
-        undoRedo.reset(buildEditorHistory(draft, relationDrafts))
-    }, [entry, entryId, draft, relationDrafts, relationsReady]) // eslint-disable-line react-hooks/exhaustive-deps
-
-    // 草稿/关联变更时自动推送历史快照（防抖以避免每次按键都记录）
-    useEffect(() => {
-        if (!entry || entry.id !== entryId) return
-        if (historyInitializedRef.current !== entryId) return
-        if (isApplyingHistoryRef.current) {
-            isApplyingHistoryRef.current = false
-            return
-        }
-        undoRedo.pushDebounced(buildEditorHistory(draft, relationDrafts))
-    }, [draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // 按需加载：进入编辑模式或需要双链时调用
     const ensureProjectEntriesLoaded = useCallback(async () => {
@@ -725,7 +527,6 @@ export default function EntryEditor({
     }, [active, ensureProjectEntriesLoaded])
     const trimmedTitle = useMemo(() => normalizeComparableText(draft.title), [draft.title])
     const trimmedSummary = useMemo(() => normalizeComparableText(draft.summary), [draft.summary])
-    const normalizedContent = useMemo(() => normalizeComparableContent(draft.content), [draft.content])
     const initialDraft = useMemo(() => (entry ? buildDraft(entry) : null), [entry])
     const comparableInitial = useMemo(() => {
         if (!initialDraft) return null
@@ -739,14 +540,10 @@ export default function EntryEditor({
             images: initialDraft.images,
         }
     }, [initialDraft])
-    const hasBodyChanges = Boolean(
-        comparableInitial && normalizedContent !== comparableInitial.content,
-    )
     const hasChanges = Boolean(
         comparableInitial && (
             trimmedTitle !== comparableInitial.title
             || trimmedSummary !== comparableInitial.summary
-            || hasBodyChanges
             || normalizeComparableType(draft.type) !== comparableInitial.type
             || !areTagMapsEqual(draft.tags, comparableInitial.tags, entryTags.localTagSchemas)
             || (draft.categoryId ?? null) !== comparableInitial.categoryId
@@ -772,7 +569,7 @@ export default function EntryEditor({
                 const fields = getEntryDraftRecoveryFields(record, {
                     ...initialDraft,
                     relationDrafts: initialRelationDrafts,
-                })
+                }).filter(field => field !== 'content')
                 if (fields.length === 0) {
                     void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
                         logger.error('delete redundant entry recovery failed', recoveryError)
@@ -861,7 +658,7 @@ export default function EntryEditor({
         setDraft((current) => ({
             title: fields.includes('title') && snapshot.title !== undefined ? snapshot.title : current.title,
             summary: fields.includes('summary') && snapshot.summary !== undefined ? snapshot.summary : current.summary,
-            content: fields.includes('content') && snapshot.content !== undefined ? snapshot.content : current.content,
+            content: current.content,
             type: fields.includes('type') && snapshot.type !== undefined ? snapshot.type : current.type,
             categoryId: fields.includes('categoryId') && snapshot.categoryId !== undefined
                 ? snapshot.categoryId
@@ -888,6 +685,12 @@ export default function EntryEditor({
         })
     }, [entryId, projectId])
 
+    const convertedLegacyText = useMemo(
+        () => convertMarkdownToPageDocument(entryId, draft.content).derivedText,
+        [draft.content, entryId],
+    )
+    const documentBodyText = pageDocumentDerivedText ?? convertedLegacyText
+
     const handleGenerateSummary = useCallback(async () => {
         if (generatingSummary || loading || saving) return
         if (!aiPluginId) {
@@ -896,7 +699,7 @@ export default function EntryEditor({
         }
 
         const fallbackTitle = normalizeComparableText(draft.title) || entry?.title || '未命名词条'
-        const draftContent = normalizeComparableContent(draft.content)
+        const draftContent = normalizeComparableText(documentBodyText)
         if (!draftContent) {
             await showAlert('正文为空，无法生成摘要。', 'warning', 'nonInvasive', 1800)
             return
@@ -914,7 +717,7 @@ export default function EntryEditor({
                     entryId,
                     title: fallbackTitle,
                     summary: normalizeComparableText(draft.summary) || null,
-                    content: draft.content,
+                    content: documentBodyText,
                     entryType: draft.type,
                 },
                 model: aiModel || null,
@@ -941,7 +744,6 @@ export default function EntryEditor({
     }, [
         aiModel,
         aiPluginId,
-        draft.content,
         draft.summary,
         draft.title,
         draft.type,
@@ -949,6 +751,7 @@ export default function EntryEditor({
         entryId,
         generatingSummary,
         loading,
+        documentBodyText,
         projectId,
         saving,
         showAlert,
@@ -967,29 +770,6 @@ export default function EntryEditor({
         saving,
         saveError,
     })
-
-    useEffect(() => {
-        if (editorMode !== 'edit' || !editorSplitView) return
-        const timer = window.setTimeout(() => setDebouncedContent(draft.content), 150)
-        return () => window.clearTimeout(timer)
-    }, [draft.content, editorMode, editorSplitView])
-
-    const previewSourceContent = resolveMarkdownPreviewSourceContent(
-        editorMode === 'page' ? 'browse' : editorMode,
-        editorSplitView,
-        draft.content,
-        debouncedContent,
-    )
-    const previewContent = useMemo(
-        () => previewSourceContent === null
-            ? ''
-            : buildMarkdownPreviewSource(previewSourceContent, draft.images),
-        [previewSourceContent, draft.images],
-    )
-    const outlineItems = useMemo(
-        () => outlineOpen ? buildMarkdownOutline(draft.content) : [],
-        [draft.content, outlineOpen],
-    )
 
     const backlinks = useMemo(() => {
         const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
@@ -1062,12 +842,6 @@ export default function EntryEditor({
         })
 
         if (reason === 'external') {
-            historyInitializedRef.current = null
-            undoRedo.reset(buildEditorHistory(savedDraft, savedRelationDrafts))
-        }
-        lastSuccessfulSaveAtRef.current = Date.now()
-
-        if (reason === 'external') {
             if (previousEntry && previousEntry.title !== refreshed.title) {
                 await onTitleChangeRef.current?.(refreshed)
             }
@@ -1077,13 +851,11 @@ export default function EntryEditor({
         return refreshed
     }, [
         applySavedRelations,
-        buildEditorHistory,
         ensureEntryDetails,
         entryId,
         projectId,
         setEntryRelations,
         setRelationDrafts,
-        undoRedo,
     ])
 
     useEffect(() => {
@@ -1149,25 +921,24 @@ export default function EntryEditor({
                 return
             }
 
-            undoRedo.flushDebounced()
             const submitted = {draft, relationDrafts}
             const submittedEditVersion = userEditVersionRef.current
-            const savedBundle = await db_save_entry_bundle({
+            await db_update_entry({
                 id: entry.id,
                 projectId,
                 categoryId: draft.categoryId,
                 title: trimmedTitle,
                 summary: trimmedSummary || null,
-                content: normalizedContent === '' ? null : normalizedContent,
                 type: draft.type,
                 tags: buildEntryTagsPayload(draft.tags, entryTags.localTagSchemas, entry.tags),
                 images: draft.images,
-                relationDrafts,
-                sourceId: saveSourceIdRef.current,
             })
-            setOutgoingLinks(savedBundle.outgoingLinks)
-            setIncomingLinks(savedBundle.incomingLinks)
-            setEntryRelations(savedBundle.relations)
+            await syncEntryRelationDrafts(entry.id, projectId, relationDrafts, {
+                list: db_list_relations_for_entry,
+                create: db_create_relation,
+                update: db_update_relation,
+                delete: db_delete_relation,
+            })
             if (recoveryWriteTimerRef.current !== null) {
                 window.clearTimeout(recoveryWriteTimerRef.current)
                 recoveryWriteTimerRef.current = null
@@ -1182,7 +953,6 @@ export default function EntryEditor({
                 await onTitleChange?.(refreshed)
             }
             await onSaved?.(refreshed)
-            lastSuccessfulSaveAtRef.current = Date.now()
             if (userEditVersionRef.current === submittedEditVersion) {
                 setHasUserEdited(false)
             }
@@ -1200,91 +970,15 @@ export default function EntryEditor({
             setSavingSource(null)
             onSavingChange?.(false)
         }
-    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations, undoRedo])
-
-    useEffect(() => {
-        canSaveRef.current = canSave
-        saveActionRef.current = (source) => {
-            void handleSave(source)
-        }
-    }, [canSave, handleSave])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, draft, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase])
 
     useEffect(() => {
         if (!shouldAutoSave(active, editorMode === 'edit', hasUserEdited, canSave)) return
         const timer = window.setTimeout(() => {
-            saveActionRef.current?.('auto')
+            void handleSave('auto')
         }, AUTO_SAVE_IDLE_MS)
         return () => window.clearTimeout(timer)
-    }, [active, canSave, draft, editorMode, hasUserEdited, relationDrafts])
-
-    const applyHistory = useCallback((history: EditorHistory) => {
-        const restoreEditorSelection = document.activeElement === editorRef.current?.getTextareaElement()
-        markUserEdited()
-        isApplyingHistoryRef.current = true
-        setDraft(history.draft)
-        setRelationDrafts(history.relationDrafts)
-        const selection = history.selection
-        if (!selection || !restoreEditorSelection) return
-        window.requestAnimationFrame(() => {
-            const textarea = editorRef.current?.getTextareaElement()
-            if (!textarea) return
-            const contentLength = history.draft.content.length
-            textarea.focus()
-            textarea.setSelectionRange(
-                Math.min(selection.start, contentLength),
-                Math.min(selection.end, contentLength),
-            )
-        })
-    }, [markUserEdited, setRelationDrafts])
-
-    const handleUndo = useCallback(() => {
-        const prev = undoRedo.undo()
-        if (prev) applyHistory(prev)
-    }, [undoRedo, applyHistory])
-
-    const handleRedo = useCallback(() => {
-        const next = undoRedo.redo()
-        if (next) applyHistory(next)
-    }, [undoRedo, applyHistory])
-
-    useEffect(() => {
-        if (!active) return
-
-        function handleKeyShortcut(event: KeyboardEvent) {
-            if (event.defaultPrevented || event.repeat) return
-            if (!(event.ctrlKey || event.metaKey)) return
-
-            const key = event.key.toLowerCase()
-            if (!shouldHandleEntryEditorShortcut(editorMode, key)) return
-
-            if (key === 's') {
-                event.preventDefault()
-                if (!canSaveRef.current) return
-                saveActionRef.current?.('manual')
-                return
-            }
-
-            // 撤销/重做 — 仅在焦点不在 MarkdownEditor 文本框内时生效
-            //（文本框通过 onKeyDown 自行处理 Ctrl+Z）
-            const textarea = editorRef.current?.getTextareaElement()
-            if (textarea && document.activeElement === textarea) return
-
-            if (key === 'z' && !event.shiftKey) {
-                event.preventDefault()
-                handleUndo()
-                return
-            }
-            if ((key === 'z' && event.shiftKey) || key === 'y') {
-                event.preventDefault()
-                handleRedo()
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyShortcut)
-        return () => {
-            window.removeEventListener('keydown', handleKeyShortcut)
-        }
-    }, [active, editorMode, handleUndo, handleRedo])
+    }, [active, canSave, draft, editorMode, handleSave, hasUserEdited, relationDrafts])
 
     async function handleUploadImages(): Promise<EntryImage[]> {
         try {
@@ -1359,60 +1053,6 @@ export default function EntryEditor({
         }))
     }
 
-    function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {
-        const imageRef = buildEntryImageMarkdownRef(image, projectId)
-        if (!image || !imageRef) {
-            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
-            return
-        }
-
-        const textarea = editorRef.current?.getTextareaElement()
-        const fallbackAlt = image.alt || image.caption || draft.title || entry?.title || `图片 ${fallbackIndex + 1}`
-        const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
-        let nextCursor = 0
-
-        updateDraftFromUser((current) => {
-            const currentContent = current.content
-            const start = textarea?.selectionStart ?? currentContent.length
-            const end = textarea?.selectionEnd ?? start
-            const prefix = currentContent.slice(0, start)
-            const suffix = currentContent.slice(end)
-            const before = prefix && !prefix.endsWith('\n') ? '\n\n' : ''
-            const after = suffix && !suffix.startsWith('\n') ? '\n\n' : ''
-            nextCursor = prefix.length + before.length + markdown.length
-
-            return {
-                ...current,
-                content: `${prefix}${before}${markdown}${after}${suffix}`,
-            }
-        })
-
-        window.requestAnimationFrame(() => {
-            const nextTextarea = editorRef.current?.getTextareaElement()
-            nextTextarea?.focus()
-            nextTextarea?.setSelectionRange(nextCursor, nextCursor)
-        })
-        if (closeLightbox) {
-            setLightboxOpen(false)
-        }
-    }
-
-    function handleInsertImageMarkdown(targetIndex: number) {
-        insertImageMarkdown(draft.images[targetIndex], targetIndex, true)
-    }
-
-    function resolveEntryAnchor(target: EventTarget | null): HTMLAnchorElement | null {
-        const anchor = resolveMarkdownAnchor(target)
-        if (!anchor) return null
-        const href = anchor.getAttribute('href') ?? ''
-        return parseInternalEntryHref(href, anchor.textContent ?? '') ? anchor : null
-    }
-
-    function getEntryLinkFromAnchor(anchor: HTMLAnchorElement): InternalEntryLink | null {
-        const href = anchor.getAttribute('href') ?? ''
-        return parseInternalEntryHref(href, anchor.textContent ?? '')
-    }
-
     function handlePageDocumentNavigation(href: string) {
         const internalLink = parseInternalEntryHref(href)
         if (internalLink) {
@@ -1435,149 +1075,13 @@ export default function EntryEditor({
         setTagCreatorOpen(false)
     }
 
-    const selectMarkdownMatch = useCallback((match: MarkdownTextMatch) => {
-        const textarea = editorRef.current?.getTextareaElement()
-        if (!textarea) return
-        textarea.setSelectionRange(match.start, match.end)
-        setSelectionToolbarPosition(null)
-        setActiveBlockStyle(resolveMarkdownBlockStyle(textarea.value, match.start))
-
-        window.requestAnimationFrame(() => {
-            const scroll = pageScrollRef.current
-            if (!scroll) return
-            const {top} = getTextareaCaretOffset(textarea, match.start)
-            const scrollBounds = scroll.getBoundingClientRect()
-            const textareaBounds = textarea.getBoundingClientRect()
-            const formatToolbar = markdownContainerRef.current
-                ?.parentElement
-                ?.querySelector<HTMLElement>('.entry-editor-format-toolbar')
-            const visibleTop = Math.max(scrollBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? 0)
-            const targetTop = visibleTop + Math.min(96, scrollBounds.height * 0.2)
-            const caretTop = textareaBounds.top + top
-            scroll.scrollTo({
-                top: scroll.scrollTop + caretTop - targetTop,
-                behavior: 'auto',
-            })
-        })
-    }, [])
-
-    const openFindBar = useCallback(() => {
-        setOutlineOpen(false)
-        setFindBarOpen(true)
-        window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
-    }, [])
-
-    const closeFindBar = useCallback(() => {
-        setFindBarOpen(false)
-        window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
-    }, [])
-
-    const handleMarkdownSearchHighlights = useCallback((
-        matches: MarkdownTextMatch[],
-        activeIndex: number,
-    ) => {
-        setMarkdownSearchHighlights(matches.length ? {matches, activeIndex} : null)
-    }, [])
-
-    const toggleOutline = useCallback(() => {
-        setFindBarOpen(false)
-        setOutlineOpen((current) => !current)
-    }, [])
-
-    const selectMarkdownOutlineItem = useCallback((item: MarkdownOutlineItem) => {
-        selectMarkdownMatch(item)
-        setOutlineOpen(false)
-        window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
-    }, [selectMarkdownMatch])
-
-    const replaceMarkdownMatch = useCallback((match: MarkdownTextMatch, replacement: string) => {
-        updateDraftFromUser((current) => ({
-            ...current,
-            content: replaceMarkdownTextMatch(current.content, match, replacement),
-        }))
-        window.requestAnimationFrame(() => selectMarkdownMatch({
-            start: match.start,
-            end: match.start + replacement.length,
-        }))
-    }, [selectMarkdownMatch, updateDraftFromUser])
-
-    const replaceAllMarkdownMatches = useCallback((
-        matches: MarkdownTextMatch[],
-        replacement: string,
-    ) => {
-        updateDraftFromUser((current) => ({
-            ...current,
-            content: replaceMarkdownTextMatches(current.content, matches, replacement),
-        }))
-        window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
-    }, [updateDraftFromUser])
-
-    const syncActiveBlockStyle = useCallback((textarea?: HTMLTextAreaElement | null) => {
-        const input = textarea ?? editorRef.current?.getTextareaElement()
-        if (!input) return
-        setActiveBlockStyle(resolveMarkdownBlockStyle(input.value, input.selectionStart))
-    }, [])
-
-    const executeMarkdownCommand = useCallback((command: ICommand) => {
-        editorRef.current?.executeCommand(command)
-        setSelectionToolbarPosition(null)
-        window.requestAnimationFrame(() => syncActiveBlockStyle())
-    }, [syncActiveBlockStyle])
-
-    const updateSelectionToolbar = useCallback((
-        textarea: HTMLTextAreaElement,
-        clientX?: number,
-        clientY?: number,
-    ) => {
-        syncActiveBlockStyle(textarea)
-        if (textarea.selectionStart === textarea.selectionEnd) {
-            setSelectionToolbarPosition(null)
-            return
-        }
-
-        const markdown = markdownContainerRef.current?.parentElement
-        if (!markdown) return
-        const bounds = markdown.getBoundingClientRect()
-        const textareaBounds = textarea.getBoundingClientRect()
-        const formatToolbar = markdown.querySelector<HTMLElement>('.entry-editor-format-toolbar')
-        const scrollBounds = pageScrollRef.current?.getBoundingClientRect() ?? bounds
-        const start = getTextareaCaretOffset(textarea, textarea.selectionStart)
-        const end = getTextareaCaretOffset(textarea, textarea.selectionEnd)
-        const selectionTop = textareaBounds.top + Math.min(start.top, end.top)
-        const selectionBottom = textareaBounds.top + Math.max(
-            start.top + start.lineHeight,
-            end.top + end.lineHeight,
-        )
-        const visibleTop = Math.max(scrollBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? bounds.top)
-        const visibleBottom = Math.min(scrollBounds.bottom, window.innerHeight)
-        const placement = resolveSelectionToolbarPlacement({
-            selectionTop,
-            selectionBottom,
-            visibleTop,
-            visibleBottom,
-            pointerY: clientY,
-        })
-        if (!placement) {
-            setSelectionToolbarPosition(null)
-            return
-        }
-        const edge = Math.min(96, bounds.width / 2)
-        const anchorX = clientX ?? (textareaBounds.left + textareaBounds.width / 2)
-
-        setSelectionToolbarPosition({
-            left: Math.min(Math.max(anchorX - bounds.left, edge), bounds.width - edge),
-            top: (placement === 'above' ? selectionTop : selectionBottom) - bounds.top,
-            placement,
-        })
-    }, [syncActiveBlockStyle])
-
     return (
         <div className="entry-editor-page">
             <RollingBox ref={pageScrollRef} axis="y" className="entry-editor-page__scroll" thumbSize="thin">
                 <div className="entry-editor-shell">
                     <section
                         ref={workspaceRef}
-                        className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}${editorMode === 'page' ? ' is-page-mode' : ''}`}
+                        className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}
                     >
                         <div ref={workspaceHeaderRef} className="entry-editor-workspace__header">
                             <div className="entry-editor-workspace__toolbar" data-mobile-horizontal-scroll>
@@ -1616,14 +1120,6 @@ export default function EntryEditor({
                                             onClick={() => void requestEditorMode('edit')}
                                         >
                                             编辑
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={`entry-editor-mode-chip${editorMode === 'page' ? ' active' : ''}`}
-                                            aria-pressed={editorMode === 'page'}
-                                            onClick={() => void requestEditorMode('page')}
-                                        >
-                                            页面
                                         </button>
                                     </div>
                                 </div>
@@ -1689,8 +1185,7 @@ export default function EntryEditor({
                         </div>
 
                         <div className="entry-editor-workspace__body">
-                            {editorMode !== 'page' && (
-                                <EntryEditorMetaPanel
+                            <EntryEditorMetaPanel
                                     entryId={entryId}
                                     entry={entry}
                                     draft={draft}
@@ -1731,8 +1226,7 @@ export default function EntryEditor({
                                         onOpenTagCreator: () => setTagCreatorOpen(true),
                                     }}
                                 />
-                            )}
-                            {editorMode !== 'page' && recoveryNotice && (
+                            {recoveryNotice && (
                                 <EntryDraftRecoveryBanner
                                     record={recoveryNotice.record}
                                     kind={recoveryNotice.kind}
@@ -1748,10 +1242,11 @@ export default function EntryEditor({
                                     title={draft.title}
                                     summary={draft.summary}
                                     markdown={draft.content}
+                                    convertLegacyMarkdown
                                     onNavigationIntent={handlePageDocumentNavigation}
                                 />
                             )}
-                            {editorMode === 'page' ? (
+                            {editorMode === 'edit' && (
                                 <PageDocumentEditorEntry
                                     entryId={entryId}
                                     projectId={projectId}
@@ -1762,258 +1257,15 @@ export default function EntryEditor({
                                     markdown={draft.content}
                                     resetVersion={pageDocumentResetVersion}
                                     onDirtyChange={setPageDocumentDirty}
+                                    onSavedDerivedText={setPageDocumentDerivedText}
                                     onNavigationIntent={handlePageDocumentNavigation}
                                     onRequestLeave={requestLeavePageDocument}
                                 />
-                            ) : editorMode === 'edit' ? (
-                                <div className="entry-editor-markdown">
-                                    <EntryMarkdownToolbar
-                                        canUndo={undoRedo.canUndo}
-                                        canRedo={undoRedo.canRedo}
-                                        activeBlockStyle={activeBlockStyle}
-                                        splitView={editorSplitView}
-                                        content={draft.content}
-                                        findBar={findBarOpen ? (
-                                            <EntryMarkdownFindBar
-                                                ref={findBarRef}
-                                                value={draft.content}
-                                                onSelect={selectMarkdownMatch}
-                                                onReplace={replaceMarkdownMatch}
-                                                onReplaceAll={replaceAllMarkdownMatches}
-                                                onHighlightChange={handleMarkdownSearchHighlights}
-                                                onClose={closeFindBar}
-                                            />
-                                        ) : undefined}
-                                        outlineOpen={outlineOpen}
-                                        outlinePanel={outlineOpen ? (
-                                            <EntryMarkdownOutline
-                                                items={outlineItems}
-                                                onSelect={selectMarkdownOutlineItem}
-                                                onClose={() => setOutlineOpen(false)}
-                                            />
-                                        ) : undefined}
-                                        onUndo={handleUndo}
-                                        onRedo={handleRedo}
-                                        onFind={openFindBar}
-                                        onOutline={toggleOutline}
-                                        onCommand={executeMarkdownCommand}
-                                        onInsertImage={() => openImageAddModal('insert')}
-                                        onSplitViewChange={setEditorSplitView}
-                                    />
-                                    {selectionToolbarPosition && (
-                                        <EntryMarkdownSelectionToolbar
-                                            left={selectionToolbarPosition.left}
-                                            top={selectionToolbarPosition.top}
-                                            placement={selectionToolbarPosition.placement}
-                                            onCommand={executeMarkdownCommand}
-                                        />
-                                    )}
-                                    <div ref={markdownContainerRef} className="entry-editor-markdown-anchor">
-                                        <MarkdownEditor
-                                            ref={editorRef}
-                                            key={entryId}
-                                            value={draft.content}
-                                            onValueChange={(value) => {
-                                                updateDraftFromUser((current) => (
-                                                    current.content === value
-                                                        ? current
-                                                        : {...current, content: value}
-                                                ))
-                                                window.requestAnimationFrame(() => syncActiveBlockStyle())
-                                            }}
-                                            tokens={{fontSizeScale: editorFontSize / 14}}
-                                            minHeight={720}
-                                            placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
-                                            previewOptions={ENTRY_MARKDOWN_PREVIEW_OPTIONS}
-                                            previewValue={previewContent}
-                                            searchHighlights={markdownSearchHighlights ?? undefined}
-                                            hideToolbar
-                                            hideFullscreen
-                                            showSplitToggle={false}
-                                            splitView={editorSplitView}
-                                            onSplitChange={setEditorSplitView}
-                                            onKeyDown={(event) => {
-                                                if (!(event.ctrlKey || event.metaKey) || event.repeat) return
-                                                const key = event.key.toLowerCase()
-                                                if (key === 'f') {
-                                                    event.preventDefault()
-                                                    openFindBar()
-                                                } else if (key === 'z' && !event.shiftKey) {
-                                                    event.preventDefault()
-                                                    handleUndo()
-                                                } else if ((key === 'z' && event.shiftKey) || key === 'y') {
-                                                    event.preventDefault()
-                                                    handleRedo()
-                                                }
-                                            }}
-                                            textareaProps={{
-                                                onKeyDownCapture: (event) => {
-                                                    wikiLink.handleWikiKeyDown(event)
-                                                    if (event.key !== 'Enter') return
-                                                    const textarea = event.currentTarget
-                                                    if (
-                                                        event.defaultPrevented
-                                                        || event.shiftKey
-                                                        || event.ctrlKey
-                                                        || event.altKey
-                                                        || event.metaKey
-                                                        || event.nativeEvent.isComposing
-                                                    ) {
-                                                        return
-                                                    }
-                                                    const edit = buildListEnterEdit(textarea.value, {
-                                                        start: textarea.selectionStart,
-                                                        end: textarea.selectionEnd,
-                                                    })
-                                                    if (!edit) return
-                                                    event.preventDefault()
-                                                    event.stopPropagation()
-                                                    const nextContent = textarea.value.slice(0, edit.start)
-                                                        + edit.replacement
-                                                        + textarea.value.slice(edit.end)
-                                                    updateDraftFromUser((current) => (
-                                                        current.content === nextContent
-                                                            ? current
-                                                            : {...current, content: nextContent}
-                                                    ))
-                                                    setSelectionToolbarPosition(null)
-                                                    window.requestAnimationFrame(() => {
-                                                        textarea.setSelectionRange(
-                                                            edit.selection.start,
-                                                            edit.selection.end,
-                                                        )
-                                                        wikiLink.handleMarkdownCursorSync(textarea)
-                                                        syncActiveBlockStyle(textarea)
-                                                    })
-                                                },
-                                                onKeyUp: (event) => {
-                                                    wikiLink.handleMarkdownCursorSync(event.currentTarget)
-                                                    updateSelectionToolbar(event.currentTarget)
-                                                },
-                                                onMouseUp: (event) => updateSelectionToolbar(
-                                                    event.currentTarget,
-                                                    event.clientX,
-                                                    event.clientY,
-                                                ),
-                                                onClick: (event) => {
-                                                    const textarea = event.currentTarget
-                                                    const {clientX, clientY} = event
-                                                    wikiLink.handleMarkdownCursorSync(textarea)
-                                                    window.requestAnimationFrame(() => {
-                                                        updateSelectionToolbar(textarea, clientX, clientY)
-                                                    })
-                                                },
-                                                onSelect: (event) => {
-                                                    wikiLink.handleMarkdownCursorSync(event.currentTarget)
-                                                    syncActiveBlockStyle(event.currentTarget)
-                                                },
-                                                onFocus: (event) => syncActiveBlockStyle(event.currentTarget),
-                                                onScroll: (event) => {
-                                                    wikiLink.updateWikiPopoverPosition(event.currentTarget as unknown as HTMLTextAreaElement)
-                                                    setSelectionToolbarPosition(null)
-                                                },
-                                                onBlur: () => {
-                                                    wikiLink.handleTextareaBlur()
-                                                    setSelectionToolbarPosition(null)
-                                                },
-                                            }}
-                                        />
-
-                                        <EntryEditorWikiLink
-                                            wikiDraft={wikiLink.wikiDraft}
-                                            wikiPopoverPosition={wikiLink.wikiPopoverPosition}
-                                            wikiLinkOptions={wikiLink.wikiLinkOptions}
-                                            activeWikiOptionIndex={wikiLink.activeWikiOptionIndex}
-                                            creatingLinkedEntry={wikiLink.creatingLinkedEntry}
-                                            hasExactCategorySuggestion={wikiLink.hasExactCategorySuggestion}
-                                            categories={categories}
-                                            popoverRef={wikiPopoverRef}
-                                            optionRefs={wikiLink.wikiOptionRefs}
-                                            onOptionCommit={wikiLink.handleWikiOptionCommit}
-                                            onActiveIndexChange={wikiLink.setActiveWikiOptionIndex}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    ref={previewContainerRef}
-                                    className="entry-editor-preview"
-                                    onClick={(e) => {
-                                        const anchor = resolveMarkdownAnchor(e.target)
-                                        if (!anchor) return
-                                        e.preventDefault()
-                                        const href = anchor.getAttribute('href') ?? ''
-                                        const internalLink = getEntryLinkFromAnchor(anchor)
-                                        if (internalLink) {
-                                            void ensureProjectEntriesLoaded().then(() => {
-                                                linkPreview.handleOpenLinkedEntry(internalLink)
-                                            })
-                                            return
-                                        }
-                                        if (isSafeExternalHref(href)) {
-                                            void openUrl(href).catch((error) => {
-                                                logger.error('open external link failed', error)
-                                                void showAlert('打开链接失败', 'error', 'nonInvasive', 1500)
-                                            })
-                                            return
-                                        }
-                                        void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
-                                    }}
-                                    onMouseOver={(e) => {
-                                        const anchor = resolveEntryAnchor(e.target)
-                                        if (!anchor) return
-                                        const internalLink = getEntryLinkFromAnchor(anchor)
-                                        if (!internalLink) return
-                                        if (linkPreview.linkPreviewAnchorRef.current === anchor) {
-                                            linkPreview.clearLinkPreviewCloseTimer()
-                                            linkPreview.updateLinkPreviewPosition(anchor)
-                                            return
-                                        }
-                                        linkPreview.openLinkPreview(anchor, internalLink)
-                                    }}
-                                    onMouseOut={(e) => {
-                                        const anchor = resolveEntryAnchor(e.target)
-                                        if (!anchor) return
-                                        const relatedTarget = e.relatedTarget
-                                        if (
-                                            relatedTarget instanceof Node
-                                            && (anchor.contains(relatedTarget) || linkPreviewPanelRef.current?.contains(relatedTarget))
-                                        ) {
-                                            return
-                                        }
-                                        linkPreview.scheduleLinkPreviewClose()
-                                    }}
-                                    onScroll={linkPreview.closeLinkPreview}
-                                >
-                                    <MarkdownEditor
-                                        mode="preview"
-                                        value={previewContent}
-                                        onValueChange={() => {
-                                        }}
-                                        tokens={{
-                                            background: 'transparent',
-                                            fontSizeScale: editorFontSize / 14,
-                                        }}
-                                        autoHeight
-                                        previewOptions={ENTRY_MARKDOWN_PREVIEW_OPTIONS}
-                                    />
-
-                                    <EntryEditorLinkPreview
-                                        linkPreview={linkPreview.linkPreview}
-                                        linkPreviewPosition={linkPreview.linkPreviewPosition}
-                                        linkPreviewEntry={linkPreview.linkPreviewEntry}
-                                        panelRef={linkPreviewPanelRef}
-                                        anchorRef={linkPreview.linkPreviewAnchorRef}
-                                        onClearCloseTimer={linkPreview.clearLinkPreviewCloseTimer}
-                                        onScheduleClose={linkPreview.scheduleLinkPreviewClose}
-                                    />
-                                </div>
                             )}
                         </div>
                     </section>
 
-                    {editorMode !== 'page' && (
-                        <EntryEditorSidebar
+                    <EntryEditorSidebar
                             entryId={entryId}
                             entry={entry}
                             editorMode={editorMode}
@@ -2028,7 +1280,6 @@ export default function EntryEditor({
                             onOpenEntry={onOpenEntry}
                             onRelationDraftsChange={updateRelationDraftsFromUser}
                         />
-                    )}
 
                     {(error || loading) && (
                         <div className={`entry-editor-feedback ${error ? 'is-error' : ''}`}>
@@ -2062,7 +1313,6 @@ export default function EntryEditor({
                 onSetCover={editorMode === 'edit' ? handleSetCover : undefined}
                 onRemove={editorMode === 'edit' ? handleRemoveImage : undefined}
                 onRemoveMany={editorMode === 'edit' ? handleRemoveImages : undefined}
-                onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
                 onAddImage={() => {
                     reopenLightboxAfterImageAddRef.current = true
                     setLightboxOpen(false)
@@ -2109,7 +1359,6 @@ export default function EntryEditor({
                     onOpenAiSettings(pluginId)
                 } : undefined}
                 onAddAiImages={handleAddAiImages}
-                onInsertImage={(image) => insertImageMarkdown(image)}
             />
         </div>
     )

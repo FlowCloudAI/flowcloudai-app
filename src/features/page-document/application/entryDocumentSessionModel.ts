@@ -18,10 +18,9 @@ import {
     CANVAS_BASE_PROJECT_HTML,
     compileCanvasPreview,
     type CompiledCanvasPreview,
-    wrapMarkdownFallback,
 } from '../canvas/host/compiledPreview.ts'
 import {parseDocumentDiagnostics} from '../domain/validators.ts'
-import {managedMarkdownParagraphsToHtml} from './managedMarkdownFallback.ts'
+import {convertMarkdownToPageDocument} from './markdownDocumentConversion.ts'
 import {
     acceptDraftValidation,
     acceptEntryDraftSave,
@@ -100,12 +99,10 @@ function snapshotFor(
         baseTemplateVersion: 1,
         revision: document?.revision ?? 0,
         hashes: {article: EMPTY_HASH, style: EMPTY_HASH},
-        articleHtml:
-            document?.html ??
-            wrapMarkdownFallback(
-                identity.entryId,
-                managedMarkdownParagraphsToHtml(identity.markdown),
-            ),
+        articleHtml: document?.html ?? convertMarkdownToPageDocument(
+            identity.entryId,
+            identity.markdown,
+        ).articleHtml,
         styleCss: document?.css ?? '',
         assets: [],
         editorLimits: {

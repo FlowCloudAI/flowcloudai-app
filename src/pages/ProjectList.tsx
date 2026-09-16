@@ -47,7 +47,8 @@ import {
 import HomeContinueCoverImage from '../features/home/HomeContinueCoverImage'
 import {HOME_TIPS} from '../features/home/homeTips'
 import {refreshIdeas, useIdeaInboxRevision} from '../features/ideas/ideaStore'
-import {stripMarkdown} from '../features/entries/lib/entryMarkdown'
+import {pageDocumentReadEntry} from '../api/pageDocument.ts'
+import {convertMarkdownToPageDocument} from '../features/page-document/application/markdownDocumentConversion.ts'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import {
@@ -177,6 +178,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const projectGridRef = useRef<HTMLDivElement>(null)
     const dashboard = useHomeDashboard()
     const [entryByTargetKey, setEntryByTargetKey] = useState<ReadonlyMap<string, Entry>>(() => new Map())
+    const [entryTextByTargetKey, setEntryTextByTargetKey] = useState<ReadonlyMap<string, string>>(() => new Map())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
     const [pendingEntryTargetKeys, setPendingEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const {
@@ -404,6 +406,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         void (async () => {
             const validKeys = new Set<string>()
             const validEntries = new Map<string, Entry>()
+            const validEntryTexts = new Map<string, string>()
             const invalidEntryKeys = new Set<string>()
 
             await Promise.all(entryTargets.map(async item => {
@@ -416,6 +419,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                     }
                     validKeys.add(item.key)
                     validEntries.set(item.key, entry)
+                    const document = await pageDocumentReadEntry(item.entryId).catch(() => null)
+                    validEntryTexts.set(item.key, document?.derivedText
+                        ?? convertMarkdownToPageDocument(item.entryId, entry.content ?? '').derivedText)
                 } catch {
                     invalidEntryKeys.add(item.key)
                     removeHomeEntryActivity(item.projectId, item.entryId)
@@ -433,6 +439,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 const next = new Map(prev)
                 for (const key of invalidEntryKeys) next.delete(key)
                 for (const [key, entry] of validEntries) next.set(key, entry)
+                return next
+            })
+            setEntryTextByTargetKey(prev => {
+                const next = new Map(prev)
+                for (const key of invalidEntryKeys) next.delete(key)
+                for (const [key, text] of validEntryTexts) next.set(key, text)
                 return next
             })
             setInvalidHomeTargetKeys(prev => {
@@ -673,12 +685,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const resumeEntry = resumeTarget?.type === 'entry' && continueKey
         ? entryByTargetKey.get(continueKey) ?? null
         : null
-    const resumeEntryText = stripMarkdown(resumeEntry?.content || resumeEntry?.summary || '')
+    const resumeEntryText = continueKey ? entryTextByTargetKey.get(continueKey) ?? resumeEntry?.summary ?? '' : ''
     const resumeExcerpt = resumeEntryText.length > 70 ? `${resumeEntryText.slice(0, 70)}…` : resumeEntryText
     const resumeDescription = resumeTarget?.type === 'entry'
         ? (resumeExcerpt ? `上次写到「${resumeExcerpt}」` : undefined)
         : resumeTarget?.description || undefined
-    const resumeWordCount = resumeEntry ? Array.from(resumeEntry.content ?? '').length : null
+    const resumeWordCount = resumeEntry ? Array.from(resumeEntryText).length : null
     const resumeTimestamp = continueTimestamp
         ?? resumeTarget?.updatedAt
         ?? asOptionalString(resumeProject?.updated_at)

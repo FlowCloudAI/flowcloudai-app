@@ -53,6 +53,8 @@ import {
     type TagSchema,
 } from '../api'
 import EntryEditor from '../features/entries/components/EntryEditor'
+import {pageDocumentReadEntry} from '../api/pageDocument.ts'
+import {convertMarkdownToPageDocument} from '../features/page-document/application/markdownDocumentConversion.ts'
 import EntryTypeCreator from '../features/entries/components/EntryTypeCreator'
 import WorldMapPanel from '../features/maps/components/WorldMapPanel'
 import ProjectContradictionPanel from '../features/project-editor/components/ProjectContradiction/ProjectContradictionPanel'
@@ -440,7 +442,10 @@ function ProjectEditorInner({
                 const entryContents = (await Promise.all(entryBriefs.map(async brief => {
                     try {
                         const entry = await db_get_entry(brief.id, projectId)
-                        return {id: brief.id, title: brief.title, content: (entry.content ?? '').trim()}
+                        const document = await pageDocumentReadEntry(brief.id).catch(() => null)
+                        const text = document?.derivedText
+                            ?? convertMarkdownToPageDocument(brief.id, entry.content ?? '').derivedText
+                        return {id: brief.id, title: brief.title, content: text.trim()}
                     } catch {
                         return null
                     }

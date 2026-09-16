@@ -11,6 +11,7 @@ import {
     compileCanvasPreview,
     wrapMarkdownFallback,
 } from '../host/compiledPreview.ts'
+import {convertMarkdownToPageDocument} from '../../application/markdownDocumentConversion.ts'
 import {markdownParagraphsToHtml} from '../host/markdownFallback.ts'
 import type {PageDocumentCanvasEntryProps} from './types.ts'
 import './PageDocumentCanvasEntry.css'
@@ -22,8 +23,10 @@ function sourceFromDocument(
     title: string,
     summary: string,
     markdown: string,
+    convertLegacyMarkdown: boolean,
 ) {
-    const html = document?.html ?? wrapMarkdownFallback(entryId, markdownParagraphsToHtml(markdown))
+    const conversion = !document && convertLegacyMarkdown ? convertMarkdownToPageDocument(entryId, markdown) : null
+    const html = document?.html ?? conversion?.articleHtml ?? wrapMarkdownFallback(entryId, markdownParagraphsToHtml(markdown))
     return {
         key: document
             ? `${projectId}:${entryId}:${document.revision}`
@@ -31,11 +34,12 @@ function sourceFromDocument(
         html,
         css: document?.css ?? '',
         metadata: {id: entryId, title, summary, tags: []},
+        derivedText: document?.derivedText ?? conversion?.derivedText ?? markdown,
     }
 }
 
 export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
-    const {projectId, entryId, title, summary, markdown, onNavigationIntent, compact = false} = props
+    const {projectId, entryId, title, summary, markdown, onNavigationIntent, compact = false, convertLegacyMarkdown = false} = props
     const [document, setDocument] = useState<PageDocument | null>(null)
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
@@ -62,8 +66,8 @@ export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
     }, [entryId])
 
     const source = useMemo(
-        () => sourceFromDocument(document, projectId, entryId, title, summary, markdown),
-        [document, entryId, markdown, projectId, summary, title],
+        () => sourceFromDocument(document, projectId, entryId, title, summary, markdown, convertLegacyMarkdown),
+        [convertLegacyMarkdown, document, entryId, markdown, projectId, summary, title],
     )
     const compiled = useMemo(() => compileCanvasPreview({
         projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
@@ -79,7 +83,9 @@ export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
             <section className={classNames('page-document-canvas-entry', compact && 'is-compact')}>
                 <header className="page-document-canvas-entry__header">
                     <h2>页面文档预览</h2>
-                    <p>{document ? `页面文档 revision ${document.revision}` : '未保存页面文档，显示 Markdown 安全降级预览'}</p>
+                    <p>{convertLegacyMarkdown
+                        ? `${document ? `页面文档 revision ${document.revision}` : '由旧 Markdown 正文临时转换，保存后成为页面文档'} · ${source.derivedText.length} 个字符`
+                        : document ? `页面文档 revision ${document.revision}` : '未保存页面文档，显示 Markdown 安全降级预览'}</p>
                 </header>
 
                 {loading ? (
@@ -103,7 +109,9 @@ export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
                     <p className="page-document-canvas-entry__state" role="alert">
                         {runtimeError
                             ? `隔离画布拒绝渲染：${runtimeError}`
-                            : `页面文档读取失败，已降级显示 Markdown：${loadError}`}
+                            : convertLegacyMarkdown
+                                ? `页面文档读取失败，已显示临时转换结果：${loadError}`
+                                : `页面文档读取失败，已降级显示 Markdown：${loadError}`}
                     </p>
                 )}
             </section>

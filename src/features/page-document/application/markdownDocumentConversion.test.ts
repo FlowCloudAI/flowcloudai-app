@@ -1,6 +1,9 @@
 // 本测试锁定旧 Markdown 的有限转换范围、逐字降级与页面文档安全契约。
 
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
+import {dirname, resolve} from 'node:path'
+import {fileURLToPath} from 'node:url'
 import {describe, it} from 'node:test'
 import {compileCanvasPreview, CANVAS_BASE_PROJECT_CSS, CANVAS_BASE_PROJECT_HTML} from '../canvas/host/compiledPreview.ts'
 import {convertMarkdownToPageDocument} from './markdownDocumentConversion.ts'
@@ -101,5 +104,12 @@ describe('Markdown 临时转换层', () => {
         assert.equal(markdown, '原始正文')
         assert.equal(result.blockCount, 1)
         assert.match(result.articleHtml, /data-fc-entry-patch/u)
+    })
+
+    it('前端转换产物与 Rust 共用的合法样例逐字一致', () => {
+        const markdown = `# 标题\n\n段落 [内链](entry://${TARGET_ID})\n\n- 项目\n\n![图](fcimg:${ASSET_ID})`
+        const converted = convertMarkdownToPageDocument(ENTRY_ID, markdown, allocator())
+        const fixture = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tests/fixtures/page-document/v1/markdown-converted-article.html'), 'utf8')
+        assert.equal(converted.articleHtml, fixture.trimEnd())
     })
 })

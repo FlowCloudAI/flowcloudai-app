@@ -8,4 +8,5 @@ export interface PageDocumentCanvasEntryProps {
     markdown: string
     onNavigationIntent: (href: string) => void
     compact?: boolean
+    convertLegacyMarkdown?: boolean
 }

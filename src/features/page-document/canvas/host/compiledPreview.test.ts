@@ -7,17 +7,16 @@ import {
     CANVAS_BASE_PROJECT_CSS,
     CANVAS_BASE_PROJECT_HTML,
     compileCanvasPreview,
-    wrapMarkdownFallback,
 } from './compiledPreview.ts'
-import {markdownParagraphsToHtml} from './markdownFallback.ts'
+import {convertMarkdownToPageDocument} from '../../application/markdownDocumentConversion.ts'
 
 const ENTRY_ID = '018f47a2-3b4c-7d5e-8f90-123456789abc'
 
-test('Markdown 降级经模板合并后得到绑定标题、正文与基线 CSS', () => {
+test('旧 Markdown 临时转换经模板合并后得到绑定标题、正文与基线 CSS', () => {
     const result = compileCanvasPreview({
         projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
         projectStyleCss: CANVAS_BASE_PROJECT_CSS,
-        entryArticleHtml: wrapMarkdownFallback(ENTRY_ID, markdownParagraphsToHtml('第一段\n\n第二段')),
+        entryArticleHtml: convertMarkdownToPageDocument(ENTRY_ID, '第一段\n\n第二段').articleHtml,
         entryStyleCss: '',
         metadata: {id: ENTRY_ID, title: '降级词条', summary: '摘要', tags: []},
     })
