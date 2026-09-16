@@ -23,6 +23,7 @@ import {
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
+import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
 import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import {mountCanvasStyles} from './styleMount.ts'
@@ -43,6 +44,7 @@ let compositionNodeId: string | null = null
 let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
+const linkCandidate = createCanvasLinkCandidateTracker()
 const linkHover = createCanvasLinkHoverTracker()
 
 type RuntimePayload = CanvasRuntimeMessage extends infer Message
@@ -93,6 +95,8 @@ function reportSize(): void {
 }
 
 function clearRenderedDocument(): void {
+    const candidateLeave = linkCandidate.clear()
+    if (candidateLeave) send(candidateLeave)
     const leave = linkHover.clear()
     if (leave) send(leave)
     authorStyle.textContent = ''
@@ -234,6 +238,16 @@ function captureSelection(): CanvasTextSelectionSnapshot | null {
     return captureTextRange(range.startContainer, range.startOffset, range.endContainer, range.endOffset)
 }
 
+function reportLinkCandidate(): void {
+    if (!editingEnabled || composition.isComposing) return
+    const selection = captureSelection()
+    const node = selection?.collapsed ? findManagedNode(selection.nodeId) : null
+    const snapshot = selection && node
+        ? {nodeId: selection.nodeId, text: semanticText(node), caret: selection.from}
+        : null
+    for (const intent of linkCandidate.update(snapshot)) send(intent)
+}
+
 function captureInputRange(event: InputEvent): CanvasTextSelectionSnapshot | null {
     const range = event.getTargetRanges?.()[0]
     return range
@@ -352,6 +366,11 @@ function submitInputIntent(
         expected: snapshot.expected,
         text,
     } satisfies Omit<CanvasInputIntentMessage, 'channel' | 'version' | 'sessionToken' | 'sequence'>)
+    // beforeinput 已拦截原生写入；手动更新 DOM 后不会再有对应的 input 事件。
+    if (inputType === 'insertParagraph') {
+        const leave = linkCandidate.clear()
+        if (leave) send(leave)
+    } else reportLinkCandidate()
     return true
 }
 
@@ -373,6 +392,8 @@ function releasePendingRenderAfterComposition(submitted: boolean): void {
 
 function setEditing(enabled: boolean): void {
     if (editingEnabled !== enabled) {
+        const candidateLeave = linkCandidate.clear()
+        if (candidateLeave) send(candidateLeave)
         const leave = linkHover.clear()
         if (leave) send(leave)
     }
@@ -471,7 +492,17 @@ function installInputListeners(): void {
         submitInputIntent(snapshot, inputType as CanvasInputType, text)
     })
 
+    document.addEventListener('input', event => {
+        if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) reportLinkCandidate()
+    })
+
+    document.addEventListener('selectionchange', () => {
+        if (editingEnabled && !composition.isComposing) reportLinkCandidate()
+    })
+
     document.addEventListener('compositionstart', event => {
+        const candidateLeave = linkCandidate.clear()
+        if (candidateLeave) send(candidateLeave)
         const leave = linkHover.clear()
         if (leave) send(leave)
         if (!editingEnabled || composition.isComposing) return
@@ -533,6 +564,11 @@ function installInputListeners(): void {
     })
 
     document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            const leave = linkCandidate.clear()
+            if (leave) send(leave)
+            return
+        }
         if (event.defaultPrevented || event.isComposing) return
         if (!(event.metaKey || event.ctrlKey) || event.altKey) return
         const key = event.key.toLowerCase()
@@ -551,6 +587,8 @@ function installInputListeners(): void {
         const nodeId = managedNodeId(node)
         if (!editingEnabled || !isCanvasEditableElement(node) || !nodeId) return
         if (managedNode(event.relatedTarget) === node) return
+        const leave = linkCandidate.clear()
+        if (leave) send(leave)
         send({type: 'input-flush', nodeId})
     })
 }
