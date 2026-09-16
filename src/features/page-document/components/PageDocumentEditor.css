@@ -123,7 +123,7 @@
     overflow: hidden;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
-    background: var(--fc-color-bg-secondary);
+    background: var(--fc-color-bg-elevated);
     box-shadow: var(--fc-shadow-sm);
 }
 

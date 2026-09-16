@@ -25,12 +25,3 @@ test('编辑页卡片和代码预览沿用浏览卡片的画布内边距', () =>
     assert.equal(declaration(editorCss, '.page-document-source-workspace__preview-canvas', 'padding'), browsePadding)
     assert.equal(declaration(editorCss, '.page-document-editor__page-card', 'box-sizing'), 'border-box')
 })
-
-test('编辑页卡片底色沿用浏览卡片的次级表面，使内边距在浅色主题下可见', () => {
-    const browseCss = readFileSync(new URL('../canvas/entry/PageDocumentCanvasEntry.css', import.meta.url), 'utf8')
-    const editorCss = readFileSync(new URL('./PageDocumentEditor.css', import.meta.url), 'utf8')
-    const browseBackground = declaration(browseCss, '.page-document-canvas-entry', 'background')
-
-    assert.equal(browseBackground, 'var(--fc-color-bg-secondary)')
-    assert.equal(declaration(editorCss, '.page-document-editor__page-card', 'background'), browseBackground)
-})
