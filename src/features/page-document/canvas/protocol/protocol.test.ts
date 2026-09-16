@@ -229,6 +229,35 @@ test('输入意图同样受来源 Window、token、序号与统一大小上限�
     assert.equal(gate.accept({source, data: {...intent, sequence: 5, text: '你'.repeat(65_537)}}), null)
 })
 
+test('双链候选意图校验 UUID、查询长度与有界 UTF-16 区间', () => {
+    const intent = message('link-candidate-intent', {
+        intentId: REQUEST_ID, nodeId: NODE_ID, query: '中文词条', from: 2, to: 6,
+    })
+    assert.equal(parseCanvasRuntimeMessage(intent, TOKEN)?.type, 'link-candidate-intent')
+    assert.equal(parseCanvasRuntimeMessage({...intent, query: null}, TOKEN)?.type, 'link-candidate-intent')
+    assert.equal(parseCanvasRuntimeMessage({...intent, query: ''}, TOKEN)?.type, 'link-candidate-intent')
+    assert.equal(parseCanvasRuntimeMessage({...intent, intentId: 'invalid'}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, nodeId: 'invalid'}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, query: '字'.repeat(201)}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, from: -1}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, to: 1}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, to: 65_537}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...intent, html: '<b>禁止</b>'}, TOKEN), null)
+})
+
+test('双链候选意图拒绝伪造来源、旧 token、重放与超限消息', () => {
+    const source = {}
+    const gate = createCanvasRuntimeMessageGate(source, TOKEN)
+    const intent = message('link-candidate-intent', {
+        intentId: REQUEST_ID, nodeId: NODE_ID, query: '词条', from: 0, to: 4,
+    }, 2)
+    assert.equal(gate.accept({source: {}, data: intent}), null)
+    assert.equal(gate.accept({source, data: {...intent, sessionToken: OTHER_TOKEN}}), null)
+    assert.equal(gate.accept({source, data: intent})?.type, 'link-candidate-intent')
+    assert.equal(gate.accept({source, data: intent}), null)
+    assert.equal(gate.accept({source, data: {...intent, sequence: 3, query: '字'.repeat(CANVAS_MESSAGE_MAX_BYTES)}}), null)
+})
+
 test('切换文档后旧 token 即使沿用同一 Window 也失效', () => {
     const source = {}
     const oldGate = createCanvasRuntimeMessageGate(source, TOKEN)

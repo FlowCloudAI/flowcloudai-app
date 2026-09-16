@@ -235,5 +235,18 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
             ? value as unknown as CanvasRuntimeMessage
             : null
     }
+    if (value.type === 'link-candidate-intent') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'intentId', 'nodeId', 'query', 'from', 'to'])
+            && isUuid(value.intentId)
+            && isUuid(value.nodeId)
+            && (value.query === null || isBoundedString(value.query, 200))
+            && Number.isInteger(value.from)
+            && Number.isInteger(value.to)
+            && (value.from as number) >= 0
+            && (value.to as number) >= (value.from as number)
+            && (value.to as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
     return null
 }

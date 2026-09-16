@@ -136,6 +136,16 @@ export interface CanvasHistoryIntentMessage extends CanvasEnvelope {
     action: 'undo' | 'redo'
 }
 
+/** 只报告双链候选的纯文本范围；null 表示取消同一意图。 */
+export interface CanvasLinkCandidateIntentMessage extends CanvasEnvelope {
+    type: 'link-candidate-intent'
+    intentId: string
+    nodeId: string
+    query: string | null
+    from: number
+    to: number
+}
+
 export type CanvasRuntimeMessage =
     | CanvasRenderedMessage
     | CanvasRenderErrorMessage
@@ -147,6 +157,7 @@ export type CanvasRuntimeMessage =
     | CanvasInputBlockedMessage
     | CanvasInputFlushMessage
     | CanvasHistoryIntentMessage
+    | CanvasLinkCandidateIntentMessage
 
 export interface CanvasMessageEventLike {
     data: unknown
