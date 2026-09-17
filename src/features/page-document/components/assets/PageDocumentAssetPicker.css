@@ -1,0 +1,68 @@
+/* 项目资产选择只使用宿主语义 token；像素由受管读取命令提供。 */
+.page-document-asset-picker {
+    width: min(38rem, 100%);
+}
+
+.page-document-asset-picker__body {
+    display: grid;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-lg);
+}
+
+.page-document-asset-picker__body p {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+}
+
+.page-document-asset-picker__body p[role="alert"] {
+    color: var(--fc-color-warning);
+}
+
+.page-document-asset-picker__list {
+    display: grid;
+    gap: var(--fc-space-sm);
+    max-height: 24rem;
+    overflow: auto;
+}
+
+.page-document-asset-picker__list > button {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-md);
+    min-width: 0;
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.page-document-asset-picker__list > button:hover {
+    background: var(--fc-color-bg-secondary);
+}
+
+.page-document-asset-picker__list small {
+    display: block;
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+    text-overflow: ellipsis;
+}
+
+.page-document-asset-picker__thumbnail {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 5rem;
+    height: 5rem;
+    overflow: hidden;
+    border: 1px solid var(--fc-color-border-light);
+    background: var(--fc-color-bg-secondary);
+}
+
+.page-document-asset-picker__thumbnail canvas {
+    max-width: 100%;
+    max-height: 100%;
+}

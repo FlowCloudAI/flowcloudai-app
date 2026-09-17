@@ -2,7 +2,7 @@
 use crate::{
     ApiError, AppState,
     apis::worldflow::common::{open_entry_db, open_project_db},
-    document_validation,
+    document_validation, page_document_assets,
 };
 use flowcloudai_client::ErrorCode;
 use serde::Deserialize;
@@ -14,7 +14,7 @@ use worldflow_core::models::{
 };
 use worldflow_core::{PageDocumentOps, WorldflowError};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveInput {
     pub entry_id: String,
@@ -38,9 +38,10 @@ pub async fn page_document_read_entry(
 #[tauri::command]
 pub async fn page_document_save_entry(
     state: State<'_, Arc<AppState>>,
+    paths: State<'_, crate::PathsState>,
     input: SaveInput,
 ) -> Result<SavePageDocumentResult<PageDocument>, ApiError> {
-    save_entry(state.inner(), &input).await
+    save_entry(state.inner(), paths.inner(), &input).await
 }
 
 #[tauri::command]
@@ -64,6 +65,7 @@ pub async fn page_document_read_project_home(
 #[tauri::command]
 pub async fn page_document_save_project_home(
     state: State<'_, Arc<AppState>>,
+    paths: State<'_, crate::PathsState>,
     project_id: String,
     html: String,
     css: String,
@@ -74,6 +76,7 @@ pub async fn page_document_save_project_home(
     let project_id = parse_uuid("projectId", &project_id)?;
     save_project_home(
         state.inner(),
+        paths.inner(),
         &project_id,
         &html,
         &css,
@@ -86,6 +89,7 @@ pub async fn page_document_save_project_home(
 
 async fn save_project_home(
     state: &AppState,
+    paths: &crate::PathsState,
     project_id: &Uuid,
     html: &str,
     css: &str,
@@ -98,6 +102,9 @@ async fn save_project_home(
     let db = open_project_db(state, project_id)
         .await
         .map_err(ApiError::internal)?;
+    for id in &validation.asset_ids {
+        page_document_assets::require_asset(&db, paths, project_id, id).await?;
+    }
     db.save_project_home_document(
         project_id,
         html,
@@ -122,6 +129,7 @@ async fn read_entry(state: &AppState, entry_id: &Uuid) -> Result<Option<PageDocu
 
 async fn save_entry(
     state: &AppState,
+    paths: &crate::PathsState,
     input: &SaveInput,
 ) -> Result<SavePageDocumentResult<PageDocument>, ApiError> {
     let entry_id = parse_uuid("entryId", &input.entry_id)?;
@@ -140,6 +148,9 @@ async fn save_entry(
     let db = open_entry_db(state, &entry_id, Some(&project_id))
         .await
         .map_err(ApiError::internal)?;
+    for id in &validation.asset_ids {
+        page_document_assets::require_asset(&db, paths, &project_id, id).await?;
+    }
     db.save_entry_page_document(
         &entry_id,
         &project_id,
@@ -211,6 +222,7 @@ mod tests {
     struct Fixture {
         _dir: tempfile::TempDir,
         state: AppState,
+        paths: crate::PathsState,
         project_id: Uuid,
         other_project_id: Uuid,
         entry_id: Uuid,
@@ -252,6 +264,10 @@ mod tests {
         }
 
         Fixture {
+            paths: crate::PathsState {
+                db_path: dir.path().join("catalog.db"),
+                plugins_path: dir.path().join("plugins"),
+            },
             _dir: dir,
             state: AppState {
                 sqlite_db: Mutex::new(catalog),
@@ -276,7 +292,9 @@ mod tests {
             request_key: "world-save-1".into(),
             modified_by: None,
         };
-        let saved = save_entry(&fixture.state, &input).await.unwrap();
+        let saved = save_entry(&fixture.state, &fixture.paths, &input)
+            .await
+            .unwrap();
         assert_eq!(saved.document.derived_text, "独立世界正文");
 
         let read = read_entry(&fixture.state, &fixture.entry_id)
@@ -301,6 +319,7 @@ mod tests {
         let fixture = setup().await;
         save_entry(
             &fixture.state,
+            &fixture.paths,
             &SaveInput {
                 entry_id: fixture.entry_id.to_string(),
                 project_id: fixture.project_id.to_string(),
@@ -379,7 +398,11 @@ mod tests {
             request_key: "wrong-world".into(),
             modified_by: None,
         };
-        assert!(save_entry(&fixture.state, &input).await.is_err());
+        assert!(
+            save_entry(&fixture.state, &fixture.paths, &input)
+                .await
+                .is_err()
+        );
 
         let original_world = fixture
             .state
@@ -403,6 +426,7 @@ mod tests {
             "<p><a href=\"entry-title://%E5%BE%85%E5%BB%BA%E8%AF%8D%E6%9D%A1\">待建词条</a></p>";
         let first = save_entry(
             &fixture.state,
+            &fixture.paths,
             &SaveInput {
                 entry_id: fixture.entry_id.to_string(),
                 project_id: fixture.project_id.to_string(),
@@ -443,6 +467,7 @@ mod tests {
 
         let second = save_entry(
             &fixture.state,
+            &fixture.paths,
             &SaveInput {
                 entry_id: fixture.entry_id.to_string(),
                 project_id: fixture.project_id.to_string(),
@@ -473,11 +498,14 @@ mod tests {
             request_key: "entry-conflict-first".into(),
             modified_by: None,
         };
-        let first = save_entry(&fixture.state, &input).await.unwrap();
+        let first = save_entry(&fixture.state, &fixture.paths, &input)
+            .await
+            .unwrap();
         assert_eq!(first.revision, 1);
 
         let error = save_entry(
             &fixture.state,
+            &fixture.paths,
             &SaveInput {
                 html: "<p>过期写入</p>".into(),
                 expected_revision: None,
@@ -496,6 +524,7 @@ mod tests {
         let fixture = setup().await;
         let first = save_project_home(
             &fixture.state,
+            &fixture.paths,
             &fixture.project_id,
             "<main>第一版</main>",
             "",
@@ -509,6 +538,7 @@ mod tests {
 
         let error = save_project_home(
             &fixture.state,
+            &fixture.paths,
             &fixture.project_id,
             "<main>过期写入</main>",
             "",
@@ -534,13 +564,18 @@ mod tests {
             request_key: "entry-idempotent".into(),
             modified_by: None,
         };
-        let first = save_entry(&fixture.state, &input).await.unwrap();
-        let replay = save_entry(&fixture.state, &input).await.unwrap();
+        let first = save_entry(&fixture.state, &fixture.paths, &input)
+            .await
+            .unwrap();
+        let replay = save_entry(&fixture.state, &fixture.paths, &input)
+            .await
+            .unwrap();
         assert_eq!(replay.revision, first.revision);
         assert_eq!(replay.request_key, first.request_key);
 
         let error = save_entry(
             &fixture.state,
+            &fixture.paths,
             &SaveInput {
                 html: "<p>不同正文</p>".into(),
                 ..input
@@ -549,6 +584,144 @@ mod tests {
         .await
         .unwrap_err();
         assert_ne!(error.code, ErrorCode::DocumentRevisionConflict.as_str());
+    }
+
+    #[tokio::test]
+    async fn imported_asset_is_project_bound_readable_and_required_before_save() {
+        let fixture = setup().await;
+        let source = fixture._dir.path().join("sample.png");
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([20, 40, 60, 255]))
+            .save(&source)
+            .unwrap();
+        let asset = page_document_assets::import_asset(
+            &fixture.state,
+            &fixture.paths,
+            &fixture.project_id,
+            &source,
+        )
+        .await
+        .unwrap();
+        let frame = page_document_assets::read_asset_frame(
+            &fixture.state,
+            &fixture.paths,
+            &fixture.project_id,
+            &asset.id,
+        )
+        .await
+        .unwrap();
+        assert_eq!((frame.width, frame.height), (2, 2));
+        assert_eq!(
+            base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD,
+                frame.rgba_base64
+            )
+            .unwrap()
+            .len(),
+            16
+        );
+        assert!(
+            page_document_assets::read_asset_frame(
+                &fixture.state,
+                &fixture.paths,
+                &fixture.other_project_id,
+                &asset.id,
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            save_project_home(
+                &fixture.state,
+                &fixture.paths,
+                &fixture.other_project_id,
+                &format!("<img src=\"fcasset://{}\">", asset.id),
+                "",
+                None,
+                "foreign-project-asset",
+                None,
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            read_project_home(&fixture.state, &fixture.other_project_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let html = format!(
+            "<figure data-fc-node-id=\"{}\" data-fc-node-kind=\"asset\"><img src=\"fcasset://{}\" data-fc-asset-id=\"{}\" alt=\"图\"></figure>",
+            Uuid::new_v4(),
+            asset.id,
+            asset.id
+        );
+        let input = SaveInput {
+            entry_id: fixture.entry_id.to_string(),
+            project_id: fixture.project_id.to_string(),
+            html,
+            css: String::new(),
+            expected_revision: None,
+            request_key: "asset-first-save".into(),
+            modified_by: None,
+        };
+        assert_eq!(
+            save_entry(&fixture.state, &fixture.paths, &input)
+                .await
+                .unwrap()
+                .revision,
+            1
+        );
+        let missing = SaveInput {
+            html: format!("<img src=\"fcasset://{}\">", Uuid::new_v4()),
+            expected_revision: Some(1),
+            request_key: "asset-missing".into(),
+            ..input.clone()
+        };
+        assert!(
+            save_entry(&fixture.state, &fixture.paths, &missing)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            read_entry(&fixture.state, &fixture.entry_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .revision,
+            1
+        );
+
+        let path = page_document_assets::asset_path(&fixture.paths, &asset).unwrap();
+        std::fs::write(path, b"corrupted").unwrap();
+        assert!(
+            page_document_assets::read_asset_frame(
+                &fixture.state,
+                &fixture.paths,
+                &fixture.project_id,
+                &asset.id,
+            )
+            .await
+            .is_err()
+        );
+        let resave = SaveInput {
+            expected_revision: Some(1),
+            request_key: "asset-corrupt".into(),
+            ..input
+        };
+        assert!(
+            save_entry(&fixture.state, &fixture.paths, &resave)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            read_entry(&fixture.state, &fixture.entry_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .revision,
+            1
+        );
     }
 
     #[test]

@@ -2,6 +2,8 @@
 
 import classNames from 'classnames'
 import {useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref} from 'react'
+import {pageDocumentAssetErrorStatus, pageDocumentReadAssetFrame} from '../../../../api/pageDocument.ts'
+import {isolatePageDocument} from '../runtime/isolationPolicy.ts'
 import {
     createCanvasHostCommandFactory,
     createCanvasRequestId,
@@ -23,6 +25,7 @@ import './PageDocumentCanvas.css'
 export interface PageDocumentCanvasProps {
     ref?: Ref<PageDocumentCanvasHandle>
     documentKey: string
+    projectId?: string | null
     html: string
     css: string
     selectedNodeId?: string | null
@@ -51,6 +54,7 @@ export interface PageDocumentCanvasHandle {
 export function PageDocumentCanvas({
     ref,
     documentKey,
+    projectId = null,
     html,
     css,
     selectedNodeId = null,
@@ -71,6 +75,7 @@ export function PageDocumentCanvas({
 }: PageDocumentCanvasProps) {
     const frameRef = useRef<HTMLIFrameElement>(null)
     const loadedRef = useRef(false)
+    const renderRequestIdRef = useRef<string | null>(null)
     const latest = useRef({
         html,
         css,
@@ -132,28 +137,54 @@ export function PageDocumentCanvas({
         })
     }, [send])
 
+    const loadAssets = useCallback((requestId: string, htmlSource: string, cssSource: string) => {
+        const isolated = isolatePageDocument(htmlSource, cssSource)
+        for (const assetId of isolated.artifact?.assetIds ?? []) {
+            if (!projectId) {
+                send({type: 'asset-frame', requestId, assetId, status: 'unavailable', width: 0, height: 0, rgbaBase64: ''})
+                continue
+            }
+            void pageDocumentReadAssetFrame(projectId, assetId).then(frame => {
+                if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
+                send({type: 'asset-frame', requestId, assetId, status: 'ready',
+                    width: frame.width, height: frame.height, rgbaBase64: frame.rgbaBase64})
+            }).catch(error => {
+                if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
+                send({type: 'asset-frame', requestId, assetId, status: pageDocumentAssetErrorStatus(error),
+                    width: 0, height: 0, rgbaBase64: ''})
+            })
+        }
+    }, [projectId, send])
+
     const sendRender = useCallback(() => {
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
+        const requestId = createCanvasRequestId()
+        renderRequestIdRef.current = requestId
         send({
             type: 'render',
-            requestId: createCanvasRequestId(),
+            requestId,
             html,
             css,
         })
-    }, [css, html, send])
+        loadAssets(requestId, html, css)
+    }, [css, html, loadAssets, send])
 
     const sendLatestRender = useCallback(() => {
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
+        const requestId = createCanvasRequestId()
+        renderRequestIdRef.current = requestId
         send({
             type: 'render',
-            requestId: createCanvasRequestId(),
+            requestId,
             html: latest.current.html,
             css: latest.current.css,
         })
-    }, [send])
+        loadAssets(requestId, latest.current.html, latest.current.css)
+    }, [loadAssets, send])
 
     useEffect(() => {
         loadedRef.current = false
+        renderRequestIdRef.current = null
         setHeight(minimumHeight)
         setStatus('loading')
     }, [minimumHeight, session.token])

@@ -2,6 +2,7 @@
 
 import type {
     PageDocument,
+    PageDocumentAsset,
     PageDocumentDiagnostic,
     PageDocumentSaveError,
     SavePageDocumentInput,
@@ -10,6 +11,7 @@ import type {
 import type {
     DocumentDiagnostic,
     EntrySourceSnapshot,
+    EntryAssetSnapshot,
     SourceFileName,
     SourceFileSet,
 } from '../domain/contract.ts'
@@ -78,6 +80,7 @@ export type EntryDocumentSavePreparation =
 function snapshotFor(
     identity: EntryDocumentIdentity,
     document: PageDocument | null,
+    assets: readonly EntryAssetSnapshot[],
 ): EntrySourceSnapshot {
     return {
         project: {
@@ -104,7 +107,7 @@ function snapshotFor(
             identity.markdown,
         ).articleHtml,
         styleCss: document?.css ?? '',
-        assets: [],
+        assets: [...assets],
         editorLimits: {
             paragraph: 100,
             asset: 100,
@@ -149,8 +152,9 @@ function isRenderable(preview: CompiledCanvasPreview): boolean {
 export function createEntryDocumentSessionState(
     identity: EntryDocumentIdentity,
     document: PageDocument | null,
+    assets: readonly EntryAssetSnapshot[] = [],
 ): EntryDocumentSessionState {
-    const snapshot = snapshotFor(identity, document)
+    const snapshot = snapshotFor(identity, document, assets)
     const initial: EntryDocumentSessionState = {
         identity,
         snapshot,
@@ -316,7 +320,7 @@ export function acceptEntryDocumentSave(
     result: SavePageDocumentResult,
 ): EntryDocumentSessionState {
     const sources = state.pendingSave?.sources ?? state.model.entry.sources
-    const snapshot = snapshotFor(state.identity, result.document)
+    const snapshot = snapshotFor(state.identity, result.document, state.snapshot.assets)
     return {
         ...state,
         snapshot,
@@ -397,7 +401,7 @@ export function keepEntryDocumentDraft(
         }
     }
 
-    const snapshot = snapshotFor(state.identity, latestDocument)
+    const snapshot = snapshotFor(state.identity, latestDocument, state.snapshot.assets)
     const baseSources: SourceFileSet = {
         'article.html': latestDocument.html,
         'style.css': latestDocument.css,
@@ -452,7 +456,27 @@ export function loadLatestEntryDocument(
     state: EntryDocumentSessionState,
 ): EntryDocumentSessionState {
     if (!state.conflict?.latestDocument) return state
-    return createEntryDocumentSessionState(state.identity, state.conflict.latestDocument)
+    return createEntryDocumentSessionState(state.identity, state.conflict.latestDocument, state.snapshot.assets)
+}
+
+export function registerEntryDocumentAsset(
+    state: EntryDocumentSessionState,
+    asset: PageDocumentAsset,
+): EntryDocumentSessionState {
+    if (asset.projectId !== state.identity.projectId) return state
+    const snapshotAsset: EntryAssetSnapshot = {
+        id: asset.id,
+        mediaType: asset.mediaType,
+        sizeBytes: asset.sizeBytes,
+        sha256: asset.sha256,
+    }
+    return {
+        ...state,
+        snapshot: {
+            ...state.snapshot,
+            assets: [...state.snapshot.assets.filter(item => item.id !== asset.id), snapshotAsset],
+        },
+    }
 }
 
 export function undoEntryDocumentSession(

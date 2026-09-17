@@ -90,6 +90,28 @@ test('宿主命令严格校验渲染、选择、编辑权限、输入回执与�
     }), TOKEN), null)
 })
 
+test('受管图片像素帧只接受当前会话的有界 RGBA 数据', () => {
+    const valid = message('asset-frame', {
+        requestId: REQUEST_ID,
+        assetId: NODE_ID,
+        status: 'ready',
+        width: 1,
+        height: 1,
+        rgbaBase64: 'AQIDBA==',
+    })
+    assert.equal(parseCanvasHostCommand(valid, TOKEN)?.type, 'asset-frame')
+    assert.equal(parseCanvasHostCommand({...valid, sessionToken: OTHER_TOKEN}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, rgbaBase64: 'not-image'}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, width: 513}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, assetId: '/tmp/image.png'}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, url: 'file:///tmp/image.png'}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, rgbaBase64: 'A'.repeat(CANVAS_MESSAGE_MAX_BYTES)}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand(message('asset-frame', {
+        requestId: REQUEST_ID, assetId: NODE_ID, status: 'unavailable',
+        width: 0, height: 0, rgbaBase64: '',
+    }), TOKEN)?.type, 'asset-frame')
+})
+
 test('运行时只读消息只接受当前 token、版本与有界字段', () => {
     assert.equal(
         parseCanvasRuntimeMessage(message('rendered', {requestId: REQUEST_ID, managedNodeCount: 3}), TOKEN)?.type,

@@ -47,6 +47,53 @@ export interface PageDocumentValidation {
     diagnostics: PageDocumentDiagnostic[]
     derivedText: string
     linkTargets: Array<{entryId: string | null; title: string}>
+    assetIds: string[]
+}
+
+export interface PageDocumentAsset {
+    id: string
+    projectId: string
+    mediaType: 'image/png' | 'image/jpeg' | 'image/webp'
+    sizeBytes: number
+    sha256: string
+    width: number
+    height: number
+    createdAt: string
+}
+
+export interface PageDocumentAssetFrame {
+    assetId: string
+    width: number
+    height: number
+    rgbaBase64: string
+}
+
+export function pageDocumentListAssets(projectId: string): Promise<PageDocumentAsset[]> {
+    return invoke('page_document_list_assets', {projectId})
+}
+
+export function pageDocumentCheckAsset(projectId: string, assetId: string): Promise<PageDocumentAsset> {
+    return invoke('page_document_check_asset', {projectId, assetId})
+}
+
+export function pageDocumentReadAssetFrame(projectId: string, assetId: string): Promise<PageDocumentAssetFrame> {
+    return invoke('page_document_read_asset_frame', {projectId, assetId})
+}
+
+export async function pageDocumentChooseAndImportAsset(projectId: string): Promise<PageDocumentAsset | null> {
+    return invoke('page_document_import_asset', {projectId})
+}
+
+export function pageDocumentAssetErrorMessage(value: unknown): string {
+    const error = toApiError(value)
+    const status = error.detail?.assetStatus
+    if (status === 'unavailable') return `图片不存在、无权读取或原件已损坏：${error.message}`
+    if (status === 'invalid') return `不支持或无效的图片：${error.message}`
+    return error.message
+}
+
+export function pageDocumentAssetErrorStatus(value: unknown): 'unavailable' | 'invalid' {
+    return toApiError(value).detail?.assetStatus === 'invalid' ? 'invalid' : 'unavailable'
 }
 
 interface PageDocumentWire extends Omit<PageDocument, 'entryId' | 'projectId' | 'derivedText' | 'modifiedBy' | 'updatedAt'> {

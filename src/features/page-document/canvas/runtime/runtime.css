@@ -25,6 +25,12 @@
     #page-document-canvas-root {
         min-width: 0;
     }
+
+    [data-fc-asset-display] {
+        display: block;
+        max-inline-size: 100%;
+        block-size: auto;
+    }
 }
 
 /* 安全高亮和资产占位故意不分层，避免作者层覆盖隔离状态。 */
@@ -37,5 +43,18 @@
     min-block-size: 4rem;
     border: 1px dashed var(--fc-entry-muted);
     background: var(--fc-entry-surface);
+    color: var(--fc-entry-muted);
+}
+
+[data-fc-asset-display][hidden],
+[data-fc-asset-state][hidden] {
+    display: none;
+}
+
+[data-fc-asset-state] {
+    display: inline-block;
+    min-block-size: 4rem;
+    padding: 1rem;
+    border: 1px dashed var(--fc-entry-muted);
     color: var(--fc-entry-muted);
 }

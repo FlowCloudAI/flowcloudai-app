@@ -25,6 +25,7 @@ pub struct ValidationResult {
     pub diagnostics: Vec<ValidationDiagnostic>,
     pub derived_text: String,
     pub link_targets: Vec<DerivedLinkTarget>,
+    pub asset_ids: Vec<Uuid>,
 }
 
 const FORBIDDEN_TAGS: &[&str] = &[
@@ -60,16 +61,24 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
 
     let document = Html::parse_fragment(html);
     let mut link_targets = Vec::new();
+    let mut asset_ids = Vec::new();
     for element in document.root_element().descendent_elements() {
-        validate_element(element, project_id, &mut diagnostics, &mut link_targets);
+        validate_element(
+            element,
+            project_id,
+            &mut diagnostics,
+            &mut link_targets,
+            &mut asset_ids,
+        );
     }
-    validate_css(css, &mut diagnostics);
+    validate_css(css, &mut diagnostics, &mut asset_ids);
 
     ValidationResult {
         valid: diagnostics.is_empty(),
         diagnostics,
         derived_text: derive_text(&document),
         link_targets,
+        asset_ids,
     }
 }
 
@@ -78,6 +87,7 @@ fn validate_element(
     project_id: Option<&str>,
     diagnostics: &mut Vec<ValidationDiagnostic>,
     link_targets: &mut Vec<DerivedLinkTarget>,
+    asset_ids: &mut Vec<Uuid>,
 ) {
     let tag_name = element.value().name();
     if FORBIDDEN_TAGS
@@ -85,6 +95,17 @@ fn validate_element(
         .any(|forbidden| tag_name.eq_ignore_ascii_case(forbidden))
     {
         diagnostics.push(d("element", format!("禁止元素 {tag_name}")));
+    }
+    if tag_name.eq_ignore_ascii_case("img") {
+        if let Some(declared) = element.value().attr("data-fc-asset-id") {
+            let source = element.value().attr("src").and_then(managed_asset_id);
+            if parse_document_uuid(declared).ok() != source {
+                diagnostics.push(d(
+                    "resource",
+                    "img 的 data-fc-asset-id 必须与 src UUID 一致",
+                ));
+            }
+        }
     }
 
     for (qualified_name, value) in &element.value().attrs {
@@ -132,7 +153,7 @@ fn validate_element(
             }
         }
         if non_link_managed_resource && !is_link_element {
-            validate_managed_resource(value, &display_name, diagnostics);
+            validate_managed_resource(value, &display_name, diagnostics, asset_ids);
         }
         if xlink_href && is_link_element {
             diagnostics.push(d(
@@ -141,11 +162,11 @@ fn validate_element(
             ));
         }
         match managed_resource_attribute {
-            Some("src") if !is_managed_asset_url(value) => {
-                diagnostics.push(d("resource", format!("不允许的资源地址: {value}")));
+            Some("src") => validate_managed_resource(value, &display_name, diagnostics, asset_ids),
+            Some("poster") => {
+                validate_managed_resource(value, &display_name, diagnostics, asset_ids)
             }
-            Some("poster") => validate_managed_resource(value, &display_name, diagnostics),
-            Some("srcset") => validate_srcset(value, diagnostics),
+            Some("srcset") => validate_srcset(value, diagnostics, asset_ids),
             _ => {}
         }
         if name.eq_ignore_ascii_case("style") {
@@ -156,13 +177,14 @@ fn validate_element(
                     ..CssContext::default()
                 },
                 diagnostics,
+                asset_ids,
             );
         }
     }
 
     if tag_name.eq_ignore_ascii_case("style") {
         let embedded_css = element.text().collect::<String>();
-        validate_css(&embedded_css, diagnostics);
+        validate_css(&embedded_css, diagnostics, asset_ids);
     }
 }
 
@@ -350,19 +372,27 @@ fn parse_document_uuid(value: &str) -> Result<Uuid, ()> {
     (!id.is_nil()).then_some(id).ok_or(())
 }
 
-fn is_managed_asset_url(value: &str) -> bool {
+fn managed_asset_id(value: &str) -> Option<Uuid> {
     let Some((scheme, id)) = value.split_once("://") else {
-        return false;
+        return None;
     };
-    scheme.eq_ignore_ascii_case("fcasset") && parse_document_uuid(id).is_ok()
+    scheme
+        .eq_ignore_ascii_case("fcasset")
+        .then(|| parse_document_uuid(id).ok())
+        .flatten()
 }
 
 fn validate_managed_resource(
     value: &str,
     attribute: &str,
     diagnostics: &mut Vec<ValidationDiagnostic>,
+    asset_ids: &mut Vec<Uuid>,
 ) {
-    if !is_managed_asset_url(value) {
+    if let Some(id) = managed_asset_id(value) {
+        if !asset_ids.contains(&id) {
+            asset_ids.push(id);
+        }
+    } else {
         diagnostics.push(d(
             "resource",
             format!("{attribute} 只允许 fcasset://<uuid>: {value}"),
@@ -370,7 +400,11 @@ fn validate_managed_resource(
     }
 }
 
-fn validate_srcset(value: &str, diagnostics: &mut Vec<ValidationDiagnostic>) {
+fn validate_srcset(
+    value: &str,
+    diagnostics: &mut Vec<ValidationDiagnostic>,
+    asset_ids: &mut Vec<Uuid>,
+) {
     let mut candidate_count = 0;
     for candidate in value.split(',') {
         let Some(url) = candidate.split_whitespace().next() else {
@@ -378,7 +412,7 @@ fn validate_srcset(value: &str, diagnostics: &mut Vec<ValidationDiagnostic>) {
             continue;
         };
         candidate_count += 1;
-        validate_managed_resource(url, "srcset", diagnostics);
+        validate_managed_resource(url, "srcset", diagnostics, asset_ids);
     }
     if candidate_count == 0 {
         diagnostics.push(d("resource", "srcset 必须包含候选地址"));
@@ -407,24 +441,26 @@ fn derive_text(document: &Html) -> String {
     raw_text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn validate_css(css: &str, diagnostics: &mut Vec<ValidationDiagnostic>) {
-    validate_css_tokens(css, CssContext::default(), diagnostics);
+fn validate_css(css: &str, diagnostics: &mut Vec<ValidationDiagnostic>, asset_ids: &mut Vec<Uuid>) {
+    validate_css_tokens(css, CssContext::default(), diagnostics, asset_ids);
 }
 
 fn validate_css_tokens(
     css: &str,
     context: CssContext,
     diagnostics: &mut Vec<ValidationDiagnostic>,
+    asset_ids: &mut Vec<Uuid>,
 ) {
     let mut input = ParserInput::new(css);
     let mut parser = Parser::new(&mut input);
-    scan_css_tokens(&mut parser, context, diagnostics);
+    scan_css_tokens(&mut parser, context, diagnostics, asset_ids);
 }
 
 fn scan_css_tokens(
     parser: &mut Parser<'_, '_>,
     context: CssContext,
     diagnostics: &mut Vec<ValidationDiagnostic>,
+    asset_ids: &mut Vec<Uuid>,
 ) {
     let mut significant = Vec::<SignificantToken>::new();
     let mut statement = Vec::<SignificantToken>::new();
@@ -497,15 +533,13 @@ fn scan_css_tokens(
                 statement.clear();
             }
             Token::UnquotedUrl(value) => {
-                if !is_managed_asset_url(&value) {
-                    diagnostics.push(d("css", format!("不允许的 CSS 资源地址: {value}")));
-                }
+                validate_managed_resource(&value, "CSS url()", diagnostics, asset_ids);
                 pending_bang = false;
                 push_significant(&mut significant, &mut statement, SignificantToken::Other);
             }
             Token::QuotedString(value) => {
-                if context.quoted_strings_are_resources && !is_managed_asset_url(&value) {
-                    diagnostics.push(d("css", format!("不允许的 CSS 资源地址: {value}")));
+                if context.quoted_strings_are_resources {
+                    validate_managed_resource(&value, "CSS 资源", diagnostics, asset_ids);
                 }
                 pending_bang = false;
                 push_significant(&mut significant, &mut statement, SignificantToken::Other);
@@ -524,7 +558,9 @@ fn scan_css_tokens(
                             Ok(value.to_string())
                         });
                     match parsed_url {
-                        Ok(value) if is_managed_asset_url(&value) => {}
+                        Ok(value) if managed_asset_id(&value).is_some() => {
+                            validate_managed_resource(&value, "CSS url()", diagnostics, asset_ids);
+                        }
                         Ok(value) => {
                             diagnostics.push(d("css", format!("不允许的 CSS 资源地址: {value}")))
                         }
@@ -544,7 +580,7 @@ fn scan_css_tokens(
                 };
                 let result: Result<(), cssparser::ParseError<'_, ()>> =
                     parser.parse_nested_block(|nested| {
-                        scan_css_tokens(nested, nested_context, diagnostics);
+                        scan_css_tokens(nested, nested_context, diagnostics, asset_ids);
                         Ok(())
                     });
                 if result.is_err() {
@@ -563,6 +599,7 @@ fn scan_css_tokens(
                                 ..context
                             },
                             diagnostics,
+                            asset_ids,
                         );
                         Ok(())
                     });
@@ -589,6 +626,7 @@ fn scan_css_tokens(
                                 quoted_strings_are_resources: false,
                             },
                             diagnostics,
+                            asset_ids,
                         );
                         Ok(())
                     });

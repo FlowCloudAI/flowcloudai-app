@@ -2,6 +2,7 @@
 
 import {useEffect, useMemo, useState} from 'react'
 import {Button, Input, Select} from 'flowcloudai-ui'
+import type {PageDocumentAsset} from '../../../../api/pageDocument.ts'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 import type {
     InspectVisualComponent,
@@ -32,6 +33,7 @@ import './PageDocumentPropertiesPanel.css'
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
     articleHtml: string
+    assets: readonly PageDocumentAsset[]
     entryStyleCss: string
     inspectComponent: InspectVisualComponent
     applyKernelEntry: (
@@ -41,15 +43,18 @@ interface PageDocumentPropertiesPanelProps {
     ) => Promise<boolean>
     flushPendingChanges: () => void
     onAdopt: (node: LayerProjectionNode) => Promise<string | null>
+    onReplaceImage: () => void
     visualError: string | null
 }
 
 function ImageDescriptionControls({
     image,
     applyKernelEntry,
+    onReplaceImage,
 }: {
     image: ManagedImageDescription
     applyKernelEntry: PageDocumentPropertiesPanelProps['applyKernelEntry']
+    onReplaceImage: () => void
 }) {
     const [alt, setAlt] = useState(image.alt)
     const [caption, setCaption] = useState(image.caption ?? '')
@@ -79,7 +84,7 @@ function ImageDescriptionControls({
         <section className="page-document-image-details" aria-label="图片说明">
             <strong>图片说明</strong>
             <p data-asset-status={image.reference.status} role="status">{image.reference.message}</p>
-            <Button type="button" size="sm" variant="outline" disabled>插入或替换图片需先接通受管资产服务</Button>
+            <Button type="button" size="sm" variant="outline" onClick={onReplaceImage}>替换图片</Button>
             <label>
                 替代文本
                 <Input value={alt} onValueChange={setAlt} aria-label="图片替代文本" />
@@ -173,11 +178,13 @@ function FontWeightControl({
 export function PageDocumentPropertiesPanel({
     node,
     articleHtml,
+    assets,
     entryStyleCss,
     inspectComponent,
     applyKernelEntry,
     flushPendingChanges,
     onAdopt,
+    onReplaceImage,
     visualError,
 }: PageDocumentPropertiesPanelProps) {
     const [tab, setTab] = useState<VisualPropertyGroup>('text')
@@ -187,8 +194,8 @@ export function PageDocumentPropertiesPanel({
     )
     const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
     const image = useMemo(() => node?.managed && node.kind === 'asset'
-        ? readManagedImageDescription(articleHtml, node.id)
-        : null, [articleHtml, node])
+        ? readManagedImageDescription(articleHtml, node.id, assets.map(asset => asset.id))
+        : null, [articleHtml, assets, node])
     const selectedNodeId = node?.id ?? null
     useEffect(
         () => () => flushPendingChanges(),
@@ -219,6 +226,7 @@ export function PageDocumentPropertiesPanel({
                 key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
                 image={image}
                 applyKernelEntry={applyKernelEntry}
+                onReplaceImage={onReplaceImage}
             />}
             {node?.managed && node.kind === 'asset' && !image && (
                 <p className="page-document-image-details" role="alert">

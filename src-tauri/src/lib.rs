@@ -19,6 +19,7 @@ mod layout;
 /// `#[doc(hidden)]` 仅为让集成测试（`tests/coastline_v2.rs`）访问 map 模块；非稳定公开 API。
 #[doc(hidden)]
 pub mod map;
+mod page_document_assets;
 mod page_document_commands;
 mod reports;
 mod senses;
@@ -76,6 +77,7 @@ use apis::worldflow::system::*;
 use apis::worldflow::tags::*;
 use auto_backup::start_auto_backup_worker;
 use layout::cache::LayoutCacheState;
+use page_document_assets::*;
 use page_document_commands::*;
 use template::install_global_template_runtime;
 
@@ -510,6 +512,10 @@ pub fn run() {
             page_document_validate,
             page_document_read_project_home,
             page_document_save_project_home,
+            page_document_import_asset,
+            page_document_list_assets,
+            page_document_read_asset_frame,
+            page_document_check_asset,
             db_create_project,
             db_get_project,
             db_list_projects,

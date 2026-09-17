@@ -49,12 +49,24 @@ export interface CanvasResolveInputCommand extends CanvasEnvelope {
     selection: {nodeId: string; offset: number} | null
 }
 
+/** 受管原件由宿主解码后传像素；画布不取得 URL、路径或网络读取能力。 */
+export interface CanvasAssetFrameCommand extends CanvasEnvelope {
+    type: 'asset-frame'
+    requestId: string
+    assetId: string
+    status: 'ready' | 'unavailable' | 'invalid'
+    width: number
+    height: number
+    rgbaBase64: string
+}
+
 export type CanvasHostCommand =
     | CanvasRenderCommand
     | CanvasSetSelectionCommand
     | CanvasViewportCommand
     | CanvasSetEditingCommand
     | CanvasResolveInputCommand
+    | CanvasAssetFrameCommand
 
 export interface CanvasRenderedMessage extends CanvasEnvelope {
     type: 'rendered'

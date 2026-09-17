@@ -23,6 +23,7 @@ import {
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
+import {applyCanvasAssetFrame, mountCanvasAssetDisplays, type CanvasAssetDisplays} from './assetDisplay.ts'
 import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
 import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
@@ -36,6 +37,7 @@ let outgoingSequence = 0
 let incomingSequence = 0
 let selectedNodeId: string | null = null
 let latestRequestId: string | null = null
+let assetDisplays: CanvasAssetDisplays = new Map()
 let editingEnabled = false
 let pendingRender: CanvasRenderCommand | null = null
 let rejectedInputPending = false
@@ -101,6 +103,7 @@ function clearRenderedDocument(): void {
     if (leave) send(leave)
     authorStyle.textContent = ''
     root.replaceChildren()
+    assetDisplays = new Map()
     selectedNodeId = null
     reportSize()
 }
@@ -130,6 +133,7 @@ function applyRender(
         template.innerHTML = result.artifact.html
         authorStyle.textContent = result.artifact.css
         root.replaceChildren(template.content.cloneNode(true))
+        assetDisplays = mountCanvasAssetDisplays(root)
         applyCanvasEditingState(root, editingEnabled)
         setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
         if (resolvedSelection) {
@@ -618,6 +622,10 @@ function start(): void {
         if (!command || command.sequence <= incomingSequence) return
         incomingSequence = command.sequence
         if (command.type === 'render') render(command)
+        if (command.type === 'asset-frame' && command.requestId === latestRequestId) {
+            applyCanvasAssetFrame(assetDisplays, command)
+            reportSize()
+        }
         if (command.type === 'set-selection') setSelection(command.nodeId)
         if (command.type === 'set-editing') setEditing(command.enabled)
         if (command.type === 'resolve-input') {

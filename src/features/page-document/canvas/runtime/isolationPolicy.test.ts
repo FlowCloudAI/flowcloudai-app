@@ -19,8 +19,18 @@ test('合法内容保留托管节点与链接，并把 fcasset 资源改成无 U
     assert.deepEqual(result.artifact?.assetIds, [V7_ASSET_ID])
     assert.match(result.artifact?.html ?? '', /href="https:\/\/example\.invalid"/u)
     assert.match(result.artifact?.html ?? '', /data-fc-asset-placeholder/u)
+    assert.match(result.artifact?.html ?? '', new RegExp(`data-fc-canvas-asset-id="${V7_ASSET_ID}"`, 'u'))
     assert.doesNotMatch(result.artifact?.html ?? '', /src=/u)
     assert.doesNotMatch(result.artifact?.css ?? '', /fcasset:|url\(/u)
+})
+
+test('作者伪造画布图片身份会被清除，只有合法 src 可派生受管加载身份', () => {
+    const forged = isolatePageDocument(`<img data-fc-canvas-asset-id="${V7_ASSET_ID}">`, '')
+    assert.ok(forged.artifact)
+    assert.deepEqual(forged.artifact.assetIds, [])
+    assert.doesNotMatch(forged.artifact.html, /data-fc-canvas-asset-id/u)
+    const external = isolatePageDocument(`<img src="https://example.invalid/a.png" data-fc-canvas-asset-id="${V7_ASSET_ID}">`, '')
+    assert.equal(external.artifact, null)
 })
 
 test('脚本、事件、外部资源、表单能力与危险 CSS 在挂载前被拒绝', () => {

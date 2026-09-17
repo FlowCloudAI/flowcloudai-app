@@ -97,6 +97,7 @@ export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
                 ) : (
                     <PageDocumentCanvas
                         documentKey={source.key}
+                        projectId={projectId}
                         html={compiled.html}
                         css={compiled.css}
                         onNavigationIntent={onNavigationIntent}

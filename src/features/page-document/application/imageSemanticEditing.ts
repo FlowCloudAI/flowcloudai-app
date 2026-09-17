@@ -1,4 +1,4 @@
-// 本模块只编辑已有受管图片的说明文字；资产导入与引用替换须等待可鉴权的逻辑资产服务。
+// 本模块读取受管图片说明与引用状态；写回仍由文档内核和项目资产鉴权边界执行。
 
 import {parseFragment, type DefaultTreeAdapterTypes} from 'parse5'
 import {documentFingerprint, idempotencyKey, interactionId, type EditIntent} from '../domain/kernel/index.ts'
@@ -12,12 +12,13 @@ export interface ManagedImageDescription {
     readonly nodeId: string
     readonly alt: string
     readonly expectedAlt: string | null
+    readonly sourceReference: {readonly src: string | null; readonly assetId: string | null}
     readonly caption: string | null
     readonly captionKind: 'absent' | 'plain' | 'structured'
     readonly captionEditable: boolean
     readonly captionReason: string | null
     readonly reference: {
-        readonly status: 'unverified' | 'missing' | 'invalid'
+        readonly status: 'available' | 'unverified' | 'missing' | 'invalid'
         readonly assetId: string | null
         readonly message: string
     }
@@ -54,7 +55,7 @@ function semanticText(node: HtmlNode): string {
     return children(node).map(semanticText).join('')
 }
 
-function referenceState(image: HtmlElement): ManagedImageDescription['reference'] {
+function referenceState(image: HtmlElement, knownAssetIds?: readonly string[]): ManagedImageDescription['reference'] {
     const src = attribute(image, 'src')
     const declaredId = attribute(image, 'data-fc-asset-id')
     if (!src || !declaredId) {
@@ -65,16 +66,23 @@ function referenceState(image: HtmlElement): ManagedImageDescription['reference'
         match[1].toLowerCase() !== declaredId.toLowerCase()) {
         return {status: 'invalid', assetId: null, message: '图片引用格式或资产身份不一致；本机路径与运行时 URL 均不可使用。'}
     }
+    if (knownAssetIds && !knownAssetIds.some(id => id.toLowerCase() === match[1].toLowerCase())) {
+        return {status: 'missing', assetId: match[1].toLowerCase(), message: '当前项目资产库中没有这张图片。'}
+    }
+    if (knownAssetIds) {
+        return {status: 'available', assetId: match[1].toLowerCase(), message: '图片已登记到当前项目，原件由受管读取链路加载。'}
+    }
     return {
         status: 'unverified',
         assetId: match[1].toLowerCase(),
-        message: '当前尚无页面资产查询与受管加载服务，原件存在性和项目归属无法验证；画布仅显示占位。',
+        message: '尚未读取当前项目资产目录，原件状态待核验。',
     }
 }
 
 export function readManagedImageDescription(
     articleHtml: string,
     nodeId: string,
+    knownAssetIds?: readonly string[],
 ): ManagedImageDescription | null {
     const root = parseFragment(articleHtml, {scriptingEnabled: false})
     const matches = descendants(root, element =>
@@ -105,13 +113,14 @@ export function readManagedImageDescription(
         nodeId: nodeId.toLowerCase(),
         alt: expectedAlt ?? '',
         expectedAlt,
+        sourceReference: {src: attribute(image, 'src'), assetId: attribute(image, 'data-fc-asset-id')},
         caption: caption ? semanticText(caption) : null,
         captionKind,
         captionEditable: component.tagName === 'figure' && !nestedCaption,
         captionReason: component.tagName !== 'figure'
             ? '只有 figure 图片组件支持图注。'
             : nestedCaption ? '嵌套图注无法由可视编辑器安全接管。' : null,
-        reference: referenceState(image),
+        reference: referenceState(image, knownAssetIds),
     }
 }
 

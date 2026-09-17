@@ -158,8 +158,10 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
     let managedNodeCount = 0
     const nextAttributes: HtmlElement['attrs'] = []
     let assetPlaceholder = false
+    let displayAssetId: string | null = null
     for (const attribute of element.attrs) {
         const name = qualifiedName(attribute)
+        if (name === 'data-fc-asset-placeholder' || name === 'data-fc-canvas-asset-id') continue
         if ([...FORBIDDEN_HTML_ATTRIBUTE_PREFIXES].some(prefix => name.startsWith(prefix))) {
             errors.push(`画布隔离层拒绝事件属性 ${name}。`)
             continue
@@ -192,11 +194,15 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
         }
         const assetId = isLogicalAsset(attribute.value)
         if (!assetId) errors.push(`画布隔离层拒绝 ${name} 的非 fcasset 资源。`)
-        else assetIds.add(assetId)
+        else {
+            assetIds.add(assetId)
+            if (element.tagName === 'img' && name === 'src') displayAssetId = assetId
+        }
         assetPlaceholder = true
     }
     if (assetPlaceholder) {
         nextAttributes.push({name: 'data-fc-asset-placeholder', value: ''})
+        if (displayAssetId) nextAttributes.push({name: 'data-fc-canvas-asset-id', value: displayAssetId})
     }
     if (nextAttributes.some(attribute => attribute.name === 'data-fc-node-id')) managedNodeCount += 1
     element.attrs = nextAttributes

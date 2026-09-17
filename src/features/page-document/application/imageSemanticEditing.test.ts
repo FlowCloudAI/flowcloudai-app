@@ -1,4 +1,4 @@
-// 本测试验证现有图片的说明写回，并固定无资产服务时的新引用必须失败关闭。
+// 本测试验证图片说明写回，并固定未鉴权的新引用必须失败关闭。
 
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
@@ -43,7 +43,7 @@ describe('现有页面图片说明的安全切片', () => {
     it('只识别稳定逻辑引用，并把路径、运行 URL、缺失引用标为不可加载', () => {
         assert.deepEqual(readManagedImageDescription(article(), NODE_ID)?.reference, {
             status: 'unverified', assetId: ASSET_ID,
-            message: '当前尚无页面资产查询与受管加载服务，原件存在性和项目归属无法验证；画布仅显示占位。',
+            message: '尚未读取当前项目资产目录，原件状态待核验。',
         })
         for (const invalid of ['/Users/test/image.png', 'file:///tmp/image.png',
             'http://asset.local/image.png', 'blob:opaque', `fcasset://${OTHER_ID}`]) {

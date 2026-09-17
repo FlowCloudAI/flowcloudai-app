@@ -129,6 +129,15 @@ fn managed_html_resource_attributes_are_accepted() {
 }
 
 #[test]
+fn image_asset_identity_must_match_its_source() {
+    let valid = format!("<img src=\"fcasset://{V7_ASSET_ID}\" data-fc-asset-id=\"{V7_ASSET_ID}\">");
+    assert!(validate_entry(&valid, "").valid);
+    let mismatched =
+        format!("<img src=\"fcasset://{V7_ASSET_ID}\" data-fc-asset-id=\"{ASSET_ID}\">");
+    assert!(!validate_entry(&mismatched, "").valid);
+}
+
+#[test]
 fn slash_separated_event_attribute_is_rejected() {
     assert!(!validate_entry("<img/onerror=x>", "").valid);
 }

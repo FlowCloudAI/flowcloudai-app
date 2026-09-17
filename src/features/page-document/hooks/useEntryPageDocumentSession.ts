@@ -3,9 +3,13 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useAlert} from 'flowcloudai-ui'
 import {
+    pageDocumentCheckAsset,
+    pageDocumentChooseAndImportAsset,
+    pageDocumentListAssets,
     pageDocumentReadEntry,
     pageDocumentSaveEntry,
     parsePageDocumentSaveError,
+    type PageDocumentAsset,
 } from '../../../api/pageDocument.ts'
 import {isDocumentScopeDirty, sourceDraftView} from '../application/documentDraftModel.ts'
 import {
@@ -47,6 +51,7 @@ import {
     keepEntryDocumentDraft,
     loadLatestEntryDocument,
     prepareEntryDocumentSave,
+    registerEntryDocumentAsset,
     redoEntryDocumentSession,
     rejectEntryDocumentSave,
     undoEntryDocumentSession,
@@ -86,6 +91,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const [loadAttempt, setLoadAttempt] = useState(0)
     const [state, setState] = useState<EntryDocumentSessionState | null>(null)
     const [visualError, setVisualError] = useState<string | null>(null)
+    const [assets, setAssets] = useState<PageDocumentAsset[]>([])
     const stateRef = useRef<EntryDocumentSessionState | null>(null)
     const inputRef = useRef(input)
     const kernelRuntimeRef = useRef(createDocumentKernelDraftRuntime())
@@ -107,12 +113,16 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     useEffect(() => {
         let cancelled = false
         publish(null)
+        setAssets([])
         setLoadStatus('loading')
         setLoadError(null)
-        void pageDocumentReadEntry(entryId)
-            .then(document => {
+        void Promise.all([pageDocumentReadEntry(entryId), pageDocumentListAssets(projectId)])
+            .then(([document, catalog]) => {
                 if (cancelled) return
-                publish(createEntryDocumentSessionState(inputRef.current, document))
+                setAssets(catalog)
+                publish(createEntryDocumentSessionState(inputRef.current, document, catalog.map(asset => ({
+                    id: asset.id, mediaType: asset.mediaType, sizeBytes: asset.sizeBytes, sha256: asset.sha256,
+                }))))
                 setLoadStatus('ready')
             })
             .catch(error => {
@@ -232,6 +242,36 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const loadLatest = useCallback(() => mutate(loadLatestEntryDocument), [mutate])
     const retryLoad = useCallback(() => setLoadAttempt(current => current + 1), [])
 
+    const refreshAssets = useCallback(async (): Promise<PageDocumentAsset[]> => {
+        const catalog = await pageDocumentListAssets(projectId)
+        if (stateRef.current?.identity.projectId === projectId) setAssets(catalog)
+        return catalog
+    }, [projectId])
+
+    const verifyImageAsset = useCallback(async (assetId: string): Promise<PageDocumentAsset | null> => {
+        const current = stateRef.current
+        if (!current) return null
+        const verified = await pageDocumentCheckAsset(current.identity.projectId, assetId)
+        const latest = stateRef.current
+        if (!latest || latest.identity.entryId !== current.identity.entryId ||
+            latest.identity.projectId !== current.identity.projectId) return null
+        publish(registerEntryDocumentAsset(latest, verified))
+        return verified
+    }, [publish])
+
+    const importImageAsset = useCallback(async (): Promise<PageDocumentAsset | null> => {
+        const current = stateRef.current
+        if (!current) return null
+        const imported = await pageDocumentChooseAndImportAsset(current.identity.projectId)
+        if (!imported) return null
+        const latest = stateRef.current
+        if (!latest || latest.identity.entryId !== current.identity.entryId ||
+            latest.identity.projectId !== current.identity.projectId) return null
+        setAssets(catalog => [imported, ...catalog.filter(item => item.id !== imported.id)])
+        publish(registerEntryDocumentAsset(latest, imported))
+        return imported
+    }, [publish])
+
     const inspectComponent = useCallback((request: KernelComponentInspectionRequest) => {
         const current = stateRef.current
         if (!current) {
@@ -282,6 +322,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             preparation: Exclude<KernelDraftPreparationResult, {status: 'rejected' | 'unchanged'}>,
             label: string,
             history: {historyGroupId?: string} = {},
+            stillCurrent: (() => boolean) | null = null,
         ): Promise<boolean> => {
             if (preparation.status === 'needs-decision') {
                 const impacts = [...new Set(preparation.decisions.map(item => item.message))]
@@ -291,6 +332,9 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                     'confirm',
                 )
                 if (confirmed !== 'yes') return false
+            }
+            if (stillCurrent && !stillCurrent()) {
+                return reportVisualFailure('图片操作的目标在确认期间已变化；页面草稿未修改。')
             }
             const current = stateRef.current
             if (!current) return reportVisualFailure('确认后已无法取得当前页面文档草稿。')
@@ -318,8 +362,12 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             request: KernelDraftEditRequest,
             label: string,
             history: {historyGroupId?: string} = {},
+            stillCurrent: (() => boolean) | null = null,
         ): Promise<boolean> =>
             visualQueueRef.current.enqueue(async () => {
+                if (stillCurrent && !stillCurrent()) {
+                    return reportVisualFailure('图片操作的词条、目标或草稿已变化，请重新选择。')
+                }
                 const preparation = prepareKernelEntry(request)
                 if (preparation.status === 'rejected') {
                     return reportVisualFailure(
@@ -330,7 +378,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                     setVisualError(null)
                     return true
                 }
-                return applyPreparedKernelEntry(preparation, label, history)
+                return applyPreparedKernelEntry(preparation, label, history, stillCurrent)
             }),
         [applyPreparedKernelEntry, prepareKernelEntry, reportVisualFailure],
     )
@@ -527,6 +575,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         loadStatus,
         loadError,
         state,
+        assets,
         source,
         dirty,
         canSave: state ? canSaveEntryDocument(state) : false,
@@ -540,6 +589,9 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         keepDraft,
         loadLatest,
         retryLoad,
+        refreshAssets,
+        verifyImageAsset,
+        importImageAsset,
         visualError,
         inspectComponent,
         prepareKernelEntry,

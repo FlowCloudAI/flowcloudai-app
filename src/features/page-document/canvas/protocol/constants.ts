@@ -10,6 +10,7 @@ export const CANVAS_HREF_MAX_CODE_UNITS = 2_048
 export const CANVAS_ERROR_MAX_CODE_UNITS = 2_048
 export const CANVAS_DIMENSION_MAX = 100_000
 export const CANVAS_PIXEL_RATIO_MAX = 16
+export const CANVAS_ASSET_FRAME_MAX_EDGE = 512
 
 export const CANVAS_EDITABLE_KINDS = Object.freeze([
     'paragraph',

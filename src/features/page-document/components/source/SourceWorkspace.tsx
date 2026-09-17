@@ -19,6 +19,7 @@ const SOURCE_FILES: Array<{file: SourceFileName; label: string}> = [
 
 interface SourceWorkspaceProps {
     documentKey: string
+    projectId: string
     sources: SourceFileSet
     baseSources: SourceFileSet
     conflictSources?: SourceFileSet | null
@@ -38,6 +39,7 @@ export interface SourceWorkspaceHandle {
 export const SourceWorkspace = forwardRef<SourceWorkspaceHandle, SourceWorkspaceProps>(
 function SourceWorkspace({
     documentKey,
+    projectId,
     sources,
     baseSources,
     conflictSources = null,
@@ -142,6 +144,7 @@ function SourceWorkspace({
                     {preview?.html != null && preview.css != null ? (
                         <PageDocumentCanvas
                             documentKey={documentKey}
+                            projectId={projectId}
                             html={preview.html}
                             css={preview.css}
                             minimumHeight={420}

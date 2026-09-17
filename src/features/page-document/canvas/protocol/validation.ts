@@ -2,6 +2,7 @@
 
 import {RFC_9562_UUID_PATTERN} from '../../domain/uuidPolicy.ts'
 import {
+    CANVAS_ASSET_FRAME_MAX_EDGE,
     CANVAS_DIMENSION_MAX,
     CANVAS_ERROR_MAX_CODE_UNITS,
     CANVAS_HREF_MAX_CODE_UNITS,
@@ -125,6 +126,27 @@ export function parseCanvasHostCommand(value: unknown, token: string): CanvasHos
             && typeof value.accepted === 'boolean'
             && validSelection
             && (value.accepted || selection === null)
+            ? value as unknown as CanvasHostCommand
+            : null
+    }
+    if (value.type === 'asset-frame') {
+        const ready = value.status === 'ready'
+        const width = value.width
+        const height = value.height
+        const validDimensions = Number.isInteger(width) && Number.isInteger(height)
+            && (width as number) >= (ready ? 1 : 0) && (height as number) >= (ready ? 1 : 0)
+            && (width as number) <= CANVAS_ASSET_FRAME_MAX_EDGE
+            && (height as number) <= CANVAS_ASSET_FRAME_MAX_EDGE
+            && (ready || (width === 0 && height === 0))
+        const expectedBytes = ready ? (width as number) * (height as number) * 4 : 0
+        const expectedBase64Length = Math.ceil(expectedBytes / 3) * 4
+        return hasOnlyKeys(value, [...envelopeKeys, 'requestId', 'assetId', 'status', 'width', 'height', 'rgbaBase64'])
+            && isUuid(value.requestId) && isUuid(value.assetId)
+            && (ready || value.status === 'unavailable' || value.status === 'invalid')
+            && validDimensions
+            && isBoundedString(value.rgbaBase64, expectedBase64Length)
+            && value.rgbaBase64.length === expectedBase64Length
+            && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(value.rgbaBase64)
             ? value as unknown as CanvasHostCommand
             : null
     }

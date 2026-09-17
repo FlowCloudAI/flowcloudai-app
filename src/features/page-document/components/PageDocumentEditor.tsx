@@ -1,8 +1,9 @@
 // 本组件提供页面文档第一批编辑壳层；只编辑独立 HTML/CSS，并把保存交给页面文档会话。
 
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
+import {pageDocumentAssetErrorMessage, type PageDocumentAsset} from '../../../api/pageDocument.ts'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
@@ -15,11 +16,14 @@ import {
 import {PageDocumentCanvas, type PageDocumentCanvasHandle} from '../canvas/host/PageDocumentCanvas.tsx'
 import {CANVAS_EDITABLE_KINDS, type CanvasLinkCandidateIntentMessage} from '../canvas/protocol/index.ts'
 import {pageDocumentLinkCandidates} from '../application/linkCandidateSelection.ts'
+import {createImageInsertionRequest, createImageReplacementRequest, isCurrentImageAssetSelection, resolveImageInsertionTarget} from '../application/imageAssetEditing.ts'
+import {readManagedImageDescription} from '../application/imageSemanticEditing.ts'
 import type {EntryBrief} from '../../../api/worldflow.ts'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
 import {PageDocumentLayerTree} from './layers/PageDocumentLayerTree.tsx'
 import {pageDocumentLayerLabel} from './layers/layerTreePresentation.ts'
 import {PageDocumentPropertiesPanel} from './properties/PageDocumentPropertiesPanel.tsx'
+import {PageDocumentAssetPicker} from './assets/PageDocumentAssetPicker.tsx'
 import type {PageDocumentEditorEntryProps} from '../editor/entry/types.ts'
 import {
     setActivePageDocumentWorkspace,
@@ -65,9 +69,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
+    const [assetPicker, setAssetPicker] = useState<{mode: 'insert' | 'replace'; contextKey: string; pickerId: string} | null>(null)
+    const [assetPickerBusy, setAssetPickerBusy] = useState(false)
+    const [assetPickerError, setAssetPickerError] = useState<string | null>(null)
     const canvasRef = useRef<PageDocumentCanvasHandle>(null)
     const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
+    const interactionKeyRef = useRef('')
+    const activeAssetPickerIdRef = useRef<string | null>(null)
     const session = useEntryPageDocumentSession({
         entryId,
         projectId,
@@ -150,6 +159,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         () => createLayerProjection(state?.model.entry.sources['article.html'] ?? ''),
         [state?.model.entry.sources],
     )
+    const interactionKey = `${projectId}:${entryId}:${active}:${mode}:${selectedNodeId ?? ''}:${state?.model.changeVersion ?? -1}`
+    useLayoutEffect(() => {
+        interactionKeyRef.current = interactionKey
+    }, [interactionKey])
 
     useEffect(() => {
         if (selectedNodeId === null) return
@@ -181,6 +194,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
 
     const changeMode = (nextMode: PageDocumentWorkspaceMode) => {
         setLinkCandidateIntent(null)
+        activeAssetPickerIdRef.current = null
+        setAssetPicker(null)
         setMode(nextMode)
     }
 
@@ -220,6 +235,84 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const selectedNode = selectedNodeId
         ? findLayerNode(layerProjection.nodes, selectedNodeId)
         : null
+    const openAssetPicker = (pickerMode: 'insert' | 'replace') => {
+        if (!active || mode !== 'visual') return
+        if (pickerMode === 'replace' && selectedNode?.kind !== 'asset') return
+        const pickerId = crypto.randomUUID()
+        activeAssetPickerIdRef.current = pickerId
+        setAssetPicker({mode: pickerMode, contextKey: interactionKey, pickerId})
+        setAssetPickerError(null)
+        void session.refreshAssets().catch(error => {
+            if (interactionKeyRef.current === interactionKey) setAssetPickerError(pageDocumentAssetErrorMessage(error))
+        })
+    }
+    const applyChosenAsset = async (
+        asset: PageDocumentAsset,
+        importedPicker?: {mode: 'insert' | 'replace'; contextKey: string; pickerId: string},
+    ) => {
+        const picker = importedPicker ?? assetPicker
+        if (!picker || (assetPickerBusy && !importedPicker)) return
+        setAssetPickerBusy(true)
+        setAssetPickerError(null)
+        try {
+            if (!isCurrentImageAssetSelection(
+                picker.contextKey, interactionKeyRef.current, asset.projectId, projectId,
+                picker.pickerId, activeAssetPickerIdRef.current,
+            )) {
+                throw new TypeError('词条、选中节点或草稿已变化，请重新打开图片选择器。')
+            }
+            const checked = await session.verifyImageAsset(asset.id)
+            if (!checked || activeAssetPickerIdRef.current !== picker.pickerId ||
+                picker.contextKey !== interactionKeyRef.current) {
+                throw new TypeError('图片或编辑目标已变化，本次没有修改页面草稿。')
+            }
+            let newNodeId: string | null = null
+            let request
+            if (picker.mode === 'replace') {
+                const image = selectedNodeId
+                    ? readManagedImageDescription(scope.sources['article.html'], selectedNodeId)
+                    : null
+                if (!image) throw new TypeError('选中的图片已变化，请重新选择。')
+                request = createImageReplacementRequest(image, checked.id)
+            } else {
+                const target = resolveImageInsertionTarget(layerProjection.nodes, selectedNodeId)
+                if (!target) throw new TypeError('请选择正文容器或其中一个受管节点作为插入位置。')
+                newNodeId = crypto.randomUUID()
+                request = createImageInsertionRequest(target, checked.id, newNodeId)
+            }
+            const accepted = await session.applyKernelEntry(request,
+                picker.mode === 'insert' ? '插入图片' : '替换图片', {},
+                () => activeAssetPickerIdRef.current === picker.pickerId &&
+                    picker.contextKey === interactionKeyRef.current)
+            if (!accepted) throw new TypeError('内核未接纳图片操作；页面草稿保持原样。')
+            if (newNodeId) setSelectedNodeId(newNodeId)
+            activeAssetPickerIdRef.current = null
+            setAssetPicker(null)
+        } catch (error) {
+            setAssetPickerError(pageDocumentAssetErrorMessage(error))
+        } finally {
+            setAssetPickerBusy(false)
+        }
+    }
+    const importAndApplyAsset = async () => {
+        if (!assetPicker || assetPickerBusy) return
+        const captured = assetPicker
+        setAssetPickerBusy(true)
+        setAssetPickerError(null)
+        try {
+            const imported = await session.importImageAsset()
+            if (!imported) return
+            if (activeAssetPickerIdRef.current !== captured.pickerId ||
+                captured.contextKey !== interactionKeyRef.current) {
+                throw new TypeError('导入已留在项目资产库；编辑目标已变化，页面草稿未修改。')
+            }
+            await applyChosenAsset(imported, captured)
+        } catch (error) {
+            setAssetPickerError(pageDocumentAssetErrorMessage(error))
+        } finally {
+            setAssetPickerBusy(false)
+        }
+    }
     const editorIdentity = {projectId, entryId}
     // 词条标签会常驻挂载；共享宿主必须只由当前活动词条独占，避免后台草稿叠进同一 portal。
     const sidebarPortalHost = shouldOccupyPageDocumentSharedHost({
@@ -254,6 +347,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 <PageDocumentPropertiesPanel
                     node={selectedNode}
                     articleHtml={scope.sources['article.html']}
+                    assets={session.assets}
                     entryStyleCss={scope.sources['style.css']}
                     inspectComponent={session.inspectComponent}
                     applyKernelEntry={session.applyVisualPropertyEntry}
@@ -263,11 +357,24 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         if (adoptedNodeId) setSelectedNodeId(adoptedNodeId)
                         return adoptedNodeId
                     }}
+                    onReplaceImage={() => openAssetPicker('replace')}
                     visualError={session.visualError}
                 />,
                 dockPortalHost,
             )}
             <section className="page-document-editor">
+            {assetPicker && <PageDocumentAssetPicker
+                mode={assetPicker.mode}
+                assets={session.assets}
+                busy={assetPickerBusy}
+                error={assetPickerError}
+                onChoose={asset => void applyChosenAsset(asset)}
+                onImport={() => void importAndApplyAsset()}
+                onClose={() => {
+                    activeAssetPickerIdRef.current = null
+                    setAssetPicker(null)
+                }}
+            />}
             {visibleCandidate && <FloatingPanel
                 open
                 passive
@@ -323,6 +430,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         代码
                     </button>
                 </div>
+                {mode === 'visual' && <Button type="button" size="sm" variant="outline" onClick={() => openAssetPicker('insert')}>插入图片</Button>}
                 <Button
                     type="button"
                     size="sm"
@@ -367,6 +475,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 <PageDocumentCanvas
                                     ref={canvasRef}
                                     documentKey={entryId}
+                                    projectId={projectId}
                                     html={state.preview.html}
                                     css={state.preview.css}
                                     minimumHeight={560}
@@ -400,6 +509,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     <SourceWorkspace
                         ref={sourceWorkspaceRef}
                         documentKey={entryId}
+                        projectId={projectId}
                         sources={scope.sources}
                         baseSources={scope.baseSources}
                         conflictSources={conflictSources}
