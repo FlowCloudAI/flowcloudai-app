@@ -5,12 +5,14 @@ use crate::{
     document_validation, page_document_assets,
 };
 use flowcloudai_client::ErrorCode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
 use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 use worldflow_core::models::{
-    PageDocument, ProjectHomeDocument, SaveEntryLinkTarget, SavePageDocumentResult,
+    PageDocument, PageDocumentProjection, PageTextBlock, ProjectHomeDocument, SaveEntryLinkTarget,
+    SavePageDocumentResult,
 };
 use worldflow_core::{PageDocumentOps, WorldflowError};
 
@@ -51,6 +53,144 @@ pub fn page_document_validate(
     project_id: Option<String>,
 ) -> document_validation::ValidationResult {
     document_validation::validate(&html, &css, project_id.as_deref())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionRebuildReport {
+    pub rebuilt: usize,
+    pub skipped: Vec<String>,
+}
+
+/// 显式重建旧页面派生数据；失败对象保留原源码和旧纯文本检索兜底。
+#[tauri::command]
+pub async fn page_document_rebuild_projection(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, crate::PathsState>,
+    project_id: String,
+) -> Result<ProjectionRebuildReport, ApiError> {
+    let project_id = parse_uuid("projectId", &project_id)?;
+    rebuild_projection(state.inner(), paths.inner(), project_id).await
+}
+
+async fn rebuild_projection(
+    state: &AppState,
+    paths: &crate::PathsState,
+    project_id: Uuid,
+) -> Result<ProjectionRebuildReport, ApiError> {
+    let db = open_project_db(state, &project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    let rows = sqlx::query("SELECT entry_id FROM entry_page_documents WHERE project_id=?")
+        .bind(project_id)
+        .fetch_all(&db.pool)
+        .await
+        .map_err(ApiError::from_display)?;
+    let mut report = ProjectionRebuildReport {
+        rebuilt: 0,
+        skipped: Vec::new(),
+    };
+    for row in rows {
+        let entry_id: Uuid = row.try_get("entry_id").map_err(ApiError::from_display)?;
+        let Some(document) = db
+            .get_entry_page_document(&entry_id)
+            .await
+            .map_err(ApiError::from_display)?
+        else {
+            continue;
+        };
+        let validation = document_validation::validate(
+            &document.html,
+            &document.css,
+            Some(&project_id.to_string()),
+        );
+        if !validation.valid {
+            report
+                .skipped
+                .push(format!("词条 {entry_id}：源码未通过当前校验"));
+            continue;
+        }
+        let mut asset_error = false;
+        for asset_id in &validation.asset_ids {
+            if page_document_assets::require_asset(&db, paths, &project_id, asset_id)
+                .await
+                .is_err()
+            {
+                asset_error = true;
+                break;
+            }
+        }
+        if asset_error {
+            report
+                .skipped
+                .push(format!("词条 {entry_id}：页面资产缺失或不可读取"));
+            continue;
+        }
+        if let Err(error) = db
+            .rebuild_page_document_projection(
+                &project_id,
+                &entry_id,
+                document.revision,
+                &validation.derived_text,
+                &projection_from_validation(&validation),
+            )
+            .await
+        {
+            report.skipped.push(format!("词条 {entry_id}：{error}"));
+        } else {
+            report.rebuilt += 1;
+        }
+    }
+    if let Some(document) = db
+        .get_project_home_document(&project_id)
+        .await
+        .map_err(ApiError::from_display)?
+    {
+        let object_id: Uuid =
+            sqlx::query_scalar("SELECT object_id FROM project_home_documents WHERE project_id=?")
+                .bind(project_id)
+                .fetch_one(&db.pool)
+                .await
+                .map_err(ApiError::from_display)?;
+        let validation = document_validation::validate(
+            &document.html,
+            &document.css,
+            Some(&project_id.to_string()),
+        );
+        let mut valid = validation.valid;
+        if valid {
+            for asset_id in &validation.asset_ids {
+                if page_document_assets::require_asset(&db, paths, &project_id, asset_id)
+                    .await
+                    .is_err()
+                {
+                    valid = false;
+                    break;
+                }
+            }
+        }
+        if !valid {
+            report
+                .skipped
+                .push(format!("项目首页 {project_id}：校验或资产读取失败"));
+        } else if let Err(error) = db
+            .rebuild_page_document_projection(
+                &project_id,
+                &object_id,
+                document.revision,
+                &validation.derived_text,
+                &projection_from_validation(&validation),
+            )
+            .await
+        {
+            report
+                .skipped
+                .push(format!("项目首页 {project_id}：{error}"));
+        } else {
+            report.rebuilt += 1;
+        }
+    }
+    Ok(report)
 }
 
 #[tauri::command]
@@ -110,6 +250,7 @@ async fn save_project_home(
         html,
         css,
         &validation.derived_text,
+        &projection_from_validation(&validation),
         expected_revision,
         request_key,
         modified_by.unwrap_or("local"),
@@ -158,12 +299,29 @@ async fn save_entry(
         &input.css,
         &validation.derived_text,
         &link_targets,
+        &projection_from_validation(&validation),
         input.expected_revision,
         &input.request_key,
         input.modified_by.as_deref().unwrap_or("local"),
     )
     .await
     .map_err(|error| map_save_error(error, "词条页面"))
+}
+
+fn projection_from_validation(
+    validation: &document_validation::ValidationResult,
+) -> PageDocumentProjection {
+    PageDocumentProjection {
+        text_blocks: validation
+            .text_blocks
+            .iter()
+            .map(|block| PageTextBlock {
+                node_id: block.node_id,
+                text: block.text.clone(),
+            })
+            .collect(),
+        asset_ids: validation.asset_ids.clone(),
+    }
 }
 
 async fn read_project_home(
@@ -520,6 +678,94 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn production_save_and_rebuild_store_validated_blocks_without_revision_change() {
+        let fixture = setup().await;
+        let node_id = Uuid::now_v7();
+        let html = format!(
+            "<p data-fc-node-id='{node_id}' data-fc-node-kind='paragraph'>海风中文正文 &amp; 远航</p>"
+        );
+        let saved = save_entry(
+            &fixture.state,
+            &fixture.paths,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html,
+                css: ".marker { color: red; }".into(),
+                expected_revision: None,
+                request_key: "indexed-save".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.revision, 1);
+        let world = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT text FROM object_text_blocks WHERE object_id=? AND node_id=?"
+            )
+            .bind(fixture.entry_id)
+            .bind(node_id)
+            .fetch_one(&world.pool)
+            .await
+            .unwrap(),
+            "海风中文正文 & 远航"
+        );
+        assert_eq!(
+            world
+                .search_entries(&fixture.project_id, "海风中文正文", Default::default(), 20)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            world
+                .search_entries(&fixture.project_id, "marker", Default::default(), 20)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        sqlx::query("DELETE FROM object_text_blocks WHERE object_id=?")
+            .bind(fixture.entry_id)
+            .execute(&world.pool)
+            .await
+            .unwrap();
+        let report = rebuild_projection(&fixture.state, &fixture.paths, fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(report.rebuilt, 1);
+        assert!(report.skipped.is_empty());
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT text FROM object_text_blocks WHERE object_id=? AND node_id=?"
+            )
+            .bind(fixture.entry_id)
+            .bind(node_id)
+            .fetch_one(&world.pool)
+            .await
+            .unwrap(),
+            "海风中文正文 & 远航"
+        );
+        assert_eq!(
+            world
+                .get_entry_page_document(&fixture.entry_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .revision,
+            1
+        );
+    }
+
+    #[tokio::test]
     async fn stale_project_home_revision_returns_conflict_code_and_current_revision() {
         let fixture = setup().await;
         let first = save_project_home(
@@ -673,6 +919,14 @@ mod tests {
                 .revision,
             1
         );
+        let world = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM object_references WHERE source_id=? AND target_id=? AND ref_type='asset'")
+            .bind(fixture.entry_id).bind(asset.id).fetch_one(&world.pool).await.unwrap(), 1);
         let missing = SaveInput {
             html: format!("<img src=\"fcasset://{}\">", Uuid::new_v4()),
             expected_revision: Some(1),
@@ -692,6 +946,8 @@ mod tests {
                 .revision,
             1
         );
+        assert_eq!(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM object_references WHERE source_id=? AND target_id=? AND ref_type='asset'")
+            .bind(fixture.entry_id).bind(asset.id).fetch_one(&world.pool).await.unwrap(), 1);
 
         let path = page_document_assets::asset_path(&fixture.paths, &asset).unwrap();
         std::fs::write(path, b"corrupted").unwrap();

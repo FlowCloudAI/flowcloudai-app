@@ -18,12 +18,20 @@ pub struct DerivedLinkTarget {
     pub title: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DerivedTextBlock {
+    pub node_id: Uuid,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationResult {
     pub valid: bool,
     pub diagnostics: Vec<ValidationDiagnostic>,
     pub derived_text: String,
+    pub text_blocks: Vec<DerivedTextBlock>,
     pub link_targets: Vec<DerivedLinkTarget>,
     pub asset_ids: Vec<Uuid>,
 }
@@ -77,9 +85,32 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
         valid: diagnostics.is_empty(),
         diagnostics,
         derived_text: derive_text(&document),
+        text_blocks: derive_text_blocks(&document),
         link_targets,
         asset_ids,
     }
+}
+
+fn derive_text_blocks(document: &Html) -> Vec<DerivedTextBlock> {
+    let mut seen = std::collections::HashSet::new();
+    document
+        .root_element()
+        .descendent_elements()
+        .filter_map(|element| {
+            let kind = element.value().attr("data-fc-node-kind")?;
+            if !matches!(kind, "paragraph" | "heading" | "list-item" | "table-cell") {
+                return None;
+            }
+            let node_id = parse_document_uuid(element.value().attr("data-fc-node-id")?).ok()?;
+            if !seen.insert(node_id) {
+                return None;
+            }
+            Some(DerivedTextBlock {
+                node_id,
+                text: element.text().collect::<String>(),
+            })
+        })
+        .collect()
 }
 
 fn validate_element(

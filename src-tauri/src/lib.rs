@@ -509,6 +509,7 @@ pub fn run() {
             // 项目
             page_document_read_entry,
             page_document_save_entry,
+            page_document_rebuild_projection,
             page_document_validate,
             page_document_read_project_home,
             page_document_save_project_home,

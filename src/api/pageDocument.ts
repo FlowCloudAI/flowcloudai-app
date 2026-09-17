@@ -46,6 +46,7 @@ export interface PageDocumentValidation {
     valid: boolean
     diagnostics: PageDocumentDiagnostic[]
     derivedText: string
+    textBlocks: Array<{nodeId: string; text: string}>
     linkTargets: Array<{entryId: string | null; title: string}>
     assetIds: string[]
 }

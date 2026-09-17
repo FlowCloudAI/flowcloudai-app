@@ -71,6 +71,27 @@ fn markdown_conversion_output_is_accepted_by_rust_validation() {
 }
 
 #[test]
+fn validated_html_derives_ordered_utf8_blocks_by_managed_node_id() {
+    let result = validate_entry(&read_fixture("markdown-converted-article.html"), "");
+    assert!(result.valid, "{:?}", result.diagnostics);
+    let texts = result
+        .text_blocks
+        .iter()
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(texts[..3], ["标题", "段落 内链", "项目"]);
+    assert_eq!(
+        result.text_blocks[0].node_id.to_string(),
+        "00000000-0000-4000-8000-000000000001"
+    );
+    let entities = validate_entry(
+        "<p data-fc-node-id='018f47a2-3b4c-7d5e-8f90-123456789abc' data-fc-node-kind='paragraph'>中文&amp;海风</p>",
+        "",
+    );
+    assert_eq!(entities.text_blocks[0].text, "中文&海风");
+}
+
+#[test]
 fn every_shared_malicious_case_is_rejected() {
     let fixture: MaliciousFixture =
         serde_json::from_str(&read_fixture("malicious-cases.json")).unwrap();
