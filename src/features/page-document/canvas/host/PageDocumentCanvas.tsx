@@ -18,6 +18,7 @@ import {
 } from '../protocol/index.ts'
 import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
+import {sourceForRenderedAssetRequest, type CanvasAssetRenderSource} from './assetRenderSource.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
 import {canvasRectToHostViewport} from './linkHoverGeometry.ts'
 import './PageDocumentCanvas.css'
@@ -76,6 +77,7 @@ export function PageDocumentCanvas({
     const frameRef = useRef<HTMLIFrameElement>(null)
     const loadedRef = useRef(false)
     const renderRequestIdRef = useRef<string | null>(null)
+    const assetRenderSourceRef = useRef<CanvasAssetRenderSource | null>(null)
     const latest = useRef({
         html,
         css,
@@ -160,31 +162,32 @@ export function PageDocumentCanvas({
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
         const requestId = createCanvasRequestId()
         renderRequestIdRef.current = requestId
+        assetRenderSourceRef.current = {requestId, html, css}
         send({
             type: 'render',
             requestId,
             html,
             css,
         })
-        loadAssets(requestId, html, css)
-    }, [css, html, loadAssets, send])
+    }, [css, html, send])
 
     const sendLatestRender = useCallback(() => {
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
         const requestId = createCanvasRequestId()
         renderRequestIdRef.current = requestId
+        assetRenderSourceRef.current = {requestId, html: latest.current.html, css: latest.current.css}
         send({
             type: 'render',
             requestId,
             html: latest.current.html,
             css: latest.current.css,
         })
-        loadAssets(requestId, latest.current.html, latest.current.css)
-    }, [loadAssets, send])
+    }, [send])
 
     useEffect(() => {
         loadedRef.current = false
         renderRequestIdRef.current = null
+        assetRenderSourceRef.current = null
         setHeight(minimumHeight)
         setStatus('loading')
     }, [minimumHeight, session.token])
@@ -243,10 +246,17 @@ export function PageDocumentCanvas({
                 })()
             }
             if (message.type === 'rendered') {
+                const source = sourceForRenderedAssetRequest(assetRenderSourceRef.current, message.requestId)
+                if (!source) return
+                // 输入或组合期可能先缓存 render；只在画布确认挂载后读取并发送该次的资产帧。
+                assetRenderSourceRef.current = null
+                loadAssets(source.requestId, source.html, source.css)
                 setStatus('ready')
                 latest.current.onRendered?.()
             }
             if (message.type === 'render-error') {
+                if (message.requestId !== renderRequestIdRef.current) return
+                assetRenderSourceRef.current = null
                 setStatus('error')
                 latest.current.onRenderError?.(message.message)
             }
@@ -258,7 +268,7 @@ export function PageDocumentCanvas({
             gate.destroy()
             window.removeEventListener('message', handleMessage)
         }
-    }, [minimumHeight, send, sendLatestRender, session.token])
+    }, [loadAssets, minimumHeight, send, sendLatestRender, session.token])
 
     useEffect(() => {
         if (loadedRef.current) sendRender()

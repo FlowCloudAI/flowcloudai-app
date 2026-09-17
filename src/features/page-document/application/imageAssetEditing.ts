@@ -36,12 +36,6 @@ export function resolveImageInsertionTarget(
     nodes: readonly LayerProjectionNode[],
     selectedNodeId: string | null,
 ): ImageInsertionTarget | null {
-    const root = firstEditorContainer(nodes)
-    if (!root) return null
-    if (!selectedNodeId) {
-        const last = [...root.children].reverse().find(child => child.managed)
-        return {parentId: root.id, afterId: last?.id ?? null}
-    }
     const visit = (items: readonly LayerProjectionNode[], parent: LayerProjectionNode | null): ImageInsertionTarget | null => {
         for (const node of items) {
             if (node.id === selectedNodeId) {
@@ -59,7 +53,11 @@ export function resolveImageInsertionTarget(
         }
         return null
     }
-    return visit(nodes, null)
+    if (selectedNodeId) return visit(nodes, null)
+    const root = firstEditorContainer(nodes)
+    if (!root) return null
+    const last = [...root.children].reverse().find(child => child.managed)
+    return {parentId: root.id, afterId: last?.id ?? null}
 }
 
 function requireAssetId(value: string): string {

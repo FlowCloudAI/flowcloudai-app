@@ -109,6 +109,24 @@ describe('项目页面图片生产会话', () => {
         assert.equal(readManagedImageDescription(reopened.model.entry.sources['article.html'], IMAGE)?.reference.assetId, ASSET_A)
     })
 
+    it('无可选编辑根标记时，优先沿选中的受管容器解析并完成真实插入', () => {
+        const customArticle = article.replace(' data-fc-editor-root', '')
+        const initial = createEntryDocumentSessionState(identity, document(customArticle), session().snapshot.assets)
+        const target = resolveImageInsertionTarget(createLayerProjection(customArticle).nodes, ROOT)
+        assert.deepEqual(target, {parentId: ROOT, afterId: PARAGRAPH})
+        assert.ok(target)
+        const runtime = createDocumentKernelDraftRuntime()
+        const prepared = runtime.prepare(initial.model, initial.snapshot,
+            createImageInsertionRequest(target, ASSET_A, IMAGE, 'custom-container'))
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const update = runtime.applyPrepared(initial.model, initial.snapshot, prepared.edit, '插入图片')
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        assert.match(update.model.entry.sources['article.html'], new RegExp(`fcasset://${ASSET_A}`, 'u'))
+        assert.match(update.model.entry.sources['article.html'], /<!-- 保留作者注释 -->/u)
+        assert.equal(resolveImageInsertionTarget(createLayerProjection(customArticle).nodes, null), null)
+    })
+
     it('替换仅修改资源，保留 alt、结构化图注和其他源码，且可撤销', () => {
         const target = resolveImageInsertionTarget(createLayerProjection(article).nodes, PARAGRAPH)
         assert.ok(target)

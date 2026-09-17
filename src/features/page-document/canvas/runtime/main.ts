@@ -23,7 +23,14 @@ import {
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
 import {isolatePageDocument} from './isolationPolicy.ts'
-import {applyCanvasAssetFrame, mountCanvasAssetDisplays, type CanvasAssetDisplays} from './assetDisplay.ts'
+import {
+    applyCanvasAssetFrame,
+    disposeCanvasAssetDisplays,
+    mountCanvasAssetDisplays,
+    selectCanvasAssetDisplays,
+    syncCanvasAssetDisplays,
+    type CanvasAssetDisplays,
+} from './assetDisplay.ts'
 import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
 import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
@@ -89,6 +96,7 @@ function setSelection(nodeId: string | null): void {
     findManagedNode(selectedNodeId)?.removeAttribute('data-fc-canvas-selected')
     selectedNodeId = nodeId?.toLowerCase() ?? null
     findManagedNode(selectedNodeId)?.setAttribute('data-fc-canvas-selected', '')
+    selectCanvasAssetDisplays(assetDisplays, selectedNodeId)
 }
 
 function reportSize(): void {
@@ -102,6 +110,7 @@ function clearRenderedDocument(): void {
     const leave = linkHover.clear()
     if (leave) send(leave)
     authorStyle.textContent = ''
+    disposeCanvasAssetDisplays(assetDisplays)
     root.replaceChildren()
     assetDisplays = new Map()
     selectedNodeId = null
@@ -132,6 +141,7 @@ function applyRender(
         const template = document.createElement('template')
         template.innerHTML = result.artifact.html
         authorStyle.textContent = result.artifact.css
+        disposeCanvasAssetDisplays(assetDisplays)
         root.replaceChildren(template.content.cloneNode(true))
         assetDisplays = mountCanvasAssetDisplays(root)
         applyCanvasEditingState(root, editingEnabled)
@@ -623,7 +633,7 @@ function start(): void {
         incomingSequence = command.sequence
         if (command.type === 'render') render(command)
         if (command.type === 'asset-frame' && command.requestId === latestRequestId) {
-            applyCanvasAssetFrame(assetDisplays, command)
+            applyCanvasAssetFrame(root, assetDisplays, command)
             reportSize()
         }
         if (command.type === 'set-selection') setSelection(command.nodeId)
@@ -635,6 +645,7 @@ function start(): void {
             document.documentElement.style.setProperty('--fc-entry-viewport-width', `${command.width}px`)
             document.documentElement.style.setProperty('--fc-entry-viewport-height', `${command.height}px`)
             document.documentElement.style.setProperty('--fc-entry-device-pixel-ratio', String(command.pixelRatio))
+            syncCanvasAssetDisplays(root, assetDisplays)
         }
     })
 

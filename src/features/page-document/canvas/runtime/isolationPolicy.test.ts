@@ -33,6 +33,17 @@ test('作者伪造画布图片身份会被清除，只有合法 src 可派生受
     assert.equal(external.artifact, null)
 })
 
+test('直接受管图片隔离后仍保留身份、尺寸、隐藏属性与作者选择器目标', () => {
+    const result = isolatePageDocument(
+        `<img data-fc-node-id="${V7_ASSET_ID}" data-fc-node-kind="asset" class="hero" hidden width="320" height="180" src="fcasset://${V7_ASSET_ID}">`,
+        `img.hero { object-fit: cover; }`,
+    )
+    assert.ok(result.artifact)
+    assert.match(result.artifact.html, new RegExp(`data-fc-node-id="${V7_ASSET_ID}"`, 'u'))
+    assert.match(result.artifact.html, /class="hero" hidden="" width="320" height="180"/u)
+    assert.match(result.artifact.css, /img\.hero\s*\{\s*object-fit:\s*cover/u)
+})
+
 test('脚本、事件、外部资源、表单能力与危险 CSS 在挂载前被拒绝', () => {
     const attacks = [
         ['<script>parent.compromised=true</script>', ''],
