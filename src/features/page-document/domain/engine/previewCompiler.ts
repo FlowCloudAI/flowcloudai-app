@@ -19,7 +19,7 @@ const RENDERER_BASELINE_CSS = `@layer fc-renderer {
     line-height: 1.6;
   }
   body { overflow-wrap: anywhere; }
-  img { display: block; max-width: 100%; }
+  img { display: block; max-width: 100%; height: auto; }
   [data-fc-node-kind] { min-width: 0; margin: 0; padding: 0; }
   [data-fc-node-kind="list"] { list-style-position: inside; }
   [data-fc-node-kind="table"] { width: 100%; border-collapse: collapse; }

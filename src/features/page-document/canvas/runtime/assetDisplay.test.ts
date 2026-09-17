@@ -12,7 +12,6 @@ function fakeImage(attributes: Record<string, string> = {}) {
     const listeners = new Map<string, Array<() => void>>()
     const image = {
         tagName: 'IMG', attrs, hidden: attrs.has('hidden'), complete: false, naturalWidth: 0, naturalHeight: 0,
-        status: null as ReturnType<typeof fakeStatus> | null,
         getAttribute(name: string) { return attrs.get(name) ?? null },
         hasAttribute(name: string) { return attrs.has(name) },
         setAttribute(name: string, value: string) { attrs.set(name, value) },
@@ -20,7 +19,7 @@ function fakeImage(attributes: Record<string, string> = {}) {
         addEventListener(name: string, callback: () => void) {
             listeners.set(name, [...listeners.get(name) ?? [], callback])
         },
-        insertAdjacentElement(_position: string, status: ReturnType<typeof fakeStatus>) { this.status = status },
+        insertAdjacentElement() { throw new Error('状态不得向作者 DOM 插入兄弟节点') },
         get src() { return attrs.get('src') ?? '' },
         set src(value: string) { attrs.set('src', value) },
         fireLoad() {
@@ -33,21 +32,12 @@ function fakeImage(attributes: Record<string, string> = {}) {
     return image
 }
 
-function fakeStatus() {
-    return {
-        attrs: new Map<string, string>(), textContent: '', removed: false,
-        setAttribute(name: string, value: string) { this.attrs.set(name, value) },
-        remove() { this.removed = true },
-    }
-}
-
 function withFakeDom(run: (image: ReturnType<typeof fakeImage>, root: HTMLElement) => void, attributes: Record<string, string> = {}) {
     const image = fakeImage(attributes)
     const root = {querySelectorAll: () => [image]} as unknown as HTMLElement
     const before = new Map<string, PropertyDescriptor | undefined>()
     for (const name of ['document', 'ImageData']) before.set(name, Object.getOwnPropertyDescriptor(globalThis, name))
     Object.defineProperty(globalThis, 'document', {configurable: true, value: {createElement(tag: string) {
-        if (tag === 'span') return fakeStatus()
         assert.equal(tag, 'canvas')
         return {width: 0, height: 0,
             getContext: () => ({putImageData() { /* 测试只关心安全编码入口。 */ }}),
@@ -74,7 +64,8 @@ test('像素写回原 img；大于 512 的原图尺寸由可信图片声明且�
         const cache = new CanvasAssetImageCache()
         const displays = mountCanvasAssetDisplays(root, cache)
         assert.deepEqual(missingCanvasAssetIds(displays, cache), [ID])
-        assert.equal(image.status?.textContent, '正在读取图片…')
+        assert.equal(image.getAttribute('data-fc-asset-state'), 'loading')
+        assert.match(decodeURIComponent(image.src), /正在读取图片/u)
         assert.equal(applyCanvasAssetFrame(displays, cache, frame), true)
         assert.match(image.src, /^data:image\/svg\+xml,/u)
         const svg = decodeURIComponent(image.src.slice('data:image/svg+xml,'.length))
@@ -84,7 +75,7 @@ test('像素写回原 img；大于 512 的原图尺寸由可信图片声明且�
         assert.equal(image.hasAttribute('height'), false)
         image.fireLoad()
         assert.equal(image.hasAttribute('data-fc-asset-placeholder'), false)
-        assert.equal(image.status?.removed, true)
+        assert.equal(image.hasAttribute('data-fc-asset-state'), false)
         assert.deepEqual(missingCanvasAssetIds(displays, cache), [])
     })
 })
@@ -99,7 +90,7 @@ test('已显示图片重渲染从有界缓存直接赋给新 img，不回到加�
         const displays = mountCanvasAssetDisplays(nextRoot, cache)
         assert.equal(nextRoot.querySelectorAll('img[data-fc-canvas-asset-id]')[0], next as unknown as Element)
         assert.equal(next.getAttribute('data-fc-node-id'), ID)
-        assert.equal(next.status, null)
+        assert.equal(next.hasAttribute('data-fc-asset-state'), false)
         assert.equal(next.hasAttribute('data-fc-asset-placeholder'), false)
         assert.equal(next.getAttribute('width'), '240')
         assert.equal(next.getAttribute('height'), '24')
@@ -110,22 +101,40 @@ test('已显示图片重渲染从有界缓存直接赋给新 img，不回到加�
     })
 })
 
-test('无权与格式无效保持不同状态，坏帧不进入缓存', () => {
+test('缺失与格式无效只在原 img 上显示状态，失败缓存使重渲染不再请求帧', () => {
     withFakeDom((image, root) => {
         const cache = new CanvasAssetImageCache()
         const displays = mountCanvasAssetDisplays(root, cache)
         assert.equal(applyCanvasAssetFrame(displays, cache, {...frame, status: 'unavailable', width: 0,
             height: 0, originalWidth: 0, originalHeight: 0, rgbaBase64: ''}), false)
-        assert.equal(image.status?.textContent, '图片缺失、无权读取或读取失败')
+        assert.equal(image.getAttribute('data-fc-asset-state'), 'unavailable')
+        assert.match(decodeURIComponent(image.src), /图片缺失、无权读取或读取失败/u)
         assert.equal(applyCanvasAssetFrame(displays, cache, {...frame, rgbaBase64: 'AAAA'}), false)
-        assert.equal(image.status?.textContent, '图片格式或内容无效')
-        assert.deepEqual(missingCanvasAssetIds(displays, cache), [ID])
+        assert.equal(image.getAttribute('data-fc-asset-state'), 'invalid')
+        assert.match(decodeURIComponent(image.src), /图片格式或内容无效/u)
+        const next = fakeImage()
+        const nextDisplays = mountCanvasAssetDisplays({querySelectorAll: () => [next]} as unknown as HTMLElement, cache)
+        assert.equal(next.getAttribute('data-fc-asset-state'), 'invalid')
+        assert.deepEqual(missingCanvasAssetIds(nextDisplays, cache), [])
+        assert.deepEqual(missingCanvasAssetIds(displays, cache), [])
     })
+})
+
+test('hidden 图片的加载与失败提示始终留在原 img，不新增可见兄弟节点', () => {
+    withFakeDom((image, root) => {
+        const cache = new CanvasAssetImageCache()
+        const displays = mountCanvasAssetDisplays(root, cache)
+        assert.equal(image.hidden, true)
+        assert.equal(image.getAttribute('data-fc-asset-state'), 'loading')
+        assert.equal(applyCanvasAssetFrame(displays, cache, {...frame, status: 'unavailable', rgbaBase64: ''}), false)
+        assert.equal(image.hidden, true)
+        assert.equal(image.getAttribute('data-fc-asset-state'), 'unavailable')
+    }, {hidden: ''})
 })
 
 test('画布已解码图片缓存覆盖合法单页的一百项，超额淘汰并可在会话结束时释放', () => {
     const cache = new CanvasAssetImageCache()
-    for (let index = 0; index < 101; index += 1) cache.set(String(index), {url: 'data:image/png;base64,AA==', decoded: true})
+    for (let index = 0; index < 101; index += 1) cache.set(String(index), {url: 'data:image/png;base64,AA==', state: 'ready', decoded: true})
     assert.equal(cache.get('0'), null)
     assert.ok(cache.get('100'))
     cache.clear()

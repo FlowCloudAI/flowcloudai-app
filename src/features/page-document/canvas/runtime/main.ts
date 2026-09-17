@@ -187,14 +187,12 @@ function render(command: CanvasRenderCommand): void {
 
 function semanticLength(value: Node): number {
     if (value.nodeType === Node.TEXT_NODE) return value.textContent?.length ?? 0
-    if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return 0
     if (value instanceof Element && value.tagName === 'BR') return 1
     return [...value.childNodes].reduce((total, child) => total + semanticLength(child), 0)
 }
 
 function semanticText(value: Node): string {
     if (value.nodeType === Node.TEXT_NODE) return value.textContent ?? ''
-    if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return ''
     if (value instanceof Element && value.tagName === 'BR') return '\n'
     return [...value.childNodes].map(semanticText).join('')
 }
@@ -216,7 +214,6 @@ function semanticOffset(rootNode: Node, container: Node, offset: number): number
             resolved = total
             return
         }
-        if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return
         if (value.nodeType === Node.TEXT_NODE || (value instanceof Element && value.tagName === 'BR')) {
             total += semanticLength(value)
             return
@@ -279,7 +276,6 @@ function locateTextOffset(rootNode: Node, offset: number): {node: Node; offset: 
     const locate = (parentNode: Node): {node: Node; offset: number} => {
         const children = [...parentNode.childNodes]
         for (const [index, child] of children.entries()) {
-            if (child instanceof Element && child.hasAttribute('data-fc-asset-state')) continue
             if (child.nodeType === Node.TEXT_NODE) {
                 const length = child.textContent?.length ?? 0
                 if (remaining <= length) return {node: child, offset: remaining}

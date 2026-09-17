@@ -28,29 +28,12 @@
 
 }
 
-/* 安全高亮和资产占位故意不分层，避免作者层覆盖隔离状态。 */
+/* 安全高亮与 hidden 语义故意不分层，避免作者层覆盖隔离状态。 */
 [data-fc-node-id][data-fc-canvas-selected] {
     outline: 2px solid var(--fc-entry-accent);
     outline-offset: -2px;
 }
 
-[data-fc-asset-placeholder] {
-    min-block-size: 4rem;
-    border: 1px dashed var(--fc-entry-muted);
-    background: var(--fc-entry-surface);
-    color: var(--fc-entry-muted);
-}
-
 [data-fc-canvas-asset-id][hidden] {
     display: none;
-}
-
-[data-fc-asset-state] {
-    display: inline-block;
-    pointer-events: none;
-    user-select: none;
-    min-block-size: 4rem;
-    padding: 1rem;
-    border: 1px dashed var(--fc-entry-muted);
-    color: var(--fc-entry-muted);
 }

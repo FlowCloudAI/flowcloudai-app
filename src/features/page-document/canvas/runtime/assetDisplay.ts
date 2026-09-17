@@ -4,12 +4,12 @@ import type {CanvasAssetFrameCommand} from '../protocol/index.ts'
 
 interface CachedImage {
     url: string
+    state: 'ready' | 'unavailable' | 'invalid'
     decoded: boolean
 }
 
 interface AssetDisplay {
     image: HTMLImageElement
-    status: HTMLSpanElement | null
 }
 
 type AssetFailureState = 'loading' | 'unavailable' | 'invalid'
@@ -47,37 +47,35 @@ function statusLabel(state: AssetFailureState): string {
     return '图片缺失、无权读取或读取失败'
 }
 
-function showStatus(display: AssetDisplay, state: AssetFailureState): void {
-    display.image.removeAttribute('src')
-    display.image.setAttribute('data-fc-asset-placeholder', '')
-    const status = display.status ?? document.createElement('span')
-    status.setAttribute('data-fc-asset-state', state)
-    status.setAttribute('contenteditable', 'false')
-    status.setAttribute('aria-hidden', 'true')
-    status.textContent = statusLabel(state)
-    if (!display.status) display.image.insertAdjacentElement('afterend', status)
-    display.status = status
+function statusImageUrl(state: AssetFailureState): string {
+    const label = statusLabel(state)
+    // 固定文案的可信 SVG 只作为原 img 的 src；它不引入作者 URL、外部资源或额外 DOM 节点。
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="96" viewBox="0 0 240 96"><rect x="1" y="1" width="238" height="94" fill="Canvas" stroke="GrayText" stroke-dasharray="5 4"/><text x="120" y="50" text-anchor="middle" dominant-baseline="middle" fill="GrayText" font-family="sans-serif" font-size="13">${label}</text></svg>`
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-function showImage(display: AssetDisplay, cached: CachedImage): void {
+function showStatus(display: AssetDisplay, state: AssetFailureState): void {
+    display.image.removeAttribute('data-fc-asset-placeholder')
+    display.image.setAttribute('data-fc-asset-state', state)
+    display.image.src = statusImageUrl(state)
+}
+
+function showImage(display: AssetDisplay, cached: CachedImage, onInvalid: () => void): void {
     const {image} = display
-    if (cached.decoded) {
-        image.removeAttribute('data-fc-asset-placeholder')
-        display.status?.remove()
-        display.status = null
-    }
+    image.removeAttribute('data-fc-asset-placeholder')
+    image.removeAttribute('data-fc-asset-state')
     const loaded = () => {
+        if (image.src !== cached.url) return
         if (image.naturalWidth < 1 || image.naturalHeight < 1) {
-            showStatus(display, 'invalid')
+            onInvalid()
             return
         }
         cached.decoded = true
-        image.removeAttribute('data-fc-asset-placeholder')
-        display.status?.remove()
-        display.status = null
     }
     image.addEventListener('load', loaded, {once: true})
-    image.addEventListener('error', () => showStatus(display, 'invalid'), {once: true})
+    image.addEventListener('error', () => {
+        if (image.src === cached.url) onInvalid()
+    }, {once: true})
     // src 只来自通过信封验证的 RGBA 帧；浏览器在原 img 的层叠、裁剪与变换上下文中绘制。
     image.src = cached.url
     if (cached.decoded && image.complete && image.naturalWidth > 0) loaded()
@@ -121,17 +119,21 @@ export function mountCanvasAssetDisplays(root: HTMLElement, cache: CanvasAssetIm
     for (const image of root.querySelectorAll<HTMLImageElement>('img[data-fc-canvas-asset-id]')) {
         const id = image.getAttribute('data-fc-canvas-asset-id')?.toLowerCase()
         if (!id) continue
-        const display: AssetDisplay = {image, status: null}
+        const display: AssetDisplay = {image}
         const cached = cache.get(id)
-        if (cached?.decoded) showImage(display, cached)
-        else showStatus(display, 'loading')
+        if (!cached) showStatus(display, 'loading')
+        else if (cached.state === 'ready') showImage(display, cached, () => {
+            cache.set(id, {url: statusImageUrl('invalid'), state: 'invalid', decoded: true})
+            showStatus(display, 'invalid')
+        })
+        else showStatus(display, cached.state)
         displays.set(id, [...displays.get(id) ?? [], display])
     }
     return displays
 }
 
 export function missingCanvasAssetIds(displays: CanvasAssetDisplays, cache: CanvasAssetImageCache): string[] {
-    return [...displays.keys()].filter(id => !cache.get(id)?.decoded)
+    return [...displays.keys()].filter(id => !cache.get(id))
 }
 
 export function applyCanvasAssetFrame(
@@ -143,16 +145,21 @@ export function applyCanvasAssetFrame(
     if (!targets) return false
     const status = command.status
     if (status !== 'ready') {
+        cache.set(command.assetId.toLowerCase(), {url: statusImageUrl(status), state: status, decoded: true})
         targets.forEach(target => showStatus(target, status))
         return false
     }
     const url = encodedImageUrl(command)
     if (!url) {
+        cache.set(command.assetId.toLowerCase(), {url: statusImageUrl('invalid'), state: 'invalid', decoded: true})
         targets.forEach(target => showStatus(target, 'invalid'))
         return false
     }
-    const cached: CachedImage = {url, decoded: false}
+    const cached: CachedImage = {url, state: 'ready', decoded: false}
     cache.set(command.assetId.toLowerCase(), cached)
-    targets.forEach(target => showImage(target, cached))
+    targets.forEach(target => showImage(target, cached, () => {
+        cache.set(command.assetId.toLowerCase(), {url: statusImageUrl('invalid'), state: 'invalid', decoded: true})
+        showStatus(target, 'invalid')
+    }))
     return true
 }

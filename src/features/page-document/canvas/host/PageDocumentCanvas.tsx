@@ -147,20 +147,24 @@ export function PageDocumentCanvas({
                     originalWidth: 0, originalHeight: 0, rgbaBase64: ''})
                 continue
             }
-            void assetFrames.read(projectId, assetId, pageDocumentReadAssetFrame).then(frame => {
-                if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
-                send({type: 'asset-frame', requestId, assetId, status: 'ready',
-                    width: frame.width, height: frame.height, originalWidth: frame.originalWidth,
-                    originalHeight: frame.originalHeight, rgbaBase64: frame.rgbaBase64})
-            }).catch(error => {
-                if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
-                send({type: 'asset-frame', requestId, assetId, status: pageDocumentAssetErrorStatus(error),
-                    width: 0, height: 0, originalWidth: 0, originalHeight: 0, rgbaBase64: ''})
+            void assetFrames.read(projectId, assetId, pageDocumentReadAssetFrame, pageDocumentAssetErrorStatus).then(result => {
+                if (!assetFrames.isActive() || renderRequestIdRef.current !== requestId || !loadedRef.current) return
+                const frame = result.status === 'ready' ? result.frame : null
+                send({type: 'asset-frame', requestId, assetId, status: result.status,
+                    width: frame?.width ?? 0, height: frame?.height ?? 0, originalWidth: frame?.originalWidth ?? 0,
+                    originalHeight: frame?.originalHeight ?? 0, rgbaBase64: frame?.rgbaBase64 ?? ''})
+            }).catch(() => {
+                if (!assetFrames.isActive() || renderRequestIdRef.current !== requestId || !loadedRef.current) return
+                send({type: 'asset-frame', requestId, assetId, status: 'unavailable', width: 0, height: 0,
+                    originalWidth: 0, originalHeight: 0, rgbaBase64: ''})
             })
         }
     }, [assetFrames, projectId, send])
 
-    useEffect(() => () => assetFrames.clear(), [assetFrames])
+    useEffect(() => {
+        assetFrames.activate()
+        return () => assetFrames.deactivate()
+    }, [assetFrames])
 
     const sendRender = useCallback(() => {
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})

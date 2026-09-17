@@ -26,7 +26,6 @@ test('运行时主题与排版基线位于首个默认层，安全标记保持�
     const seenBaselineSelectors = new Set<string>()
     const safetySelectors = new Set([
         '[data-fc-node-id][data-fc-canvas-selected]',
-        '[data-fc-asset-placeholder]',
         '[data-fc-canvas-asset-id][hidden]',
     ])
     const seenSafetySelectors = new Set<string>()
