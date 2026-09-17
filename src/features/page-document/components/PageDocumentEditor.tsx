@@ -253,6 +253,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             {dockPortalHost && createPortal(
                 <PageDocumentPropertiesPanel
                     node={selectedNode}
+                    articleHtml={scope.sources['article.html']}
                     entryStyleCss={scope.sources['style.css']}
                     inspectComponent={session.inspectComponent}
                     applyKernelEntry={session.applyVisualPropertyEntry}

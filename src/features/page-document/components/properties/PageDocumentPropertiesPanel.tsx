@@ -1,7 +1,7 @@
 // 本组件呈现“所有宽度”的有限调节控件；所有结构化修改均由内核适配层序列化和校验。
 
 import {useEffect, useMemo, useState} from 'react'
-import {Button, Select} from 'flowcloudai-ui'
+import {Button, Input, Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 import type {
     InspectVisualComponent,
@@ -19,6 +19,11 @@ import {
 } from '../../application/visualPropertyEditing.ts'
 import type {KernelDraftEditRequest} from '../../application/documentKernelDraftRuntime.ts'
 import {inferOpaqueAdoptionKind} from '../../application/opaqueElementAdoption.ts'
+import {
+    createImageDescriptionEditRequest,
+    readManagedImageDescription,
+    type ManagedImageDescription,
+} from '../../application/imageSemanticEditing.ts'
 import {BoxSpacingControls} from './BoxSpacingControls.tsx'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
@@ -26,6 +31,7 @@ import './PageDocumentPropertiesPanel.css'
 
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
+    articleHtml: string
     entryStyleCss: string
     inspectComponent: InspectVisualComponent
     applyKernelEntry: (
@@ -36,6 +42,66 @@ interface PageDocumentPropertiesPanelProps {
     flushPendingChanges: () => void
     onAdopt: (node: LayerProjectionNode) => Promise<string | null>
     visualError: string | null
+}
+
+function ImageDescriptionControls({
+    image,
+    applyKernelEntry,
+}: {
+    image: ManagedImageDescription
+    applyKernelEntry: PageDocumentPropertiesPanelProps['applyKernelEntry']
+}) {
+    const [alt, setAlt] = useState(image.alt)
+    const [caption, setCaption] = useState(image.caption ?? '')
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const nextCaption = caption === '' && image.caption !== '' ? null : caption
+    const changed = alt !== image.alt || (image.captionEditable && nextCaption !== image.caption)
+    const commit = async () => {
+        if (!changed || busy) return
+        try {
+            const request = createImageDescriptionEditRequest(image, {
+                alt,
+                caption: image.captionEditable ? nextCaption : image.caption,
+            })
+            if (!request) return
+            setBusy(true)
+            setError(null)
+            const accepted = await applyKernelEntry(request, '修改图片说明', {immediate: true})
+            if (!accepted) setError('图片说明未写入草稿；原有源码保持不变。')
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : '图片说明未写入草稿。')
+        } finally {
+            setBusy(false)
+        }
+    }
+    return (
+        <section className="page-document-image-details" aria-label="图片说明">
+            <strong>图片说明</strong>
+            <p data-asset-status={image.reference.status} role="status">{image.reference.message}</p>
+            <Button type="button" size="sm" variant="outline" disabled>插入或替换图片需先接通受管资产服务</Button>
+            <label>
+                替代文本
+                <Input value={alt} onValueChange={setAlt} aria-label="图片替代文本" />
+            </label>
+            <label>
+                图注
+                <textarea
+                    value={caption}
+                    onChange={event => setCaption(event.target.value)}
+                    disabled={!image.captionEditable}
+                    aria-label="图片图注"
+                    rows={3}
+                />
+            </label>
+            {image.captionReason && <p>{image.captionReason}</p>}
+            {image.captionKind === 'structured' && <p>复杂图注的替换会先要求确认。</p>}
+            <Button type="button" size="sm" disabled={!changed || busy} onClick={() => void commit()}>
+                {busy ? '正在应用…' : '应用图片说明'}
+            </Button>
+            {error && <p role="alert">{error}</p>}
+        </section>
+    )
 }
 
 const TABS: readonly {key: VisualPropertyGroup; label: string}[] = [
@@ -106,6 +172,7 @@ function FontWeightControl({
 
 export function PageDocumentPropertiesPanel({
     node,
+    articleHtml,
     entryStyleCss,
     inspectComponent,
     applyKernelEntry,
@@ -119,6 +186,9 @@ export function PageDocumentPropertiesPanel({
         [entryStyleCss, inspectComponent, node],
     )
     const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
+    const image = useMemo(() => node?.managed && node.kind === 'asset'
+        ? readManagedImageDescription(articleHtml, node.id)
+        : null, [articleHtml, node])
     const selectedNodeId = node?.id ?? null
     useEffect(
         () => () => flushPendingChanges(),
@@ -145,6 +215,16 @@ export function PageDocumentPropertiesPanel({
                 <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
                 <span>修改范围 · 所有宽度</span>
             </header>
+            {image && <ImageDescriptionControls
+                key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
+                image={image}
+                applyKernelEntry={applyKernelEntry}
+            />}
+            {node?.managed && node.kind === 'asset' && !image && (
+                <p className="page-document-image-details" role="alert">
+                    当前图片结构没有唯一的受管图片，不能安全编辑说明或替换资源。
+                </p>
+            )}
             {node?.managed && (
                 <div className="page-document-properties-panel__tabs" role="tablist" aria-label="属性分类">
                     {TABS.map(item => (

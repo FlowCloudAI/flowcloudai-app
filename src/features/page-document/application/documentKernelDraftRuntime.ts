@@ -7,6 +7,9 @@ import type {
     SourceFileSet,
 } from '../domain/contract.ts'
 import {compilePreviewArtifact} from '../domain/engine/previewCompiler.ts'
+import {parseHtmlSource} from '../domain/engine/htmlParser.ts'
+import {parseCssSource} from '../domain/engine/cssParser.ts'
+import {guardDocumentSources} from '../domain/engine/guard.ts'
 import {
     createDocumentKernel,
     documentFingerprint,
@@ -316,8 +319,12 @@ export function createDocumentKernelDraftRuntime(): DocumentKernelDraftRuntime {
                 ]),
             })
         }
-        const acceptanceDiagnostics =
-            acceptance === 'validated' ? validateCandidateSources(snapshot, candidate) : []
+        // 说明文字不更换资源身份：只容许原已保存源码中的引用继续存在，不把它们冒充已验真的资产。
+        const preservesAssetReferences = intents.every(intent =>
+            intent.kind === 'set-asset-alt' || intent.kind === 'set-asset-caption')
+        const acceptanceDiagnostics = acceptance === 'validated'
+            ? validateCandidateSources(snapshot, candidate, preservesAssetReferences)
+            : []
         if (acceptanceDiagnostics.some(item => item.severity === 'error')) {
             return Object.freeze({
                 status: 'rejected' as const,
@@ -579,7 +586,16 @@ export function createDocumentKernelDraftRuntime(): DocumentKernelDraftRuntime {
 function validateCandidateSources(
     snapshot: EntrySourceSnapshot,
     candidate: {readonly entry: SourceFileSet; readonly project: SourceFileSet},
+    preserveStoredAssets = false,
 ): readonly DocumentDiagnostic[] {
+    const knownAssetIds = snapshot.assets.map(asset => asset.id)
+    if (preserveStoredAssets) {
+        const stored = guardDocumentSources(
+            [parseHtmlSource(snapshot.articleHtml, {mode: 'fragment', scope: 'entry'})],
+            [parseCssSource(snapshot.styleCss, 'entry')],
+        )
+        knownAssetIds.push(...stored.referencedAssetIds)
+    }
     return Object.freeze(
         compilePreviewArtifact({
             projectArticleHtml: candidate.project['article.html'],
@@ -587,7 +603,7 @@ function validateCandidateSources(
             entryArticleHtml: candidate.entry['article.html'],
             entryStyleCss: candidate.entry['style.css'],
             metadata: snapshot.entry,
-            assetIds: snapshot.assets.map(asset => asset.id),
+            assetIds: knownAssetIds,
             paragraphLimit: snapshot.editorLimits.paragraph,
             assetLimit: snapshot.editorLimits.asset,
         }).diagnostics,

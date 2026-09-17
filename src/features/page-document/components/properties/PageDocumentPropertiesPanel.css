@@ -21,6 +21,44 @@
     font-size: var(--fc-font-size-caption);
 }
 
+.page-document-image-details {
+    display: grid;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-md);
+    border-bottom: 1px solid var(--fc-color-border-light);
+    color: var(--fc-color-text);
+}
+
+.page-document-image-details > label {
+    display: grid;
+    gap: var(--fc-space-xs);
+    font-size: var(--fc-font-size-sm);
+}
+
+.page-document-image-details textarea {
+    width: 100%;
+    min-height: 4rem;
+    resize: vertical;
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font: inherit;
+}
+
+.page-document-image-details > p {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-image-details > p[role="alert"],
+.page-document-image-details > p[data-asset-status="invalid"],
+.page-document-image-details > p[data-asset-status="missing"] {
+    color: var(--fc-color-warning);
+}
+
 .page-document-properties-panel__tabs {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
