@@ -7,6 +7,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
+mod object_layer;
+
 const KNOWN_ASSET_KINDS: &[&str] = &[
     "project_cover",
     "entry_image",
@@ -33,6 +35,8 @@ pub(super) struct ValidatedFcworldPackage {
     pub csv_items: Vec<worldflow_core::CsvImportItem>,
     pub assets_index: FcworldAssetsIndex,
     pub asset_bytes_by_path: HashMap<String, Vec<u8>>,
+    pub object_layer_json: Option<String>,
+    pub page_asset_bytes_by_path: HashMap<String, Vec<u8>>,
     pub maps_json: String,
     pub history_files: Vec<PackageHistoryFile>,
     pub input_file_size: u64,
@@ -63,7 +67,9 @@ pub(super) struct PreparedFcworldImport {
     pub new_project_id: Uuid,
     pub project_name: String,
     pub csv_items: Vec<worldflow_core::CsvImportItem>,
+    pub object_layer_json: Option<String>,
     pub assets: Vec<PreparedImportAsset>,
+    pub page_assets: Vec<PreparedImportAsset>,
     pub maps_json: String,
     pub history_files: Vec<PackageHistoryFile>,
     pub asset_count: usize,
@@ -186,6 +192,8 @@ where
         let known = name == "manifest.json"
             || name == ASSETS_INDEX_PATH
             || name == MAPS_PATH
+            || name == OBJECT_LAYER_PATH
+            || name.starts_with("assets/page-document/")
             || name.starts_with(HISTORY_SNAPSHOTS_DIR)
             || name
                 .strip_prefix(WORLD_DATA_DIR)
@@ -347,11 +355,24 @@ fn validate_manifest(
     if manifest.format != FCWORLD_FORMAT {
         return Err(format!("不支持的 fcworld 格式: {}", manifest.format));
     }
-    if manifest.format_version != FCWORLD_FORMAT_VERSION {
+    if !matches!(
+        manifest.format_version,
+        FCWORLD_FORMAT_VERSION | FCWORLD_OBJECT_FORMAT_VERSION
+    ) {
         return Err(format!(
             "不支持的 fcworld 版本: {}",
             manifest.format_version
         ));
+    }
+    if (manifest.format_version == FCWORLD_OBJECT_FORMAT_VERSION)
+        != manifest.contents.object_layer.is_some()
+    {
+        return Err("世界包版本与对象层载荷声明不一致".to_string());
+    }
+    if let Some(layer) = &manifest.contents.object_layer {
+        if layer.path != OBJECT_LAYER_PATH {
+            return Err(format!("对象层载荷路径不匹配: {}", layer.path));
+        }
     }
     match manifest.contents.worldflow.bundle_format_version {
         // 新包：CSV 交换格式版本是唯一兼容性契约，schema_version 仅作诊断。
@@ -593,6 +614,96 @@ where
     Ok(maps_json)
 }
 
+fn validate_object_layer_in_package(
+    zip: &mut ZipArchive<File>,
+    zip_names: &HashSet<String>,
+    manifest: &FcworldManifest,
+) -> Result<(Option<String>, HashMap<String, Vec<u8>>), String> {
+    let Some(declaration) = &manifest.contents.object_layer else {
+        if zip_names.contains(OBJECT_LAYER_PATH)
+            || zip_names
+                .iter()
+                .any(|name| name.starts_with("assets/page-document/"))
+        {
+            return Err("旧版世界包包含未声明的页面文档载荷".into());
+        }
+        return Ok((None, HashMap::new()));
+    };
+    let file = zip
+        .by_name(OBJECT_LAYER_PATH)
+        .map_err(|error| format!("世界包缺少对象层载荷：{error}"))?;
+    const MAX_OBJECT_LAYER_BYTES: u64 = 64 * 1024 * 1024;
+    if file.size() > MAX_OBJECT_LAYER_BYTES {
+        return Err("对象层载荷超过 64 MiB".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_OBJECT_LAYER_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("读取对象层载荷失败：{error}"))?;
+    if bytes.len() as u64 > MAX_OBJECT_LAYER_BYTES {
+        return Err("对象层载荷超过 64 MiB".into());
+    }
+    let json =
+        String::from_utf8(bytes).map_err(|error| format!("对象层载荷不是 UTF-8：{error}"))?;
+    if sha256_hex(json.as_bytes()) != declaration.sha256 {
+        return Err("页面文档对象层载荷摘要不匹配".into());
+    }
+    let value: Value =
+        serde_json::from_str(&json).map_err(|error| format!("页面文档对象层载荷无效：{error}"))?;
+    if value["version"].as_u64() != Some(2) {
+        return Err("不支持的页面文档对象层载荷版本".into());
+    }
+    let assets = value["assets"]
+        .as_array()
+        .ok_or("页面文档对象层载荷缺少资产表")?;
+    if assets.len() != declaration.count {
+        return Err("页面文档资产数量与 manifest 不一致".into());
+    }
+    let mut bytes_by_path = HashMap::new();
+    let mut ids = HashSet::new();
+    for asset in assets {
+        let id = asset["id"].as_str().ok_or("页面资产缺少 ID")?;
+        let id = Uuid::parse_str(id).map_err(|_| "页面资产 ID 无效")?;
+        if !ids.insert(id) {
+            return Err(format!("页面资产 ID 重复：{id}"));
+        }
+        let media = asset["media_type"].as_str().ok_or("页面资产缺少媒体类型")?;
+        let extension = match media {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            "image/webp" => "webp",
+            _ => return Err(format!("页面资产类型不受支持：{media}")),
+        };
+        let path = format!("assets/page-document/{id}.{extension}");
+        let size = asset["size_bytes"].as_i64().ok_or("页面资产缺少大小")?;
+        let sha256 = asset["sha256"].as_str().ok_or("页面资产缺少摘要")?;
+        let width = asset["width"].as_i64().ok_or("页面资产缺少宽度")?;
+        let height = asset["height"].as_i64().ok_or("页面资产缺少高度")?;
+        let (bytes, hash) = read_zip_asset_bytes_with_sha256(
+            zip,
+            &path,
+            size.try_into().map_err(|_| "页面资产大小无效")?,
+        )?;
+        if hash != sha256 {
+            return Err(format!("页面资产摘要不匹配：{id}"));
+        }
+        crate::page_document_assets::validate_packaged_asset(
+            &bytes, media, size, sha256, width, height,
+        )
+        .map_err(|error| format!("页面资产独立校验失败 {id}：{error}"))?;
+        bytes_by_path.insert(path, bytes);
+    }
+    for name in zip_names
+        .iter()
+        .filter(|name| name.starts_with("assets/page-document/"))
+    {
+        if !bytes_by_path.contains_key(name) {
+            return Err(format!("世界包含未登记页面资产：{name}"));
+        }
+    }
+    Ok((Some(json), bytes_by_path))
+}
+
 fn validate_history_files_with_progress_inner<F>(
     zip: &mut ZipArchive<File>,
     zip_names: &HashSet<String>,
@@ -706,6 +817,8 @@ where
     let (assets_index, asset_bytes_by_path) =
         validate_assets_index_with_progress_inner(&mut zip, &zip_names, &manifest, &mut progress)?;
     let maps_json = validate_maps_json_with_progress_inner(&mut zip, &manifest, &mut progress)?;
+    let (object_layer_json, page_asset_bytes_by_path) =
+        validate_object_layer_in_package(&mut zip, &zip_names, &manifest)?;
     let history_files =
         validate_history_files_with_progress_inner(&mut zip, &zip_names, &manifest, &mut progress)?;
 
@@ -714,6 +827,8 @@ where
         csv_items,
         assets_index,
         asset_bytes_by_path,
+        object_layer_json,
+        page_asset_bytes_by_path,
         maps_json,
         history_files,
         input_file_size,
@@ -820,15 +935,22 @@ fn collect_import_id_maps(
         *value = new_project_id.to_string();
     }
 
+    let fresh = |table| -> Result<HashMap<String, String>, String> {
+        let mut ids = collect_id_map(&package.csv_items, table)?;
+        for mapped in ids.values_mut() {
+            *mapped = Uuid::now_v7().to_string();
+        }
+        Ok(ids)
+    };
     Ok(ImportIdMaps {
         projects,
-        categories: collect_id_map(&package.csv_items, WorldflowCsvTable::Categories)?,
-        tag_schemas: collect_id_map(&package.csv_items, WorldflowCsvTable::TagSchemas)?,
-        entry_types: collect_id_map(&package.csv_items, WorldflowCsvTable::EntryTypes)?,
-        entries: collect_id_map(&package.csv_items, WorldflowCsvTable::Entries)?,
-        entry_relations: collect_id_map(&package.csv_items, WorldflowCsvTable::EntryRelations)?,
-        entry_links: collect_id_map(&package.csv_items, WorldflowCsvTable::EntryLinks)?,
-        idea_notes: collect_id_map(&package.csv_items, WorldflowCsvTable::IdeaNotes)?,
+        categories: fresh(WorldflowCsvTable::Categories)?,
+        tag_schemas: fresh(WorldflowCsvTable::TagSchemas)?,
+        entry_types: fresh(WorldflowCsvTable::EntryTypes)?,
+        entries: fresh(WorldflowCsvTable::Entries)?,
+        entry_relations: fresh(WorldflowCsvTable::EntryRelations)?,
+        entry_links: fresh(WorldflowCsvTable::EntryLinks)?,
+        idea_notes: fresh(WorldflowCsvTable::IdeaNotes)?,
     })
 }
 
@@ -1187,7 +1309,7 @@ fn rewrite_fc_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, Str
             let entry_id = urlencoding::decode(parts[2])
                 .map_err(|e| format!("解析 fc 词条链接失败: {e}"))?
                 .to_string();
-            if id_maps.projects.contains_key(&project_id) {
+            if project_id == "self" || id_maps.projects.contains_key(&project_id) {
                 let mapped_entry =
                     required_mapped_id(&id_maps.entries, &entry_id, "entries.content fc entry")?;
                 output.push_str("self");
@@ -1764,6 +1886,8 @@ pub(super) fn prepare_fcworld_import(
     let (csv_items, project_name) =
         rewrite_csv_items_for_import(&package, &id_maps, &asset_targets, import_project_name)?;
     let (maps_json, map_count) = rewrite_maps_json_for_import(&package, &id_maps, &new_project_id)?;
+    let (object_layer_json, page_assets) =
+        object_layer::prepare(&package, &id_maps, paths, new_project_id)?;
 
     Ok(PreparedFcworldImport {
         package_id: package.manifest.package_id.clone(),
@@ -1771,10 +1895,12 @@ pub(super) fn prepare_fcworld_import(
         new_project_id,
         project_name,
         csv_items,
+        object_layer_json,
         assets,
+        page_assets,
         maps_json,
         history_files: package.history_files,
-        asset_count: package.assets_index.assets.len(),
+        asset_count: package.assets_index.assets.len() + package.page_asset_bytes_by_path.len(),
         map_count,
         input_file_size: package.input_file_size,
         warnings: Vec::new(),
@@ -1927,6 +2053,25 @@ mod tests {
             format!(
                 "fc://self [词条](fc://self/entry/{entry_id}) fc://{other_project_id}/entry/{entry_id}"
             )
+        );
+    }
+
+    #[test]
+    fn rewrite_fc_hrefs_remaps_entry_identity() {
+        let old_project_id = "11111111-1111-7111-8111-111111111111";
+        let old_entry_id = "aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa";
+        let new_entry_id = "bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb";
+        let mut id_maps = ImportIdMaps::default();
+        id_maps.projects.insert(
+            old_project_id.into(),
+            "22222222-2222-7222-8222-222222222222".into(),
+        );
+        id_maps
+            .entries
+            .insert(old_entry_id.into(), new_entry_id.into());
+        assert_eq!(
+            rewrite_entry_hrefs(&format!("[a](entry://{old_entry_id}) [b](fc://{old_project_id}/entry/{old_entry_id}) [c](fc://self/entry/{old_entry_id})"), &id_maps).expect("链接应重映射"),
+            format!("[a](entry://{new_entry_id}) [b](fc://self/entry/{new_entry_id}) [c](fc://self/entry/{new_entry_id})")
         );
     }
 

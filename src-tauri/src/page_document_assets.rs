@@ -96,6 +96,32 @@ fn inspect_image(
     Ok((format, media_type, extension, width, height))
 }
 
+/// 世界包导入前按与本地原件相同的媒体、容量、尺寸和摘要规则独立核验。
+pub(crate) fn validate_packaged_asset(
+    bytes: &[u8],
+    media_type: &str,
+    size_bytes: i64,
+    sha256: &str,
+    width: i64,
+    height: i64,
+) -> Result<(), ApiError> {
+    if bytes.len() as u64 > MAX_SOURCE_BYTES
+        || bytes.is_empty()
+        || i64::try_from(bytes.len()).ok() != Some(size_bytes)
+        || format!("{:x}", Sha256::digest(bytes)) != sha256
+    {
+        return Err(invalid("世界包页面资产大小或摘要不匹配"));
+    }
+    let (_, actual_media_type, _, actual_width, actual_height) = inspect_image(bytes)?;
+    if actual_media_type != media_type
+        || i64::from(actual_width) != width
+        || i64::from(actual_height) != height
+    {
+        return Err(invalid("世界包页面资产类型或尺寸不匹配"));
+    }
+    Ok(())
+}
+
 fn asset_root(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, ApiError> {
     let db_dir = paths
         .db_path
@@ -133,7 +159,10 @@ pub(crate) fn asset_path(
     Ok(root.join(format!("{}.{}", asset.id, extension)))
 }
 
-fn verified_bytes(paths: &PathsState, asset: &PageDocumentAsset) -> Result<Vec<u8>, ApiError> {
+pub(crate) fn verified_bytes(
+    paths: &PathsState,
+    asset: &PageDocumentAsset,
+) -> Result<Vec<u8>, ApiError> {
     let root = match asset.storage_layout {
         0 => asset_root(paths, &asset.project_id)?,
         1 => shared_asset_root(paths)?,

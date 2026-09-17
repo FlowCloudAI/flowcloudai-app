@@ -16,14 +16,17 @@ use crate::android_file_import::{copy_local_file_to_android_uri, is_android_cont
 
 use worldflow_core::{
     CsvExportItem, CsvExportScope, CsvImportBundle, CsvImportMode, CsvImportProgressPhase,
-    CsvImportResult, ProjectCsvExport, ProjectOps, WorldflowCsvTable, models::Project,
+    CsvImportResult, PageAssetOps, ProjectCsvExport, ProjectOps, WorldflowCsvTable,
+    models::Project,
 };
 
 mod import;
 
 const FCWORLD_FORMAT: &str = "com.flowcloudai.fcworld";
 const FCWORLD_FORMAT_VERSION: u32 = 1;
+const FCWORLD_OBJECT_FORMAT_VERSION: u32 = 2;
 const WORLD_DATA_DIR: &str = "data/worldflow/";
+const OBJECT_LAYER_PATH: &str = "data/page-document/object-layer-v2.json";
 const ASSETS_INDEX_PATH: &str = "assets/index.json";
 const MAPS_PATH: &str = "maps/maps.json";
 const HISTORY_SNAPSHOTS_DIR: &str = "history/snapshots/";
@@ -324,6 +327,7 @@ struct PreparedFcworldPackage {
     package_id: String,
     project_id: Uuid,
     csv_items: Vec<CsvExportItem>,
+    object_layer: Option<PackageObjectLayer>,
     assets_index_json: String,
     manifest_json: String,
     maps_json: String,
@@ -332,6 +336,12 @@ struct PreparedFcworldPackage {
     asset_count: usize,
     map_count: usize,
     warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PackageObjectLayer {
+    json: String,
+    assets: Vec<PackageAssetBytes>,
 }
 
 #[derive(Debug)]
@@ -387,6 +397,8 @@ struct ManifestContents {
     worldflow: ManifestWorldflowContents,
     assets_index: ManifestFile,
     maps: ManifestFile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    object_layer: Option<ManifestFile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     history: Option<ManifestFile>,
     counts: ManifestCounts,
@@ -1522,6 +1534,7 @@ fn build_manifest(
     maps_json: &str,
     map_count: usize,
     history_files: &[PackageHistoryFile],
+    object_layer: Option<&PackageObjectLayer>,
 ) -> Result<String, String> {
     let tables = csv_items
         .iter()
@@ -1548,10 +1561,17 @@ fn build_manifest(
     if has_history {
         features.push("gitHistory".to_string());
     }
+    if object_layer.is_some() {
+        features.push("pageDocumentObjectLayerV2".to_string());
+    }
 
     let manifest = FcworldManifest {
         format: FCWORLD_FORMAT.to_string(),
-        format_version: FCWORLD_FORMAT_VERSION,
+        format_version: if object_layer.is_some() {
+            FCWORLD_OBJECT_FORMAT_VERSION
+        } else {
+            FCWORLD_FORMAT_VERSION
+        },
         package_id: package_id.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
         generator: ManifestGenerator {
@@ -1590,6 +1610,11 @@ fn build_manifest(
                 count: map_count,
                 sha256: sha256_hex(maps_json.as_bytes()),
             },
+            object_layer: object_layer.map(|layer| ManifestFile {
+                path: OBJECT_LAYER_PATH.to_string(),
+                count: layer.assets.len(),
+                sha256: sha256_hex(layer.json.as_bytes()),
+            }),
             history: has_history.then(|| ManifestFile {
                 path: HISTORY_SNAPSHOTS_DIR.to_string(),
                 count: history_files.len(),
@@ -1603,7 +1628,7 @@ fn build_manifest(
                 relations: csv_row_count(csv_items, WorldflowCsvTable::EntryRelations),
                 entry_links: csv_row_count(csv_items, WorldflowCsvTable::EntryLinks),
                 idea_notes: csv_row_count(csv_items, WorldflowCsvTable::IdeaNotes),
-                images: asset_count,
+                images: asset_count + object_layer.map_or(0, |layer| layer.assets.len()),
                 maps: map_count,
             },
         },
@@ -1618,7 +1643,7 @@ fn prepare_fcworld_package(
     project: Project,
     export: ProjectCsvExport,
 ) -> Result<PreparedFcworldPackage, String> {
-    prepare_fcworld_package_with_progress(paths, project, export, false, |_| {})
+    prepare_fcworld_package_with_progress(paths, project, export, false, None, |_| {})
 }
 
 fn prepare_fcworld_package_with_progress<F>(
@@ -1626,6 +1651,7 @@ fn prepare_fcworld_package_with_progress<F>(
     project: Project,
     export: ProjectCsvExport,
     include_history: bool,
+    object_layer: Option<PackageObjectLayer>,
     mut on_asset: F,
 ) -> Result<PreparedFcworldPackage, String>
 where
@@ -1660,21 +1686,107 @@ where
         &maps_json,
         map_count,
         &history_files,
+        object_layer.as_ref(),
     )?;
+    let total_asset_count =
+        asset_count + object_layer.as_ref().map_or(0, |layer| layer.assets.len());
 
     Ok(PreparedFcworldPackage {
         package_id,
         project_id: project.id,
         csv_items,
+        object_layer,
         assets_index_json,
         manifest_json,
         maps_json,
         assets: package_assets,
         history_files,
-        asset_count,
+        asset_count: total_asset_count,
         map_count,
         warnings: Vec::new(),
     })
+}
+
+async fn prepare_page_document_export(
+    db: &SqliteDb,
+    paths: &PathsState,
+    project_id: Uuid,
+) -> Result<PackageObjectLayer, String> {
+    let mut assets = Vec::new();
+    for asset in db
+        .list_page_assets(&project_id)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        let verified =
+            crate::page_document_assets::require_asset(db, paths, &project_id, &asset.id)
+                .await
+                .map_err(|e| e.to_string())?;
+        let bytes = crate::page_document_assets::verified_bytes(paths, &verified)
+            .map_err(|e| e.to_string())?;
+        let extension = match verified.media_type.as_str() {
+            "image/png" => "png",
+            "image/jpeg" => "jpg",
+            "image/webp" => "webp",
+            _ => return Err(format!("页面资产类型不受支持：{}", verified.media_type)),
+        };
+        assets.push(PackageAssetBytes {
+            path: format!("assets/page-document/{}.{}", asset.id, extension),
+            bytes,
+        });
+    }
+    let json = db
+        .export_project_object_layer(project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PackageObjectLayer { json, assets })
+}
+
+async fn export_consistent_page_project(
+    db: &SqliteDb,
+    paths: &PathsState,
+    project_id: Uuid,
+) -> Result<(Project, ProjectCsvExport, PackageObjectLayer), String> {
+    // 旧资产路径若需迁移，先在锁外完成；正式导出再冻结数据库视图。
+    prepare_page_document_export(db, paths, project_id).await?;
+    let mut guard = db.pool.acquire().await.map_err(|e| e.to_string())?;
+    sqlx::query("BEGIN IMMEDIATE")
+        .execute(&mut *guard)
+        .await
+        .map_err(|e| format!("冻结世界包导出视图失败：{e}"))?;
+    let prepared = async {
+        let project = db
+            .get_project(&project_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut items = Vec::with_capacity(WorldflowCsvTable::ordered().len());
+        for table in WorldflowCsvTable::ordered() {
+            let item = db
+                .export_csv_table(*table, CsvExportScope::Project { project_id })
+                .await
+                .map_err(|e| e.to_string())?;
+            items.push(item);
+        }
+        let export = ProjectCsvExport {
+            project_id,
+            schema_version: db.worldflow_schema_version(),
+            bundle_format_version: worldflow_core::CSV_BUNDLE_FORMAT_VERSION,
+            items,
+        };
+        let object_layer = prepare_page_document_export(db, paths, project_id).await?;
+        Ok::<_, String>((project, export, object_layer))
+    }
+    .await;
+    let ending = if prepared.is_ok() {
+        "COMMIT"
+    } else {
+        "ROLLBACK"
+    };
+    sqlx::query(ending)
+        .execute(&mut *guard)
+        .await
+        .map_err(|e| format!("结束世界包导出视图失败：{e}"))?;
+    prepared
 }
 
 fn temp_output_path(output_path: &Path) -> Result<PathBuf, String> {
@@ -1743,6 +1855,14 @@ where
         let path = format!("{WORLD_DATA_DIR}{}", item.file_name);
         write_zip_entry(&mut zip, options, &path, item.content.as_bytes())?;
         on_entry(&path);
+    }
+    if let Some(layer) = &package.object_layer {
+        write_zip_entry(&mut zip, options, OBJECT_LAYER_PATH, layer.json.as_bytes())?;
+        on_entry(OBJECT_LAYER_PATH);
+        for asset in &layer.assets {
+            write_zip_entry(&mut zip, options, &asset.path, &asset.bytes)?;
+            on_entry(&asset.path);
+        }
     }
     write_zip_entry(
         &mut zip,
@@ -1939,7 +2059,7 @@ fn import_preview_from_package(
         project_name: project_name.clone(),
         suggested_name: suggested_import_project_name(&project_name, existing_projects),
         duplicate_project,
-        asset_count: package.assets_index.assets.len(),
+        asset_count: package.assets_index.assets.len() + package.page_asset_bytes_by_path.len(),
         map_count: package.manifest.contents.maps.count,
         history_file_count: package.history_files.len(),
         has_history: !package.history_files.is_empty(),
@@ -2035,6 +2155,29 @@ where
             .map_err(|e| format!("写入导入资源失败 {:?}: {e}", asset.target_path))?;
         let path_text = asset.target_path.to_string_lossy();
         on_file(path_text.as_ref());
+    }
+    for asset in &package.page_assets {
+        if let Some(parent) = asset.target_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建共享页面资产目录失败 {:?}: {e}", parent))?;
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&asset.target_path)
+            .map_err(|e| format!("写入共享页面资产失败 {:?}: {e}", asset.target_path))?;
+        if let Err(error) = file.write_all(&asset.bytes).and_then(|()| file.sync_all()) {
+            drop(file);
+            let cleanup = std::fs::remove_file(&asset.target_path);
+            return Err(match cleanup {
+                Ok(()) => format!("写入共享页面资产失败 {:?}: {error}", asset.target_path),
+                Err(cleanup_error) => format!(
+                    "写入共享页面资产失败 {:?}: {error}；清理不完整文件失败：{cleanup_error}",
+                    asset.target_path
+                ),
+            });
+        }
+        on_file(&asset.target_path.to_string_lossy());
     }
 
     let map_path = map_store_path(paths, &package.new_project_id)?;
@@ -2229,7 +2372,7 @@ async fn import_fcworld_package_to_db(
         .import_csvs_with_progress(
             CsvImportBundle {
                 items: prepared.csv_items.clone(),
-                object_layer_json: None,
+                object_layer_json: prepared.object_layer_json.clone(),
             },
             CsvImportMode::Merge,
             |event| match event.phase {
@@ -2426,7 +2569,7 @@ async fn import_fcworld_package_to_world_store(
         .import_csvs_with_progress(
             CsvImportBundle {
                 items: prepared.csv_items.clone(),
-                object_layer_json: None,
+                object_layer_json: prepared.object_layer_json.clone(),
             },
             CsvImportMode::Merge,
             |event| match event.phase {
@@ -2633,32 +2776,14 @@ pub async fn db_export_project_fcworld(
         let (output_path_buf, android_output_uri) =
             resolve_fcworld_export_target(paths.inner(), &output_path)?;
 
-        let (project, export) = {
-            let db = open_project_db(state.inner(), &project_id).await?;
-            progress.note("export_csv", "导出 CSV 数据");
-            let project = db
-                .get_project(&project_id)
-                .await
-                .map_err(|e| e.to_string())?;
-            let mut items = Vec::with_capacity(WorldflowCsvTable::ordered().len());
-            for table in WorldflowCsvTable::ordered() {
-                let item = db
-                    .export_csv_table(*table, CsvExportScope::Project { project_id })
-                    .await
-                    .map_err(|e| e.to_string())?;
-                items.push(item);
-            }
-            let export = ProjectCsvExport {
-                project_id,
-                schema_version: db.worldflow_schema_version(),
-                bundle_format_version: worldflow_core::CSV_BUNDLE_FORMAT_VERSION,
-                items,
-            };
-            (project, export)
-        };
+        let db = open_project_db(state.inner(), &project_id).await?;
+        progress.note("export_csv", "导出 CSV 数据");
+        let (project, export, object_layer) =
+            export_consistent_page_project(&db, paths.inner(), project_id).await?;
 
         let csv_total = export.items.len();
-        let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?;
+        let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?
+            + object_layer.assets.len();
         let history_total = if include_history {
             count_history_files(&world_snapshots_dir(paths.inner(), &project_id)?)?
         } else {
@@ -2685,6 +2810,7 @@ pub async fn db_export_project_fcworld(
             project,
             export,
             include_history,
+            Some(object_layer),
             |path| {
                 progress.step("export_assets", format!("已处理资源：{path}"));
             },
@@ -2790,10 +2916,12 @@ mod tests {
     use std::io::{Cursor, Read};
     use tempfile::TempDir;
     use worldflow_core::{
-        CategoryOps, EntryOps, EntryTypeOps, ProjectOps, SqliteDb, TagSchemaOps,
+        CategoryOps, EntryOps, EntryTypeOps, PageAssetOps, PageDocumentOps, ProjectOps, SqliteDb,
+        TagSchemaOps,
         models::{
             CreateCategory, CreateCustomEntryType, CreateEntry, CreateProject, CreateTagSchema,
-            EntryFilter, EntryTag, FCImage,
+            EntryFilter, EntryTag, FCImage, PageDocumentAsset, PageDocumentProjection,
+            PageTextBlock, SaveEntryLinkTarget,
         },
     };
     use zip::ZipArchive;
@@ -2850,6 +2978,283 @@ mod tests {
 
     fn disabled_import_progress() -> FcworldProgressTracker {
         FcworldProgressTracker::new(FcworldProgressEmitter::disabled("import"), 0)
+    }
+
+    #[tokio::test]
+    async fn page_document_world_package_roundtrips_twice_with_assets_links_and_search() {
+        let (source_dir, source_db, source_paths) = new_test_db("page_world_source").await;
+        let project = source_db
+            .create_project(CreateProject {
+                name: "页面世界".into(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .unwrap();
+        let target = source_db
+            .create_entry(CreateEntry {
+                project_id: project.id,
+                category_id: None,
+                title: "目标词条".into(),
+                summary: None,
+                content: None,
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .unwrap();
+        let entry = source_db
+            .create_entry(CreateEntry {
+                project_id: project.id,
+                category_id: None,
+                title: "来源词条".into(),
+                summary: None,
+                content: None,
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .unwrap();
+        let asset_id = Uuid::now_v7();
+        let bytes = png_bytes();
+        let asset = PageDocumentAsset {
+            id: asset_id,
+            project_id: project.id,
+            media_type: "image/png".into(),
+            size_bytes: bytes.len() as i64,
+            sha256: sha256_hex(&bytes),
+            width: 1,
+            height: 1,
+            storage_layout: 1,
+            created_at: String::new(),
+        };
+        let asset_path = crate::page_document_assets::asset_path(&source_paths, &asset).unwrap();
+        std::fs::create_dir_all(asset_path.parent().unwrap()).unwrap();
+        std::fs::write(&asset_path, &bytes).unwrap();
+        source_db.register_page_asset(&asset).await.unwrap();
+        let node_id = Uuid::now_v7();
+        let html = format!(
+            "<p data-fc-node-id='{node_id}' data-fc-node-kind='paragraph'>海潮正文 <a href='entry://{}'>目标</a></p><img src='fcasset://{asset_id}'>",
+            target.id
+        );
+        let validation =
+            crate::document_validation::validate(&html, "", Some(&project.id.to_string()));
+        assert!(validation.valid, "{:?}", validation.diagnostics);
+        let projection = PageDocumentProjection {
+            text_blocks: validation
+                .text_blocks
+                .iter()
+                .map(|block| PageTextBlock {
+                    node_id: block.node_id,
+                    text: block.text.clone(),
+                })
+                .collect(),
+            asset_ids: validation.asset_ids.clone(),
+        };
+        source_db
+            .save_entry_page_document(
+                &entry.id,
+                &project.id,
+                &html,
+                "",
+                &validation.derived_text,
+                &[SaveEntryLinkTarget {
+                    entry_id: Some(target.id),
+                    title: String::new(),
+                }],
+                &projection,
+                None,
+                "page-save",
+                "local",
+            )
+            .await
+            .unwrap();
+        let home_html = "<main><p>首页海潮</p></main>";
+        let home_validation =
+            crate::document_validation::validate(home_html, "", Some(&project.id.to_string()));
+        assert!(home_validation.valid);
+        source_db
+            .save_project_home_document(
+                &project.id,
+                home_html,
+                "",
+                &home_validation.derived_text,
+                &PageDocumentProjection::default(),
+                None,
+                "home-save",
+                "local",
+            )
+            .await
+            .unwrap();
+
+        let (_, export, layer) =
+            export_consistent_page_project(&source_db, &source_paths, project.id)
+                .await
+                .unwrap();
+        let package = prepare_fcworld_package_with_progress(
+            &source_paths,
+            project.clone(),
+            export,
+            false,
+            Some(layer),
+            |_| {},
+        )
+        .unwrap();
+        let path = source_dir.path().join("页面世界.fcworld");
+        write_fcworld_package(&package, &path).unwrap();
+        let manifest: Value = serde_json::from_str(&package.manifest_json).unwrap();
+        assert_eq!(manifest["formatVersion"], FCWORLD_OBJECT_FORMAT_VERSION);
+
+        let inspected =
+            import::read_and_validate_fcworld_package(&path, source_db.worldflow_schema_version())
+                .unwrap();
+        let prepared = import::prepare_fcworld_import(inspected, &source_paths, "预检").unwrap();
+        let payload: Value =
+            serde_json::from_str(prepared.object_layer_json.as_ref().unwrap()).unwrap();
+        assert_eq!(
+            payload["entry_documents"][0]["validated_link_targets"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            payload["entry_documents"][0]["validated_link_targets"][0]["entry_id"]
+                .as_str()
+                .is_some()
+        );
+
+        let (_target_dir, target_db, target_paths) = new_test_db("page_world_target").await;
+        for index in 0..2 {
+            let result = import_fcworld_package_to_db(
+                &target_db,
+                &target_paths,
+                &path,
+                Some(FcworldImportOptions {
+                    mode: FcworldImportMode::Rename,
+                    project_name: Some(format!("页面世界导入{index}")),
+                    overwrite_project_id: None,
+                }),
+                disabled_import_progress(),
+            )
+            .await
+            .unwrap();
+            let imported_project = Uuid::parse_str(&result.project_id).unwrap();
+            let imported_entry: Uuid = sqlx::query_scalar(
+                "SELECT id FROM entries WHERE project_id=? AND title='来源词条'",
+            )
+            .bind(imported_project)
+            .fetch_one(&target_db.pool)
+            .await
+            .unwrap();
+            let imported_target: Uuid = sqlx::query_scalar(
+                "SELECT id FROM entries WHERE project_id=? AND title='目标词条'",
+            )
+            .bind(imported_project)
+            .fetch_one(&target_db.pool)
+            .await
+            .unwrap();
+            assert_ne!(imported_entry, entry.id);
+            assert_ne!(imported_target, target.id);
+            let page = target_db
+                .get_entry_page_document(&imported_entry)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(page.html.contains(&format!("entry://{imported_target}")));
+            assert!(page.html.contains(&format!("fcasset://{asset_id}")));
+            assert_eq!(
+                target_db
+                    .get_page_asset(&imported_project, &asset_id)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .sha256,
+                asset.sha256
+            );
+            assert_eq!(
+                target_db
+                    .search_entries(&imported_project, "海潮正文", EntryFilter::default(), 20)
+                    .await
+                    .unwrap()
+                    .len(),
+                1
+            );
+            assert!(
+                target_db
+                    .get_project_home_document(&imported_project)
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+            assert_eq!(
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT COUNT(*) FROM entry_links WHERE a_id=? AND b_id=?"
+                )
+                .bind(imported_entry)
+                .bind(imported_target)
+                .fetch_one(&target_db.pool)
+                .await
+                .unwrap(),
+                1
+            );
+        }
+        for case in ["html", "digest", "missing"] {
+            let mut layer = prepare_page_document_export(&source_db, &source_paths, project.id)
+                .await
+                .unwrap();
+            if case == "html" {
+                let mut value: Value = serde_json::from_str(&layer.json).unwrap();
+                value["entry_documents"][0]["html"] = json!("<script>不可信内容</script>");
+                layer.json = serde_json::to_string(&value).unwrap();
+            }
+            let mut bad_package = prepare_fcworld_package_with_progress(
+                &source_paths,
+                project.clone(),
+                source_db.export_project_csvs(project.id).await.unwrap(),
+                false,
+                Some(layer),
+                |_| {},
+            )
+            .unwrap();
+            if case == "digest" {
+                bad_package.object_layer.as_mut().unwrap().assets[0].bytes[0] ^= 1;
+            }
+            if case == "missing" {
+                bad_package.object_layer.as_mut().unwrap().assets.clear();
+            }
+            let bad_path = source_dir.path().join(format!("不可信-{case}.fcworld"));
+            write_fcworld_package(&bad_package, &bad_path).unwrap();
+            let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM projects")
+                .fetch_one(&target_db.pool)
+                .await
+                .unwrap();
+            assert!(
+                import_fcworld_package_to_db(
+                    &target_db,
+                    &target_paths,
+                    &bad_path,
+                    Some(FcworldImportOptions {
+                        mode: FcworldImportMode::Rename,
+                        project_name: Some(format!("不可信-{case}")),
+                        overwrite_project_id: None
+                    }),
+                    disabled_import_progress()
+                )
+                .await
+                .is_err(),
+                "{case}"
+            );
+            let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM projects")
+                .fetch_one(&target_db.pool)
+                .await
+                .unwrap();
+            assert_eq!(after, before, "{case} 不得留下项目");
+        }
     }
 
     #[tokio::test]
@@ -2930,7 +3335,7 @@ mod tests {
         let source_project_id = project.id;
         let mut asset_progress = Vec::new();
         let package =
-            prepare_fcworld_package_with_progress(&paths, project, export, false, |path| {
+            prepare_fcworld_package_with_progress(&paths, project, export, false, None, |path| {
                 asset_progress.push(path.to_string());
             })
             .expect("准备 fcworld 失败");
@@ -3112,8 +3517,9 @@ mod tests {
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package = prepare_fcworld_package_with_progress(&paths, project, export, true, |_| {})
-            .expect("准备带历史 fcworld 失败");
+        let package =
+            prepare_fcworld_package_with_progress(&paths, project, export, true, None, |_| {})
+                .expect("准备带历史 fcworld 失败");
         assert_eq!(package.history_files.len(), 2);
 
         let output_path = temp.path().join("历史世界.fcworld");
@@ -3168,7 +3574,9 @@ mod tests {
             new_project_id: project_id,
             project_name: "导入世界".to_string(),
             csv_items: Vec::new(),
+            object_layer_json: None,
             assets: Vec::new(),
+            page_assets: Vec::new(),
             maps_json: json!({
                 "projectId": project_id.to_string(),
                 "maps": []
@@ -3355,16 +3763,16 @@ mod tests {
             .id_maps
             .entries
             .get(&target.id.to_string())
-            .expect("目标词条应保留 ID");
+            .expect("目标词条应建立新 ID 映射");
         let schema_id = prepared
             .id_maps
             .tag_schemas
             .get(&tag_schema.id.to_string())
-            .expect("标签应保留 ID");
+            .expect("标签应建立新 ID 映射");
         let new_project_id = prepared.new_project_id.to_string();
 
         assert_ne!(new_project_id, project.id.to_string());
-        assert_eq!(target_id, &target.id.to_string());
+        assert_ne!(target_id, &target.id.to_string());
         assert_eq!(prepared.project_name, "引用世界【导入】");
         assert_eq!(prepared.map_count, 1);
         assert_eq!(prepared.asset_count, 1);
@@ -3386,7 +3794,11 @@ mod tests {
             .map(|item| item.content.as_str())
             .expect("应包含 entries.csv");
         assert!(entries_csv.contains(&format!("entry://{target_id}")));
-        assert!(entries_csv.contains(&format!("fc://self/entry/{target_id}")));
+        assert!(
+            entries_csv.contains(&format!("fc://self/entry/{target_id}")),
+            "old={} mapped={target_id}\n{entries_csv}",
+            target.id
+        );
         assert!(entries_csv.contains("fc://self"));
         assert!(entries_csv.contains(schema_id));
 
@@ -3754,6 +4166,15 @@ mod tests {
         let output_path = temp.path().join("回滚世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
+        // 注入数据库写入中途失败，验证覆盖目标不会被提前删除。
+        sqlx::query(
+            "CREATE TRIGGER reject_imported_entry BEFORE INSERT ON entries \
+             BEGIN SELECT RAISE(ABORT, 'injected import failure'); END",
+        )
+        .execute(&db.pool)
+        .await
+        .expect("注入导入失败触发器");
+
         let error = import_fcworld_package_to_db(
             &db,
             &paths,
@@ -3766,8 +4187,8 @@ mod tests {
             disabled_import_progress(),
         )
         .await
-        .expect_err("实体 ID 冲突时覆盖导入应回滚");
-        assert!(error.contains("fcworld 导入行数不匹配"));
+        .expect_err("数据库写入失败时覆盖导入应回滚");
+        assert!(error.contains("injected import failure"));
 
         let projects = db.list_projects().await.expect("读取项目列表失败");
         assert_eq!(projects.len(), 1, "失败导入不应留下临时项目");
