@@ -147,4 +147,60 @@ describe('现有页面图片说明的安全切片', () => {
         assert.equal(original.model.entry.sources['article.html'], source)
         assert.equal(original.persistedRevision, 3)
     })
+
+    it('含 HTML 注释的图注按结构化内容确认替换，取消时不丢注释', () => {
+        const source = article().replace(
+            '<figcaption>旧图注</figcaption>',
+            '<figcaption><!--作者注释-->旧图注</figcaption>',
+        )
+        const original = session(source)
+        const image = readManagedImageDescription(original.model.entry.sources['article.html'], NODE_ID)
+        assert.ok(image)
+        assert.equal(image.captionKind, 'structured')
+        assert.equal(image.caption, '旧图注')
+        const request = createImageDescriptionEditRequest(image, {
+            alt: image.alt, caption: '新图注',
+        }, () => 'comment-caption')
+        assert.ok(request)
+        const runtime = createDocumentKernelDraftRuntime()
+        const prepared = runtime.prepare(original.model, original.snapshot, request)
+        assert.equal(prepared.status, 'needs-decision', JSON.stringify(prepared))
+        if (prepared.status !== 'needs-decision') return
+        assert.ok(prepared.decisions.some(decision => decision.code === 'asset-caption-structured-replacement'))
+        // 用户取消确认时不应用候选，原注释与 revision 必须原样保留。
+        assert.equal(original.model.entry.sources['article.html'], source)
+        assert.equal(original.persistedRevision, 3)
+
+        const applied = runtime.applyPrepared(original.model, original.snapshot, prepared.edit, '修改图片说明')
+        assert.equal(applied.applied, true, JSON.stringify(applied.diagnostics))
+        const changed = acceptEntryDocumentVisualUpdate(original, applied)
+        assert.equal(changed.model.entry.sources['article.html'], article().replace(
+            '<figcaption>旧图注</figcaption>', '<figcaption>新图注</figcaption>',
+        ))
+        assert.equal(changed.persistedRevision, 3)
+        assert.equal(undoEntryDocumentSession(changed).model.entry.sources['article.html'], source)
+    })
+
+    it('含 HTML 注释的图注仅修改 alt 时保留完整图注、引用和无关源码', () => {
+        const source = article().replace(
+            '<figcaption>旧图注</figcaption>',
+            '<figcaption><!--作者注释-->旧图注</figcaption>',
+        )
+        const original = session(source)
+        const image = readManagedImageDescription(source, NODE_ID)
+        assert.ok(image)
+        const request = createImageDescriptionEditRequest(image, {
+            alt: '新说明', caption: image.caption,
+        }, () => 'comment-caption-alt-only')
+        assert.ok(request)
+        const runtime = createDocumentKernelDraftRuntime()
+        const prepared = runtime.prepare(original.model, original.snapshot, request)
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const applied = runtime.applyPrepared(original.model, original.snapshot, prepared.edit, '修改图片说明')
+        assert.equal(applied.applied, true, JSON.stringify(applied.diagnostics))
+        const changed = acceptEntryDocumentVisualUpdate(original, applied)
+        assert.equal(changed.model.entry.sources['article.html'], source.replace('alt="旧说明"', 'alt="新说明"'))
+        assert.equal(changed.model.entry.sources['style.css'], '/* keep-css */')
+    })
 })

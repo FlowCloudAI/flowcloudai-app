@@ -96,7 +96,8 @@ export function readManagedImageDescription(
     const captionKind = !caption
         ? 'absent'
         : children(caption).every(child =>
-            !isElement(child) || (child.tagName === 'br' && child.attrs.length === 0))
+            child.nodeName === '#text' ||
+            (isElement(child) && child.tagName === 'br' && child.attrs.length === 0))
             ? 'plain'
             : 'structured'
     const expectedAlt = attribute(image, 'alt')
