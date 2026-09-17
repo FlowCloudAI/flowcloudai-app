@@ -2917,7 +2917,7 @@ mod tests {
     use tempfile::TempDir;
     use worldflow_core::{
         CategoryOps, EntryOps, EntryTypeOps, PageAssetOps, PageDocumentOps, ProjectOps, SqliteDb,
-        TagSchemaOps,
+        TagSchemaOps, WorldStore, WorldStoreConfig,
         models::{
             CreateCategory, CreateCustomEntryType, CreateEntry, CreateProject, CreateTagSchema,
             EntryFilter, EntryTag, FCImage, PageDocumentAsset, PageDocumentProjection,
@@ -3203,6 +3203,53 @@ mod tests {
                 1
             );
         }
+        let (world_dir, index_db, world_paths) = new_test_db("page_world_store_target").await;
+        let state = AppState {
+            sqlite_db: tokio::sync::Mutex::new(index_db.clone()),
+            world_store: WorldStore::open_with_config(WorldStoreConfig::new(
+                world_dir.path().join("worlds"),
+            ))
+            .await
+            .unwrap(),
+            thumbnail_jobs: tokio::sync::Mutex::new(HashMap::new()),
+        };
+        let world_result = import_fcworld_package_to_world_store(
+            &index_db,
+            &state,
+            &world_paths,
+            &path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Rename,
+                project_name: Some("世界库页面导入".into()),
+                overwrite_project_id: None,
+            }),
+            disabled_import_progress(),
+        )
+        .await
+        .unwrap();
+        let world_project = Uuid::parse_str(&world_result.project_id).unwrap();
+        assert!(index_db.get_project(&world_project).await.is_ok());
+        let world_db = state.world_store.open_world(world_project).await.unwrap();
+        let world_entry: Uuid =
+            sqlx::query_scalar("SELECT id FROM entries WHERE project_id=? AND title='来源词条'")
+                .bind(world_project)
+                .fetch_one(&world_db.pool)
+                .await
+                .unwrap();
+        assert!(
+            world_db
+                .get_entry_page_document(&world_entry)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            world_db
+                .get_page_asset(&world_project, &asset_id)
+                .await
+                .unwrap()
+                .is_some()
+        );
         for case in ["html", "digest", "missing"] {
             let mut layer = prepare_page_document_export(&source_db, &source_paths, project.id)
                 .await
