@@ -1,7 +1,7 @@
 // 本组件拥有 iframe 与 bridge 会话；业务页面只接收已鉴权的选择、错误和导航意图。
 
 import classNames from 'classnames'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref} from 'react'
 import {
     createCanvasHostCommandFactory,
     createCanvasRequestId,
@@ -21,6 +21,7 @@ import {canvasRectToHostViewport} from './linkHoverGeometry.ts'
 import './PageDocumentCanvas.css'
 
 export interface PageDocumentCanvasProps {
+    ref?: Ref<PageDocumentCanvasHandle>
     documentKey: string
     html: string
     css: string
@@ -43,7 +44,12 @@ export interface PageDocumentCanvasProps {
     onRendered?: () => void
 }
 
+export interface PageDocumentCanvasHandle {
+    resolveLinkCandidate(intentId: string, resolution: CanvasInputResolution): void
+}
+
 export function PageDocumentCanvas({
+    ref,
     documentKey,
     html,
     css,
@@ -107,6 +113,13 @@ export function PageDocumentCanvas({
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
     }, [session])
+
+    useImperativeHandle(ref, () => ({
+        resolveLinkCandidate(intentId, resolution) {
+            if (!loadedRef.current) return
+            send({type: 'resolve-input', intentId, accepted: resolution.accepted, selection: resolution.selection})
+        },
+    }), [send])
 
     const sendViewport = useCallback(() => {
         const rect = frameRef.current?.getBoundingClientRect()

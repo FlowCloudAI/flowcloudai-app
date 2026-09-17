@@ -22,6 +22,8 @@ interface OverlayProps {
     onClose?: () => void
     /** 背板点击 / Esc / 返回键是否关闭，默认 true。需强制用户做选择时传 false。 */
     dismissible?: boolean
+    /** 非模态建议浮层保留原输入焦点，不遮挡背景交互。 */
+    passive?: boolean
     variant?: OverlayVariant
     /** 浮层外壳附加类名，用于变体组件调整背板或安全区。 */
     layerClassName?: string
@@ -41,6 +43,7 @@ export default function Overlay({
     open,
     onClose,
     dismissible = true,
+    passive = false,
     variant = 'floating',
     layerClassName,
     className,
@@ -140,21 +143,27 @@ export default function Overlay({
         })
 
         const bodyOverflow = document.body.style.overflow
-        document.body.style.overflow = 'hidden'
+        if (!passive) document.body.style.overflow = 'hidden'
 
-        const prevFocus = document.activeElement as HTMLElement | null
-        const focusRaf = requestAnimationFrame(() => {
+        const prevFocus = passive ? null : document.activeElement as HTMLElement | null
+        const focusRaf = passive ? 0 : requestAnimationFrame(() => {
             if (document.activeElement && panelRef.current?.contains(document.activeElement)) return
             panelRef.current?.focus()
         })
+        const onOutsidePointerDown = (event: PointerEvent) => {
+            if (!passive || !shouldDismissOverlay(dismissibleRef.current, isAlertModalOpenRef.current)) return
+            if (event.target instanceof Node && !panelRef.current?.contains(event.target)) onCloseRef.current?.()
+        }
+        if (passive) document.addEventListener('pointerdown', onOutsidePointerDown, true)
 
         return () => {
+            if (passive) document.removeEventListener('pointerdown', onOutsidePointerDown, true)
             removeOverlay(id)
-            document.body.style.overflow = bodyOverflow
+            if (!passive) document.body.style.overflow = bodyOverflow
             cancelAnimationFrame(focusRaf)
             prevFocus?.focus?.()
         }
-    }, [open])
+    }, [open, passive])
 
     useEffect(() => {
         if (!open) return
@@ -178,7 +187,7 @@ export default function Overlay({
 
     return createPortal(
         <div
-            className={`fc-overlay fc-overlay--${variant}${layerClassName ? ` ${layerClassName}` : ''}`}
+            className={`fc-overlay fc-overlay--${variant}${passive ? ' fc-overlay--passive' : ''}${layerClassName ? ` ${layerClassName}` : ''}`}
             data-state={active ? 'open' : 'closed'}
             style={overlayStyle}
             onMouseDown={(e) => {
@@ -193,7 +202,7 @@ export default function Overlay({
                 ref={panelRef}
                 className={`fc-overlay__panel fc-overlay__panel--${variant}${className ? ` ${className}` : ''}`}
                 role="dialog"
-                aria-modal="true"
+                aria-modal={passive ? undefined : 'true'}
                 aria-label={ariaLabel}
                 aria-labelledby={labelledBy}
                 data-tour-id={dataTourId}

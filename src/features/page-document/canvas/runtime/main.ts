@@ -411,7 +411,20 @@ function resolveInput(
     accepted: boolean,
     selection: {nodeId: string; offset: number} | null,
 ): void {
-    if (!pendingInputIds.delete(intentId.toLowerCase())) return
+    if (!pendingInputIds.delete(intentId.toLowerCase())) {
+        const candidate = linkCandidate.accept(intentId)
+        if (!candidate) return
+        if (accepted && selection?.nodeId === candidate.nodeId) {
+            pendingResolvedSelection = selection
+            const node = findManagedNode(selection.nodeId)
+            if (node && !semanticText(node).slice(candidate.from).startsWith('[[')) {
+                node.focus({preventScroll: true})
+                restoreTextSelection({nodeId: selection.nodeId, from: selection.offset, to: selection.offset, expected: '', collapsed: true})
+                pendingResolvedSelection = null
+            }
+        }
+        return
+    }
     if (!accepted) rejectedInputPending = true
     if (accepted && selection) pendingResolvedSelection = selection
     if (pendingInputIds.size > 0 || composition.isComposing) return

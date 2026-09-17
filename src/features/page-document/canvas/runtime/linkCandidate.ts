@@ -46,6 +46,12 @@ export function createCanvasLinkCandidateTracker(createId: () => string = () => 
     }
 
     return {
+        accept(intentId: string): ActiveCandidate | null {
+            if (active?.intentId !== intentId.toLowerCase()) return null
+            const accepted = active
+            active = null
+            return accepted
+        },
         update(snapshot: CandidateSnapshot | null): CandidatePayload[] {
             const candidate = snapshot && findCanvasLinkCandidate(snapshot.text, snapshot.caret)
             if (!snapshot || !candidate) {

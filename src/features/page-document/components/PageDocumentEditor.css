@@ -1,5 +1,47 @@
 /* 页面文档编辑壳只使用宿主语义 token；画布内部主题仍由隔离运行时负责。 */
 
+.page-document-editor__link-candidate-layer {
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: var(--fc-space-xl);
+}
+
+.page-document-editor__link-candidate {
+    width: min(28rem, 100%);
+    padding-bottom: var(--fc-space-sm);
+}
+
+.page-document-editor__link-candidate-query {
+    padding: 0 var(--fc-space-lg) var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+}
+
+.page-document-editor__link-candidate-list {
+    display: grid;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
+.page-document-editor__link-candidate-list button {
+    padding: var(--fc-space-sm) var(--fc-space-lg);
+    border: 0;
+    background: transparent;
+    color: var(--fc-color-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.page-document-editor__link-candidate-list button:hover,
+.page-document-editor__link-candidate-list button:focus-visible {
+    background: var(--fc-color-bg-secondary);
+}
+
+.page-document-editor__link-candidate-list p {
+    margin: 0;
+    padding: var(--fc-space-sm) var(--fc-space-lg);
+    color: var(--fc-color-text-secondary);
+}
+
 .page-document-editor {
     display: grid;
     grid-template-rows: auto auto minmax(36rem, 1fr) auto;

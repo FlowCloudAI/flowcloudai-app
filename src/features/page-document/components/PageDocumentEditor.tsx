@@ -3,6 +3,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
 import {createLayerProjection} from '../domain/layerProjection.ts'
@@ -11,7 +12,10 @@ import {
     resolveVisualSelection,
     type VisualSelectionSource,
 } from '../application/visualSelectionModel.ts'
-import {PageDocumentCanvas} from '../canvas/host/PageDocumentCanvas.tsx'
+import {PageDocumentCanvas, type PageDocumentCanvasHandle} from '../canvas/host/PageDocumentCanvas.tsx'
+import {CANVAS_EDITABLE_KINDS, type CanvasLinkCandidateIntentMessage} from '../canvas/protocol/index.ts'
+import {pageDocumentLinkCandidates} from '../application/linkCandidateSelection.ts'
+import type {EntryBrief} from '../../../api/worldflow.ts'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
 import {PageDocumentLayerTree} from './layers/PageDocumentLayerTree.tsx'
 import {pageDocumentLayerLabel} from './layers/layerTreePresentation.ts'
@@ -50,6 +54,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         title,
         summary,
         markdown,
+        projectEntries,
         resetVersion,
         onDirtyChange,
         onSavedDerivedText,
@@ -59,6 +64,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
+    const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
+    const canvasRef = useRef<PageDocumentCanvasHandle>(null)
+    const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
     const session = useEntryPageDocumentSession({
         entryId,
@@ -159,6 +167,36 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         setSelectedNodeId(resolveVisualSelection(layerProjection.nodes, nodeId, source))
     }
 
+    const handleLinkCandidateIntent = (message: CanvasLinkCandidateIntentMessage) => {
+        if (committingCandidateRef.current) return
+        if (message.query === null) {
+            setLinkCandidateIntent(current => current?.intentId === message.intentId ? null : current)
+            return
+        }
+        const target = findLayerNode(layerProjection.nodes, message.nodeId)
+        if (active && mode === 'visual' && target && CANVAS_EDITABLE_KINDS.some(kind => kind === target.kind)) {
+            setLinkCandidateIntent(message)
+        }
+    }
+
+    const changeMode = (nextMode: PageDocumentWorkspaceMode) => {
+        setLinkCandidateIntent(null)
+        setMode(nextMode)
+    }
+
+    const commitLinkCandidate = async (entry: EntryBrief) => {
+        const candidate = linkCandidateIntent
+        if (!candidate || committingCandidateRef.current) return
+        committingCandidateRef.current = candidate.intentId
+        setLinkCandidateIntent(null)
+        try {
+            const resolution = await session.applyLinkCandidateSelection(candidate, entry)
+            canvasRef.current?.resolveLinkCandidate(candidate.intentId, resolution)
+        } finally {
+            committingCandidateRef.current = null
+        }
+    }
+
     if (loadView === 'error') {
         return (
             <div className="page-document-editor-state is-error" role="alert">
@@ -197,6 +235,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         host: dockHost,
     }) ? dockHost : null
     const forwardsNavigation = shouldForwardPageDocumentNavigation(mode)
+    const visibleCandidate = active && mode === 'visual' ? linkCandidateIntent : null
+    const linkCandidates = visibleCandidate?.query !== null && visibleCandidate
+        ? pageDocumentLinkCandidates(projectEntries, entryId, visibleCandidate.query)
+        : []
 
     return (
         <>
@@ -225,6 +267,34 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 dockPortalHost,
             )}
             <section className="page-document-editor">
+            {visibleCandidate && <FloatingPanel
+                open
+                passive
+                onClose={() => setLinkCandidateIntent(null)}
+                title="选择词条双链"
+                className="page-document-editor__link-candidate"
+                layerClassName="page-document-editor__link-candidate-layer"
+            >
+                <div className="page-document-editor__link-candidate-query">
+                    {visibleCandidate?.query || '继续输入词条名…'}
+                </div>
+                <div className="page-document-editor__link-candidate-list">
+                    {linkCandidates.map(entry => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            onPointerDown={event => {
+                                event.preventDefault()
+                                void commitLinkCandidate(entry)
+                            }}
+                            onClick={() => void commitLinkCandidate(entry)}
+                        >
+                            {entry.title}
+                        </button>
+                    ))}
+                    {linkCandidates.length === 0 && <p>没有匹配的词条</p>}
+                </div>
+            </FloatingPanel>}
             <header className="page-document-editor__workbar">
                 <strong>页面编辑</strong>
                 <span className="page-document-editor__separator" aria-hidden="true" />
@@ -233,13 +303,13 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         type="button"
                         className={mode === 'visual' ? 'is-active' : ''}
                         aria-pressed={mode === 'visual'}
-                        onClick={() => setMode('visual')}
+                        onClick={() => changeMode('visual')}
                     >可视</button>
                     <button
                         type="button"
                         className={mode === 'display' ? 'is-active' : ''}
                         aria-pressed={mode === 'display'}
-                        onClick={() => setMode('display')}
+                        onClick={() => changeMode('display')}
                     >
                         展示
                     </button>
@@ -247,7 +317,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         type="button"
                         className={mode === 'code' ? 'is-active' : ''}
                         aria-pressed={mode === 'code'}
-                        onClick={() => setMode('code')}
+                        onClick={() => changeMode('code')}
                     >
                         代码
                     </button>
@@ -294,11 +364,12 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         <div className="page-document-editor__page-card">
                             {state.preview?.html != null && state.preview.css != null ? (
                                 <PageDocumentCanvas
+                                    ref={canvasRef}
                                     documentKey={entryId}
                                     html={state.preview.html}
                                     css={state.preview.css}
                                     minimumHeight={560}
-                                    editingEnabled={mode === 'visual'}
+                                    editingEnabled={active && mode === 'visual'}
                                     selectedNodeId={mode === 'visual' ? selectedNodeId : null}
                                     onSelectionChange={mode === 'visual'
                                         ? nodeId => handleSelection(nodeId, 'canvas')
@@ -316,6 +387,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     onHistoryIntent={mode === 'visual'
                                         ? action => action === 'undo' ? session.undo() : session.redo()
                                         : undefined}
+                                    onLinkCandidateIntent={handleLinkCandidateIntent}
                                 />
                             ) : (
                                 <p>当前没有可渲染的合法结果。</p>

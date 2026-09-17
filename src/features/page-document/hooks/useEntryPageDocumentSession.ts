@@ -33,6 +33,8 @@ import {
     type LiveVisualScheduleOptions,
 } from '../application/liveVisualCommitScheduler.ts'
 import {createOpaqueElementAdoptionKernelRequest} from '../application/opaqueElementAdoption.ts'
+import {createLinkCandidateKernelRequest} from '../application/linkCandidateSelection.ts'
+import type {EntryBrief} from '../../../api/worldflow.ts'
 import {
     acceptEntryDocumentSave,
     acceptEntryDocumentVisualUpdate,
@@ -57,6 +59,7 @@ import {
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
     type CanvasInputResolution,
+    type CanvasLinkCandidateIntentMessage,
 } from '../canvas/protocol/index.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
@@ -471,6 +474,30 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         void canvasInputSchedulerRef.current?.endInteraction()
     }, [])
 
+    const applyLinkCandidateSelection = useCallback(async (
+        candidate: CanvasLinkCandidateIntentMessage,
+        entry: EntryBrief,
+    ): Promise<CanvasInputResolution> => {
+        const flushed = await canvasInputSchedulerRef.current?.endInteraction()
+        if (flushed === false) return {accepted: false, selection: null}
+        const current = stateRef.current
+        if (!current || entry.project_id !== current.identity.projectId || entry.id === current.identity.entryId) {
+            await reportVisualFailure('候选词条已不属于当前项目，链接未写入草稿。')
+            return {accepted: false, selection: null}
+        }
+        const request = createLinkCandidateKernelRequest(
+            current.model.entry.sources['article.html'], candidate, entry,
+        )
+        if (!request) {
+            await reportVisualFailure('双链候选范围或目标已变化，链接未写入草稿。')
+            return {accepted: false, selection: null}
+        }
+        const accepted = await applyKernelEntry(request, '插入词条双链')
+        return accepted
+            ? {accepted: true, selection: {nodeId: candidate.nodeId, offset: candidate.from + entry.title.trim().length}}
+            : {accepted: false, selection: null}
+    }, [applyKernelEntry, reportVisualFailure])
+
     const adoptOpaqueElement = useCallback(
         async (node: LayerProjectionNode): Promise<string | null> => {
             const current = stateRef.current
@@ -523,6 +550,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         applyCanvasInputIntent,
         reportCanvasInputBlocked,
         flushCanvasInput,
+        applyLinkCandidateSelection,
         adoptOpaqueElement,
     }
 }

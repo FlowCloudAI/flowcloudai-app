@@ -6,6 +6,8 @@ export interface FloatingPanelProps {
     open: boolean
     onClose?: () => void
     dismissible?: boolean
+    /** 输入建议等浮层不夺取编辑焦点，也不锁定页面滚动。 */
+    passive?: boolean
     /** 浮层背板附加类名，用于全屏等页面级布局。 */
     layerClassName?: string
     className?: string

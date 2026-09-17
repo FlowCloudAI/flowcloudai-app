@@ -18,6 +18,15 @@
     opacity: 1;
 }
 
+.fc-overlay--passive {
+    background: transparent;
+    pointer-events: none;
+}
+
+.fc-overlay--passive .fc-overlay__panel {
+    pointer-events: auto;
+}
+
 /* 浮动：居中，四周留边（含安全区），不挨屏。 */
 .fc-overlay--floating {
     align-items: center;

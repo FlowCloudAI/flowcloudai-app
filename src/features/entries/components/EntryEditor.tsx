@@ -1283,6 +1283,7 @@ export default function EntryEditor({
                                     summary={draft.summary}
                                     markdown={draft.content}
                                     resetVersion={pageDocumentResetVersion}
+                                    projectEntries={projectEntries}
                                     onDirtyChange={setPageDocumentDirty}
                                     onSavedDerivedText={setPageDocumentDerivedText}
                                     onNavigationIntent={handlePageDocumentNavigation}

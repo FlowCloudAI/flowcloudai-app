@@ -46,6 +46,17 @@ test('光标离开节点先取消旧候选，进入另一节点分配新 intentI
     ])
 })
 
+test('宿主确认只消费当前候选意图，旧 ID 不能劫持光标', () => {
+    const tracker = createCanvasLinkCandidateTracker(() => FIRST_INTENT)
+    tracker.update({nodeId: NODE_ID, text: '[[词', caret: 3})
+    assert.equal(tracker.accept(SECOND_INTENT), null)
+    assert.deepEqual(tracker.accept(FIRST_INTENT), {
+        intentId: FIRST_INTENT, nodeId: NODE_ID, query: '词', from: 0, to: 3,
+    })
+    assert.equal(tracker.accept(FIRST_INTENT), null)
+    assert.equal(tracker.clear(), null)
+})
+
 test('运行时在受控写入后及原生 input 后检测，组合期间不报告，Escape 可取消', () => {
     const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
     assert.match(source, /send\(\{\s*type: 'input-intent',[\s\S]*?\}\s*satisfies[\s\S]*?reportLinkCandidate\(\)/u)
