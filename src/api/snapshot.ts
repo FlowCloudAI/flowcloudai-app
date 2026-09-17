@@ -46,6 +46,12 @@ export interface AppendResult {
   links: number
   entryTypes: number
   ideaNotes: number
+  preservedLegacyPageDocuments: number
+}
+
+export interface SnapshotRestoreReport {
+  preservedLegacyPageDocuments: number
+  warning: string | null
 }
 
 export const dbSnapshot = (projectId?: string | null) =>
@@ -68,7 +74,7 @@ export const dbCreateBranch = (
     command<void>('db_create_branch', {branchName, fromRef: fromRef ?? null, projectId: projectId ?? null})
 
 export const dbSwitchBranch = (branchName: string, projectId?: string | null) =>
-    command<void>('db_switch_branch', {branchName, projectId: projectId ?? null})
+    command<SnapshotRestoreReport>('db_switch_branch', {branchName, projectId: projectId ?? null})
 
 export const dbListSnapshots = (projectId?: string | null) =>
   command<SnapshotInfo[]>('db_list_snapshots', {projectId: projectId ?? null})
@@ -83,7 +89,7 @@ export const dbSnapshotToBranch = (branchName: string, message: string, projectI
     command<boolean>('db_snapshot_to_branch', {branchName, message, projectId: projectId ?? null})
 
 export const dbRollbackTo = (snapshotId: string, projectId?: string | null) =>
-  command<void>('db_rollback_to', { snapshotId, projectId: projectId ?? null })
+  command<SnapshotRestoreReport>('db_rollback_to', { snapshotId, projectId: projectId ?? null })
 
 export const dbAppendFrom = (snapshotId: string, projectId?: string | null) =>
   command<AppendResult>('db_append_from', { snapshotId, projectId: projectId ?? null })

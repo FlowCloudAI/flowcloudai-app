@@ -33,6 +33,14 @@ pub struct AppendResultDto {
     pub links: usize,
     pub entry_types: usize,
     pub idea_notes: usize,
+    pub preserved_legacy_page_documents: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotRestoreReportDto {
+    pub preserved_legacy_page_documents: usize,
+    pub warning: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -117,7 +125,7 @@ pub async fn db_switch_branch(
     _state: State<'_, Arc<AppState>>,
     _branch_name: String,
     _project_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<SnapshotRestoreReportDto, String> {
     snapshot_unsupported()
 }
 
@@ -162,7 +170,7 @@ pub async fn db_rollback_to(
     _state: State<'_, Arc<AppState>>,
     _snapshot_id: String,
     _project_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<SnapshotRestoreReportDto, String> {
     snapshot_unsupported()
 }
 

@@ -1,6 +1,22 @@
 use super::common::*;
 use git2::{BranchType, Oid, Repository, Sort};
-use worldflow_core::{AppendResult, SnapshotBranchInfo, SnapshotInfo};
+use worldflow_core::{AppendResult, SnapshotBranchInfo, SnapshotInfo, SnapshotRestoreReport};
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotRestoreReportDto {
+    pub preserved_legacy_page_documents: usize,
+    pub warning: Option<String>,
+}
+
+impl From<SnapshotRestoreReport> for SnapshotRestoreReportDto {
+    fn from(report: SnapshotRestoreReport) -> Self {
+        Self {
+            preserved_legacy_page_documents: report.preserved_legacy_page_documents,
+            warning: report.warning,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +67,7 @@ pub struct AppendResultDto {
     pub links: usize,
     pub entry_types: usize,
     pub idea_notes: usize,
+    pub preserved_legacy_page_documents: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -94,6 +111,7 @@ impl From<AppendResult> for AppendResultDto {
             links: r.links,
             entry_types: r.entry_types,
             idea_notes: r.idea_notes,
+            preserved_legacy_page_documents: r.preserved_legacy_page_documents,
         }
     }
 }
@@ -302,11 +320,12 @@ pub async fn db_switch_branch(
     state: State<'_, Arc<AppState>>,
     branch_name: String,
     project_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<SnapshotRestoreReportDto, String> {
     let project_id = parse_snapshot_project_id(project_id)?;
     let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.switch_branch(&branch_name)
         .await
+        .map(SnapshotRestoreReportDto::from)
         .map_err(|e| e.to_string())
 }
 
@@ -377,11 +396,12 @@ pub async fn db_rollback_to(
     state: State<'_, Arc<AppState>>,
     snapshot_id: String,
     project_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<SnapshotRestoreReportDto, String> {
     let project_id = parse_snapshot_project_id(project_id)?;
     let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.rollback_to(&snapshot_id)
         .await
+        .map(SnapshotRestoreReportDto::from)
         .map_err(|e| e.to_string())
 }
 

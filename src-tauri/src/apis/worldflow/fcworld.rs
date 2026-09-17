@@ -2229,6 +2229,7 @@ async fn import_fcworld_package_to_db(
         .import_csvs_with_progress(
             CsvImportBundle {
                 items: prepared.csv_items.clone(),
+                object_layer_json: None,
             },
             CsvImportMode::Merge,
             |event| match event.phase {
@@ -2425,6 +2426,7 @@ async fn import_fcworld_package_to_world_store(
         .import_csvs_with_progress(
             CsvImportBundle {
                 items: prepared.csv_items.clone(),
+                object_layer_json: None,
             },
             CsvImportMode::Merge,
             |event| match event.phase {

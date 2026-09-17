@@ -288,9 +288,9 @@ export function useSnapshotPanel({
 
         setBranchSwitching(true)
         try {
-            await dbSwitchBranch(branchName, currentProjectId)
+            const report = await dbSwitchBranch(branchName, currentProjectId)
             onVersionApplied?.(currentProjectId)
-            void showAlert(`已切换到「${branchName}」分支路线`, 'success', 'nonInvasive', 2200)
+            void showAlert(report.warning ?? `已切换到「${branchName}」分支路线`, report.warning ? 'warning' : 'success', 'nonInvasive', report.warning ? 5000 : 2200)
             await load()
         } catch (error) {
             logger.error('切换分支路线失败', error)
@@ -338,11 +338,11 @@ export function useSnapshotPanel({
         setActionId(branchDialogNode.id)
         try {
             await dbCreateBranch(branchName, branchDialogNode.id, currentProjectId)
-            await dbSwitchBranch(branchName, currentProjectId)
+            const report = await dbSwitchBranch(branchName, currentProjectId)
             onVersionApplied?.(currentProjectId)
             setBranchDialogNode(null)
             setBranchNameDraft('')
-            void showAlert(`已创建并切换到「${branchName}」分支路线`, 'success', 'nonInvasive', 2200)
+            void showAlert(report.warning ?? `已创建并切换到「${branchName}」分支路线`, report.warning ? 'warning' : 'success', 'nonInvasive', report.warning ? 5000 : 2200)
             await load()
         } catch (error) {
             logger.error('创建分支路线失败', error)
@@ -367,9 +367,9 @@ export function useSnapshotPanel({
 
         setActionId(snapshot.id)
         try {
-            await dbRollbackTo(snapshot.id, currentProjectId)
+            const report = await dbRollbackTo(snapshot.id, currentProjectId)
             onVersionApplied?.(currentProjectId)
-            void showAlert('已回到所选版本', 'success', 'nonInvasive', 2200)
+            void showAlert(report.warning ?? '已回到所选版本', report.warning ? 'warning' : 'success', 'nonInvasive', report.warning ? 5000 : 2200)
             await load()
         } catch (error) {
             logger.error('回到版本失败', error)
