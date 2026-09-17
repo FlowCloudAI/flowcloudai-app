@@ -4,6 +4,7 @@ import {RFC_9562_UUID_PATTERN} from '../../domain/uuidPolicy.ts'
 import {
     PAGE_DOCUMENT_CANVAS_CHANNEL,
     PAGE_DOCUMENT_CANVAS_VERSION,
+    CANVAS_ASSET_REQUEST_MAX_COUNT,
     parseCanvasHostCommand,
     type CanvasInputIntentMessage,
     type CanvasInputType,
@@ -25,10 +26,9 @@ import {
 import {isolatePageDocument} from './isolationPolicy.ts'
 import {
     applyCanvasAssetFrame,
-    disposeCanvasAssetDisplays,
+    CanvasAssetImageCache,
+    missingCanvasAssetIds,
     mountCanvasAssetDisplays,
-    selectCanvasAssetDisplays,
-    syncCanvasAssetDisplays,
     type CanvasAssetDisplays,
 } from './assetDisplay.ts'
 import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
@@ -45,6 +45,7 @@ let incomingSequence = 0
 let selectedNodeId: string | null = null
 let latestRequestId: string | null = null
 let assetDisplays: CanvasAssetDisplays = new Map()
+const assetCache = new CanvasAssetImageCache()
 let editingEnabled = false
 let pendingRender: CanvasRenderCommand | null = null
 let rejectedInputPending = false
@@ -96,7 +97,6 @@ function setSelection(nodeId: string | null): void {
     findManagedNode(selectedNodeId)?.removeAttribute('data-fc-canvas-selected')
     selectedNodeId = nodeId?.toLowerCase() ?? null
     findManagedNode(selectedNodeId)?.setAttribute('data-fc-canvas-selected', '')
-    selectCanvasAssetDisplays(assetDisplays, selectedNodeId)
 }
 
 function reportSize(): void {
@@ -110,7 +110,6 @@ function clearRenderedDocument(): void {
     const leave = linkHover.clear()
     if (leave) send(leave)
     authorStyle.textContent = ''
-    disposeCanvasAssetDisplays(assetDisplays)
     root.replaceChildren()
     assetDisplays = new Map()
     selectedNodeId = null
@@ -141,9 +140,10 @@ function applyRender(
         const template = document.createElement('template')
         template.innerHTML = result.artifact.html
         authorStyle.textContent = result.artifact.css
-        disposeCanvasAssetDisplays(assetDisplays)
         root.replaceChildren(template.content.cloneNode(true))
-        assetDisplays = mountCanvasAssetDisplays(root)
+        assetDisplays = mountCanvasAssetDisplays(root, assetCache)
+        const missingAssetIds = missingCanvasAssetIds(assetDisplays, assetCache)
+        if (missingAssetIds.length > CANVAS_ASSET_REQUEST_MAX_COUNT) throw new Error('画布图片引用超过上限。')
         applyCanvasEditingState(root, editingEnabled)
         setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
         if (resolvedSelection) {
@@ -161,6 +161,7 @@ function applyRender(
             type: 'rendered',
             requestId: command.requestId,
             managedNodeCount: result.artifact.managedNodeCount,
+            missingAssetIds,
         })
         reportSize()
     } catch (error) {
@@ -186,12 +187,14 @@ function render(command: CanvasRenderCommand): void {
 
 function semanticLength(value: Node): number {
     if (value.nodeType === Node.TEXT_NODE) return value.textContent?.length ?? 0
+    if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return 0
     if (value instanceof Element && value.tagName === 'BR') return 1
     return [...value.childNodes].reduce((total, child) => total + semanticLength(child), 0)
 }
 
 function semanticText(value: Node): string {
     if (value.nodeType === Node.TEXT_NODE) return value.textContent ?? ''
+    if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return ''
     if (value instanceof Element && value.tagName === 'BR') return '\n'
     return [...value.childNodes].map(semanticText).join('')
 }
@@ -213,6 +216,7 @@ function semanticOffset(rootNode: Node, container: Node, offset: number): number
             resolved = total
             return
         }
+        if (value instanceof Element && value.hasAttribute('data-fc-asset-state')) return
         if (value.nodeType === Node.TEXT_NODE || (value instanceof Element && value.tagName === 'BR')) {
             total += semanticLength(value)
             return
@@ -275,6 +279,7 @@ function locateTextOffset(rootNode: Node, offset: number): {node: Node; offset: 
     const locate = (parentNode: Node): {node: Node; offset: number} => {
         const children = [...parentNode.childNodes]
         for (const [index, child] of children.entries()) {
+            if (child instanceof Element && child.hasAttribute('data-fc-asset-state')) continue
             if (child.nodeType === Node.TEXT_NODE) {
                 const length = child.textContent?.length ?? 0
                 if (remaining <= length) return {node: child, offset: remaining}
@@ -625,6 +630,7 @@ function start(): void {
     token = startup.token
     root = startup.root
     authorStyle = mountCanvasStyles(document, runtimeCss).authorStyle
+    window.addEventListener('pagehide', () => assetCache.clear(), {once: true})
 
     window.addEventListener('message', event => {
         if (event.source !== parent) return
@@ -633,7 +639,7 @@ function start(): void {
         incomingSequence = command.sequence
         if (command.type === 'render') render(command)
         if (command.type === 'asset-frame' && command.requestId === latestRequestId) {
-            applyCanvasAssetFrame(root, assetDisplays, command)
+            applyCanvasAssetFrame(assetDisplays, assetCache, command)
             reportSize()
         }
         if (command.type === 'set-selection') setSelection(command.nodeId)
@@ -645,7 +651,6 @@ function start(): void {
             document.documentElement.style.setProperty('--fc-entry-viewport-width', `${command.width}px`)
             document.documentElement.style.setProperty('--fc-entry-viewport-height', `${command.height}px`)
             document.documentElement.style.setProperty('--fc-entry-device-pixel-ratio', String(command.pixelRatio))
-            syncCanvasAssetDisplays(root, assetDisplays)
         }
     })
 

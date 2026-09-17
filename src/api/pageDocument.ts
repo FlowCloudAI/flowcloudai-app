@@ -65,6 +65,8 @@ export interface PageDocumentAssetFrame {
     assetId: string
     width: number
     height: number
+    originalWidth: number
+    originalHeight: number
     rgbaBase64: string
 }
 

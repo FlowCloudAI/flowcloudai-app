@@ -26,6 +26,8 @@ pub struct PageAssetFrame {
     pub asset_id: Uuid,
     pub width: u32,
     pub height: u32,
+    pub original_width: u32,
+    pub original_height: u32,
     pub rgba_base64: String,
 }
 
@@ -267,6 +269,8 @@ pub(crate) async fn read_asset_frame(
         asset_id: *asset_id,
         width,
         height,
+        original_width: u32::try_from(asset.width).map_err(|_| invalid("图片原始宽度无效"))?,
+        original_height: u32::try_from(asset.height).map_err(|_| invalid("图片原始高度无效"))?,
         rgba_base64: STANDARD.encode(preview.as_raw()),
     })
 }

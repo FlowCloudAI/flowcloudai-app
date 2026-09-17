@@ -57,6 +57,8 @@ export interface CanvasAssetFrameCommand extends CanvasEnvelope {
     status: 'ready' | 'unavailable' | 'invalid'
     width: number
     height: number
+    originalWidth: number
+    originalHeight: number
     rgbaBase64: string
 }
 
@@ -72,6 +74,7 @@ export interface CanvasRenderedMessage extends CanvasEnvelope {
     type: 'rendered'
     requestId: string
     managedNodeCount: number
+    missingAssetIds: string[]
 }
 
 export interface CanvasRenderErrorMessage extends CanvasEnvelope {

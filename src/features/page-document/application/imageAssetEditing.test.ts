@@ -19,6 +19,8 @@ import {
 } from './entryDocumentSessionModel.ts'
 import {createImageInsertionRequest, createImageReplacementRequest, isCurrentImageAssetSelection, resolveImageInsertionTarget} from './imageAssetEditing.ts'
 import {readManagedImageDescription} from './imageSemanticEditing.ts'
+import {CANVAS_BASE_PROJECT_CSS, CANVAS_BASE_PROJECT_HTML, compileCanvasPreview} from '../canvas/host/compiledPreview.ts'
+import {isolatePageDocument} from '../canvas/runtime/isolationPolicy.ts'
 
 const ENTRY = '018f47a2-3b4c-7d5e-8f90-123456789abc'
 const PROJECT = '11111111-1111-7111-8111-111111111111'
@@ -57,12 +59,34 @@ function apply(state: EntryDocumentSessionState, request: ReturnType<typeof crea
 }
 
 describe('项目页面图片生产会话', () => {
-    it('导入 API 不接受前端传入的本机路径，画布显示也不创建资源 URL', () => {
+    it('导入 API 不接受路径，作者 data/blob 图片在编译与隔离两道门均被拒绝', () => {
         const api = readFileSync(new URL('../../../api/pageDocument.ts', import.meta.url), 'utf8')
-        const display = readFileSync(new URL('../canvas/runtime/assetDisplay.ts', import.meta.url), 'utf8')
         assert.match(api, /invoke\('page_document_import_asset', \{projectId\}\)/u)
         assert.doesNotMatch(api, /sourcePath|convertFileSrc/u)
-        assert.doesNotMatch(display, /createObjectURL|data:image|\.src\s*=/u)
+        for (const url of ['data:image/png;base64,AQID', 'blob:https://example.invalid/picture']) {
+            const unsafeArticle = article.replace('<!-- 保留作者注释 -->', `<img src="${url}">`)
+            const compiled = compileCanvasPreview({
+                projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
+                projectStyleCss: CANVAS_BASE_PROJECT_CSS,
+                entryArticleHtml: unsafeArticle,
+                entryStyleCss: '',
+                metadata: {id: ENTRY, title: '图片', summary: '', tags: []},
+            })
+            assert.equal(compiled.html, null)
+            assert.ok(compiled.diagnostics.some(item => item.severity === 'error'))
+            assert.equal(isolatePageDocument(`<img src="${url}">`, '').artifact, null)
+            const unsafeCss = `@layer fc-entry { [data-fc-entry-id="${ENTRY}"] { background-image: url("${url}"); } }`
+            const cssCompiled = compileCanvasPreview({
+                projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
+                projectStyleCss: CANVAS_BASE_PROJECT_CSS,
+                entryArticleHtml: article,
+                entryStyleCss: unsafeCss,
+                metadata: {id: ENTRY, title: '图片', summary: '', tags: []},
+            })
+            assert.equal(cssCompiled.html, null)
+            assert.ok(cssCompiled.diagnostics.some(item => item.severity === 'error'))
+            assert.equal(isolatePageDocument('<p>正文</p>', unsafeCss).artifact, null)
+        }
     })
 
     it('异步选择结果仅能写回原项目、词条、模式、节点和草稿版本', () => {

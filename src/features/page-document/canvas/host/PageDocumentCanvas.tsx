@@ -3,7 +3,6 @@
 import classNames from 'classnames'
 import {useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref} from 'react'
 import {pageDocumentAssetErrorStatus, pageDocumentReadAssetFrame} from '../../../../api/pageDocument.ts'
-import {isolatePageDocument} from '../runtime/isolationPolicy.ts'
 import {
     createCanvasHostCommandFactory,
     createCanvasRequestId,
@@ -18,7 +17,8 @@ import {
 } from '../protocol/index.ts'
 import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
-import {sourceForRenderedAssetRequest, type CanvasAssetRenderSource} from './assetRenderSource.ts'
+import {CanvasAssetFrameCache} from './assetFrameCache.ts'
+import {requestedCanvasAssetIds, sourceForRenderedAssetRequest, type CanvasAssetRenderSource} from './assetRenderSource.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
 import {canvasRectToHostViewport} from './linkHoverGeometry.ts'
 import './PageDocumentCanvas.css'
@@ -94,8 +94,9 @@ export function PageDocumentCanvas({
     })
     const session = useMemo(() => {
         const token = createCanvasSessionToken()
-        return {documentKey, token, createCommand: createCanvasHostCommandFactory(token)}
-    }, [documentKey])
+        return {documentKey, projectId, token, createCommand: createCanvasHostCommandFactory(token)}
+    }, [documentKey, projectId])
+    const assetFrames = useMemo(() => new CanvasAssetFrameCache(session.token), [session.token])
     const source = useMemo(() => createCanvasPageUrl(window.location.href, session.token), [session.token])
     const [height, setHeight] = useState(minimumHeight)
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -139,24 +140,27 @@ export function PageDocumentCanvas({
         })
     }, [send])
 
-    const loadAssets = useCallback((requestId: string, htmlSource: string, cssSource: string) => {
-        const isolated = isolatePageDocument(htmlSource, cssSource)
-        for (const assetId of isolated.artifact?.assetIds ?? []) {
+    const loadAssets = useCallback((requestId: string, htmlSource: string, cssSource: string, missingAssetIds: string[]) => {
+        for (const assetId of requestedCanvasAssetIds({requestId, html: htmlSource, css: cssSource}, missingAssetIds)) {
             if (!projectId) {
-                send({type: 'asset-frame', requestId, assetId, status: 'unavailable', width: 0, height: 0, rgbaBase64: ''})
+                send({type: 'asset-frame', requestId, assetId, status: 'unavailable', width: 0, height: 0,
+                    originalWidth: 0, originalHeight: 0, rgbaBase64: ''})
                 continue
             }
-            void pageDocumentReadAssetFrame(projectId, assetId).then(frame => {
+            void assetFrames.read(projectId, assetId, pageDocumentReadAssetFrame).then(frame => {
                 if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
                 send({type: 'asset-frame', requestId, assetId, status: 'ready',
-                    width: frame.width, height: frame.height, rgbaBase64: frame.rgbaBase64})
+                    width: frame.width, height: frame.height, originalWidth: frame.originalWidth,
+                    originalHeight: frame.originalHeight, rgbaBase64: frame.rgbaBase64})
             }).catch(error => {
                 if (renderRequestIdRef.current !== requestId || !loadedRef.current) return
                 send({type: 'asset-frame', requestId, assetId, status: pageDocumentAssetErrorStatus(error),
-                    width: 0, height: 0, rgbaBase64: ''})
+                    width: 0, height: 0, originalWidth: 0, originalHeight: 0, rgbaBase64: ''})
             })
         }
-    }, [projectId, send])
+    }, [assetFrames, projectId, send])
+
+    useEffect(() => () => assetFrames.clear(), [assetFrames])
 
     const sendRender = useCallback(() => {
         latest.current.onLinkHover?.({href: null, nodeId: null, rect: null})
@@ -250,7 +254,7 @@ export function PageDocumentCanvas({
                 if (!source) return
                 // 输入或组合期可能先缓存 render；只在画布确认挂载后读取并发送该次的资产帧。
                 assetRenderSourceRef.current = null
-                loadAssets(source.requestId, source.html, source.css)
+                loadAssets(source.requestId, source.html, source.css, message.missingAssetIds)
                 setStatus('ready')
                 latest.current.onRendered?.()
             }

@@ -1,201 +1,158 @@
-// 本模块让原始 img 继续承担作者样式、布局、可见性和点选；受控 canvas 只覆盖像素，资源 URL 不进活 DOM。
+// 本模块只把可信像素写回原 img；缓存属于当前隔离画布会话，作者资源地址永远不会进入活 DOM。
 
 import type {CanvasAssetFrameCommand} from '../protocol/index.ts'
 
+interface CachedImage {
+    url: string
+    decoded: boolean
+}
+
 interface AssetDisplay {
     image: HTMLImageElement
-    overlay: HTMLSpanElement
-    canvas: HTMLCanvasElement
-    status: HTMLSpanElement
-    originalOpacity: string
-    originalOpacityPriority: string
-    needsIntrinsicSize: boolean
-    state: CanvasAssetFrameCommand['status'] | 'loading'
+    status: HTMLSpanElement | null
 }
+
+type AssetFailureState = 'loading' | 'unavailable' | 'invalid'
 
 export type CanvasAssetDisplays = Map<string, AssetDisplay[]>
 
-const disposers = new WeakMap<CanvasAssetDisplays, () => void>()
+// 与单页受管资产块默认上限一致；宿主只缓存少量原始 RGBA，画布缓存压缩后的图片 URL。
+const CACHE_MAX_ENTRIES = 100
 
-function restoreAuthorOpacity(display: AssetDisplay): void {
-    const {image, originalOpacity, originalOpacityPriority} = display
-    if (originalOpacity) image.style.setProperty('opacity', originalOpacity, originalOpacityPriority)
-    else image.style.removeProperty('opacity')
+export class CanvasAssetImageCache {
+    private readonly images = new Map<string, CachedImage>()
+
+    get(assetId: string): CachedImage | null {
+        const image = this.images.get(assetId)
+        if (!image) return null
+        this.images.delete(assetId)
+        this.images.set(assetId, image)
+        return image
+    }
+
+    set(assetId: string, image: CachedImage): void {
+        this.images.delete(assetId)
+        this.images.set(assetId, image)
+        if (this.images.size > CACHE_MAX_ENTRIES) this.images.delete(this.images.keys().next().value!)
+    }
+
+    clear(): void {
+        this.images.clear()
+    }
 }
 
-function syncDisplay(root: HTMLElement, display: AssetDisplay): void {
-    restoreAuthorOpacity(display)
-    const style = getComputedStyle(display.image)
-    const imageRect = display.image.getBoundingClientRect()
-    const rootRect = root.getBoundingClientRect()
-    let opacity = Number(style.opacity)
-    for (let parent = display.image.parentElement; parent && parent !== root; parent = parent.parentElement) {
-        opacity *= Number(getComputedStyle(parent).opacity)
+function statusLabel(state: AssetFailureState): string {
+    if (state === 'loading') return '正在读取图片…'
+    if (state === 'invalid') return '图片格式或内容无效'
+    return '图片缺失、无权读取或读取失败'
+}
+
+function showStatus(display: AssetDisplay, state: AssetFailureState): void {
+    display.image.removeAttribute('src')
+    display.image.setAttribute('data-fc-asset-placeholder', '')
+    const status = display.status ?? document.createElement('span')
+    status.setAttribute('data-fc-asset-state', state)
+    status.setAttribute('contenteditable', 'false')
+    status.setAttribute('aria-hidden', 'true')
+    status.textContent = statusLabel(state)
+    if (!display.status) display.image.insertAdjacentElement('afterend', status)
+    display.status = status
+}
+
+function showImage(display: AssetDisplay, cached: CachedImage): void {
+    const {image} = display
+    if (cached.decoded) {
+        image.removeAttribute('data-fc-asset-placeholder')
+        display.status?.remove()
+        display.status = null
     }
-    // 保留 img 供作者选择器、DOM 身份与点击命中；只遮住无 src 的浏览器占位图。
-    display.image.style.setProperty('opacity', '0')
-    const visible = !display.image.hidden && style.display !== 'none' && style.visibility === 'visible' &&
-        opacity > 0 && imageRect.width > 0 && imageRect.height > 0
-    const {overlay, canvas, status} = display
-    canvas.hidden = !visible || display.state !== 'ready'
-    status.hidden = !visible || display.state === 'ready'
-    overlay.hidden = !visible
-    if (!visible) return
-    const left = imageRect.left - rootRect.left - root.clientLeft + root.scrollLeft
-    const top = imageRect.top - rootRect.top - root.clientTop + root.scrollTop
-    overlay.style.left = `${left}px`
-    overlay.style.top = `${top}px`
-    overlay.style.width = `${imageRect.width}px`
-    overlay.style.height = `${imageRect.height}px`
-    overlay.style.opacity = String(opacity)
-    let clipTop = 0
-    let clipRight = 0
-    let clipBottom = 0
-    let clipLeft = 0
-    for (let parent = display.image.parentElement; parent && parent !== root; parent = parent.parentElement) {
-        const parentStyle = getComputedStyle(parent)
-        if (parentStyle.overflowX === 'visible' && parentStyle.overflowY === 'visible') continue
-        const rect = parent.getBoundingClientRect()
-        if (parentStyle.overflowY !== 'visible') {
-            clipTop = Math.max(clipTop, rect.top - imageRect.top)
-            clipBottom = Math.max(clipBottom, imageRect.bottom - rect.bottom)
+    const loaded = () => {
+        if (image.naturalWidth < 1 || image.naturalHeight < 1) {
+            showStatus(display, 'invalid')
+            return
         }
-        if (parentStyle.overflowX !== 'visible') {
-            clipLeft = Math.max(clipLeft, rect.left - imageRect.left)
-            clipRight = Math.max(clipRight, imageRect.right - rect.right)
-        }
+        cached.decoded = true
+        image.removeAttribute('data-fc-asset-placeholder')
+        display.status?.remove()
+        display.status = null
     }
-    overlay.style.clipPath = clipTop || clipRight || clipBottom || clipLeft
-        ? `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)` : 'none'
-    canvas.style.objectFit = style.objectFit
-    canvas.style.objectPosition = style.objectPosition
-    canvas.style.borderRadius = style.borderRadius
-    canvas.style.border = style.border
-    canvas.style.padding = style.padding
-    canvas.style.filter = style.filter
-    canvas.style.clipPath = style.clipPath
-    canvas.style.boxShadow = style.boxShadow
+    image.addEventListener('load', loaded, {once: true})
+    image.addEventListener('error', () => showStatus(display, 'invalid'), {once: true})
+    // src 只来自通过信封验证的 RGBA 帧；浏览器在原 img 的层叠、裁剪与变换上下文中绘制。
+    image.src = cached.url
+    if (cached.decoded && image.complete && image.naturalWidth > 0) loaded()
 }
 
-export function syncCanvasAssetDisplays(root: HTMLElement, displays: CanvasAssetDisplays): void {
-    for (const targets of displays.values()) {
-        for (const display of targets) syncDisplay(root, display)
-    }
+export function imageDataUrlForOriginalSize(
+    png: string,
+    previewWidth: number,
+    previewHeight: number,
+    originalWidth: number,
+    originalHeight: number,
+): string {
+    if (originalWidth === previewWidth && originalHeight === previewHeight) return png
+    // 预览帧仍最多 512 像素；可信 SVG 只声明原图固有尺寸，内嵌的唯一图片仍是该预览像素。
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${originalWidth}" height="${originalHeight}" viewBox="0 0 ${previewWidth} ${previewHeight}" preserveAspectRatio="none"><image width="${previewWidth}" height="${previewHeight}" href="${png}"/></svg>`
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-export function disposeCanvasAssetDisplays(displays: CanvasAssetDisplays): void {
-    disposers.get(displays)?.()
-    disposers.delete(displays)
-}
-
-export function mountCanvasAssetDisplays(root: HTMLElement): CanvasAssetDisplays {
-    const displays: CanvasAssetDisplays = new Map()
-    root.style.position = 'relative'
-    for (const image of root.querySelectorAll<HTMLImageElement>('img[data-fc-canvas-asset-id]')) {
-        const id = image.getAttribute('data-fc-canvas-asset-id')
-        if (!id) continue
+function encodedImageUrl(command: CanvasAssetFrameCommand): string | null {
+    try {
+        const raw = atob(command.rgbaBase64)
+        if (raw.length !== command.width * command.height * 4) return null
+        const pixels = Uint8ClampedArray.from(raw, character => character.charCodeAt(0))
         const canvas = document.createElement('canvas')
-        canvas.setAttribute('data-fc-asset-display', id)
-        canvas.setAttribute('aria-hidden', 'true')
-        canvas.hidden = true
-        const status = document.createElement('span')
-        status.setAttribute('data-fc-asset-state', 'loading')
-        status.textContent = '正在读取图片…'
-        status.hidden = true
-        const overlay = document.createElement('span')
-        overlay.setAttribute('data-fc-asset-overlay', '')
-        overlay.style.position = 'absolute'
-        overlay.style.pointerEvents = 'none'
-        overlay.style.boxSizing = 'border-box'
-        overlay.append(canvas, status)
-        canvas.style.width = '100%'
-        canvas.style.height = '100%'
-        canvas.style.boxSizing = 'border-box'
-        status.style.position = 'absolute'
-        status.style.inset = '0'
-        status.style.boxSizing = 'border-box'
-        const needsIntrinsicSize = !image.hasAttribute('width') && !image.hasAttribute('height')
-        const display: AssetDisplay = {
-            image, overlay, canvas, status,
-            originalOpacity: image.style.getPropertyValue('opacity'),
-            originalOpacityPriority: image.style.getPropertyPriority('opacity'),
-            needsIntrinsicSize,
-            state: 'loading',
-        }
-        // 无 src 的 img 没有固有尺寸；仅给缺失的运行时副本补占位比例，原有尺寸属性不改。
-        if (needsIntrinsicSize) {
-            image.width = 160
-            image.height = 96
-        }
-        root.append(overlay)
+        canvas.width = command.width
+        canvas.height = command.height
+        const context = canvas.getContext('2d')
+        if (!context) return null
+        context.putImageData(new ImageData(pixels, command.width, command.height), 0, 0)
+        const png = canvas.toDataURL('image/png')
+        if (!png.startsWith('data:image/png;base64,')) return null
+        return imageDataUrlForOriginalSize(png, command.width, command.height,
+            command.originalWidth, command.originalHeight)
+    } catch {
+        return null
+    }
+}
+
+export function mountCanvasAssetDisplays(root: HTMLElement, cache: CanvasAssetImageCache): CanvasAssetDisplays {
+    const displays: CanvasAssetDisplays = new Map()
+    for (const image of root.querySelectorAll<HTMLImageElement>('img[data-fc-canvas-asset-id]')) {
+        const id = image.getAttribute('data-fc-canvas-asset-id')?.toLowerCase()
+        if (!id) continue
+        const display: AssetDisplay = {image, status: null}
+        const cached = cache.get(id)
+        if (cached?.decoded) showImage(display, cached)
+        else showStatus(display, 'loading')
         displays.set(id, [...displays.get(id) ?? [], display])
     }
-    if (displays.size === 0) return displays
-    let active = true
-    const sync = () => { if (active) syncCanvasAssetDisplays(root, displays) }
-    const observer = new ResizeObserver(sync)
-    for (const targets of displays.values()) {
-        for (const {image} of targets) observer.observe(image)
-    }
-    window.addEventListener('resize', sync)
-    window.addEventListener('scroll', sync, true)
-    disposers.set(displays, () => {
-        active = false
-        observer.disconnect()
-        window.removeEventListener('resize', sync)
-        window.removeEventListener('scroll', sync, true)
-    })
-    sync()
     return displays
 }
 
-export function selectCanvasAssetDisplays(displays: CanvasAssetDisplays, nodeId: string | null): void {
-    for (const targets of displays.values()) {
-        for (const {image, canvas} of targets) {
-            canvas.toggleAttribute('data-fc-canvas-selected', image.getAttribute('data-fc-node-id') === nodeId && nodeId !== null)
-        }
-    }
+export function missingCanvasAssetIds(displays: CanvasAssetDisplays, cache: CanvasAssetImageCache): string[] {
+    return [...displays.keys()].filter(id => !cache.get(id)?.decoded)
 }
 
 export function applyCanvasAssetFrame(
-    root: HTMLElement,
     displays: CanvasAssetDisplays,
+    cache: CanvasAssetImageCache,
     command: CanvasAssetFrameCommand,
 ): boolean {
     const targets = displays.get(command.assetId.toLowerCase())
     if (!targets) return false
-    let pixels: Uint8ClampedArray | null = null
-    if (command.status === 'ready') {
-        try {
-            const decoded = atob(command.rgbaBase64)
-            if (decoded.length !== command.width * command.height * 4) throw new TypeError('像素长度不符')
-            pixels = Uint8ClampedArray.from(decoded, character => character.charCodeAt(0))
-        } catch {
-            pixels = null
-        }
+    const status = command.status
+    if (status !== 'ready') {
+        targets.forEach(target => showStatus(target, status))
+        return false
     }
-    for (const display of targets) {
-        const {image, canvas, status} = display
-        const context = pixels ? canvas.getContext('2d') : null
-        if (context && pixels) {
-            canvas.width = command.width
-            canvas.height = command.height
-            context.putImageData(new ImageData(new Uint8ClampedArray(pixels), command.width, command.height), 0, 0)
-            if (display.needsIntrinsicSize) {
-                image.width = command.width
-                image.height = command.height
-            }
-            display.state = 'ready'
-            status.setAttribute('data-fc-asset-state', 'ready')
-            status.textContent = ''
-        } else {
-            display.state = command.status === 'ready' ? 'invalid' : command.status
-            status.setAttribute('data-fc-asset-state', display.state)
-            status.textContent = display.state === 'invalid'
-                ? '图片格式或内容无效'
-                : '图片缺失、无权读取或读取失败'
-        }
+    const url = encodedImageUrl(command)
+    if (!url) {
+        targets.forEach(target => showStatus(target, 'invalid'))
+        return false
     }
-    syncCanvasAssetDisplays(root, displays)
-    return Boolean(pixels)
+    const cached: CachedImage = {url, decoded: false}
+    cache.set(command.assetId.toLowerCase(), cached)
+    targets.forEach(target => showImage(target, cached))
+    return true
 }

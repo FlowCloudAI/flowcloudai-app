@@ -21,6 +21,7 @@ export interface CanvasIsolationArtifact {
     css: string
     managedNodeCount: number
     assetIds: string[]
+    displayAssetIds: string[]
 }
 
 export interface CanvasIsolationResult {
@@ -151,7 +152,7 @@ function sanitizeInlineStyle(source: string, errors: string[], assetIds: Set<str
     }
 }
 
-function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: Set<string>): number {
+function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: Set<string>, displayAssetIds: Set<string>): number {
     if (FORBIDDEN_HTML_TAGS.has(element.tagName)) {
         errors.push(`画布隔离层拒绝 <${element.tagName}>。`)
     }
@@ -196,7 +197,10 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
         if (!assetId) errors.push(`画布隔离层拒绝 ${name} 的非 fcasset 资源。`)
         else {
             assetIds.add(assetId)
-            if (element.tagName === 'img' && name === 'src') displayAssetId = assetId
+            if (element.tagName === 'img' && name === 'src') {
+                displayAssetId = assetId
+                displayAssetIds.add(assetId)
+            }
         }
         assetPlaceholder = true
     }
@@ -207,7 +211,7 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
     if (nextAttributes.some(attribute => attribute.name === 'data-fc-node-id')) managedNodeCount += 1
     element.attrs = nextAttributes
     for (const child of childNodes(element)) {
-        if (isElement(child)) managedNodeCount += sanitizeHtmlElement(child, errors, assetIds)
+        if (isElement(child)) managedNodeCount += sanitizeHtmlElement(child, errors, assetIds, displayAssetIds)
     }
     return managedNodeCount
 }
@@ -215,6 +219,7 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
 export function isolatePageDocument(html: string, css: string): CanvasIsolationResult {
     const errors: string[] = []
     const assets = new Set<string>()
+    const displayAssets = new Set<string>()
     let fragment: DefaultTreeAdapterTypes.DocumentFragment
     try {
         fragment = parseFragment(html, {scriptingEnabled: false})
@@ -223,7 +228,7 @@ export function isolatePageDocument(html: string, css: string): CanvasIsolationR
     }
     let managedNodeCount = 0
     for (const child of fragment.childNodes) {
-        if (isElement(child)) managedNodeCount += sanitizeHtmlElement(child, errors, assets)
+        if (isElement(child)) managedNodeCount += sanitizeHtmlElement(child, errors, assets, displayAssets)
     }
     const safeCss = sanitizeStylesheet(css, errors, assets)
     if (errors.length > 0) return {artifact: null, errors: [...new Set(errors)]}
@@ -233,6 +238,7 @@ export function isolatePageDocument(html: string, css: string): CanvasIsolationR
             css: safeCss,
             managedNodeCount,
             assetIds: [...assets].sort(),
+            displayAssetIds: [...displayAssets].sort(),
         },
         errors: [],
     }

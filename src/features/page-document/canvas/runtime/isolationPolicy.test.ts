@@ -17,6 +17,7 @@ test('合法内容保留托管节点与链接，并把 fcasset 资源改成无 U
     assert.deepEqual(result.errors, [])
     assert.equal(result.artifact?.managedNodeCount, 1)
     assert.deepEqual(result.artifact?.assetIds, [V7_ASSET_ID])
+    assert.deepEqual(result.artifact?.displayAssetIds, [V7_ASSET_ID])
     assert.match(result.artifact?.html ?? '', /href="https:\/\/example\.invalid"/u)
     assert.match(result.artifact?.html ?? '', /data-fc-asset-placeholder/u)
     assert.match(result.artifact?.html ?? '', new RegExp(`data-fc-canvas-asset-id="${V7_ASSET_ID}"`, 'u'))
@@ -28,9 +29,24 @@ test('作者伪造画布图片身份会被清除，只有合法 src 可派生受
     const forged = isolatePageDocument(`<img data-fc-canvas-asset-id="${V7_ASSET_ID}">`, '')
     assert.ok(forged.artifact)
     assert.deepEqual(forged.artifact.assetIds, [])
+    assert.deepEqual(forged.artifact.displayAssetIds, [])
     assert.doesNotMatch(forged.artifact.html, /data-fc-canvas-asset-id/u)
     const external = isolatePageDocument(`<img src="https://example.invalid/a.png" data-fc-canvas-asset-id="${V7_ASSET_ID}">`, '')
     assert.equal(external.artifact, null)
+})
+
+test('CSS 中受管图片引用只保留作校验，不请求画布从不显示的帧', () => {
+    const result = isolatePageDocument('<p>正文</p>', `.hero{background-image:url(fcasset://${V7_ASSET_ID})}`)
+    assert.ok(result.artifact)
+    assert.deepEqual(result.artifact.assetIds, [V7_ASSET_ID])
+    assert.deepEqual(result.artifact.displayAssetIds, [])
+})
+
+test('作者 data 与 blob 图片地址在隔离层拒绝，可信运行时是唯一 data 图片来源', () => {
+    for (const url of ['data:image/png;base64,AQID', 'blob:https://example.invalid/picture']) {
+        assert.equal(isolatePageDocument(`<img src="${url}">`, '').artifact, null)
+        assert.equal(isolatePageDocument('<p>正文</p>', `.hero{background-image:url("${url}")}`).artifact, null)
+    }
 })
 
 test('直接受管图片隔离后仍保留身份、尺寸、隐藏属性与作者选择器目标', () => {

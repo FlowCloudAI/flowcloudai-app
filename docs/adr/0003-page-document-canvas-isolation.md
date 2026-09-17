@@ -1,7 +1,7 @@
 # ADR 0003：页面文档隔离画布
 
 - 状态：提议；macOS、Android 已原生验收，Windows 待验证
-- 日期：2026-09-15
+- 日期：2026-09-15；图片来源决策更新于 2026-09-17
 
 ## 决策
 
@@ -11,11 +11,21 @@
 `allow-same-origin`、`allow-top-navigation`、`allow-popups`、`allow-forms`，因此标准要求它使用唯一的
 opaque origin，且脚本、弹窗、表单和跨浏览上下文导航之外的沙箱限制继续生效。
 
-画布页在全局 CSP 之外叠加 meta CSP：默认、连接、图片、字体、媒体、对象、frame、worker、manifest
-和预取来源均为 `none`，`base-uri` 与 `form-action` 为 `none`；`script-src` 只接受构建产物中唯一内联
+画布页在全局 CSP 之外叠加 meta CSP：默认、连接、字体、媒体、对象、frame、worker、manifest
+和预取来源均为 `none`，图片来源仅为 `data:`，`base-uri` 与 `form-action` 为 `none`；`script-src` 只接受构建产物中唯一内联
 脚本的精确 SHA-256，`style-src` 只为运行时动态挂载的可信样式和经过校验的作者样式开放
-`'unsafe-inline'`。本阶段不开放任何图片来源，`fcasset://<uuid>` 在挂载前替换成不含 URL 的占位
-元素。两条策略同时生效，独立策略只能收紧全局策略，不能扩大 `src-tauri/tauri.conf.json` 的权限。
+`'unsafe-inline'`。`fcasset://<uuid>` 在挂载前仍被剥离为无 URL 占位；只有宿主按项目授权读取、后端解码且限尺寸的
+RGBA 帧通过会话 bridge 后，可信运行时才把像素编码为 `data:` 图片，赋给原 `<img>`。作者 HTML/CSS
+提供的 `data:`、`blob:` 或网络图片继续被领域 guard 和画布隔离层拒绝。全局 CSP 原有的 `data:` 图片许可
+不变，画布 meta 只为这一条受管显示链路开放 `img-src data:`，其他指令与 iframe sandbox 不变。
+
+原 `<img>` 绘制像素，才能沿用自身的层叠、变换、裁剪、尺寸、`hidden`、透明度和点选语义；根级像素叠加层
+无法等价模拟。后端帧仍最多 512 像素，并额外传出经原件核验的宽高。若帧被缩小，运行时把 PNG
+预览像素内嵌在固定模板的 `data:image/svg+xml` 图片中，由 SVG 根尺寸声明原图固有几何；SVG 只含
+受管预览像素，不含脚本或外部资源。运行时按单页默认资产块上限缓存最近 100 项压缩图片，宿主缓存最近
+16 项授权帧并合并在途读取；两级缓存都随会话或项目切换释放，
+命中缓存的图片重渲染时直接赋给新 `<img>`，不再向后端读取。CSS 中仅被校验并清空、并未显示的 `fcasset` 引用
+不请求帧。加载中、不可用与内容无效继续分开显示，成功后删除占位标记。
 
 构建器先把运行时编译为 IIFE，再转义其中可能结束 HTML 脚本元素的 `</script>` 字面量，按 Tauri
 相同的 CRLF / 孤立 CR 转 LF 规则计算哈希，并把最终文本写成 `canvas.html` 唯一的内联脚本。源码
@@ -25,7 +35,7 @@ HTML 只保留安全骨架与占位，不含外链脚本、样式表或 `style` 
 
 作者内容经过两道相互独立的门。宿主正常路径先运行页面文档领域 guard；画布运行时仍在浏览器开始
 解析或挂载前，以无网络副作用的源码解析器拒绝可执行元素、事件属性、资源 URL、表单和导航属性，
-并把资产节点改成占位。只有隔离检查通过的节点和 CSS 才进入活文档；bridge 脚本从不拼入作者源码，
+并把资产地址剥离为占位。只有隔离检查通过的节点和 CSS 才进入活文档；bridge 脚本从不拼入作者源码，
 也不从预览 DOM 回写文档真值。
 
 消息身份不能依赖 `event.origin`，因为画布是 opaque origin。宿主同时校验当前 iframe 的
@@ -247,6 +257,12 @@ WebView 已由 `window.origin` 与跨文档访问实测确认画布使用 opaque
 - CSP Level 3 的 [`style-src`](https://www.w3.org/TR/CSP3/#directive-style-src) 处理规定：指令一旦
   含 nonce 或 hash source，`'unsafe-inline'` 就不再作为行内样式的通用放行。因此骨架 HTML 不放静态
   `style`，避免 Tauri 生成只覆盖静态元素的 nonce 后阻断动态样式和作者 `style` 属性。
+- 工作区开发记录 `docs/devlog/2026-08-28-opaque-sandbox-父页面-Blob-资产失效.md` 在独立作者工具中
+  实测父页面创建的 `blob:` 资产在 opaque iframe 中 `naturalWidth=0`；该结果只支持本次避开
+  `blob:` 的选型，不替代本仓打包 WebView 的图片验收。
+- [SVG 2 Conformance](https://www.w3.org/TR/SVG2/conform.html) 规定 SVG 作为 HTML 图片使用时禁用脚本、
+  交互及外部资源；内嵌 `data:` 图片不属于外部文件引用。由此推导固定 SVG 尺寸包装不会产生网络
+  读取能力，但 WebView 对嵌套 `data:` 图片的实际绘制仍须按下节原生验收。
 - 本仓 `src-tauri/tauri.conf.json` 的全局策略当前为 `default-src 'self'`，脚本仅开放 `self` 与
   `unsafe-eval`，没有开放 `blob:` frame 来源；三个平台覆盖配置都没有另改 security。
 
@@ -272,3 +288,9 @@ WebView 已由 `window.origin` 与跨文档访问实测确认画布使用 opaque
   是否与协议假设一致。
 
 三端全部通过前，本 ADR 不写为“接受”，M6 也不写为“三端原生验收完成”。
+
+2026-09-17 新增的受管图片显示链路还须分别在 macOS WKWebView、Android WebView 与 Windows
+WebView2 的打包产物验收：全局响应头与画布 meta 策略共同允许运行时 `data:` 图片，且不允许作者
+`data:` / `blob:`；大图原始比例与显式宽高、层叠背景、旋转、父级裁剪圆角、`object-fit`、`hidden`
+及透明度均按原 `<img>` 绘制；连续输入重渲染不闪回占位也不重复读取后端；插入、替换、缺失、无权
+与格式损坏分别得到正确状态。Node 测试和静态浏览器截图即使通过，也不能代替这些打包 WebView 结果。

@@ -72,6 +72,13 @@ const cspMetas = elements.filter(element => element.node.tagName === 'meta'
 assert.equal(cspMetas.length, 1, 'canvas.html 必须恰有一个 meta CSP')
 const csp = attribute(cspMetas[0].node, 'content')
 assert.ok(csp, 'canvas.html 的 meta CSP 不得为空')
+const directiveParts = csp.split(';').map(directive => directive.trim().split(/\s+/u)).filter(parts => parts[0])
+const directives = new Map(directiveParts.map(([name, ...sources]) => [name, sources.join(' ')]))
+assert.equal(directives.size, directiveParts.length, '画布 CSP 不得重复声明指令')
+assert.equal(directives.get('img-src'), 'data:', '画布只为运行时受管像素开放 data: 图片')
+for (const name of ['default-src', 'connect-src', 'font-src', 'media-src', 'object-src', 'frame-src', 'child-src', 'worker-src', 'manifest-src', 'prefetch-src', 'base-uri', 'form-action']) {
+    assert.equal(directives.get(name), "'none'", `${name} 不得随图片能力放宽`)
+}
 const scriptDirective = csp.split(';')
     .map(directive => directive.trim())
     .find(directive => directive.startsWith('script-src '))

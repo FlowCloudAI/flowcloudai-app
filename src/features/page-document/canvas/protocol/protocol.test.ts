@@ -97,26 +97,37 @@ test('受管图片像素帧只接受当前会话的有界 RGBA 数据', () => {
         status: 'ready',
         width: 1,
         height: 1,
+        originalWidth: 2048,
+        originalHeight: 1024,
         rgbaBase64: 'AQIDBA==',
     })
     assert.equal(parseCanvasHostCommand(valid, TOKEN)?.type, 'asset-frame')
     assert.equal(parseCanvasHostCommand({...valid, sessionToken: OTHER_TOKEN}, TOKEN), null)
     assert.equal(parseCanvasHostCommand({...valid, rgbaBase64: 'not-image'}, TOKEN), null)
     assert.equal(parseCanvasHostCommand({...valid, width: 513}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, originalWidth: 0}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, originalHeight: 24_000_001}, TOKEN), null)
+    assert.equal(parseCanvasHostCommand({...valid, originalWidth: 24_000_000, originalHeight: 2}, TOKEN), null)
     assert.equal(parseCanvasHostCommand({...valid, assetId: '/tmp/image.png'}, TOKEN), null)
     assert.equal(parseCanvasHostCommand({...valid, url: 'file:///tmp/image.png'}, TOKEN), null)
     assert.equal(parseCanvasHostCommand({...valid, rgbaBase64: 'A'.repeat(CANVAS_MESSAGE_MAX_BYTES)}, TOKEN), null)
     assert.equal(parseCanvasHostCommand(message('asset-frame', {
         requestId: REQUEST_ID, assetId: NODE_ID, status: 'unavailable',
-        width: 0, height: 0, rgbaBase64: '',
+        width: 0, height: 0, originalWidth: 0, originalHeight: 0, rgbaBase64: '',
     }), TOKEN)?.type, 'asset-frame')
 })
 
 test('运行时只读消息只接受当前 token、版本与有界字段', () => {
     assert.equal(
-        parseCanvasRuntimeMessage(message('rendered', {requestId: REQUEST_ID, managedNodeCount: 3}), TOKEN)?.type,
+        parseCanvasRuntimeMessage(message('rendered', {requestId: REQUEST_ID, managedNodeCount: 3, missingAssetIds: [NODE_ID]}), TOKEN)?.type,
         'rendered',
     )
+    assert.equal(parseCanvasRuntimeMessage(message('rendered', {
+        requestId: REQUEST_ID, managedNodeCount: 3, missingAssetIds: [NODE_ID, NODE_ID],
+    }), TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('rendered', {
+        requestId: REQUEST_ID, managedNodeCount: 3, missingAssetIds: ['file:///tmp/a.png'],
+    }), TOKEN), null)
     assert.equal(
         parseCanvasRuntimeMessage(message('render-error', {requestId: REQUEST_ID, code: 'invalid-document', message: '拒绝'}), TOKEN)?.type,
         'render-error',

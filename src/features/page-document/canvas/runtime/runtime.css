@@ -26,20 +26,10 @@
         min-width: 0;
     }
 
-    [data-fc-asset-overlay],
-    [data-fc-asset-display] {
-        display: block;
-    }
-
 }
 
 /* 安全高亮和资产占位故意不分层，避免作者层覆盖隔离状态。 */
 [data-fc-node-id][data-fc-canvas-selected] {
-    outline: 2px solid var(--fc-entry-accent);
-    outline-offset: -2px;
-}
-
-[data-fc-asset-display][data-fc-canvas-selected] {
     outline: 2px solid var(--fc-entry-accent);
     outline-offset: -2px;
 }
@@ -51,14 +41,14 @@
     color: var(--fc-entry-muted);
 }
 
-[data-fc-asset-display][hidden],
-[data-fc-asset-state][hidden],
-[data-fc-asset-overlay][hidden] {
+[data-fc-canvas-asset-id][hidden] {
     display: none;
 }
 
 [data-fc-asset-state] {
     display: inline-block;
+    pointer-events: none;
+    user-select: none;
     min-block-size: 4rem;
     padding: 1rem;
     border: 1px dashed var(--fc-entry-muted);

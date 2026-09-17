@@ -610,6 +610,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!((frame.width, frame.height), (2, 2));
+        assert_eq!((frame.original_width, frame.original_height), (2, 2));
         assert_eq!(
             base64::Engine::decode(
                 &base64::engine::general_purpose::STANDARD,
@@ -722,6 +723,36 @@ mod tests {
                 .revision,
             1
         );
+    }
+
+    #[tokio::test]
+    async fn preview_frame_keeps_original_geometry_when_pixels_are_downsampled() {
+        let fixture = setup().await;
+        let source = fixture._dir.path().join("wide.png");
+        image::RgbaImage::from_pixel(1024, 512, image::Rgba([20, 40, 60, 255]))
+            .save(&source)
+            .unwrap();
+        let asset = page_document_assets::import_asset(
+            &fixture.state,
+            &fixture.paths,
+            &fixture.project_id,
+            &source,
+        )
+        .await
+        .unwrap();
+        let frame = page_document_assets::read_asset_frame(
+            &fixture.state,
+            &fixture.paths,
+            &fixture.project_id,
+            &asset.id,
+        )
+        .await
+        .unwrap();
+        assert_eq!((frame.width, frame.height), (512, 256));
+        assert_eq!((frame.original_width, frame.original_height), (1024, 512));
+        let wire = serde_json::to_value(&frame).unwrap();
+        assert_eq!(wire["originalWidth"], 1024);
+        assert_eq!(wire["originalHeight"], 512);
     }
 
     #[test]
