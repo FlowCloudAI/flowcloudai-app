@@ -1,7 +1,7 @@
 # ADR 0004：统一对象层、受控引用与资产归属范围
 
-- 状态：接受；迁移未实施，须在页面文档阶段 A 退出前完成
-- 日期：2026-09-17
+- 状态：接受；对象层、资产范围、段落索引与桌面快照/世界包后端迁移已实施，组件链授权、节点规则和跨平台验收仍未完成
+- 日期：2026-09-18
 - 修订：[ADR 0002](0002-page-document-storage.md) 中派生投影按记录存放、删除时由触发器写墓碑、回执按封闭作用域分组的部分，以及迁移 `0011_page_document_assets.sql` 中资产归属项目的做法。ADR 0002 的源码按领域对象分表、revision CAS 与幂等回执语义保持有效。
 
 ## 背景
@@ -47,15 +47,17 @@ ADR 0002 的源码存储布局不变，仍不建万能文档源码表，不为�
 
 ### 3. 统一对象层
 
-身份、引用、派生索引、删除记录、变更记录与保存回执统一为一层，由所有对象种类共用。下表中的表名与字段为候选，迁移实现时定稿：
+身份、引用、派生索引、删除记录、变更记录与保存回执统一为一层，由所有对象种类共用。迁移 `0012_object_layer.sql`、`0014_asset_scopes.sql` 和 `0015_object_text_fts.sql` 已将首批表名与关键字段定稿：
 
-| 候选表 | 候选字段 | 作用 |
+| 已实施表 | 关键字段 | 作用 |
 | --- | --- | --- |
-| `object_registry` | `id`（16 字节 UUID，主键）、`kind`、`project_id`、`deleted_revision`、`deleted_at`、`deleted_by` | 对象登记；对象删除后保留该行并标记删除，作为墓碑 |
-| `object_references` | `source_id`、`source_node_id`、`target_id`、`target_node_id`、`ref_type`、`source_revision` | 内链、事实绑定、组件实例、资产引用；出链、反向链接、依赖检查与影响分析 |
-| `object_text_blocks` | `object_id`、`node_id`、`ord`、`text`、`revision` | 段落级派生索引；整篇全文检索由段落聚合 |
-| `object_changes` | `seq`（自增）、`object_id`、`kind`、`revision`、`change_type`、`actor`、`source`、`at` | 本地变更流；`source` 取用户、AI、插件、合并或导入 |
-| `object_save_receipts` | `kind`、`object_id`、`request_key`、`request_hash`、`receipt_json`、`created_at` | 取代按封闭作用域分组的回执表，幂等语义与每目标保留上限不变 |
+| `local_spaces` | `id`、`name`；`projects.space_id` 指向本地默认空间 | 项目空间落点，尚无跨设备空间管理 |
+| `object_registry` | `id`（16 字节 UUID，主键）、`kind`、`project_id`、`deleted_revision`、`deleted_at`、`deleted_by`、`cascade_source_id`、`created_at` | 对象登记；对象删除后保留该行并标记删除，作为墓碑 |
+| `object_references` | `source_id`、非空哨兵 `source_node_id`、`target_id`、非空哨兵 `target_node_id`、`ref_type`、`source_revision` | 内链与资产引用；组件实例引用尚未接入 |
+| `object_text_blocks` / `object_text_blocks_fts` | 显式 `block_rowid`、`object_id`、`node_id`、`ord`、`text`、`revision` | 段落级派生索引与 FTS；旧页面在应用重建前由 `object_legacy_text` 保底 |
+| `object_changes` | `seq`（自增）、`object_id`、`kind`、`revision`、`change_type`、`actor`、`source`、`at` | 本地变更流 |
+| `object_save_receipts` | `kind`、`object_id`、`request_key`、`request_hash`、`receipt_json`、`created_at` | 开放对象种类的幂等回执，每目标仍保留最新 64 条 |
+| `page_document_assets` / `asset_scopes` | 资产身份与内容事实；`asset_id`、`scope_kind`、`scope_id`、`added_at` | 同一原件可登记多个项目范围；当前只授权项目范围 |
 
 约束：
 
@@ -90,11 +92,11 @@ ADR 0002 的源码存储布局不变，仍不建万能文档源码表，不为�
 
 ### 6. 资产身份与归属范围分离
 
-- 资产记录只保存身份与内容事实：资产 ID、媒体类型、字节数、内容摘要、尺寸、处理版本与原件/派生关系，去掉 `project_id`。
-- 归属范围单独记录（候选表 `asset_scopes`：`asset_id`、`scope_kind`、`scope_id`、`added_at`），一个资产可以属于多个范围。首批只实现项目范围，范围种类按开放集合设计。
+- 资产记录只保存身份与内容事实：资产 ID、媒体类型、字节数、内容摘要、尺寸与当前原件布局，去掉 `project_id`。处理版本和原件/派生关系尚未进入本次表结构。
+- 归属范围单独记录于 `asset_scopes`（`asset_id`、`scope_kind`、`scope_id`、`added_at`），一个资产可以属于多个范围。首批只实现项目范围，范围种类按开放集合设计。
 - 页面与组件对资产的使用记入 `object_references`，`ref_type` 为资产引用。
-- 画布读取资产时，宿主沿「当前文档 → 组件实例 → 组件定义 → 资产」检查每一步都在调用方可访问的范围内，而不是只看资产是否属于当前项目。
-- 资产在某范围内不再被引用、且被移出该范围时解除归属；所有范围都解除后才清理原件与派生表示。
+- 当前画布读取和保存按文档所在项目的资产范围授权，草稿新图在引用落库前也可读取；组件落地后须扩展为「当前文档 → 组件实例 → 组件定义 → 资产」逐段授权，不得只凭引用记录授权。
+- 资产在某范围内不再被引用、且被移出该范围时方可解除归属；所有范围都解除后才允许清理原件与派生表示。自动清理仍未接入，以免误删共享原件。
 - 媒体类型允许集合由 Rust 校验，不写数据库 `CHECK`。
 
 ### 7. 层叠顺序与最低系统版本
@@ -105,10 +107,9 @@ ADR 0002 的源码存储布局不变，仍不建万能文档源码表，不为�
 
 ## 后果
 
-- `core_world_data` 新增统一对象层迁移，并把 0010、0011 中的派生文本、墓碑、回执和资产数据迁入新结构。迁移保护现有开发数据，不以删库重建代替；默认特性与 `--no-default-features --features sqlite` 两条测试链路都要通过。
-- `app_main` 的 Rust 校验模块输出段落块（节点 ID 与纯文本）和引用集合，TS 与 Rust 共享的 fixture 同步更新；资产读取与 bridge 授权改为沿引用链判断。
-- 删除词条、项目等操作改走领域命令；直接用 SQL 删除会被触发器拒绝，测试与导入代码需要相应调整。
-- ADR 0002「已知缺口」中 CSV、快照与 `.fcworld` 不包含页面文档表的问题，关闭时一并覆盖统一对象层与组件定义修订。
+- `core_world_data` 已以增量迁移接收 0010、0011 的派生文本、墓碑、回执和资产数据；默认特性与 SQLite 最小特性两条全量测试链通过。组件定义尚无领域实现，不在本次迁移范围。
+- `app_main` Rust 校验已输出段落块与引用集合，保存和显式重建可更新 FTS；资产读取与保存目前按项目范围授权，组件链授权仍待组件落地。
+- 删除词条、项目等操作已走领域命令；直接 SQL 删除由 `BEFORE DELETE` 触发器拒绝。桌面快照、CSV 与版本化 `.fcworld` 已带对象层载荷；旧快照和旧包仍可读取。
 - 代价：每次保存都要重建该对象的段落块与引用，写入量增加；对象种类开放后，数据库不再兜底枚举合法性，合法性由领域服务与测试保证。
 
 ## 备选方案

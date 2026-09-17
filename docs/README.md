@@ -34,7 +34,7 @@
 | [adr/0001-frontend-feature-modular-monolith.md](adr/0001-frontend-feature-modular-monolith.md) | 现行 | 2026-07-21 | ADR：前端功能模块化单体。`app` / `features` / `api` / `shared` 的边界与禁止跨模块复用界面内部实现 |
 | [adr/0002-page-document-storage.md](adr/0002-page-document-storage.md) | 现行 | 2026-09-17 | 页面文档独立存储、revision CAS、幂等回执与派生投影语义；派生投影、墓碑、回执作用域与资产归属部分由 ADR 0004 修订 |
 | [adr/0003-page-document-canvas-isolation.md](adr/0003-page-document-canvas-isolation.md) | 提议；macOS、Android 已原生验收，Windows 待验证 | 2026-09-15 | 页面文档采用独立打包页面、opaque sandbox、严格画布 CSP 与带会话鉴权 bridge；macOS 与 Android 已确认隔离、样式、网络拦截、导航、尺寸及生命周期，Windows 待验 |
-| [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-17 | 页面源码受控引用（组件实例、事实绑定、资产、对象内链）、统一对象层（登记、引用、段落级索引、墓碑、变更记录、回执）、删除走领域命令、节点身份保持与重映射、资产身份与归属范围分离、层叠顺序与 macOS 最低版本；迁移未实施，须在阶段 A 退出前完成 |
+| [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引与桌面快照/世界包后端迁移已实施；组件链授权、节点规则及跨平台验收仍待完成 |
 | [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |
