@@ -107,6 +107,14 @@ fn asset_root(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, ApiError
         .join("page-document"))
 }
 
+fn shared_asset_root(paths: &PathsState) -> Result<PathBuf, ApiError> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| unavailable("无法定位图片目录"))?;
+    Ok(db_dir.join("images").join("page-document"))
+}
+
 pub(crate) fn asset_path(
     paths: &PathsState,
     asset: &PageDocumentAsset,
@@ -117,11 +125,20 @@ pub(crate) fn asset_path(
         "image/webp" => "webp",
         _ => return Err(invalid("资产媒体类型无效")),
     };
-    Ok(asset_root(paths, &asset.project_id)?.join(format!("{}.{}", asset.id, extension)))
+    let root = match asset.storage_layout {
+        0 => asset_root(paths, &asset.project_id)?,
+        1 => shared_asset_root(paths)?,
+        _ => return Err(invalid("资产存储布局版本无效")),
+    };
+    Ok(root.join(format!("{}.{}", asset.id, extension)))
 }
 
 fn verified_bytes(paths: &PathsState, asset: &PageDocumentAsset) -> Result<Vec<u8>, ApiError> {
-    let root = asset_root(paths, &asset.project_id)?;
+    let root = match asset.storage_layout {
+        0 => asset_root(paths, &asset.project_id)?,
+        1 => shared_asset_root(paths)?,
+        _ => return Err(invalid("资产存储布局版本无效")),
+    };
     let images_root = paths
         .db_path
         .parent()
@@ -129,14 +146,16 @@ fn verified_bytes(paths: &PathsState, asset: &PageDocumentAsset) -> Result<Vec<u
         .join("images");
     let canonical_images =
         std::fs::canonicalize(images_root).map_err(|_| unavailable("图片根目录不存在"))?;
-    let canonical_root =
-        std::fs::canonicalize(&root).map_err(|_| unavailable("项目图片目录不存在"))?;
-    if canonical_root
-        != canonical_images
+    let canonical_root = std::fs::canonicalize(&root).map_err(|_| unavailable("图片目录不存在"))?;
+    let expected_root = match asset.storage_layout {
+        0 => canonical_images
             .join(asset.project_id.to_string())
-            .join("page-document")
-    {
-        return Err(unavailable("项目图片目录越界"));
+            .join("page-document"),
+        1 => canonical_images.join("page-document"),
+        _ => return Err(invalid("资产存储布局版本无效")),
+    };
+    if canonical_root != expected_root {
+        return Err(unavailable("图片目录越界"));
     }
     let path = std::fs::canonicalize(asset_path(paths, asset)?)
         .map_err(|_| unavailable("图片原件不存在"))?;
@@ -158,6 +177,52 @@ fn verified_bytes(paths: &PathsState, asset: &PageDocumentAsset) -> Result<Vec<u
     Ok(bytes)
 }
 
+async fn migrate_legacy_asset(
+    db: &SqliteDb,
+    paths: &PathsState,
+    asset: &PageDocumentAsset,
+) -> Result<PageDocumentAsset, ApiError> {
+    if asset.storage_layout == 1 {
+        return Ok(asset.clone());
+    }
+    if asset.storage_layout != 0 {
+        return Err(invalid("资产存储布局版本无效"));
+    }
+    let bytes = verified_bytes(paths, asset)?;
+    let shared_root = shared_asset_root(paths)?;
+    std::fs::create_dir_all(&shared_root).map_err(|_| unavailable("无法创建共享图片目录"))?;
+    let mut migrated = asset.clone();
+    migrated.storage_layout = 1;
+    let destination = asset_path(paths, &migrated)?;
+    if !destination.exists() {
+        let temporary = shared_root.join(format!("{}.{}.tmp", asset.id, Uuid::new_v4()));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|_| unavailable("无法准备迁移后的图片原件"))?;
+        if file.write_all(&bytes).is_err() || file.sync_all().is_err() {
+            drop(file);
+            let _ = std::fs::remove_file(&temporary);
+            return Err(unavailable("无法复制图片原件"));
+        }
+        drop(file);
+        if let Err(error) = std::fs::hard_link(&temporary, &destination) {
+            let _ = std::fs::remove_file(&temporary);
+            if !destination.exists() {
+                return Err(unavailable(format!("无法切换图片原件位置: {error}")));
+            }
+        } else {
+            let _ = std::fs::remove_file(&temporary);
+        }
+    }
+    verified_bytes(paths, &migrated)?;
+    db.set_page_asset_storage_layout(&asset.project_id, &asset.id, 1)
+        .await
+        .map_err(ApiError::from_display)?;
+    Ok(migrated)
+}
+
 pub(crate) async fn require_asset(
     db: &SqliteDb,
     paths: &PathsState,
@@ -169,8 +234,9 @@ pub(crate) async fn require_asset(
         .await
         .map_err(ApiError::from_display)?
         .ok_or_else(|| unavailable("图片不存在或不属于当前项目"))?;
-    verified_bytes(paths, &asset)?;
-    Ok(asset)
+    let migrated = migrate_legacy_asset(db, paths, &asset).await?;
+    verified_bytes(paths, &migrated)?;
+    Ok(migrated)
 }
 
 pub(crate) async fn import_asset(
@@ -188,8 +254,8 @@ pub(crate) async fn import_asset(
     let bytes = read_bounded(source)?;
     let (_, media_type, extension, width, height) = inspect_image(&bytes)?;
     let asset_id = Uuid::new_v4();
-    let root = asset_root(paths, project_id)?;
-    std::fs::create_dir_all(&root).map_err(|_| unavailable("无法创建项目图片目录"))?;
+    let root = shared_asset_root(paths)?;
+    std::fs::create_dir_all(&root).map_err(|_| unavailable("无法创建图片目录"))?;
     let images_root = paths
         .db_path
         .parent()
@@ -199,12 +265,8 @@ pub(crate) async fn import_asset(
         std::fs::canonicalize(images_root).map_err(|_| unavailable("无法核验图片根目录"))?;
     let canonical_root =
         std::fs::canonicalize(&root).map_err(|_| unavailable("无法核验项目图片目录"))?;
-    if canonical_root
-        != canonical_images
-            .join(project_id.to_string())
-            .join("page-document")
-    {
-        return Err(unavailable("项目图片目录越界"));
+    if canonical_root != canonical_images.join("page-document") {
+        return Err(unavailable("图片目录越界"));
     }
     let path = root.join(format!("{asset_id}.{extension}"));
     let temporary = root.join(format!("{asset_id}.{extension}.tmp"));
@@ -214,16 +276,17 @@ pub(crate) async fn import_asset(
         .create_new(true)
         .open(&temporary)
         .map_err(|_| unavailable("无法准备图片原件"))?;
-    if file.write_all(&bytes).is_err() {
+    if file.write_all(&bytes).is_err() || file.sync_all().is_err() {
         drop(file);
         let _ = std::fs::remove_file(&temporary);
         return Err(unavailable("无法写入图片原件"));
     }
     drop(file);
-    if let Err(error) = std::fs::rename(&temporary, &path) {
+    if let Err(error) = std::fs::hard_link(&temporary, &path) {
         let _ = std::fs::remove_file(&temporary);
         return Err(unavailable(format!("无法存储图片原件: {error}")));
     }
+    let _ = std::fs::remove_file(&temporary);
     let asset = PageDocumentAsset {
         id: asset_id,
         project_id: *project_id,
@@ -232,8 +295,13 @@ pub(crate) async fn import_asset(
         sha256: digest,
         width: i64::from(width),
         height: i64::from(height),
+        storage_layout: 1,
         created_at: String::new(),
     };
+    if let Err(error) = verified_bytes(paths, &asset) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error);
+    }
     match db.register_page_asset(&asset).await {
         Ok(stored) => Ok(stored),
         Err(error) => {
@@ -350,6 +418,8 @@ pub async fn page_document_check_asset(
 mod tests {
     use super::*;
 
+    use sqlx::Row;
+
     #[test]
     fn media_type_and_byte_limits_are_checked_from_content() {
         let image = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
@@ -389,17 +459,157 @@ mod tests {
             sha256: "a".repeat(64),
             width: 1,
             height: 1,
+            storage_layout: 1,
             created_at: String::new(),
         };
         let paths = PathsState {
             db_path: dir.path().join("catalog.db"),
             plugins_path: dir.path().join("plugins"),
         };
-        let root = asset_root(&paths, &project_id).unwrap();
+        let root = shared_asset_root(&paths).unwrap();
         std::fs::create_dir_all(&root).unwrap();
         let outside = dir.path().join("outside.png");
         std::fs::write(&outside, b"other").unwrap();
         symlink(&outside, asset_path(&paths, &asset).unwrap()).unwrap();
         assert!(verified_bytes(&paths, &asset).is_err());
+    }
+
+    #[tokio::test]
+    async fn legacy_asset_is_copied_and_verified_before_switching_storage_layout() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = PathsState {
+            db_path: dir.path().join("catalog.db"),
+            plugins_path: dir.path().join("plugins"),
+        };
+        let db = SqliteDb::new(&format!(
+            "sqlite:{}?mode=rwc",
+            dir.path().join("world.db").display()
+        ))
+        .await
+        .unwrap();
+        let project_id = Uuid::now_v7();
+        sqlx::query("INSERT INTO projects(id,name) VALUES(?,'迁移测试')")
+            .bind(project_id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let mut encoded = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(2, 3, image::Rgb([1, 2, 3])))
+            .write_to(&mut encoded, ImageFormat::Png)
+            .unwrap();
+        let bytes = encoded.into_inner();
+        let asset = PageDocumentAsset {
+            id: Uuid::now_v7(),
+            project_id,
+            media_type: "image/png".into(),
+            size_bytes: bytes.len() as i64,
+            sha256: format!("{:x}", Sha256::digest(&bytes)),
+            width: 2,
+            height: 3,
+            storage_layout: 0,
+            created_at: String::new(),
+        };
+        db.register_page_asset(&asset).await.unwrap();
+        let old_path = asset_path(&paths, &asset).unwrap();
+        std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
+        std::fs::write(&old_path, &bytes).unwrap();
+
+        let migrated = require_asset(&db, &paths, &project_id, &asset.id)
+            .await
+            .unwrap();
+        assert_eq!(migrated.storage_layout, 1);
+        assert!(old_path.exists());
+        assert_eq!(
+            std::fs::read(asset_path(&paths, &migrated).unwrap()).unwrap(),
+            bytes
+        );
+        assert_eq!(
+            sqlx::query("SELECT storage_layout FROM page_document_assets WHERE id=?")
+                .bind(asset.id)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap()
+                .try_get::<i64, _>("storage_layout")
+                .unwrap(),
+            1
+        );
+        let second_project = Uuid::now_v7();
+        sqlx::query("INSERT INTO projects(id,name) VALUES(?,'第二项目')")
+            .bind(second_project)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        assert!(
+            db.get_page_asset(&second_project, &asset.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let shared = PageDocumentAsset {
+            project_id: second_project,
+            ..migrated.clone()
+        };
+        db.register_page_asset(&shared).await.unwrap();
+        let second = require_asset(&db, &paths, &second_project, &asset.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            asset_path(&paths, &second).unwrap(),
+            asset_path(&paths, &migrated).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_legacy_asset_migration_keeps_original_and_layout_marker() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = PathsState {
+            db_path: dir.path().join("catalog.db"),
+            plugins_path: dir.path().join("plugins"),
+        };
+        let db = SqliteDb::new(&format!(
+            "sqlite:{}?mode=rwc",
+            dir.path().join("world.db").display()
+        ))
+        .await
+        .unwrap();
+        let project_id = Uuid::now_v7();
+        sqlx::query("INSERT INTO projects(id,name) VALUES(?,'损坏资产')")
+            .bind(project_id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let asset = PageDocumentAsset {
+            id: Uuid::now_v7(),
+            project_id,
+            media_type: "image/png".into(),
+            size_bytes: 9,
+            sha256: "a".repeat(64),
+            width: 1,
+            height: 1,
+            storage_layout: 0,
+            created_at: String::new(),
+        };
+        db.register_page_asset(&asset).await.unwrap();
+        let old_path = asset_path(&paths, &asset).unwrap();
+        std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
+        std::fs::write(&old_path, b"corrupted").unwrap();
+
+        assert!(
+            require_asset(&db, &paths, &project_id, &asset.id)
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&old_path).unwrap(), b"corrupted");
+        assert_eq!(
+            db.get_page_asset(&project_id, &asset.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .storage_layout,
+            0
+        );
+        let mut shared = asset;
+        shared.storage_layout = 1;
+        assert!(!asset_path(&paths, &shared).unwrap().exists());
     }
 }
