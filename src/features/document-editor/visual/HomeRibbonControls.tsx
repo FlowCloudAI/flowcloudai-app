@@ -27,6 +27,7 @@ import {
     DocumentRibbonRows,
 } from './DocumentOfficeRibbon.tsx'
 import {createRibbonPropertyRequest} from './ribbonKernelBinding.ts'
+import {InlineRibbonStyleControls} from './InlineRibbonStyleControls.tsx'
 
 export type RibbonApplyKernelEntry = (
     request: KernelDraftEditRequest,
@@ -264,6 +265,7 @@ export function HomeRibbonControls({
             >
                 <RibbonUnavailable label="块操作" reason={availability.block ?? '块移动与删除将在后续工具栏批次接入'} />
             </DocumentRibbonGroup>
+            <InlineRibbonStyleControls />
         </>
     )
 }
