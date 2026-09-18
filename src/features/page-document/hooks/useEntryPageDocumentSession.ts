@@ -15,6 +15,7 @@ import {isDocumentScopeDirty, sourceDraftView} from '../application/documentDraf
 import {
     createDocumentKernelDraftRuntime,
     type KernelComponentInspectionRequest,
+    type KernelTextRangeInspectionRequest,
     type KernelDraftEditRequest,
     type KernelDraftPreparationResult,
 } from '../application/documentKernelDraftRuntime.ts'
@@ -283,6 +284,23 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             })
         }
         return kernelRuntimeRef.current.inspectComponent(current.model, current.snapshot, request)
+    }, [])
+
+    const inspectTextRange = useCallback((request: KernelTextRangeInspectionRequest) => {
+        const current = stateRef.current
+        if (!current) {
+            return Object.freeze({
+                status: 'rejected' as const,
+                failures: Object.freeze([
+                    Object.freeze({
+                        code: 'document-snapshot-unavailable',
+                        message: '当前没有可读取的页面文档草稿。',
+                        property: null,
+                    }),
+                ]),
+            })
+        }
+        return kernelRuntimeRef.current.inspectTextRange(current.model, current.snapshot, request)
     }, [])
 
     const prepareKernelEntry = useCallback(
@@ -594,6 +612,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         importImageAsset,
         visualError,
         inspectComponent,
+        inspectTextRange,
         prepareKernelEntry,
         applyPreparedKernelEntry,
         applyKernelEntry,

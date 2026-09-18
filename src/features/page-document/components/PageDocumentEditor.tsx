@@ -3,11 +3,12 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
+import {Eye, FilePlus2, Home, Image, LayoutPanelTop, Table2, type LucideIcon} from 'lucide-react'
 import {pageDocumentAssetErrorMessage, type PageDocumentAsset} from '../../../api/pageDocument.ts'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
-import {createLayerProjection} from '../domain/layerProjection.ts'
+import {createLayerProjection, type LayerProjectionNode} from '../domain/layerProjection.ts'
 import {
     findLayerNode,
     resolveVisualSelection,
@@ -36,6 +37,16 @@ import {
     type PageDocumentWorkspaceMode,
 } from './pageDocumentEditorWorkspacePolicy.ts'
 import './PageDocumentEditor.css'
+import {
+    DocumentOfficeRibbon,
+    type DocumentRibbonTabOption,
+} from '../../document-editor/visual/DocumentOfficeRibbon.tsx'
+import {HomeRibbonControls} from '../../document-editor/visual/HomeRibbonControls.tsx'
+import {
+    resolveRibbonTab,
+    ribbonTabsForNode,
+    type DocumentRibbonTab,
+} from '../../document-editor/visual/documentRibbonModel.ts'
 
 function validationLabel(phase: string): string {
     if (phase === 'valid') return '校验通过'
@@ -47,6 +58,50 @@ function validationLabel(phase: string): string {
 
 function sourceSetFromConflict(html: string, css: string): SourceFileSet {
     return {'article.html': html, 'style.css': css}
+}
+
+function RibbonUnavailableTab({tab}: {tab: string}) {
+    return (
+        <div className="page-document-editor__ribbon-unavailable" role="status">
+            {tab} 页签将在后续页面文档编辑批次接入。
+        </div>
+    )
+}
+
+const RIBBON_TAB_ICONS: Readonly<Record<DocumentRibbonTab, LucideIcon>> = {
+    home: Home,
+    insert: FilePlus2,
+    page: LayoutPanelTop,
+    view: Eye,
+    picture: Image,
+    gallery: Image,
+    table: Table2,
+    container: LayoutPanelTop,
+    list: LayoutPanelTop,
+    divider: LayoutPanelTop,
+}
+
+const RIBBON_TAB_LABELS: Readonly<Record<DocumentRibbonTab, string>> = {
+    home: '开始',
+    insert: '插入',
+    page: '页面',
+    view: '视图',
+    picture: '图片',
+    gallery: '画廊',
+    table: '表格',
+    container: '容器',
+    list: '列表',
+    divider: '分隔线',
+}
+
+function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRibbonTabOption[] {
+    return ribbonTabsForNode(node).map(tab => ({
+        id: tab,
+        label: RIBBON_TAB_LABELS[tab],
+        icon: RIBBON_TAB_ICONS[tab],
+        contextual: !['home', 'insert', 'page', 'view'].includes(tab),
+        disabled: tab !== 'home',
+    }))
 }
 
 export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
@@ -66,6 +121,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         onRequestLeave,
     } = props
     const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
+    const [ribbonTab, setRibbonTab] = useState<DocumentRibbonTab>('home')
+    const [ribbonCollapsed, setRibbonCollapsed] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
@@ -212,6 +269,12 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         }
     }
 
+    const selectedNode = selectedNodeId
+        ? findLayerNode(layerProjection.nodes, selectedNodeId)
+        : null
+    const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
+    const ribbonTabs = ribbonTabOptions(selectedNode)
+
     if (loadView === 'error') {
         return (
             <div className="page-document-editor-state is-error" role="alert">
@@ -231,9 +294,6 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const conflict = state.conflict
     const conflictSources = conflict?.latestDocument
         ? sourceSetFromConflict(conflict.latestDocument.html, conflict.latestDocument.css)
-        : null
-    const selectedNode = selectedNodeId
-        ? findLayerNode(layerProjection.nodes, selectedNodeId)
         : null
     const openAssetPicker = (pickerMode: 'insert' | 'replace') => {
         if (!active || mode !== 'visual') return
@@ -465,6 +525,29 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         载入最新版本（放弃本地修改）
                     </Button>
                 </section>
+            )}
+
+            {mode === 'visual' && (
+                <div className="page-document-editor__ribbon">
+                    <DocumentOfficeRibbon
+                        activeTab={visibleRibbonTab}
+                        collapsed={ribbonCollapsed}
+                        onCollapsedChange={setRibbonCollapsed}
+                        onTabChange={setRibbonTab}
+                        tabs={ribbonTabs}
+                    >
+                        {visibleRibbonTab === 'home' ? (
+                            <HomeRibbonControls
+                                selected={selectedNode}
+                                applyKernelEntry={session.applyVisualPropertyEntry}
+                                inspectComponent={session.inspectComponent}
+                                inspectTextRange={session.inspectTextRange}
+                            />
+                        ) : (
+                            <RibbonUnavailableTab tab={visibleRibbonTab} />
+                        )}
+                    </DocumentOfficeRibbon>
+                </div>
             )}
 
             <div className="page-document-editor__workspace" data-mode={mode}>

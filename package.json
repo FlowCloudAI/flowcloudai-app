@@ -90,6 +90,7 @@
     "html-to-image": "^1.11.13",
     "i18next": "^26.0.3",
     "i18next-browser-languagedetector": "^8.2.1",
+    "lucide-react": "^1.47.0",
     "parse5": "^8.0.1",
     "pixi.js": "^8.18.1",
     "postcss": "^8.5.26",

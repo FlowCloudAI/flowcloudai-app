@@ -47,6 +47,15 @@ const LEGAL_PUBLIC_COMPONENT_MUTATION: CanvasProbeMutation = {
     },
 }
 
+const LEGAL_RIBBON_FORMATTING_MUTATION: CanvasProbeMutation = {
+    id: 'legal-ribbon-formatting',
+    file: 'entry/article.html',
+    replace: {
+        needle: 'id="linked-section"',
+        value: 'id="linked-section" class="fc-ribbon-sample"',
+    },
+}
+
 function isElement(node: HtmlNode): node is HtmlElement {
     return 'tagName' in node && 'attrs' in node
 }
@@ -89,6 +98,11 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
         LEGAL_PUBLIC_COMPONENT_MUTATION,
         '合法',
     )
+    const ribbonFormattingHtml = mutate(
+        sources.fixtureHtml,
+        LEGAL_RIBBON_FORMATTING_MUTATION,
+        '合法',
+    )
     return [
         {
             id: 'legal-shared-fixture',
@@ -111,6 +125,14 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             label: '合法：公共组件序列化',
             validationHtml: publicComponentHtml,
             html: extractCanvasRenderableHtml(publicComponentHtml),
+            css: sources.fixtureCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_RIBBON_FORMATTING_MUTATION.id,
+            label: '合法：功能区文字节点',
+            validationHtml: ribbonFormattingHtml,
+            html: extractCanvasRenderableHtml(ribbonFormattingHtml),
             css: sources.fixtureCss,
             assetIds: sources.assetIds,
         },

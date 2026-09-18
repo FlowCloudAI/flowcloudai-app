@@ -27,6 +27,7 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'font-size', label: '字号', group: 'text'},
     {property: 'font-weight', label: '字重', group: 'text'},
     {property: 'line-height', label: '行高', group: 'text'},
+    {property: 'text-align', label: '对齐', group: 'layout'},
     {property: 'margin-block-start', label: '外距上', group: 'layout'},
     {property: 'margin-block-end', label: '外距下', group: 'layout'},
     {property: 'margin-inline-start', label: '外距左', group: 'layout'},
@@ -326,6 +327,7 @@ export function parseSerializedVisualColor(rawValue: string): VisualColorPropert
 export type VisualPropertyEditValue =
     | VisualNumericPropertyValue
     | {readonly kind: 'font-weight'; readonly value: VisualFontWeight}
+    | {readonly kind: 'choice'; readonly value: 'left' | 'center' | 'right' | 'justify'}
     | VisualColorPropertyValue
     | {readonly kind: 'clear-override'}
 
@@ -377,6 +379,10 @@ export function serializeVisualPropertyValue(
         if (property !== 'font-weight' || !VISUAL_FONT_WEIGHTS.includes(value.value)) {
             throw new TypeError('字重结构与目标属性不匹配。')
         }
+        return value.value
+    }
+    if (value.kind === 'choice') {
+        if (property !== 'text-align') throw new TypeError('选择值结构与目标属性不匹配。')
         return value.value
     }
     if (value.kind === 'color') {
