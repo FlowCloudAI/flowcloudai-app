@@ -56,6 +56,7 @@ anyhow = "1"
 
 # ── 本地路径依赖 ──
 flowcloudai_client = { path = "../../core_ai_client" }
+flowcloudai_image = { path = "../../core_image" }
 
 # ── 网络与 HTTP ──
 reqwest = { version = "0.13.2", features = ["json", "multipart", "stream"] }

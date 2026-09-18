@@ -1,8 +1,12 @@
 //! 页面图片的受管原件适配：世界库授权稳定 ID，宿主解码为有界像素供隔离画布绘制。
 
-use crate::{ApiError, AppState, PathsState, apis::worldflow::common::open_project_db};
+use crate::{
+    ApiError, AppState, PathsState,
+    apis::worldflow::{common::open_project_db, images::image_processor},
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use flowcloudai_client::ErrorCode;
+use flowcloudai_image::{AnimationPolicy, Cancellation, CropMode, VariantSpec};
 use image::{ImageFormat, ImageReader};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -309,7 +313,18 @@ pub(crate) async fn cleanup_deleted_project_assets(
         }
         let path = asset_path(paths, asset).map_err(|error| error.to_string())?;
         match std::fs::remove_file(&path) {
-            Ok(()) => cleaned += 1,
+            Ok(()) => {
+                cleaned += 1;
+                let variants = shared_asset_root(paths)
+                    .map_err(|error| error.to_string())?
+                    .join("variants")
+                    .join(asset.id.to_string());
+                if variants.exists() {
+                    if let Err(error) = std::fs::remove_dir_all(&variants) {
+                        errors.push(format!("资产 {} 派生图未能清理：{error}", asset.id));
+                    }
+                }
+            }
             Err(error) => errors.push(format!("资产 {} 原件未能清理：{error}", asset.id)),
         }
     }
@@ -452,23 +467,45 @@ pub(crate) async fn read_asset_frame(
         .map_err(ApiError::internal)?;
     let asset = require_asset(&db, paths, project_id, asset_id).await?;
     let bytes = verified_bytes(paths, &asset)?;
-    let (format, _, _, _, _) = inspect_image(&bytes)?;
-    let decoded = image::load_from_memory_with_format(&bytes, format)
-        .map_err(|_| unavailable("图片原件解码失败"))?;
-    let preview = if decoded.width() <= MAX_PREVIEW_EDGE && decoded.height() <= MAX_PREVIEW_EDGE {
-        decoded.to_rgba8()
-    } else {
-        decoded
-            .thumbnail(MAX_PREVIEW_EDGE, MAX_PREVIEW_EDGE)
-            .to_rgba8()
-    };
-    let (width, height) = preview.dimensions();
+    let cache_dir = shared_asset_root(paths)?
+        .join("variants")
+        .join(asset_id.to_string());
+    let asset_id = *asset_id;
+    tauri::async_runtime::spawn_blocking(move || {
+        create_page_asset_frame(&bytes, &cache_dir, asset_id)
+    })
+    .await
+    .map_err(|_| unavailable("图片预览后台任务失败"))?
+}
+
+fn create_page_asset_frame(
+    verified_original: &[u8],
+    cache_dir: &Path,
+    asset_id: Uuid,
+) -> Result<PageAssetFrame, ApiError> {
+    let variant = image_processor()
+        .process_bytes(
+            verified_original,
+            cache_dir,
+            VariantSpec {
+                width: MAX_PREVIEW_EDGE,
+                height: MAX_PREVIEW_EDGE,
+                crop: CropMode::Fit,
+                quality: None,
+                animation: AnimationPolicy::StaticCover,
+            },
+            &Cancellation::default(),
+        )
+        .map_err(|error| unavailable(format!("图片 WebP 预览生成失败：{error}")))?;
+    let preview = image::open(&variant.path)
+        .map_err(|_| unavailable("图片 WebP 预览读取失败"))?
+        .to_rgba8();
     Ok(PageAssetFrame {
-        asset_id: *asset_id,
-        width,
-        height,
-        original_width: u32::try_from(asset.width).map_err(|_| invalid("图片原始宽度无效"))?,
-        original_height: u32::try_from(asset.height).map_err(|_| invalid("图片原始高度无效"))?,
+        asset_id,
+        width: variant.width,
+        height: variant.height,
+        original_width: variant.oriented_source_width,
+        original_height: variant.oriented_source_height,
         rgba_base64: STANDARD.encode(preview.as_raw()),
     })
 }
@@ -574,6 +611,33 @@ mod tests {
         let file = std::fs::File::create(&too_large).unwrap();
         file.set_len(MAX_SOURCE_BYTES + 1).unwrap();
         assert!(read_bounded(&too_large).is_err());
+    }
+
+    #[test]
+    fn page_frame_reuses_webp_variant_without_rewriting_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let asset_id = Uuid::now_v7();
+        let mut encoded = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
+            16,
+            8,
+            image::Rgba([20, 60, 90, 120]),
+        ))
+        .write_to(&mut encoded, ImageFormat::Png)
+        .unwrap();
+        let original = encoded.into_inner();
+        let cache_dir = dir.path().join("variants").join(asset_id.to_string());
+
+        let first = create_page_asset_frame(&original, &cache_dir, asset_id).unwrap();
+        let second = create_page_asset_frame(&original, &cache_dir, asset_id).unwrap();
+        assert_eq!((first.width, first.height), (16, 8));
+        assert_eq!((first.original_width, first.original_height), (16, 8));
+        assert_eq!(first.rgba_base64, second.rgba_base64);
+        let variants: Vec<_> = std::fs::read_dir(&cache_dir).unwrap().collect();
+        assert_eq!(variants.len(), 1);
+        let bytes = std::fs::read(variants[0].as_ref().unwrap().path()).unwrap();
+        assert_eq!(image::guess_format(&bytes).unwrap(), ImageFormat::WebP);
+        assert_eq!(image::guess_format(&original).unwrap(), ImageFormat::Png);
     }
 
     #[cfg(unix)]
@@ -778,6 +842,11 @@ mod tests {
         let original = asset_path(&paths, &asset).unwrap();
         std::fs::create_dir_all(original.parent().unwrap()).unwrap();
         std::fs::write(&original, &bytes).unwrap();
+        let variants = shared_asset_root(&paths)
+            .unwrap()
+            .join("variants")
+            .join(asset.id.to_string());
+        create_page_asset_frame(&bytes, &variants, asset.id).unwrap();
         for project in [first, second] {
             worlds
                 .create_world_with_id(project, "测试世界")
@@ -814,6 +883,7 @@ mod tests {
             0
         );
         assert!(original.exists(), "另一世界仍有项目范围时不得删除共享原件");
+        assert!(variants.exists(), "另一世界仍引用资产时不得删除派生图");
 
         let second_db = worlds.open_world(second).await.unwrap();
         second_db.delete_project(&second).await.unwrap();
@@ -826,6 +896,7 @@ mod tests {
             1
         );
         assert!(!original.exists());
+        assert!(!variants.exists());
         std::fs::write(&original, b"corrupted").unwrap();
         assert!(
             cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset])

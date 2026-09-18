@@ -35,6 +35,7 @@
 | [adr/0002-page-document-storage.md](adr/0002-page-document-storage.md) | 现行 | 2026-09-17 | 页面文档独立存储、revision CAS、幂等回执与派生投影语义；派生投影、墓碑、回执作用域与资产归属部分由 ADR 0004 修订 |
 | [adr/0003-page-document-canvas-isolation.md](adr/0003-page-document-canvas-isolation.md) | 提议；macOS、Android 已原生验收，Windows 待验证 | 2026-09-15 | 页面文档采用独立打包页面、opaque sandbox、严格画布 CSP 与带会话鉴权 bridge；macOS 与 Android 已确认隔离、样式、网络拦截、导航、尺寸及生命周期，Windows 待验 |
 | [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引与桌面快照/世界包后端迁移已实施；组件链授权、节点规则及跨平台验收仍待完成 |
+| [验收清单.md](验收清单.md) | 现行 | 2026-09-18 | 尚未由用户在原生产物确认的 WebP 图片与画布层叠层检查项；通过一项删一项 |
 | [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |

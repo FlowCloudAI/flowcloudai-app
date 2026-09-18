@@ -1,8 +1,6 @@
 use super::common::*;
-use image::{GenericImageView, codecs::jpeg::JpegEncoder, imageops::FilterType};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::io::BufWriter;
+use flowcloudai_image::{AnimationPolicy, Cancellation, CropMode, ImageProcessor, VariantSpec};
+use std::sync::OnceLock;
 
 #[cfg(target_os = "android")]
 use crate::android_file_import::{copy_android_file_uri_to_dir, is_android_file_uri};
@@ -11,7 +9,21 @@ use tauri::Url;
 
 const COVER_THUMB_MAX_EDGE: u32 = 640;
 const PROJECT_COVER_THUMB_MAX_EDGE: u32 = 1280;
-const COVER_THUMB_JPEG_QUALITY: u8 = 82;
+
+pub(crate) fn image_processor() -> &'static ImageProcessor {
+    static PROCESSOR: OnceLock<ImageProcessor> = OnceLock::new();
+    PROCESSOR.get_or_init(ImageProcessor::standard)
+}
+
+fn cover_variant(max_edge: u32) -> VariantSpec {
+    VariantSpec {
+        width: max_edge,
+        height: max_edge,
+        crop: CropMode::Fit,
+        quality: None,
+        animation: AnimationPolicy::StaticCover,
+    }
+}
 
 fn build_entry_images_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
     let db_dir = paths
@@ -66,21 +78,6 @@ fn build_entry_thumbnails_dir(paths: &PathsState, project_id: &Uuid) -> Result<P
     Ok(build_entry_images_dir(paths, project_id)?.join("thumbs"))
 }
 
-fn cover_thumbnail_hash(source_path: &Path) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    source_path.to_string_lossy().hash(&mut hasher);
-    if let Ok(metadata) = std::fs::metadata(source_path) {
-        metadata.len().hash(&mut hasher);
-        if let Ok(modified) = metadata.modified() {
-            if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                duration.as_secs().hash(&mut hasher);
-                duration.subsec_nanos().hash(&mut hasher);
-            }
-        }
-    }
-    hasher.finish()
-}
-
 pub(super) fn entry_cover_thumbnail_path(
     paths: &PathsState,
     project_id: &Uuid,
@@ -93,10 +90,13 @@ pub(super) fn entry_cover_thumbnail_path(
         return Err(format!("主图文件不存在: {:?}", source_path));
     }
 
-    Ok(build_entry_thumbnails_dir(paths, project_id)?.join(format!(
-        "cover_{:016x}.jpg",
-        cover_thumbnail_hash(source_path)
-    )))
+    image_processor()
+        .planned_path_for_file(
+            source_path,
+            &build_entry_thumbnails_dir(paths, project_id)?,
+            cover_variant(COVER_THUMB_MAX_EDGE),
+        )
+        .map_err(|error| error.to_string())
 }
 
 fn project_cover_thumbnail_path(
@@ -114,22 +114,30 @@ fn project_cover_thumbnail_path(
         return Err(format!("项目封面文件不存在: {:?}", source_path));
     }
 
-    Ok(build_entry_thumbnails_dir(paths, project_id)?.join(format!(
-        "project_cover_{:016x}.jpg",
-        cover_thumbnail_hash(source_path)
-    )))
+    image_processor()
+        .planned_path_for_file(
+            source_path,
+            &build_entry_thumbnails_dir(paths, project_id)?,
+            cover_variant(PROJECT_COVER_THUMB_MAX_EDGE),
+        )
+        .map_err(|error| error.to_string())
 }
 
 fn is_valid_cover_thumbnail(path: &Path) -> bool {
-    let is_jpeg = path
+    let is_webp = path
         .extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "jpg" | "jpeg"))
+        .map(|ext| ext.eq_ignore_ascii_case("webp"))
         .unwrap_or(false);
     let in_thumbs_dir = path
         .components()
         .any(|component| component.as_os_str().to_string_lossy() == "thumbs");
-    is_jpeg && in_thumbs_dir && path.exists()
+    is_webp
+        && in_thumbs_dir
+        && std::fs::read(path).ok().is_some_and(|bytes| {
+            bytes.len() <= 32 * 1024 * 1024
+                && image::load_from_memory_with_format(&bytes, image::ImageFormat::WebP).is_ok()
+        })
 }
 
 fn create_cover_thumbnail(
@@ -140,38 +148,18 @@ fn create_cover_thumbnail(
     let thumbs_dir = thumb_path
         .parent()
         .ok_or_else(|| format!("无法解析缩略图目录: {:?}", thumb_path))?;
-    std::fs::create_dir_all(&thumbs_dir)
-        .map_err(|e| format!("创建缩略图目录失败 {:?}: {}", thumbs_dir, e))?;
-
-    if thumb_path.exists() {
-        return Ok(thumb_path);
+    let result = image_processor()
+        .process_file(
+            source_path,
+            thumbs_dir,
+            cover_variant(max_edge),
+            &Cancellation::default(),
+        )
+        .map_err(|error| error.to_string())?;
+    if result.path != thumb_path {
+        return Err("图片派生路径与缓存键不一致".to_string());
     }
-
-    let image =
-        image::open(source_path).map_err(|e| format!("读取主图失败 {:?}: {}", source_path, e))?;
-    let (width, height) = image.dimensions();
-    if width == 0 || height == 0 {
-        return Err(format!("主图尺寸无效: {:?}", source_path));
-    }
-
-    let scale = (max_edge as f64 / width.max(height) as f64).min(1.0);
-    let target_width = ((width as f64 * scale).round() as u32).max(1);
-    let target_height = ((height as f64 * scale).round() as u32).max(1);
-    let resized = if target_width == width && target_height == height {
-        image
-    } else {
-        image.resize(target_width, target_height, FilterType::Lanczos3)
-    };
-
-    let file = std::fs::File::create(&thumb_path)
-        .map_err(|e| format!("创建缩略图失败 {:?}: {}", thumb_path, e))?;
-    let mut writer = BufWriter::new(file);
-    let mut encoder = JpegEncoder::new_with_quality(&mut writer, COVER_THUMB_JPEG_QUALITY);
-    encoder
-        .encode_image(&resized.to_rgb8())
-        .map_err(|e| format!("写入缩略图失败 {:?}: {}", thumb_path, e))?;
-
-    Ok(thumb_path)
+    Ok(result.path)
 }
 
 pub(super) fn create_entry_cover_thumbnail(
@@ -205,6 +193,7 @@ pub(super) fn use_derived_cover_thumbnails(
             continue;
         };
         entry.cover = match entry_cover_thumbnail_path(paths, project_id, source_path) {
+            // 未生成时先给逻辑派生路径，前端图片加载失败后触发按需生成；绝不回退原图。
             Ok(path) => Some(path),
             Err(error) => {
                 log::debug!(
@@ -597,7 +586,7 @@ pub async fn db_ensure_project_cover_thumbnail(
             return Ok(None);
         }
     };
-    if thumb_path.exists() {
+    if is_valid_cover_thumbnail(&thumb_path) {
         return Ok(Some(thumb_path.to_string_lossy().to_string()));
     }
 
@@ -608,7 +597,7 @@ pub async fn db_ensure_project_cover_thumbnail(
             .clone()
     };
     let guard = job_lock.lock().await;
-    if thumb_path.exists() {
+    if is_valid_cover_thumbnail(&thumb_path) {
         drop(guard);
         return Ok(Some(thumb_path.to_string_lossy().to_string()));
     }
@@ -664,7 +653,7 @@ pub async fn db_ensure_entry_cover_thumbnail(
             return Ok(None);
         }
     };
-    if thumb_path.exists() {
+    if is_valid_cover_thumbnail(&thumb_path) {
         return Ok(Some(thumb_path.to_string_lossy().to_string()));
     }
 
@@ -675,7 +664,7 @@ pub async fn db_ensure_entry_cover_thumbnail(
             .clone()
     };
     let guard = job_lock.lock().await;
-    if thumb_path.exists() {
+    if is_valid_cover_thumbnail(&thumb_path) {
         drop(guard);
         return Ok(Some(thumb_path.to_string_lossy().to_string()));
     }
@@ -749,5 +738,38 @@ mod tests {
             .expect("应生成项目封面缩略图");
 
         assert_eq!(image::image_dimensions(thumbnail).unwrap(), (1280, 640));
+    }
+
+    #[test]
+    fn cover_variant_uses_stable_webp_and_keeps_original() {
+        let temp = tempfile::tempdir().expect("应创建临时目录");
+        let project_id = Uuid::now_v7();
+        let source_dir = temp.path().join("images").join(project_id.to_string());
+        std::fs::create_dir_all(&source_dir).expect("应创建图片目录");
+        let source = source_dir.join("cover.png");
+        image::DynamicImage::new_rgba8(100, 50)
+            .save(&source)
+            .expect("应写入原件");
+        let original = std::fs::read(&source).expect("应读取原件");
+        let paths = PathsState {
+            db_path: temp.path().join("worldflow.db"),
+            plugins_path: temp.path().join("plugins"),
+        };
+
+        let first =
+            create_entry_cover_thumbnail(&paths, &project_id, &source).expect("应生成派生图");
+        let second =
+            create_entry_cover_thumbnail(&paths, &project_id, &source).expect("应复用派生图");
+        assert_eq!(first, second);
+        assert_eq!(first.extension().and_then(|ext| ext.to_str()), Some("webp"));
+        assert_eq!(
+            image::guess_format(&std::fs::read(&first).expect("应读取派生图")).unwrap(),
+            image::ImageFormat::WebP
+        );
+        assert_eq!(
+            std::fs::read(source).unwrap(),
+            original,
+            "生成派生图不得覆盖原件"
+        );
     }
 }
