@@ -14,7 +14,7 @@ use std::{
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 use uuid::Uuid;
-use worldflow_core::{PageAssetOps, SqliteDb, models::PageDocumentAsset};
+use worldflow_core::{PageAssetOps, SqliteDb, WorldStore, models::PageDocumentAsset};
 
 const MAX_SOURCE_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_SOURCE_PIXELS: u64 = 24_000_000;
@@ -249,7 +249,71 @@ async fn migrate_legacy_asset(
     db.set_page_asset_storage_layout(&asset.project_id, &asset.id, 1)
         .await
         .map_err(ApiError::from_display)?;
+    // 切换记录后，已核验的共享原件成为唯一权威位置；清旧文件失败不回退记录。
+    let old_path = asset_path(paths, asset)?;
+    if let Err(error) = std::fs::remove_file(&old_path) {
+        log::warn!("页面资产旧原件清理失败 {}: {error}", asset.id);
+    }
     Ok(migrated)
+}
+
+async fn asset_has_live_scope_or_reference(db: &SqliteDb, asset_id: Uuid) -> Result<bool, String> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM asset_scopes WHERE asset_id=?) +
+                (SELECT COUNT(*) FROM object_references WHERE target_id=? AND ref_type='asset')",
+    )
+    .bind(asset_id)
+    .bind(asset_id)
+    .fetch_one(&db.pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(count > 0)
+}
+
+/// 项目删除已成功后才清理原件；任何数据库不可读、摘要不符或删除失败都保留文件。
+pub(crate) async fn cleanup_deleted_project_assets(
+    catalog: &SqliteDb,
+    worlds: &WorldStore,
+    paths: &PathsState,
+    assets: &[PageDocumentAsset],
+) -> Result<usize, String> {
+    let remaining_worlds = worlds
+        .list_worlds()
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut cleaned = 0;
+    let mut errors = Vec::new();
+    for asset in assets {
+        if asset.storage_layout == 1 {
+            let mut referenced = asset_has_live_scope_or_reference(catalog, asset.id).await?;
+            for world in &remaining_worlds {
+                let db = worlds
+                    .open_world(world.id)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                let found = asset_has_live_scope_or_reference(&db, asset.id).await;
+                db.pool.close().await;
+                referenced |= found?;
+            }
+            if referenced {
+                continue;
+            }
+        }
+        if let Err(error) = verified_bytes(paths, asset) {
+            errors.push(format!("资产 {} 原件未通过清理前校验：{error}", asset.id));
+            continue;
+        }
+        let path = asset_path(paths, asset).map_err(|error| error.to_string())?;
+        match std::fs::remove_file(&path) {
+            Ok(()) => cleaned += 1,
+            Err(error) => errors.push(format!("资产 {} 原件未能清理：{error}", asset.id)),
+        }
+    }
+    if errors.is_empty() {
+        Ok(cleaned)
+    } else {
+        Err(errors.join("；"))
+    }
 }
 
 pub(crate) async fn require_asset(
@@ -448,6 +512,7 @@ mod tests {
     use super::*;
 
     use sqlx::Row;
+    use worldflow_core::ProjectOps;
 
     #[test]
     fn media_type_and_byte_limits_are_checked_from_content() {
@@ -547,7 +612,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(migrated.storage_layout, 1);
-        assert!(old_path.exists());
+        assert!(!old_path.exists());
         assert_eq!(
             std::fs::read(asset_path(&paths, &migrated).unwrap()).unwrap(),
             bytes
@@ -640,5 +705,86 @@ mod tests {
         let mut shared = asset;
         shared.storage_layout = 1;
         assert!(!asset_path(&paths, &shared).unwrap().exists());
+    }
+
+    #[tokio::test]
+    async fn deleted_project_cleans_only_last_unscoped_shared_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = PathsState {
+            db_path: dir.path().join("index.db"),
+            plugins_path: dir.path().join("plugins"),
+        };
+        let catalog = SqliteDb::new(&format!("sqlite:{}?mode=rwc", paths.db_path.display()))
+            .await
+            .unwrap();
+        let worlds = WorldStore::open(dir.path().join("world-store"))
+            .await
+            .unwrap();
+        let first = Uuid::now_v7();
+        let second = Uuid::now_v7();
+        let mut encoded = Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(2, 3, image::Rgb([1, 2, 3])))
+            .write_to(&mut encoded, ImageFormat::Png)
+            .unwrap();
+        let bytes = encoded.into_inner();
+        let asset = PageDocumentAsset {
+            id: Uuid::now_v7(),
+            project_id: first,
+            media_type: "image/png".into(),
+            size_bytes: bytes.len() as i64,
+            sha256: format!("{:x}", Sha256::digest(&bytes)),
+            width: 2,
+            height: 3,
+            storage_layout: 1,
+            created_at: String::new(),
+        };
+        let original = asset_path(&paths, &asset).unwrap();
+        std::fs::create_dir_all(original.parent().unwrap()).unwrap();
+        std::fs::write(&original, &bytes).unwrap();
+        for project in [first, second] {
+            worlds
+                .create_world_with_id(project, "测试世界")
+                .await
+                .unwrap();
+            let db = worlds.open_world(project).await.unwrap();
+            sqlx::query("INSERT INTO projects(id,name) VALUES(?,'测试项目')")
+                .bind(project)
+                .execute(&db.pool)
+                .await
+                .unwrap();
+            db.register_page_asset(&PageDocumentAsset {
+                project_id: project,
+                ..asset.clone()
+            })
+            .await
+            .unwrap();
+            db.pool.close().await;
+        }
+        let first_db = worlds.open_world(first).await.unwrap();
+        first_db.delete_project(&first).await.unwrap();
+        first_db.pool.close().await;
+        worlds.delete_world(first).await.unwrap();
+        assert_eq!(
+            cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset.clone()])
+                .await
+                .unwrap(),
+            0
+        );
+        assert!(original.exists(), "另一世界仍有项目范围时不得删除共享原件");
+
+        let second_db = worlds.open_world(second).await.unwrap();
+        second_db.delete_project(&second).await.unwrap();
+        second_db.pool.close().await;
+        worlds.delete_world(second).await.unwrap();
+        assert_eq!(
+            cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset.clone()])
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(!original.exists());
+        std::fs::write(&original, b"corrupted").unwrap();
+        assert!(cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset]).await.is_err());
+        assert_eq!(std::fs::read(&original).unwrap(), b"corrupted");
     }
 }

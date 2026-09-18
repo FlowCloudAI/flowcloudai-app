@@ -1,4 +1,5 @@
 use super::common::*;
+use worldflow_core::PageAssetOps;
 
 fn project_map_sidecar_paths(
     state: &AppState,
@@ -157,10 +158,32 @@ pub async fn db_delete_project(
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
     let db = state.inner().sqlite_db.lock().await.clone();
-    db.delete_project(&id).await.map_err(|e| e.to_string())?;
-    if let Err(error) = state.inner().world_store.delete_world(id).await {
-        log::warn!("删除项目对应世界观失败: {}", error);
+    let world_db = open_project_db(state.inner(), &id).await?;
+    let mut assets = world_db
+        .list_page_assets(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+    world_db.pool.close().await;
+    for asset in db.list_page_assets(&id).await.map_err(|e| e.to_string())? {
+        if !assets.iter().any(|existing| existing.id == asset.id) {
+            assets.push(asset);
+        }
     }
+    db.delete_project(&id).await.map_err(|e| e.to_string())?;
+    state
+        .inner()
+        .world_store
+        .delete_world(id)
+        .await
+        .map_err(|e| e.to_string())?;
+    crate::page_document_assets::cleanup_deleted_project_assets(
+        &db,
+        &state.inner().world_store,
+        paths.inner(),
+        &assets,
+    )
+    .await
+    .map_err(|error| format!("项目已删除，但图片原件清理未完成：{error}"))?;
     if let Err(error) = cleanup_project_map_sidecars(state.inner(), paths.inner(), &id) {
         log::warn!("清理项目地图文件失败: {}", error);
     }
