@@ -34,7 +34,8 @@
 | [adr/0001-frontend-feature-modular-monolith.md](adr/0001-frontend-feature-modular-monolith.md) | 现行 | 2026-07-21 | ADR：前端功能模块化单体。`app` / `features` / `api` / `shared` 的边界与禁止跨模块复用界面内部实现 |
 | [adr/0002-page-document-storage.md](adr/0002-page-document-storage.md) | 现行 | 2026-09-17 | 页面文档独立存储、revision CAS、幂等回执与派生投影语义；派生投影、墓碑、回执作用域与资产归属部分由 ADR 0004 修订 |
 | [adr/0003-page-document-canvas-isolation.md](adr/0003-page-document-canvas-isolation.md) | 提议；macOS、Android 已原生验收，Windows 待验证 | 2026-09-15 | 页面文档采用独立打包页面、opaque sandbox、严格画布 CSP 与带会话鉴权 bridge；macOS 与 Android 已确认隔离、样式、网络拦截、导航、尺寸及生命周期，Windows 待验 |
-| [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引与桌面快照/世界包后端迁移已实施；组件链授权、节点规则及跨平台验收仍待完成 |
+| [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引、节点规则与桌面快照/世界包后端迁移已实施；组件链授权及跨平台验收仍待完成 |
+| [adr/0005-page-document-node-identity-and-component-contract.md](adr/0005-page-document-node-identity-and-component-contract.md) | 现行 | 2026-09-18 | 页面文档 v1 的九类节点身份保持/重映射规则与引用式公共组件序列化格式；组件存储、展开与编辑流程留到阶段 D |
 | [验收清单.md](验收清单.md) | 现行 | 2026-09-18 | 尚未由用户在原生产物确认的 WebP 图片与画布层叠层检查项；通过一项删一项 |
 | [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
@@ -86,7 +87,7 @@
 | [../plans/MOBILE-ENTRY-DETAIL-REBUILD.md](../plans/MOBILE-ENTRY-DETAIL-REBUILD.md) | 现行 | 2026-08-25 | **移动端词条详情改造落地计划**（待开工）。5 个步骤、每步的验证与真机流程、8 条已确认决定、7 类易踩坑。§1 明确设计稿只是布局与视觉参考，列出「绝对不能搬进程序的东西」对照表 |
 | [../plans/ENTRY-CLIPBOARD.md](../plans/ENTRY-CLIPBOARD.md) | 现行 | 2026-08-25 | **词条剪切 / 复制 / 多选**（待开工）。把分类归属变更从词条编辑页内部移出，改由列表与分类树上的剪贴操作完成；复制语义、多选触发方式、剪贴板存续范围等 6 项待定 |
 | [../plans/UI-01.md](../plans/UI-01.md) | 现行 | 2026-09-13 | 桌面端工作台交互问题核对：位置感、编辑对象、保存态、AI 引用对象 |
-| [../plans/PAGE-DOCUMENT-01.md](../plans/PAGE-DOCUMENT-01.md) | 现行 | 2026-09-17 | 页面文档编辑接入计划：移植式重写、代码现状、阶段 A 原生隔离/存储/资产切片、阶段 C 词条闭环、能力准入与验收；衔接移动详情、保存状态和词条剪贴计划；2026-09-17 阶段 A 退出条件增加 ADR 0004 的迁移与规则 |
+| [../plans/PAGE-DOCUMENT-01.md](../plans/PAGE-DOCUMENT-01.md) | 现行 | 2026-09-18 | 页面文档编辑接入计划：阶段 A 后端迁移、节点身份与组件格式契约已收口；阶段 C 桌面闭环、移动端接入及原生验收继续推进 |
 | [../plans/ENTRY-RELATION-WORKBENCH.md](../plans/ENTRY-RELATION-WORKBENCH.md) | 现行 | 2026-07-31 | 词条关系工作台布局。**自述「暂缓实现，日后重新评审」**，两栏方案前提已被宽度验证否决 |
 
 ## 7. 设计基线与设计稿（`../designs/`）
