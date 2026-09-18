@@ -1,5 +1,4 @@
 use super::common::*;
-use worldflow_core::PageAssetOps;
 
 fn project_map_sidecar_paths(
     state: &AppState,
@@ -157,25 +156,22 @@ pub async fn db_delete_project(
     id: String,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let _asset_mutation = crate::page_document_assets::ASSET_SCOPE_MUTATION
+        .lock()
+        .await;
     let db = state.inner().sqlite_db.lock().await.clone();
-    let world_db = open_project_db(state.inner(), &id).await?;
-    let mut assets = world_db
-        .list_page_assets(&id)
-        .await
-        .map_err(|e| e.to_string())?;
-    world_db.pool.close().await;
-    for asset in db.list_page_assets(&id).await.map_err(|e| e.to_string())? {
-        if !assets.iter().any(|existing| existing.id == asset.id) {
-            assets.push(asset);
-        }
-    }
+    let (assets, has_world) =
+        crate::page_document_assets::collect_project_assets(&db, &state.inner().world_store, id)
+            .await?;
     db.delete_project(&id).await.map_err(|e| e.to_string())?;
-    state
-        .inner()
-        .world_store
-        .delete_world(id)
-        .await
-        .map_err(|e| e.to_string())?;
+    if has_world {
+        state
+            .inner()
+            .world_store
+            .delete_world(id)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
     crate::page_document_assets::cleanup_deleted_project_assets(
         &db,
         &state.inner().world_store,

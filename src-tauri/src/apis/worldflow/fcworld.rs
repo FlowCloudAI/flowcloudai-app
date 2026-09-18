@@ -2643,6 +2643,26 @@ async fn import_fcworld_package_to_world_store(
 
     if let Some(target) = overwrite_target {
         progress.note("cleanup", "清理覆盖目标世界观");
+        let (old_assets, _) = match crate::page_document_assets::collect_project_assets(
+            index_db,
+            &state.world_store,
+            target.project_id,
+        )
+        .await
+        {
+            Ok(assets) => assets,
+            Err(error) => {
+                drop(world_db);
+                return Err(cleanup_world_import_after_error(
+                    state,
+                    Some(index_db),
+                    &prepared,
+                    paths,
+                    format!("核验覆盖目标页面资产失败：{error}"),
+                )
+                .await);
+            }
+        };
         if let Err(error) = index_db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观索引失败: {error}");
             drop(world_db);
@@ -2667,6 +2687,14 @@ async fn import_fcworld_package_to_world_store(
             )
             .await);
         }
+        crate::page_document_assets::cleanup_deleted_project_assets(
+            index_db,
+            &state.world_store,
+            paths,
+            &old_assets,
+        )
+        .await
+        .map_err(|error| format!("覆盖导入已写入，但原项目页面资产清理未完成：{error}"))?;
         if let Err(error) = cleanup_project_sidecar_files(paths, &target.project_id) {
             return Err(format!(
                 "覆盖导入已写入，但清理原世界观文件失败，需要人工介入：{error}"
@@ -2863,6 +2891,9 @@ pub async fn db_import_project_fcworld(
         0,
     );
     let result = async {
+        let _asset_mutation = crate::page_document_assets::ASSET_SCOPE_MUTATION
+            .lock()
+            .await;
         let input_path_buf = PathBuf::from(&input_path);
         let db = state.inner().sqlite_db.lock().await.clone();
         import_fcworld_package_to_world_store(
@@ -3220,7 +3251,7 @@ mod tests {
             &path,
             Some(FcworldImportOptions {
                 mode: FcworldImportMode::Rename,
-                project_name: Some("世界库页面导入".into()),
+                project_name: Some("页面世界".into()),
                 overwrite_project_id: None,
             }),
             disabled_import_progress(),
@@ -3249,6 +3280,45 @@ mod tests {
                 .await
                 .unwrap()
                 .is_some()
+        );
+        let orphan_id = Uuid::now_v7();
+        let orphan_asset = PageDocumentAsset {
+            id: orphan_id,
+            project_id: world_project,
+            ..asset.clone()
+        };
+        let orphan_path =
+            crate::page_document_assets::asset_path(&world_paths, &orphan_asset).unwrap();
+        std::fs::create_dir_all(orphan_path.parent().unwrap()).unwrap();
+        std::fs::write(&orphan_path, &bytes).unwrap();
+        world_db.register_page_asset(&orphan_asset).await.unwrap();
+        world_db.pool.close().await;
+        let replacement = import_fcworld_package_to_world_store(
+            &index_db,
+            &state,
+            &world_paths,
+            &path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Overwrite,
+                project_name: None,
+                overwrite_project_id: Some(world_project.to_string()),
+            }),
+            disabled_import_progress(),
+        )
+        .await
+        .unwrap();
+        let replacement_id = Uuid::parse_str(&replacement.project_id).unwrap();
+        assert_ne!(replacement_id, world_project);
+        assert!(!orphan_path.exists(), "覆盖后应清理失去最后范围的旧原件");
+        let retained_asset = PageDocumentAsset {
+            project_id: replacement_id,
+            ..asset.clone()
+        };
+        assert!(
+            crate::page_document_assets::asset_path(&world_paths, &retained_asset)
+                .unwrap()
+                .exists(),
+            "新项目仍引用的共享原件必须保留"
         );
         for case in ["html", "digest", "missing"] {
             let mut layer = prepare_page_document_export(&source_db, &source_paths, project.id)

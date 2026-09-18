@@ -13,12 +13,16 @@ use std::{
 };
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 use worldflow_core::{PageAssetOps, SqliteDb, WorldStore, models::PageDocumentAsset};
 
 const MAX_SOURCE_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_SOURCE_PIXELS: u64 = 24_000_000;
 const MAX_PREVIEW_EDGE: u32 = 512;
+
+// 导入、项目删除和世界包覆盖跨多个世界库核验范围，进程内必须串行。
+pub(crate) static ASSET_SCOPE_MUTATION: Mutex<()> = Mutex::const_new(());
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -316,6 +320,38 @@ pub(crate) async fn cleanup_deleted_project_assets(
     }
 }
 
+/// 删除前在主库与项目世界库收集原件身份；世界库存在却打不开时拒绝继续删除。
+pub(crate) async fn collect_project_assets(
+    catalog: &SqliteDb,
+    worlds: &WorldStore,
+    project_id: Uuid,
+) -> Result<(Vec<PageDocumentAsset>, bool), String> {
+    let mut assets = catalog
+        .list_page_assets(&project_id)
+        .await
+        .map_err(|error| error.to_string())?;
+    let has_world = worlds
+        .list_worlds()
+        .await
+        .map_err(|error| error.to_string())?
+        .iter()
+        .any(|world| world.id == project_id);
+    if has_world {
+        let db = worlds
+            .open_world(project_id)
+            .await
+            .map_err(|error| error.to_string())?;
+        let world_assets = db.list_page_assets(&project_id).await;
+        db.pool.close().await;
+        for asset in world_assets.map_err(|error| error.to_string())? {
+            if !assets.iter().any(|existing| existing.id == asset.id) {
+                assets.push(asset);
+            }
+        }
+    }
+    Ok((assets, has_world))
+}
+
 pub(crate) async fn require_asset(
     db: &SqliteDb,
     paths: &PathsState,
@@ -338,6 +374,7 @@ pub(crate) async fn import_asset(
     project_id: &Uuid,
     source: &Path,
 ) -> Result<PageDocumentAsset, ApiError> {
+    let _mutation = ASSET_SCOPE_MUTATION.lock().await;
     let db = open_project_db(state, project_id)
         .await
         .map_err(ApiError::internal)?;
@@ -760,6 +797,12 @@ mod tests {
             .unwrap();
             db.pool.close().await;
         }
+        let (collected, has_world) = collect_project_assets(&catalog, &worlds, first)
+            .await
+            .unwrap();
+        assert!(has_world);
+        assert_eq!(collected.len(), 1);
+        assert_eq!(collected[0].id, asset.id);
         let first_db = worlds.open_world(first).await.unwrap();
         first_db.delete_project(&first).await.unwrap();
         first_db.pool.close().await;
