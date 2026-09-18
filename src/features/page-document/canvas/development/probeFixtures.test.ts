@@ -85,3 +85,19 @@ test('公共组件探针保留引用字段且允许不同实例使用同名 part
     assert.deepEqual(isolated.errors, [])
     assert.equal(isolated.artifact?.html.match(/data-fc-part="avatar"/gu)?.length, 2)
 })
+
+test('图片上下文功能区探针保留受管 asset 节点身份', () => {
+    const probe = createCases().find(item => item.id === 'legal-contextual-ribbon')
+    assert.ok(probe)
+    assert.match(probe.validationHtml, /data-fc-ribbon-context="picture"/u)
+    const compiled = compileCanvasPreview({
+        projectArticleHtml: projectHtml,
+        projectStyleCss: projectCss,
+        entryArticleHtml: probe.validationHtml,
+        entryStyleCss: probe.css,
+        metadata: manifest.entry,
+        assetIds: probe.assetIds,
+    })
+    assert.equal(compiled.diagnostics.filter(item => item.severity === 'error').length, 0)
+    assert.match(compiled.html ?? '', /data-fc-node-kind="asset"/u)
+})

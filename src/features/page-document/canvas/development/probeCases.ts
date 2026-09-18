@@ -56,6 +56,15 @@ const LEGAL_RIBBON_FORMATTING_MUTATION: CanvasProbeMutation = {
     },
 }
 
+const LEGAL_CONTEXTUAL_RIBBON_MUTATION: CanvasProbeMutation = {
+    id: 'legal-contextual-ribbon',
+    file: 'entry/article.html',
+    replace: {
+        needle: 'data-fc-node-id="55555555-5555-4555-8555-555555555555" data-fc-node-kind="asset"',
+        value: 'data-fc-node-id="55555555-5555-4555-8555-555555555555" data-fc-node-kind="asset" data-fc-ribbon-context="picture"',
+    },
+}
+
 function isElement(node: HtmlNode): node is HtmlElement {
     return 'tagName' in node && 'attrs' in node
 }
@@ -103,6 +112,11 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
         LEGAL_RIBBON_FORMATTING_MUTATION,
         '合法',
     )
+    const contextualRibbonHtml = mutate(
+        sources.fixtureHtml,
+        LEGAL_CONTEXTUAL_RIBBON_MUTATION,
+        '合法',
+    )
     return [
         {
             id: 'legal-shared-fixture',
@@ -133,6 +147,14 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             label: '合法：功能区文字节点',
             validationHtml: ribbonFormattingHtml,
             html: extractCanvasRenderableHtml(ribbonFormattingHtml),
+            css: sources.fixtureCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_CONTEXTUAL_RIBBON_MUTATION.id,
+            label: '合法：上下文图片功能区',
+            validationHtml: contextualRibbonHtml,
+            html: extractCanvasRenderableHtml(contextualRibbonHtml),
             css: sources.fixtureCss,
             assetIds: sources.assetIds,
         },
