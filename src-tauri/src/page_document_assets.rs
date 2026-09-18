@@ -784,7 +784,11 @@ mod tests {
         );
         assert!(!original.exists());
         std::fs::write(&original, b"corrupted").unwrap();
-        assert!(cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset]).await.is_err());
+        assert!(
+            cleanup_deleted_project_assets(&catalog, &worlds, &paths, &[asset])
+                .await
+                .is_err()
+        );
         assert_eq!(std::fs::read(&original).unwrap(), b"corrupted");
     }
 }
