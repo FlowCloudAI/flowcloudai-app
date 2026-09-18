@@ -13,6 +13,7 @@ export const DOCUMENT_NODE_KINDS = [
     'gallery',
     'divider',
     'container',
+    'component',
 ] as const
 export const ENTRY_ASSET_MEDIA_TYPES = [
     'image/png',

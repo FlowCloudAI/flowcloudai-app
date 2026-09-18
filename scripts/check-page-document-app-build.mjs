@@ -18,6 +18,7 @@ const probeMarkers = [
     'svg-image-external-href',
     'tests/fixtures/page-document',
     'malicious-cases.json',
+    'legal-public-component',
 ]
 
 function filesUnder(directory) {

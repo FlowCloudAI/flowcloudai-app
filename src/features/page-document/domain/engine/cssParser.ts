@@ -67,7 +67,9 @@ function validateLayerBlock(
         return
     }
     const allowed =
-        scope === 'project' ? new Set(['fc-project', 'fc-node']) : new Set(['fc-entry', 'fc-node'])
+        scope === 'project'
+            ? new Set(['fc-component', 'fc-project', 'fc-node'])
+            : new Set(['fc-entry', 'fc-node'])
     if (!allowed.has(names[0])) {
         diagnostics.push(
             diagnosticForNode(

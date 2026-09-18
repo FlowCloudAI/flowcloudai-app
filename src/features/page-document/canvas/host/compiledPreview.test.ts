@@ -14,18 +14,42 @@ import {guardDocumentSources} from '../../domain/engine/guard.ts'
 
 const ENTRY_ID = '018f47a2-3b4c-7d5e-8f90-123456789abc'
 
-test('新旧项目层序均可读，但组件与作者层仍不允许作者写入', () => {
+test('新旧项目层序均可读，组件层仅接受按定义选择器且作者层仍关闭', () => {
     for (const css of [
         '@layer fc-renderer, fc-project, fc-entry, fc-node;',
         CANVAS_BASE_PROJECT_CSS,
     ]) {
         assert.deepEqual(parseCssSource(css, 'project').diagnostics, [])
     }
-    for (const layer of ['fc-component', 'fc-author']) {
-        const parsed = parseCssSource(`@layer ${layer} { [data-fc-component="card"] { color: red; } }`, 'project')
-        assert.ok(parsed.diagnostics.some(item => item.code === 'layer_scope_violation'))
-        assert.ok(guardDocumentSources([], [parsed]).diagnostics.some(item => item.code === 'selector_scope_violation'))
-    }
+    const component = parseCssSource(
+        `${CANVAS_BASE_PROJECT_CSS.split('\n')[0]}
+@layer fc-component { [data-fc-component="11111111-1111-4111-8111-111111111111"] { color: red; } }`,
+        'project',
+    )
+    assert.deepEqual(component.diagnostics, [])
+    assert.deepEqual(guardDocumentSources([], [component]).diagnostics, [])
+
+    const instanceSelector = parseCssSource(
+        `${CANVAS_BASE_PROJECT_CSS.split('\n')[0]}
+@layer fc-component { [data-fc-instance="22222222-2222-4222-8222-222222222222"] { color: red; } }`,
+        'project',
+    )
+    assert.ok(
+        guardDocumentSources([], [instanceSelector]).diagnostics.some(
+            item => item.code === 'selector_scope_violation',
+        ),
+    )
+
+    const author = parseCssSource(
+        '@layer fc-author { [data-fc-component="11111111-1111-4111-8111-111111111111"] { color: red; } }',
+        'project',
+    )
+    assert.ok(author.diagnostics.some(item => item.code === 'layer_scope_violation'))
+    assert.ok(
+        guardDocumentSources([], [author]).diagnostics.some(
+            item => item.code === 'selector_scope_violation',
+        ),
+    )
 })
 
 test('旧 Markdown 临时转换经模板合并后得到绑定标题、正文与基线 CSS', () => {

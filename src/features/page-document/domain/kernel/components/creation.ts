@@ -59,6 +59,8 @@ export function createComponentMarkup(
         }
         case 'divider':
             return `<${tag} ${identity}>`
+        case 'component':
+            return null
     }
 }
 

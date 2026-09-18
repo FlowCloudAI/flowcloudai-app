@@ -17,6 +17,8 @@ import {parseHtmlSyntax} from './htmlSyntax.ts'
 import {RFC_9562_UUID_PATTERN} from '../../uuidPolicy.ts'
 
 const SLOT_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
+const COMPONENT_SCHEMA_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
+const COMPONENT_REVISION_PATTERN = /^(?:latest|[1-9]\d*)$/u
 const ALLOWED_BINDINGS = new Set(['title', 'summary', 'tags'])
 
 export type HtmlSourceMode = 'document' | 'fragment'
@@ -347,6 +349,162 @@ function validateManagedNodes(parsed: ParsedHtmlSource): void {
     })
 }
 
+function validatePublicComponentInstances(parsed: ParsedHtmlSource): void {
+    const seenInstanceIds = new Set<string>()
+    const partNamesByInstance = new Map<HtmlElement, Set<string>>()
+    walkElements(parsed.root, (element, ancestors) => {
+        const kind = getAttribute(element, 'data-fc-node-kind')
+        const isInstance = kind === 'component'
+        const componentAttributes = element.attrs.filter(
+            attribute =>
+                attribute.name === 'data-fc-component' ||
+                attribute.name === 'data-fc-component-revision' ||
+                attribute.name === 'data-fc-instance' ||
+                attribute.name.startsWith('data-fc-prop-'),
+        )
+
+        if (!isInstance && componentAttributes.length > 0) {
+            parsed.diagnostics.push(
+                diagnosticForElement(
+                    'error',
+                    'orphan_component_attribute',
+                    '组件引用、修订、实例与属性只能声明在 component 页面节点上。',
+                    element,
+                    componentAttributes[0].name,
+                ),
+            )
+        }
+
+        if (isInstance) {
+            partNamesByInstance.set(element, new Set())
+            const definitionId = getAttribute(element, 'data-fc-component')
+            const revision = getAttribute(element, 'data-fc-component-revision')
+            const instanceId = getAttribute(element, 'data-fc-instance')
+            if (!definitionId || !RFC_9562_UUID_PATTERN.test(definitionId)) {
+                parsed.diagnostics.push(
+                    diagnosticForElement(
+                        'error',
+                        'invalid_component_reference',
+                        'data-fc-component 必须是公共组件定义 UUID。',
+                        element,
+                        'data-fc-component',
+                    ),
+                )
+            }
+            if (
+                !revision ||
+                !COMPONENT_REVISION_PATTERN.test(revision) ||
+                (revision !== 'latest' && !Number.isSafeInteger(Number(revision)))
+            ) {
+                parsed.diagnostics.push(
+                    diagnosticForElement(
+                        'error',
+                        'invalid_component_revision',
+                        'data-fc-component-revision 必须是 latest 或正整数。',
+                        element,
+                        'data-fc-component-revision',
+                    ),
+                )
+            }
+            if (!instanceId || !RFC_9562_UUID_PATTERN.test(instanceId)) {
+                parsed.diagnostics.push(
+                    diagnosticForElement(
+                        'error',
+                        'invalid_component_instance_id',
+                        'data-fc-instance 必须是组件实例 UUID。',
+                        element,
+                        'data-fc-instance',
+                    ),
+                )
+            } else {
+                const normalized = instanceId.toLowerCase()
+                if (normalized === getAttribute(element, 'data-fc-node-id')?.toLowerCase()) {
+                    parsed.diagnostics.push(
+                        diagnosticForElement(
+                            'error',
+                            'component_instance_id_not_distinct',
+                            '组件实例身份必须与页面节点身份彼此独立。',
+                            element,
+                            'data-fc-instance',
+                        ),
+                    )
+                } else if (seenInstanceIds.has(normalized)) {
+                    parsed.diagnostics.push(
+                        diagnosticForElement(
+                            'error',
+                            'duplicate_component_instance_id',
+                            'data-fc-instance 在单个页面文档中必须唯一。',
+                            element,
+                            'data-fc-instance',
+                        ),
+                    )
+                } else {
+                    seenInstanceIds.add(normalized)
+                }
+            }
+            for (const attribute of componentAttributes) {
+                if (!attribute.name.startsWith('data-fc-prop-')) continue
+                const name = attribute.name.slice('data-fc-prop-'.length)
+                if (!COMPONENT_SCHEMA_NAME_PATTERN.test(name)) {
+                    parsed.diagnostics.push(
+                        diagnosticForElement(
+                            'error',
+                            'invalid_component_property_name',
+                            'data-fc-prop-* 必须使用稳定的小写短横线名称。',
+                            element,
+                            attribute.name,
+                        ),
+                    )
+                }
+            }
+        }
+
+        const partName = getAttribute(element, 'data-fc-part')
+        if (partName === undefined) return
+        const owner = [...ancestors]
+            .reverse()
+            .find(ancestor => getAttribute(ancestor, 'data-fc-node-kind') === 'component')
+        if (!owner) {
+            parsed.diagnostics.push(
+                diagnosticForElement(
+                    'error',
+                    'orphan_component_part',
+                    'data-fc-part 必须位于公共组件实例内部。',
+                    element,
+                    'data-fc-part',
+                ),
+            )
+            return
+        }
+        if (!COMPONENT_SCHEMA_NAME_PATTERN.test(partName)) {
+            parsed.diagnostics.push(
+                diagnosticForElement(
+                    'error',
+                    'invalid_component_part_name',
+                    'data-fc-part 必须使用稳定的小写短横线名称。',
+                    element,
+                    'data-fc-part',
+                ),
+            )
+            return
+        }
+        const seenParts = partNamesByInstance.get(owner)
+        if (seenParts?.has(partName)) {
+            parsed.diagnostics.push(
+                diagnosticForElement(
+                    'error',
+                    'duplicate_component_part',
+                    '同一公共组件实例内的 data-fc-part 名称必须唯一。',
+                    element,
+                    'data-fc-part',
+                ),
+            )
+        } else {
+            seenParts?.add(partName)
+        }
+    })
+}
+
 function validateBindings(parsed: ParsedHtmlSource): void {
     for (const element of parsed.elements) {
         const binding = getAttribute(element, 'data-fc-bind')
@@ -479,6 +637,7 @@ export function validateHtmlTree(
         diagnostics: [...initialDiagnostics],
     }
     validateManagedNodes(parsed)
+    validatePublicComponentInstances(parsed)
     validateBindings(parsed)
     if (options.scope === 'project') validateProjectContract(parsed)
     return parsed

@@ -64,3 +64,24 @@ test('合法行内样式探针缺少共享锚点时拒绝生成', () => {
         /合法样例 legal-inline-style 的替换锚点不存在。/u,
     )
 })
+
+test('公共组件探针保留引用字段且允许不同实例使用同名 part', () => {
+    const probe = createCases().find(item => item.id === 'legal-public-component')
+    assert.ok(probe)
+    const compiled = compileCanvasPreview({
+        projectArticleHtml: projectHtml,
+        projectStyleCss: projectCss,
+        entryArticleHtml: probe.validationHtml,
+        entryStyleCss: probe.css,
+        metadata: manifest.entry,
+        assetIds: probe.assetIds,
+    })
+    assert.equal(compiled.diagnostics.filter(item => item.severity === 'error').length, 0)
+    assert.match(compiled.html ?? '', /data-fc-node-kind="component"/u)
+    assert.equal(compiled.html?.match(/data-fc-part="avatar"/gu)?.length, 2)
+    assert.match(compiled.html ?? '', /data-fc-component-revision="latest"/u)
+
+    const isolated = isolatePageDocument(compiled.html ?? '', compiled.css ?? '')
+    assert.deepEqual(isolated.errors, [])
+    assert.equal(isolated.artifact?.html.match(/data-fc-part="avatar"/gu)?.length, 2)
+})

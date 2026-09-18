@@ -111,7 +111,7 @@ export const INSERTABLE_COMPONENT_KINDS = [
     'asset',
     'gallery',
     'divider',
-] as const satisfies readonly Exclude<DocumentNodeKind, 'list-item' | 'table-cell'>[]
+] as const satisfies readonly Exclude<DocumentNodeKind, 'list-item' | 'table-cell' | 'component'>[]
 
 const definitions = {
     paragraph: definition({
@@ -240,6 +240,14 @@ const definitions = {
         ),
         projectsManagedChildren: true,
         creation: creation('div'),
+    }),
+    component: definition({
+        kind: 'component',
+        compatibleTags: ['div'],
+        autoAdoptTags: [],
+        semanticParts: [self('root')],
+        capabilityCandidates: [],
+        creation: null,
     }),
 } as const satisfies Record<DocumentNodeKind, ComponentDefinition>
 

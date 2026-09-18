@@ -36,6 +36,17 @@ const LEGAL_INLINE_STYLE_MUTATION: CanvasProbeMutation = {
     },
 }
 
+const LEGAL_PUBLIC_COMPONENT_MUTATION: CanvasProbeMutation = {
+    id: 'legal-public-component',
+    file: 'entry/article.html',
+    replace: {
+        needle: '<p id="linked-section" data-fc-node-id="44444444-4444-4444-8444-444444444444" data-fc-node-kind="paragraph">交接样例正文。</p>',
+        value: `<p id="linked-section" data-fc-node-id="44444444-4444-4444-8444-444444444444" data-fc-node-kind="paragraph">交接样例正文。</p>
+      <div data-fc-node-id="c2000000-0000-4000-8000-000000000001" data-fc-node-kind="component" data-fc-component="c1000000-0000-4000-8000-000000000001" data-fc-component-revision="latest" data-fc-instance="c3000000-0000-4000-8000-000000000001" data-fc-prop-emphasis="true"><span data-fc-part="avatar">组件甲</span></div>
+      <div data-fc-node-id="c2000000-0000-4000-8000-000000000002" data-fc-node-kind="component" data-fc-component="c1000000-0000-4000-8000-000000000001" data-fc-component-revision="3" data-fc-instance="c3000000-0000-4000-8000-000000000002"><span data-fc-part="avatar">组件乙</span></div>`,
+    },
+}
+
 function isElement(node: HtmlNode): node is HtmlElement {
     return 'tagName' in node && 'attrs' in node
 }
@@ -73,6 +84,11 @@ function mutate(source: string, item: CanvasProbeMutation, category: '合法' | 
 
 export function createCanvasProbeCases(sources: CanvasProbeSources): readonly CanvasProbeCase[] {
     const inlineStyleHtml = mutate(sources.fixtureHtml, LEGAL_INLINE_STYLE_MUTATION, '合法')
+    const publicComponentHtml = mutate(
+        sources.fixtureHtml,
+        LEGAL_PUBLIC_COMPONENT_MUTATION,
+        '合法',
+    )
     return [
         {
             id: 'legal-shared-fixture',
@@ -87,6 +103,14 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             label: '合法：行内样式',
             validationHtml: inlineStyleHtml,
             html: extractCanvasRenderableHtml(inlineStyleHtml),
+            css: sources.fixtureCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_PUBLIC_COMPONENT_MUTATION.id,
+            label: '合法：公共组件序列化',
+            validationHtml: publicComponentHtml,
+            html: extractCanvasRenderableHtml(publicComponentHtml),
             css: sources.fixtureCss,
             assetIds: sources.assetIds,
         },
