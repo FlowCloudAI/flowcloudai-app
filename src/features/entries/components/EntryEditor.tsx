@@ -47,6 +47,7 @@ import useEntryRelationState from '../hooks/useEntryRelationState'
 import useEntrySaveStatus from '../hooks/useEntrySaveStatus'
 import {buildEntryTagsPayload,} from './entryTagUtils'
 import ActionMenu from '../../../shared/ui/overlay/ActionMenu'
+import {Overlay} from '../../../shared/ui/overlay'
 
 import './EntryEditor.css'
 import {
@@ -85,6 +86,7 @@ import {PageDocumentCanvasEntry} from '@page-document-canvas-entry'
 import {PageDocumentEditorEntry} from '@page-document-editor-entry'
 import {type EntryEditorMode} from '../lib/entryEditorShortcutModel'
 import {convertMarkdownToPageDocument} from '../../page-document/application/markdownDocumentConversion.ts'
+import {resolveSupportedEntryMode, supportsPageDocumentLayers} from '../../page-document/application/canvasLayerSupport.ts'
 
 type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
@@ -137,6 +139,7 @@ const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
 }
 
 const AUTO_SAVE_IDLE_MS = 30_000
+const PAGE_DOCUMENT_LAYERS_SUPPORTED = typeof window !== 'undefined' && supportsPageDocumentLayers(window)
 
 function buildDraft(entry: Entry): EntryDraft {
     return {
@@ -201,7 +204,12 @@ export default function EntryEditor({
     const [error, setError] = useState<string | null>(null)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [generatingSummary, setGeneratingSummary] = useState(false)
-    const [editorMode, setEditorMode] = useState<EntryEditorMode>(initialEditorMode)
+    const [editorMode, setEditorMode] = useState<EntryEditorMode>(
+        resolveSupportedEntryMode(initialEditorMode, PAGE_DOCUMENT_LAYERS_SUPPORTED),
+    )
+    const [layerSupportNoticeOpen, setLayerSupportNoticeOpen] = useState(
+        !PAGE_DOCUMENT_LAYERS_SUPPORTED && initialEditorMode === 'edit',
+    )
     const [pageDocumentDirty, setPageDocumentDirty] = useState(false)
     const [pageDocumentResetVersion, setPageDocumentResetVersion] = useState(0)
     const [pageDocumentDerivedText, setPageDocumentDerivedText] = useState<string | null>(null)
@@ -281,6 +289,10 @@ export default function EntryEditor({
     }, [confirmDiscardPageDocument])
     const requestEditorMode = useCallback(async (nextMode: EntryEditorMode) => {
         if (nextMode === editorMode) return
+        if (nextMode === 'edit' && !PAGE_DOCUMENT_LAYERS_SUPPORTED) {
+            setLayerSupportNoticeOpen(true)
+            return
+        }
         if (editorMode === 'edit' && !(await requestLeavePageDocument())) return
         setEditorMode(nextMode)
     }, [editorMode, requestLeavePageDocument])
@@ -442,7 +454,7 @@ export default function EntryEditor({
                 if (cancelled) return
                 setEntry(result)
                 setDraft(buildDraft(result))
-                setEditorMode(initialEditorMode)
+                setEditorMode(resolveSupportedEntryMode(initialEditorMode, PAGE_DOCUMENT_LAYERS_SUPPORTED))
             })
             .catch((e) => {
                 if (cancelled) return
@@ -662,6 +674,10 @@ export default function EntryEditor({
 
     const handleRestoreRecovery = useCallback((fields: EntryDraftRecoveryField[]) => {
         if (!recoveryNotice) return
+        if (!PAGE_DOCUMENT_LAYERS_SUPPORTED) {
+            setLayerSupportNoticeOpen(true)
+            return
+        }
         markUserEdited()
         const snapshot = recoveryNotice.record.draft
         setDraft((current) => ({
@@ -1143,6 +1159,8 @@ export default function EntryEditor({
                                             type="button"
                                             className={`entry-editor-mode-chip${editorMode === 'edit' ? ' active' : ''}`}
                                             aria-pressed={editorMode === 'edit'}
+                                            aria-disabled={!PAGE_DOCUMENT_LAYERS_SUPPORTED}
+                                            title={!PAGE_DOCUMENT_LAYERS_SUPPORTED ? '页面编辑需要更新系统 WebView' : undefined}
                                             onClick={() => void requestEditorMode('edit')}
                                         >
                                             编辑
@@ -1273,7 +1291,7 @@ export default function EntryEditor({
                                     onLinkHover={handlePageDocumentLinkHover}
                                 />
                             )}
-                            {editorMode === 'edit' && (
+                            {editorMode === 'edit' && PAGE_DOCUMENT_LAYERS_SUPPORTED && (
                                 <PageDocumentEditorEntry
                                     entryId={entryId}
                                     projectId={projectId}
@@ -1316,6 +1334,18 @@ export default function EntryEditor({
                     )}
                 </div>
             </RollingBox>
+
+            <Overlay
+                open={active && layerSupportNoticeOpen}
+                onClose={() => setLayerSupportNoticeOpen(false)}
+                ariaLabel="页面编辑需要更新系统 WebView"
+            >
+                <div className="entry-editor-layer-support-notice">
+                    <h2>页面编辑暂不可用</h2>
+                    <p>当前系统 WebView 不支持页面所需的 CSS 层叠层。请更新系统 WebView 后重新打开应用。</p>
+                    <Button type="button" onClick={() => setLayerSupportNoticeOpen(false)}>知道了</Button>
+                </div>
+            </Overlay>
 
             <EntryEditorLinkPreview
                 linkPreview={linkPreview.linkPreview}

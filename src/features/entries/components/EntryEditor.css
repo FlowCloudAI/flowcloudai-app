@@ -77,6 +77,29 @@
     color: var(--fc-color-text-on-primary);
 }
 
+.entry-editor-mode-chip[aria-disabled='true'] {
+    color: var(--fc-color-text-secondary);
+    opacity: 0.6;
+}
+
+.entry-editor-layer-support-notice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-md);
+    max-width: 26rem;
+    padding: var(--fc-space-lg);
+    color: var(--fc-color-text);
+}
+
+.entry-editor-layer-support-notice h2,
+.entry-editor-layer-support-notice p {
+    margin: 0;
+}
+
+.entry-editor-layer-support-notice p {
+    color: var(--fc-color-text-secondary);
+}
+
 .entry-editor-cover-panel,
 .entry-editor-meta-panel {
     min-width: 0;

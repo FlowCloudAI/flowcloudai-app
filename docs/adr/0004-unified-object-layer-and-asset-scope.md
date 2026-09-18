@@ -104,7 +104,7 @@ ADR 0002 的源码存储布局不变，仍不建万能文档源码表，不为�
 
 画布运行时首次声明的层序已定为 `fc-canvas-defaults, fc-renderer, fc-component, fc-project, fc-entry, fc-node, fc-author`。组件默认样式位于渲染基线之上、项目主题之下；实例覆写位于项目主题之上，作者高级 CSS 最高。[ADR 0003](0003-page-document-canvas-isolation.md) 中未分层的运行时安全规则保持不变。已有项目的四层声明只重复既有层名，不重排层序；`fc-component` 与 `fc-author` 的作者写入仍待后续契约开放。
 
-已选择把 `minimumSystemVersion` 从 macOS 12.0 提高至 12.3。画布的渲染基线和作者样式都位于 `@layer` 块内；低于 Safari 15.4 的 WebKit 会丢弃无法识别的整块 at-rule，不能只为旧系统提供不分层回退而维持同一层叠语义。Android 的 WebView 版本仍可能低于 CSS 层支持要求，宿主须在进入页面编辑前检测 `CSSLayerBlockRule` 并给出升级提示。macOS 配置变更仍须以实际打包产物验证最低系统版本。
+已选择把 `minimumSystemVersion` 从 macOS 12.0 提高至 12.3。画布的渲染基线和作者样式都位于 `@layer` 块内；低于 Safari 15.4 的 WebKit 会丢弃无法识别的整块 at-rule，不能只为旧系统提供不分层回退而维持同一层叠语义。Android 的 WebView 版本仍可能低于 CSS 层支持要求；宿主词条入口现检测 `CSSLayerBlockRule`，缺失时关闭页面编辑并显示升级提示。macOS 配置与 Android 提示仍须在实际原生产物验收。
 
 ## 后果
 
