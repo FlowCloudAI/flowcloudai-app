@@ -37,6 +37,7 @@
 | [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引、节点规则与桌面快照/世界包后端迁移已实施；组件链授权及跨平台验收仍待完成 |
 | [adr/0005-page-document-node-identity-and-component-contract.md](adr/0005-page-document-node-identity-and-component-contract.md) | 现行 | 2026-09-18 | 页面文档 v1 的九类节点身份保持/重映射规则与引用式公共组件序列化格式；组件存储、展开与编辑流程留到阶段 D |
 | [验收清单.md](验收清单.md) | 现行 | 2026-09-18 | 尚未由用户在原生产物确认的 WebP 图片与画布层叠层检查项；通过一项删一项 |
+| [契约缺口.md](契约缺口.md) | 现行 | 2026-09-19 | 阶段 C Office 功能区移植中确认的主仓契约缺口与禁用处理 |
 | [dock_panel_child_page_guide.md](dock_panel_child_page_guide.md) | 现行 | 2026-09-13 | 新增 `DockableSidePanel` 子页面的结构、样式与验证约定 |
 | [ui_style_unification_plan.md](ui_style_unification_plan.md) | 现行 | 2026-05-20 | 长期视觉统一改造计划，基于 UI 库语义令牌建立统一视觉语言 |
 | [plugin_system_guide.md](plugin_system_guide.md) | 现行 | 2026-05-07 | 插件系统两层架构与联调指南 |

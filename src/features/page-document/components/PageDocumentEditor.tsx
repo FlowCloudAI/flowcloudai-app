@@ -43,6 +43,13 @@ import {
 } from '../../document-editor/visual/DocumentOfficeRibbon.tsx'
 import {HomeRibbonControls} from '../../document-editor/visual/HomeRibbonControls.tsx'
 import {
+    PageRibbonControls,
+    ViewRibbonControls,
+    type DocumentQuickScope,
+    type LayoutPreviewViewportMode,
+    type ResponsiveViewportContext,
+} from '../../document-editor/visual/PageAndViewRibbonControls.tsx'
+import {
     resolveRibbonTab,
     ribbonTabsForNode,
     type DocumentRibbonTab,
@@ -100,7 +107,7 @@ function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRi
         label: RIBBON_TAB_LABELS[tab],
         icon: RIBBON_TAB_ICONS[tab],
         contextual: !['home', 'insert', 'page', 'view'].includes(tab),
-        disabled: tab !== 'home',
+        disabled: tab === 'insert' || (!['home', 'page', 'view'].includes(tab) && tab !== 'home'),
     }))
 }
 
@@ -123,6 +130,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [mode, setMode] = useState<PageDocumentWorkspaceMode>('visual')
     const [ribbonTab, setRibbonTab] = useState<DocumentRibbonTab>('home')
     const [ribbonCollapsed, setRibbonCollapsed] = useState(false)
+    const [pageScope, setPageScope] = useState<DocumentQuickScope>('entry')
+    const [previewWidth, setPreviewWidth] = useState<LayoutPreviewViewportMode>('auto')
+    const [editContext, setEditContext] = useState<ResponsiveViewportContext>('desktop')
+    const [outlineVisible, setOutlineVisible] = useState(true)
+    const [layoutGuidesVisible, setLayoutGuidesVisible] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
@@ -543,6 +555,30 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectComponent={session.inspectComponent}
                                 inspectTextRange={session.inspectTextRange}
                             />
+                        ) : visibleRibbonTab === 'page' ? (
+                            <PageRibbonControls
+                                scope={pageScope}
+                                onScopeChange={setPageScope}
+                                onOpenTheme={() => undefined}
+                                onOpenPageLayout={() => undefined}
+                                nodeId={selectedNode?.id ?? null}
+                                onApplyLayout={(request, label) => {
+                                    void session.applyVisualPropertyEntry(request, label, {immediate: true})
+                                }}
+                            />
+                        ) : visibleRibbonTab === 'view' ? (
+                            <ViewRibbonControls
+                                previewMode={previewWidth}
+                                editContext={editContext}
+                                outlineVisible={outlineVisible}
+                                layoutGuidesVisible={layoutGuidesVisible}
+                                onPreviewModeChange={setPreviewWidth}
+                                onEditContextChange={setEditContext}
+                                onOutlineVisibleChange={setOutlineVisible}
+                                onLayoutGuidesVisibleChange={setLayoutGuidesVisible}
+                                onOpenDisplay={() => changeMode('display')}
+                                onOpenDeveloperInfo={() => changeMode('code')}
+                            />
                         ) : (
                             <RibbonUnavailableTab tab={visibleRibbonTab} />
                         )}
@@ -553,7 +589,18 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             <div className="page-document-editor__workspace" data-mode={mode}>
                 {mode !== 'code' ? (
                     <div className="page-document-editor__canvas-stage">
-                        <div className="page-document-editor__page-card">
+                        <div
+                            className="page-document-editor__page-card"
+                            style={previewWidth === 'auto' ? undefined : {
+                                maxWidth: {
+                                    mobile: '390px',
+                                    tablet: '640px',
+                                    desktop: '960px',
+                                    wide: '1280px',
+                                    auto: undefined,
+                                }[previewWidth],
+                            }}
+                        >
                             {state.preview?.html != null && state.preview.css != null ? (
                                 <PageDocumentCanvas
                                     ref={canvasRef}
