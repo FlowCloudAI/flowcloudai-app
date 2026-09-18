@@ -52,6 +52,7 @@ import type {
     ResponsiveViewportContext,
 } from '../../document-editor/visual/pageAndViewRibbonModel.ts'
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
+import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
 import {
     resolveRibbonTab,
     ribbonTabsForNode,
@@ -110,7 +111,7 @@ function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRi
         label: RIBBON_TAB_LABELS[tab],
         icon: RIBBON_TAB_ICONS[tab],
         contextual: !['home', 'insert', 'page', 'view'].includes(tab),
-        disabled: tab === 'insert' || (tab !== 'home' && tab !== 'page' && tab !== 'view' && tab !== 'container'),
+        disabled: tab === 'insert',
     }))
 }
 
@@ -592,6 +593,19 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 onOpenArrangementDetails={() => undefined}
                                 onOpenGridDetails={() => undefined}
                                 onOpenSpacingDetails={() => undefined}
+                            />
+                        ) : selectedNode && visibleRibbonTab !== 'insert' ? (
+                            <ContextualRibbonControls
+                                selected={selectedNode}
+                                tableNode={selectedNode.kind === 'table' || selectedNode.kind === 'table-cell' ? selectedNode : null}
+                                snapshot={state.snapshot}
+                                context={editContext}
+                                assetFeedback={session.visualError}
+                                applyKernelEntry={session.applyVisualPropertyEntry}
+                                inspectComponent={session.inspectComponent}
+                                sourceVersion={state.model.changeVersion}
+                                onChooseLocalAsset={() => openAssetPicker('replace')}
+                                onOpenDetails={() => undefined}
                             />
                         ) : (
                             <RibbonUnavailableTab tab={visibleRibbonTab} />
