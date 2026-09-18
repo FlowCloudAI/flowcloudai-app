@@ -12,8 +12,10 @@ import {
     type DocumentNodeKind,
     type EditImpact,
     nodeId,
+    type NodeIdentityAllocator,
     type NodeIdentityDescriptor,
 } from '../domain/kernel/index.ts'
+import {normalizeManagedNodeIdentities} from '../domain/kernel/syntax/index.ts'
 import {createLayerProjection, type LayerProjectionNode} from '../domain/layerProjection.ts'
 import type {
     SourceDraftModel,
@@ -534,6 +536,11 @@ export interface AiDraftSourceBatch extends DocumentDraftSourceBatch {
     readonly decision?: AiDraftDecisionAuthorization
 }
 
+export interface AiDraftApplyOptions {
+    /** 宿主的节点身份分配器；默认使用当前运行时的随机 UUID。 */
+    readonly allocateNodeId?: NodeIdentityAllocator
+}
+
 /** 源码候选进入唯一草稿历史；expected 防止等待模型或人工确认途中发生的编辑被覆盖。 */
 function applyDraftSources(
     model: DocumentDraftModel,
@@ -628,6 +635,7 @@ export function applyAiDraftSources(
     model: DocumentDraftModel,
     batch: AiDraftSourceBatch,
     label: string,
+    options: AiDraftApplyOptions = {},
 ): DocumentDraftUpdate {
     if (batch.decision && batch.decision.confirmedPlanId !== batch.decision.planId) {
         return {
@@ -647,22 +655,87 @@ export function applyAiDraftSources(
             ],
         }
     }
-    const identityDiagnostics = validateAiDraftNodeIdentities(model, batch)
+    const prepared = allocateAiCandidateNodeIdentities(model, batch, options.allocateNodeId)
+    const identityDiagnostics = validateAiDraftNodeIdentities(
+        model,
+        prepared.batch,
+        prepared.hostAllocatedNodeIds,
+    )
     if (identityDiagnostics.length > 0) {
         return {model, applied: false, diagnostics: identityDiagnostics}
     }
-    return applyDraftSources(model, batch, label, 'ai')
+    return applyDraftSources(model, prepared.batch, label, 'ai')
+}
+
+interface PreparedAiDraft {
+    readonly batch: AiDraftSourceBatch
+    readonly hostAllocatedNodeIds: Readonly<Record<SourceEditorScope, readonly string[]>>
+}
+
+/**
+ * AI 只能描述新增节点，不能决定其最终身份。宿主在身份校验前补齐缺失 ID，
+ * 并把本批实际分配的集合交给契约层；候选显式携带的未知 UUID 仍会被拒绝。
+ */
+function allocateAiCandidateNodeIdentities(
+    model: DocumentDraftModel,
+    batch: AiDraftSourceBatch,
+    allocateNodeId: NodeIdentityAllocator = () => globalThis.crypto.randomUUID(),
+): PreparedAiDraft {
+    const unavailable = new Set<string>([
+        ...managedNodeIdentityDescriptors(model.entry.sources['article.html']).map(item => item.id),
+        ...managedNodeIdentityDescriptors(model.project.sources['article.html']).map(item => item.id),
+    ])
+    const allocated: Record<SourceEditorScope, string[]> = {entry: [], project: []}
+    const normalizedSources: Record<SourceEditorScope, SourceFileSet> = {
+        entry: {...batch.entrySources},
+        project: {...batch.projectSources},
+    }
+
+    for (const scope of ['entry', 'project'] as const) {
+        const normalized = normalizeManagedNodeIdentities(
+            batch[`${scope}Sources`]['article.html'],
+            allocateNodeId,
+            unavailable,
+        )
+        normalizedSources[scope] = {
+            ...batch[`${scope}Sources`],
+            'article.html': normalized.source,
+        }
+        for (const diagnostic of normalized.diagnostics) {
+            if (diagnostic.nodeId) {
+                allocated[scope].push(diagnostic.nodeId)
+                unavailable.add(diagnostic.nodeId)
+            }
+        }
+    }
+
+    return Object.freeze({
+        batch: Object.freeze({
+            ...batch,
+            entrySources: Object.freeze(normalizedSources.entry),
+            projectSources: Object.freeze(normalizedSources.project),
+        }),
+        hostAllocatedNodeIds: Object.freeze({
+            entry: Object.freeze(allocated.entry),
+            project: Object.freeze(allocated.project),
+        }),
+    })
 }
 
 function validateAiDraftNodeIdentities(
     model: DocumentDraftModel,
     batch: AiDraftSourceBatch,
+    hostAllocatedNodeIds: Readonly<Record<SourceEditorScope, readonly string[]>>,
 ): DocumentDiagnostic[] {
     const diagnostics: DocumentDiagnostic[] = []
     for (const scope of ['entry', 'project'] as const) {
         const current = managedNodeIdentityDescriptors(model[scope].sources['article.html'])
         const candidate = managedNodeIdentityDescriptors(batch[`${scope}Sources`]['article.html'])
-        const result = validateAiCandidateNodeIdentities(current, candidate, [])
+        const result = validateAiCandidateNodeIdentities(
+            current,
+            candidate,
+            hostAllocatedNodeIds[scope],
+        )
         if (result.status === 'rejected') {
             diagnostics.push({
                 severity: 'error',

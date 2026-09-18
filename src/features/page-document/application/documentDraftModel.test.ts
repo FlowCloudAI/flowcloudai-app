@@ -43,6 +43,8 @@ import {
 const ENTRY_ID = '11111111-1111-4111-8111-111111111111'
 const ROOT_ID = '22222222-2222-4222-8222-222222222222'
 const PARAGRAPH_ID = '33333333-3333-4333-8333-333333333333'
+const HOST_ALLOCATED_ID = '44444444-4444-4444-8444-444444444444'
+const UNALLOCATED_ID = '55555555-5555-4555-8555-555555555555'
 let testRequestSequence = 0
 
 function snapshot(revision = 7, projectRevision = 2): EntrySourceSnapshot {
@@ -289,6 +291,85 @@ function readEffectiveStyleForTest(
 }
 
 describe('document draft model', () => {
+    it('AI 候选新增节点时由宿主分配身份并沿真实草稿入口接纳', () => {
+        const initial = createDocumentDraft(snapshot())
+        const candidate = {
+            ...initial.entry.sources,
+            'article.html': initial.entry.sources['article.html'].replace(
+                '</div></template></template>',
+                '<p data-fc-node-kind="paragraph">AI 新段落</p></div></template></template>',
+            ),
+        }
+        const update = applyAiDraftSources(
+            initial,
+            {
+                expectedEntrySources: initial.entry.sources,
+                expectedProjectSources: initial.project.sources,
+                entrySources: candidate,
+                projectSources: initial.project.sources,
+                diagnostics: [],
+            },
+            'AI：新增段落',
+            {allocateNodeId: () => HOST_ALLOCATED_ID},
+        )
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        assert.match(
+            update.model.entry.sources['article.html'],
+            new RegExp(
+                `<p data-fc-node-kind="paragraph" data-fc-node-id="${HOST_ALLOCATED_ID}">AI 新段落</p>`,
+                'u',
+            ),
+        )
+    })
+
+    it('AI 候选携带未由宿主分配的新身份时沿真实草稿入口拒绝', () => {
+        const initial = createDocumentDraft(snapshot())
+        const candidate = {
+            ...initial.entry.sources,
+            'article.html': initial.entry.sources['article.html'].replace(
+                '</div></template></template>',
+                `<p data-fc-node-id="${UNALLOCATED_ID}" data-fc-node-kind="paragraph">AI 新段落</p></div></template></template>`,
+            ),
+        }
+        const update = applyAiDraftSources(
+            initial,
+            {
+                expectedEntrySources: initial.entry.sources,
+                expectedProjectSources: initial.project.sources,
+                entrySources: candidate,
+                projectSources: initial.project.sources,
+                diagnostics: [],
+            },
+            'AI：拒绝未登记身份',
+            {allocateNodeId: () => HOST_ALLOCATED_ID},
+        )
+        assert.equal(update.applied, false)
+        assert.equal(update.diagnostics[0]?.code, 'ai-candidate-node-id-not-host-allocated')
+        assert.equal(update.model, initial)
+    })
+
+    it('AI 候选保留未改动节点身份时沿真实草稿入口接纳', () => {
+        const initial = createDocumentDraft(snapshot())
+        const candidate = {
+            ...initial.entry.sources,
+            'article.html': initial.entry.sources['article.html'].replace('原文', 'AI 改写正文'),
+        }
+        const update = applyAiDraftSources(
+            initial,
+            {
+                expectedEntrySources: initial.entry.sources,
+                expectedProjectSources: initial.project.sources,
+                entrySources: candidate,
+                projectSources: initial.project.sources,
+                diagnostics: [],
+            },
+            'AI：保留段落身份',
+            {allocateNodeId: () => HOST_ALLOCATED_ID},
+        )
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        assert.match(update.model.entry.sources['article.html'], new RegExp(PARAGRAPH_ID, 'u'))
+    })
+
     it('AI 候选沿真实草稿入口拒绝复用既有节点身份的不同种类', () => {
         const initial = createDocumentDraft(snapshot())
         const candidate = {
