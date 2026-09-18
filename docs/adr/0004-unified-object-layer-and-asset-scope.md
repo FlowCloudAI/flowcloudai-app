@@ -102,9 +102,9 @@ ADR 0002 的源码存储布局不变，仍不建万能文档源码表，不为�
 
 ### 7. 层叠顺序与最低系统版本
 
-组件样式并入画布现有的 `@layer` 层序：组件默认样式位于画布主题默认值之上、项目主题层（`fc-project`）之下；实例覆写位于项目主题之上；作者高级 CSS 最高。[ADR 0003](0003-page-document-canvas-isolation.md) 中未分层的运行时安全规则保持不变。具体层名与 ADR 0003 的现有层序合并定稿，不以 `!important` 作为覆写机制。
+画布运行时首次声明的层序已定为 `fc-canvas-defaults, fc-renderer, fc-component, fc-project, fc-entry, fc-node, fc-author`。组件默认样式位于渲染基线之上、项目主题之下；实例覆写位于项目主题之上，作者高级 CSS 最高。[ADR 0003](0003-page-document-canvas-isolation.md) 中未分层的运行时安全规则保持不变。已有项目的四层声明只重复既有层名，不重排层序；`fc-component` 与 `fc-author` 的作者写入仍待后续契约开放。
 
-`@layer` 需要 Safari 15.4 及以上的 WebKit，对应 macOS 12.3，而当前 macOS 最低支持版本为 12.0。阶段 A 退出前须二选一：提高最低版本到 12.3，或在 12.0–12.2 且未更新 Safari 的系统上实测画布样式优先级。不以较新系统上的原生验收结果代替。
+已选择把 `minimumSystemVersion` 从 macOS 12.0 提高至 12.3。画布的渲染基线和作者样式都位于 `@layer` 块内；低于 Safari 15.4 的 WebKit 会丢弃无法识别的整块 at-rule，不能只为旧系统提供不分层回退而维持同一层叠语义。Android 的 WebView 版本仍可能低于 CSS 层支持要求，宿主须在进入页面编辑前检测 `CSSLayerBlockRule` 并给出升级提示。macOS 配置变更仍须以实际打包产物验证最低系统版本。
 
 ## 后果
 
