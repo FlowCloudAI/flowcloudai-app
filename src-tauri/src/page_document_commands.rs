@@ -84,7 +84,14 @@ async fn rebuild_projection(
         .map_err(ApiError::internal)?;
     let rows = sqlx::query(
         "SELECT d.entry_id FROM entry_page_documents d WHERE d.project_id=?
-        AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.entry_id)",
+        AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.entry_id)
+        AND NOT EXISTS(
+            SELECT 1 FROM object_changes c
+            WHERE c.object_id=d.entry_id
+              AND c.revision=d.revision
+              AND c.change_type='projection-rebuild'
+              AND c.source='page-document'
+        )",
     )
     .bind(project_id)
     .fetch_all(&db.pool)
@@ -143,12 +150,27 @@ async fn rebuild_projection(
         {
             report.skipped.push(format!("词条 {entry_id}：{error}"));
         } else {
-            report.rebuilt += 1;
+            if let Err(error) =
+                mark_projection_rebuilt(&db.pool, &entry_id, "entry", document.revision).await
+            {
+                report
+                    .skipped
+                    .push(format!("词条 {entry_id}：无法记录投影重建水位：{error}"));
+            } else {
+                report.rebuilt += 1;
+            }
         }
     }
     let home_missing_blocks: bool = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM project_home_documents d WHERE d.project_id=?
-         AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.object_id)",
+         AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.object_id)
+         AND NOT EXISTS(
+             SELECT 1 FROM object_changes c
+             WHERE c.object_id=d.object_id
+               AND c.revision=d.revision
+               AND c.change_type='projection-rebuild'
+               AND c.source='page-document'
+         )",
     )
     .bind(project_id)
     .fetch_one(&db.pool)
@@ -202,11 +224,38 @@ async fn rebuild_projection(
                 .skipped
                 .push(format!("项目首页 {project_id}：{error}"));
         } else {
-            report.rebuilt += 1;
+            if let Err(error) =
+                mark_projection_rebuilt(&db.pool, &object_id, "project_home", document.revision)
+                    .await
+            {
+                report.skipped.push(format!(
+                    "项目首页 {project_id}：无法记录投影重建水位：{error}"
+                ));
+            } else {
+                report.rebuilt += 1;
+            }
         }
     }
     report.skipped_count = report.skipped.len();
     Ok(report)
+}
+
+async fn mark_projection_rebuilt(
+    pool: &sqlx::SqlitePool,
+    object_id: &Uuid,
+    kind: &str,
+    revision: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO object_changes(object_id,kind,revision,change_type,actor,source)
+         VALUES(?,?,?,'projection-rebuild','local','page-document')",
+    )
+    .bind(object_id)
+    .bind(kind)
+    .bind(revision)
+    .execute(pool)
+    .await
+    .map(|_| ())
 }
 
 #[tauri::command]
@@ -785,6 +834,67 @@ mod tests {
                 .revision,
             1
         );
+    }
+
+    #[tokio::test]
+    async fn rebuild_projection_marks_empty_page_revision_and_skips_it_next_time() {
+        let fixture = setup().await;
+        let html = "<div data-fc-node-kind='container'></div>";
+        let saved = save_entry(
+            &fixture.state,
+            &fixture.paths,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html: html.into(),
+                css: String::new(),
+                expected_revision: None,
+                request_key: "empty-page-projection".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.revision, 1);
+
+        let first = rebuild_projection(&fixture.state, &fixture.paths, fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(first.rebuilt, 1);
+        assert_eq!(first.skipped_count, 0);
+
+        let second = rebuild_projection(&fixture.state, &fixture.paths, fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(second.rebuilt, 0);
+        assert_eq!(second.skipped_count, 0);
+
+        let world = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM object_changes
+                 WHERE object_id=? AND revision=? AND change_type='projection-rebuild'
+                   AND source='page-document'",
+            )
+            .bind(fixture.entry_id)
+            .bind(1_i64)
+            .fetch_one(&world.pool)
+            .await
+            .unwrap(),
+            1,
+        );
+        let reopened = world
+            .get_entry_page_document(&fixture.entry_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reopened.revision, 1);
+        assert_eq!(reopened.html, html);
     }
 
     #[tokio::test]
