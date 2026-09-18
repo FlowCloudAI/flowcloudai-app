@@ -33,9 +33,9 @@ export function PageRibbonControls({scope, onScopeChange, onOpenTheme, onOpenPag
 }) {
     const selectScope = (next: DocumentQuickScope) => { onScopeChange(next); onOpenTheme(next) }
     return <>
-        <DocumentRibbonGroup label="修改范围" priority="essential">
-            <DocumentRibbonCommand active={scope === 'entry'} icon={Palette} label="当前页面" onClick={() => selectScope('entry')} title="当前页面样式范围" />
-            <DocumentRibbonCommand active={scope === 'project'} icon={FileStack} label="项目模板" onClick={() => selectScope('project')} title="项目模板样式范围" />
+        <DocumentRibbonGroup disabledReason="页面主题范围尚未接入项目模板与页面样式写回契约。" label="修改范围" priority="essential">
+            <DocumentRibbonCommand disabled active={scope === 'entry'} icon={Palette} label="当前页面" onClick={() => selectScope('entry')} title="页面主题范围契约尚未接入" />
+            <DocumentRibbonCommand disabled active={scope === 'project'} icon={FileStack} label="项目模板" onClick={() => selectScope('project')} title="页面主题范围契约尚未接入" />
         </DocumentRibbonGroup>
         <DocumentRibbonGroup disabledReason="主题令牌与项目模板任务窗格尚未接入页面文档契约。" label="页面外观" priority="high" wide>
             <button aria-label="页面外观任务窗格未接入" className="document-page-theme-open" disabled type="button">
@@ -83,11 +83,11 @@ export function ViewRibbonControls({previewMode, editContext, outlineVisible, la
         </DocumentRibbonGroup>
         <DocumentRibbonGroup label="显示" priority="normal">
             <DocumentRibbonCommand icon={Eye} label="阅读预览" onClick={onOpenDisplay} />
-            <DocumentRibbonCommand active={outlineVisible} icon={LayoutPanelLeft} label="文档图层" onClick={() => onOutlineVisibleChange(!outlineVisible)} title="文档图层由工作区侧栏控制" />
-            <DocumentRibbonCommand active={layoutGuidesVisible} icon={layoutGuidesVisible ? Monitor : EyeOff} label="布局线" onClick={() => onLayoutGuidesVisibleChange(!layoutGuidesVisible)} title="布局线状态仅保留在当前编辑会话" />
+            <DocumentRibbonCommand active={outlineVisible} disabled icon={LayoutPanelLeft} label="文档图层" onClick={() => onOutlineVisibleChange(!outlineVisible)} title="图层可见性切换尚未接入工具栏状态" />
+            <DocumentRibbonCommand active={layoutGuidesVisible} disabled icon={layoutGuidesVisible ? Monitor : EyeOff} label="布局线" onClick={() => onLayoutGuidesVisibleChange(!layoutGuidesVisible)} title="布局线渲染尚未接入画布状态" />
         </DocumentRibbonGroup>
-        <DocumentRibbonGroup label="高级" priority="low">
-            <DocumentRibbonCommand icon={Code2} label="开发者信息" onClick={onOpenDeveloperInfo} />
+        <DocumentRibbonGroup disabledReason="开发者信息面板尚未接入页面文档功能区契约。" label="高级" priority="low">
+            <DocumentRibbonCommand disabled icon={Code2} label="开发者信息" onClick={onOpenDeveloperInfo} title="开发者信息面板尚未接入" />
         </DocumentRibbonGroup>
     </>
 }
