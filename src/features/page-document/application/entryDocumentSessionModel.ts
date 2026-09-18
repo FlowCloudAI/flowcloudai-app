@@ -21,6 +21,8 @@ import {
     compileCanvasPreview,
     type CompiledCanvasPreview,
 } from '../canvas/host/compiledPreview.ts'
+import type {NodeIdentityAllocator} from '../domain/kernel/index.ts'
+import {normalizeManagedNodeIdentities} from '../domain/kernel/syntax/index.ts'
 import {parseDocumentDiagnostics} from '../domain/validators.ts'
 import {convertMarkdownToPageDocument} from './markdownDocumentConversion.ts'
 import {
@@ -225,13 +227,30 @@ export function beginEntryDocumentValidation(
 
 export function finishEntryDocumentValidation(
     state: EntryDocumentSessionState,
+    allocateNodeId: NodeIdentityAllocator = () => globalThis.crypto.randomUUID(),
 ): EntryDocumentSessionState {
-    const preview = compileState(state)
-    const valid = !hasBlockingDiagnostics(preview.diagnostics)
+    const normalized = normalizeManagedNodeIdentities(
+        state.model.entry.sources['article.html'],
+        allocateNodeId,
+    )
+    const normalizedState = normalized.changed
+        ? {
+              ...state,
+              model: editDocumentDraftSource(
+                  state.model,
+                  'entry',
+                  'article.html',
+                  normalized.source,
+              ),
+          }
+        : state
+    const preview = compileState(normalizedState)
+    const diagnostics = [...normalized.diagnostics, ...preview.diagnostics]
+    const valid = !hasBlockingDiagnostics(diagnostics)
     return {
-        ...state,
-        model: acceptDraftValidation(state.model, 'entry', valid, preview.diagnostics),
-        preview: isRenderable(preview) ? preview : state.preview,
+        ...normalizedState,
+        model: acceptDraftValidation(normalizedState.model, 'entry', valid, diagnostics),
+        preview: isRenderable(preview) ? preview : normalizedState.preview,
         previewStale: !isRenderable(preview),
     }
 }

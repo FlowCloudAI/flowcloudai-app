@@ -69,6 +69,40 @@ function saveResult(
 }
 
 describe('entry page document session', () => {
+    it('源码校验补齐缺失身份并去重，保存发送归一化后的同一草稿', () => {
+        const duplicate = '22222222-2222-4222-8222-222222222222'
+        const missingReplacement = '33333333-3333-4333-8333-333333333333'
+        const duplicateReplacement = '44444444-4444-4444-8444-444444444444'
+        const source = `<template data-fc-entry-patch data-fc-document-version="1" data-fc-entry-id="${ENTRY_ID}" data-fc-base-template-version="1"><template data-fc-fill="entry-body"><p data-fc-node-id="${duplicate}" data-fc-node-kind="paragraph">保留</p><p data-fc-node-kind="paragraph">补身份</p><h2 data-fc-node-id="${duplicate}" data-fc-node-kind="heading">去重</h2></template></template>`
+        const edited = editEntryDocumentSource(
+            createEntryDocumentSessionState(identity, document()),
+            'article.html',
+            source,
+        )
+        const ids = [missingReplacement, duplicateReplacement]
+        const validated = finishEntryDocumentValidation(
+            edited,
+            () => ids.shift() ?? duplicateReplacement,
+        )
+
+        assert.equal(validated.model.entry.validationPhase, 'valid')
+        assert.match(validated.model.entry.sources['article.html'], new RegExp(missingReplacement, 'u'))
+        assert.match(validated.model.entry.sources['article.html'], new RegExp(duplicateReplacement, 'u'))
+        assert.equal(
+            validated.model.entry.diagnostics.some(item => item.code === 'managed_node_id_assigned'),
+            true,
+        )
+        assert.equal(
+            validated.model.entry.diagnostics.some(item => item.code === 'duplicate_node_id_reassigned'),
+            true,
+        )
+        const prepared = prepareEntryDocumentSave(validated, () => 'identity-normalized-save')
+        assert.equal(prepared.status, 'ready')
+        if (prepared.status === 'ready') {
+            assert.equal(prepared.input.html, validated.model.entry.sources['article.html'])
+        }
+    })
+
     it('保存成功后回到 clean 并推进 revision', () => {
         const prepared = prepareEntryDocumentSave(validEditedState(), () => 'save-success')
         assert.equal(prepared.status, 'ready')
