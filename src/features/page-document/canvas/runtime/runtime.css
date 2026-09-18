@@ -1,3 +1,6 @@
+/* 首次声明固定完整层序；旧项目的四层声明只重复既有层名，不会重排。 */
+@layer fc-canvas-defaults, fc-renderer, fc-component, fc-project, fc-entry, fc-node, fc-author;
+
 /* fc-canvas-defaults 必须由 runtime style 最先声明，才能让后挂载的作者层覆盖主题与排版基线。 */
 @layer fc-canvas-defaults {
     :root {

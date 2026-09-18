@@ -18,7 +18,7 @@ export const CANVAS_BASE_PROJECT_HTML = `<!doctype html>
 </body>
 </html>`
 
-export const CANVAS_BASE_PROJECT_CSS = `@layer fc-renderer, fc-project, fc-entry, fc-node;
+export const CANVAS_BASE_PROJECT_CSS = `@layer fc-canvas-defaults, fc-renderer, fc-component, fc-project, fc-entry, fc-node, fc-author;
 @layer fc-project {
   :root {
     color-scheme: light dark;

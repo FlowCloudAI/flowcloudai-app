@@ -4,8 +4,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {readFileSync} from 'node:fs'
 import postcss, {type ChildNode} from 'postcss'
+import {CANVAS_BASE_PROJECT_CSS} from '../host/compiledPreview.ts'
 
 const DEFAULT_LAYER = 'fc-canvas-defaults'
+const LAYER_ORDER = [
+    'fc-canvas-defaults', 'fc-renderer', 'fc-component', 'fc-project', 'fc-entry', 'fc-node', 'fc-author',
+]
 
 function containingLayer(node: ChildNode): string | null {
     let current = node.parent
@@ -32,7 +36,7 @@ test('运行时主题与排版基线位于首个默认层，安全标记保持�
     let themeDeclarationCount = 0
 
     root.walkAtRules('layer', rule => layers.push(rule.params.trim()))
-    assert.equal(layers[0], DEFAULT_LAYER)
+    assert.equal(layers[0], LAYER_ORDER.join(', '))
 
     root.walkDecls(declaration => {
         if (!declaration.prop.startsWith('--fc-entry-')) return
@@ -56,4 +60,20 @@ test('运行时主题与排版基线位于首个默认层，安全标记保持�
 
     assert.deepEqual(seenBaselineSelectors, baselineSelectors)
     assert.deepEqual(seenSafetySelectors, safetySelectors)
+})
+
+test('旧项目四层声明不重排运行时首次声明的组件与作者层', () => {
+    const runtime = readFileSync(new URL('./runtime.css', import.meta.url), 'utf8')
+    const oldProjectCss = '@layer fc-renderer, fc-project, fc-entry, fc-node;'
+    const stylesheet = postcss.parse(`${runtime}\n${oldProjectCss}\n${CANVAS_BASE_PROJECT_CSS}\n@layer fc-component {}\n@layer fc-author {}`)
+    const firstAppearances: string[] = []
+    stylesheet.walkAtRules('layer', rule => {
+        for (const name of rule.params.split(',').map(part => part.trim())) {
+            if (!firstAppearances.includes(name)) firstAppearances.push(name)
+        }
+    })
+    assert.deepEqual(firstAppearances, LAYER_ORDER)
+    assert.ok(firstAppearances.indexOf('fc-renderer') < firstAppearances.indexOf('fc-component'))
+    assert.ok(firstAppearances.indexOf('fc-component') < firstAppearances.indexOf('fc-project'))
+    assert.ok(firstAppearances.indexOf('fc-node') < firstAppearances.indexOf('fc-author'))
 })

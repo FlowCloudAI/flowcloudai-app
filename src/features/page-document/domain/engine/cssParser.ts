@@ -10,7 +10,11 @@ import {
 
 export {browserSafeCssPrefixEnd}
 
-export const CSS_LAYER_ORDER = ['fc-renderer', 'fc-project', 'fc-entry', 'fc-node'] as const
+export const CSS_LAYER_ORDER = [
+    'fc-canvas-defaults', 'fc-renderer', 'fc-component', 'fc-project', 'fc-entry', 'fc-node', 'fc-author',
+] as const
+// 旧项目的四层声明已落库；画布运行时先声明完整顺序后，它不会重排任何层。
+const LEGACY_CSS_LAYER_ORDER = ['fc-renderer', 'fc-project', 'fc-entry', 'fc-node'] as const
 export type CssAuthorScope = 'project' | 'entry'
 
 export interface ParsedCssSource {
@@ -110,7 +114,11 @@ function validateLayerContract(
 
         orderDeclarationCount += 1
         const names = normalizedLayerNames(node.params)
-        if (scope !== 'project' || names.join(',') !== CSS_LAYER_ORDER.join(',')) {
+        const declaredOrder = names.join(',')
+        if (scope !== 'project' || (
+            declaredOrder !== CSS_LAYER_ORDER.join(',')
+            && declaredOrder !== LEGACY_CSS_LAYER_ORDER.join(',')
+        )) {
             diagnostics.push(
                 diagnosticForNode(
                     'invalid_layer_order',
