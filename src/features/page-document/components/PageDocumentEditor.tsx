@@ -45,10 +45,13 @@ import {HomeRibbonControls} from '../../document-editor/visual/HomeRibbonControl
 import {
     PageRibbonControls,
     ViewRibbonControls,
-    type DocumentQuickScope,
-    type LayoutPreviewViewportMode,
-    type ResponsiveViewportContext,
 } from '../../document-editor/visual/PageAndViewRibbonControls.tsx'
+import type {
+    DocumentQuickScope,
+    LayoutPreviewViewportMode,
+    ResponsiveViewportContext,
+} from '../../document-editor/visual/pageAndViewRibbonModel.ts'
+import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {
     resolveRibbonTab,
     ribbonTabsForNode,
@@ -107,7 +110,7 @@ function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRi
         label: RIBBON_TAB_LABELS[tab],
         icon: RIBBON_TAB_ICONS[tab],
         contextual: !['home', 'insert', 'page', 'view'].includes(tab),
-        disabled: tab === 'insert' || (!['home', 'page', 'view'].includes(tab) && tab !== 'home'),
+        disabled: tab === 'insert' || (tab !== 'home' && tab !== 'page' && tab !== 'view' && tab !== 'container'),
     }))
 }
 
@@ -579,6 +582,17 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 onOpenDisplay={() => changeMode('display')}
                                 onOpenDeveloperInfo={() => changeMode('code')}
                             />
+                        ) : visibleRibbonTab === 'container' && selectedNode?.kind === 'container' ? (
+                            <ContainerLayoutRibbonControls
+                                node={selectedNode}
+                                context={editContext}
+                                sourceVersion={state.model.changeVersion}
+                                applyKernelEntry={session.applyVisualPropertyEntry}
+                                inspectComponent={session.inspectComponent}
+                                onOpenArrangementDetails={() => undefined}
+                                onOpenGridDetails={() => undefined}
+                                onOpenSpacingDetails={() => undefined}
+                            />
                         ) : (
                             <RibbonUnavailableTab tab={visibleRibbonTab} />
                         )}
@@ -592,13 +606,13 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         <div
                             className="page-document-editor__page-card"
                             style={previewWidth === 'auto' ? undefined : {
-                                maxWidth: {
+                                    maxWidth: ({
                                     mobile: '390px',
                                     tablet: '640px',
                                     desktop: '960px',
                                     wide: '1280px',
                                     auto: undefined,
-                                }[previewWidth],
+                                } as Record<LayoutPreviewViewportMode, string | undefined>)[previewWidth],
                             }}
                         >
                             {state.preview?.html != null && state.preview.css != null ? (
