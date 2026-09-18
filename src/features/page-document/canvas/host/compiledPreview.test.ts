@@ -27,7 +27,11 @@ test('新旧项目层序均可读，组件层仅接受按定义选择器且作�
         'project',
     )
     assert.deepEqual(component.diagnostics, [])
-    assert.deepEqual(guardDocumentSources([], [component]).diagnostics, [])
+    assert.ok(
+        guardDocumentSources([], [component]).diagnostics.some(
+            item => item.code === 'selector_scope_violation',
+        ),
+    )
 
     const instanceSelector = parseCssSource(
         `${CANVAS_BASE_PROJECT_CSS.split('\n')[0]}

@@ -627,7 +627,8 @@ function selectorAllowed(
     const trimmed = selector.trim()
     // P0F 暂不开放同级组合器，避免从受管根选择到其外部兄弟节点。
     if (trimmed.includes('+') || trimmed.includes('~')) return false
-    if (layer === 'fc-component') return trimmed.startsWith('[data-fc-component=')
+    // fc-component 只允许未来的编译期组件定义注入；作者 project/entry CSS 没有该入口，先一律拒绝。
+    if (layer === 'fc-component') return false
     if (layer === 'fc-node') return trimmed.startsWith('[data-fc-node-id=')
     if (layer === 'fc-entry') {
         return (
