@@ -51,6 +51,17 @@ export interface PageDocumentValidation {
     assetIds: string[]
 }
 
+export interface PageDocumentProjectionRebuildReport {
+    rebuilt: number
+    skippedCount: number
+    skipped: string[]
+}
+
+/** 项目打开时补建缺失的页面派生索引；命令只更新投影，不写源码或 revision。 */
+export function pageDocumentRebuildProjection(projectId: string): Promise<PageDocumentProjectionRebuildReport> {
+    return invoke('page_document_rebuild_projection', {projectId})
+}
+
 export interface PageDocumentAsset {
     id: string
     projectId: string

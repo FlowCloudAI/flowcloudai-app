@@ -53,7 +53,7 @@ import {
     type TagSchema,
 } from '../api'
 import EntryEditor from '../features/entries/components/EntryEditor'
-import {pageDocumentReadEntry} from '../api/pageDocument.ts'
+import {pageDocumentReadEntry, pageDocumentRebuildProjection} from '../api/pageDocument.ts'
 import {convertMarkdownToPageDocument} from '../features/page-document/application/markdownDocumentConversion.ts'
 import EntryTypeCreator from '../features/entries/components/EntryTypeCreator'
 import WorldMapPanel from '../features/maps/components/WorldMapPanel'
@@ -389,6 +389,13 @@ function ProjectEditorInner({
             cancelled = true
         }
     }, [fetchAll, projectId])
+
+    useEffect(() => {
+        // 项目页面打开一次只补缺失投影；旧页面仍可在重建失败时走纯文本搜索兜底。
+        void pageDocumentRebuildProjection(projectId).then(report => {
+            if (report.skippedCount > 0) logger.warn('page document projection rebuild skipped', report)
+        }).catch(error => logger.warn('page document projection rebuild failed', error))
+    }, [projectId])
 
     useEffect(() => {
         let cancelled = false

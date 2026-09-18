@@ -59,6 +59,7 @@ pub fn page_document_validate(
 #[serde(rename_all = "camelCase")]
 pub struct ProjectionRebuildReport {
     pub rebuilt: usize,
+    pub skipped_count: usize,
     pub skipped: Vec<String>,
 }
 
@@ -81,13 +82,17 @@ async fn rebuild_projection(
     let db = open_project_db(state, &project_id)
         .await
         .map_err(ApiError::internal)?;
-    let rows = sqlx::query("SELECT entry_id FROM entry_page_documents WHERE project_id=?")
-        .bind(project_id)
-        .fetch_all(&db.pool)
-        .await
-        .map_err(ApiError::from_display)?;
+    let rows = sqlx::query(
+        "SELECT d.entry_id FROM entry_page_documents d WHERE d.project_id=?
+        AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.entry_id)",
+    )
+    .bind(project_id)
+    .fetch_all(&db.pool)
+    .await
+    .map_err(ApiError::from_display)?;
     let mut report = ProjectionRebuildReport {
         rebuilt: 0,
+        skipped_count: 0,
         skipped: Vec::new(),
     };
     for row in rows {
@@ -141,10 +146,20 @@ async fn rebuild_projection(
             report.rebuilt += 1;
         }
     }
+    let home_missing_blocks: bool = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM project_home_documents d WHERE d.project_id=?
+         AND NOT EXISTS(SELECT 1 FROM object_text_blocks b WHERE b.object_id=d.object_id)",
+    )
+    .bind(project_id)
+    .fetch_one(&db.pool)
+    .await
+    .map_err(ApiError::from_display)?
+        > 0;
     if let Some(document) = db
         .get_project_home_document(&project_id)
         .await
         .map_err(ApiError::from_display)?
+        .filter(|_| home_missing_blocks)
     {
         let object_id: Uuid =
             sqlx::query_scalar("SELECT object_id FROM project_home_documents WHERE project_id=?")
@@ -190,6 +205,7 @@ async fn rebuild_projection(
             report.rebuilt += 1;
         }
     }
+    report.skipped_count = report.skipped.len();
     Ok(report)
 }
 
@@ -742,7 +758,13 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(report.rebuilt, 1);
+        assert_eq!(report.skipped_count, 0);
         assert!(report.skipped.is_empty());
+        let second = rebuild_projection(&fixture.state, &fixture.paths, fixture.project_id)
+            .await
+            .unwrap();
+        assert_eq!(second.rebuilt, 0);
+        assert_eq!(second.skipped_count, 0);
         assert_eq!(
             sqlx::query_scalar::<_, String>(
                 "SELECT text FROM object_text_blocks WHERE object_id=? AND node_id=?"
