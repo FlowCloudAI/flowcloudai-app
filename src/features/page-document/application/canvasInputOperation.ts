@@ -10,6 +10,7 @@ import {createLayerProjection} from '../domain/layerProjection.ts'
 import {
     idempotencyKey,
     interactionId,
+    mapPastedNodeIdentities,
     nodeId,
     utf16Range,
     type EditIntent,
@@ -88,6 +89,26 @@ interface CanvasPastePlan {
     readonly finalOffset: number
 }
 
+export interface CanvasPasteIdentityOptions {
+    readonly sourceNodeIds: readonly string[]
+    readonly sameDocument: boolean
+    readonly operation: 'copy' | 'move'
+    readonly unavailable?: Iterable<string>
+}
+
+/** 文本粘贴产生的新块也必须经过同一身份映射器；调用方不能自行拼接或复用 UUID。 */
+export function mapCanvasPastedNodeIdentities(
+    options: CanvasPasteIdentityOptions,
+    allocate: () => string,
+): ReadonlyMap<ReturnType<typeof nodeId>, ReturnType<typeof nodeId>> {
+    return mapPastedNodeIdentities(options.sourceNodeIds, {
+        sameDocument: options.sameDocument,
+        operation: options.operation,
+        allocate,
+        unavailable: options.unavailable ?? [],
+    })
+}
+
 /** 空行是块边界，单个换行保留给 replace-text 编译为 br。 */
 export function planCanvasPlainTextPaste(text: string, from: number): CanvasPastePlan {
     const paragraphs = text.replace(/\r\n?/gu, '\n').split(/\n(?:[\t ]*\n)+/gu)
@@ -128,6 +149,7 @@ export function createCanvasInputKernelOperation(
     historyGroupId: string,
     targetKind: string,
     allocateNodeId: () => string = () => crypto.randomUUID(),
+    pasteIdentity?: CanvasPasteIdentityOptions,
 ): CanvasInputKernelOperation {
     const first = messages[0]
     if (!first || messages.some(message => message.nodeId.toLowerCase() !== first.nodeId.toLowerCase())) {
@@ -143,13 +165,29 @@ export function createCanvasInputKernelOperation(
     if (structural.length > 0 && !splittableKinds.has(targetKind)) {
         throw new TypeError(`${targetKind} 不支持创建后续文本块。`)
     }
+    const structuralCount = structural.length === 0
+        ? 0
+        : structural[0].inputType === 'insertParagraph'
+          ? 1
+          : planCanvasPlainTextPaste(structural[0].text, structural[0].from).splitOffsets.length
+    const pasteSourceIds = pasteIdentity?.sourceNodeIds ?? Array.from(
+        {length: structuralCount},
+        () => crypto.randomUUID(),
+    )
+    const pastedMapping = structuralCount === 0
+        ? new Map<string, string>()
+        : mapCanvasPastedNodeIdentities(
+              pasteIdentity ?? {
+                  sourceNodeIds: pasteSourceIds,
+                  sameDocument: false,
+                  operation: 'copy',
+              },
+              allocateNodeId,
+          )
     const allocatedNodeIds = structural.length === 0
         ? []
-        : Array.from(
-              {length: structural[0].inputType === 'insertParagraph'
-                  ? 1
-                  : planCanvasPlainTextPaste(structural[0].text, structural[0].from).splitOffsets.length},
-              () => nodeId(allocateNodeId()),
+        : pasteSourceIds.map(sourceId =>
+              nodeId(pastedMapping.get(nodeId(sourceId)) ?? allocateNodeId()),
           )
     const selection = structural.length === 0
         ? null

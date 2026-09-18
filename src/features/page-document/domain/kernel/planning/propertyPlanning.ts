@@ -35,6 +35,10 @@ import type {
 } from '../contracts/edit.ts'
 import type {ComponentHandle, NodeId} from '../contracts/identity.ts'
 import {
+    preserveNodeIdentity,
+    planTextBlockSplit as planTextBlockSplitIdentity,
+} from '../contracts/nodeIdentityPolicy.ts'
+import {
     sourceKeyString,
     utf16RangeFromUtf8ByteRange,
     type SourceDocument,
@@ -145,6 +149,7 @@ type PlannedVerification =
           readonly kind: 'component-removed'
           readonly removedNodeIds: readonly NodeId[]
           readonly parentNodeId: NodeId
+          readonly degradedReferenceCount: number
       }
     | {
           readonly kind: 'component-moved'
@@ -1049,6 +1054,7 @@ function planComponentRemoval(
             kind: 'component-removed',
             removedNodeIds: html.removedNodeIds,
             parentNodeId: policy.parentNodeId,
+            degradedReferenceCount: html.remappedReferences.filter(reference => reference.degraded).length,
         },
         [
             Object.freeze({
@@ -1377,6 +1383,15 @@ function planSinglePropertyEdit(
     if (!handle || !current.properties || !current.components) {
         return rejected('stale-component-handle', '目标组件已删除、改型或身份发生变化。')
     }
+    try {
+        preserveNodeIdentity({id: handle.nodeId, kind: handle.kind}, handle.kind)
+    } catch (error) {
+        return rejected(
+            'node-identity-preservation-failed',
+            error instanceof Error ? error.message : '属性编辑不能改变节点身份。',
+            handle,
+        )
+    }
     if (!propertyCapabilityForComponent(handle.kind, intent.target.kind, property)) {
         return rejected(
             'property-capability-unavailable',
@@ -1546,6 +1561,15 @@ function planTextReplacement(
     if (!componentHasCapability(handle.kind, 'content.text')) {
         return rejected('text-content-not-supported', `${handle.kind} 不支持文本内容编辑。`, handle)
     }
+    try {
+        preserveNodeIdentity({id: handle.nodeId, kind: handle.kind}, handle.kind)
+    } catch (error) {
+        return rejected(
+            'node-identity-preservation-failed',
+            error instanceof Error ? error.message : '文本编辑不能改变节点身份。',
+            handle,
+        )
+    }
     const source = handle.origin.source
     const element = current.components.resolveElement(handle)
     if (!source || source.file !== 'article.html' || !element) {
@@ -1649,13 +1673,23 @@ function planTextBlockSplit(
     }
     const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
     if (!document) return rejected('source-not-found', '目标作者源码不在当前快照中。', handle)
+    let splitIdentity
+    try {
+        splitIdentity = planTextBlockSplitIdentity(handle.nodeId, intent.newNodeId)
+    } catch (error) {
+        return rejected(
+            'node-identity-allocation-invalid',
+            error instanceof Error ? error.message : '文本块分裂身份无效。',
+            handle,
+        )
+    }
     const result = createTextBlockSplitPatches(
         document,
         element,
         node => current.components?.originOfNode(node) ?? null,
         handle.kind,
         Number(intent.target.range.from),
-        intent.newNodeId,
+        splitIdentity.rightNodeId,
     )
     if (result.status === 'rejected') return rejected(result.code, result.message, handle)
     return readyPatches(result.patches, 'component-tree', {

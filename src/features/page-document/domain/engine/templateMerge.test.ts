@@ -12,6 +12,9 @@ const ENTRY_ID = '11111111-1111-4111-8111-111111111111'
 const PROJECT_NODE_ID = '22222222-2222-4222-8222-222222222222'
 const ENTRY_NODE_ID = '33333333-3333-4333-8333-333333333333'
 const ENTRY_CONTAINER_ID = '44444444-4444-4444-8444-444444444444'
+const COMPONENT_NODE_ID = '55555555-5555-4555-8555-555555555555'
+const COMPONENT_INSTANCE_ID = '66666666-6666-4666-8666-666666666666'
+const COMPONENT_DEFINITION_ID = '77777777-7777-4777-8777-777777777777'
 const METADATA = {id: ENTRY_ID, title: '组合标题', summary: '摘要', tags: ['标签']}
 
 function projectSource(extra = ''): string {
@@ -166,6 +169,26 @@ describe('template composition source mapping', () => {
             instanceNamespace: ENTRY_ID,
         })
         assert.equal(second.resolveElement(paragraph.handle), null)
+    })
+
+    it('组件索引从真实公共组件入口保留独立的节点与实例身份', () => {
+        const project = parseHtmlSource(projectSource(), {mode: 'document', scope: 'project'})
+        const entry = parseHtmlSource(
+            `<template data-fc-entry-patch data-fc-document-version="1" data-fc-entry-id="${ENTRY_ID}" data-fc-base-template-version="1">
+<template data-fc-fill="body"><div data-fc-node-id="${COMPONENT_NODE_ID}" data-fc-node-kind="component" data-fc-component="${COMPONENT_DEFINITION_ID}" data-fc-component-revision="latest" data-fc-instance="${COMPONENT_INSTANCE_ID}"><span data-fc-part="label">组件</span></div></template>
+</template>`,
+            {mode: 'fragment', scope: 'entry'},
+        )
+        const result = mergeEntryTemplate(project, entry, METADATA)
+        assert.ok(result.composition)
+        const index = createComponentIndex(result.composition, {
+            analysisStamp: analysisStampId('analysis:component-identity'),
+            instanceNamespace: ENTRY_ID,
+        })
+        const component = index.bind([COMPONENT_NODE_ID]).handles[0]
+        assert.ok(component)
+        assert.equal(component.instanceId, COMPONENT_INSTANCE_ID)
+        assert.notEqual(component.nodeId, component.instanceId)
     })
 
     it('内部语义部位显式报告缺失与歧义，不把 kind 当作唯一图片证明', () => {

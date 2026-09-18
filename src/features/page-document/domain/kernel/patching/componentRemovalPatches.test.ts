@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
-import {parseSourceSnapshot, sourceKey, type SourceDocument} from '../contracts/index.ts'
+import {nodeId, parseSourceSnapshot, sourceKey, type SourceDocument} from '../contracts/index.ts'
 import {findElementsByAttribute, parseHtmlSource} from '../syntax/index.ts'
 import {createComponentRemovalPatch} from './componentRemovalPatches.ts'
 import {applySourcePatches} from './sourcePatches.ts'
@@ -66,5 +66,27 @@ describe('component removal patches', () => {
         const element = parsed.elements.find(candidate => candidate.tagName === 'div')
         assert.ok(element)
         assert.equal(createComponentRemovalPatch(plain, element).status, 'rejected')
+    })
+
+    it('删除补丁通过身份契约退休节点并把节点引用降级为对象引用', () => {
+        const source = document(
+            `<div data-fc-node-id="${CONTAINER_ID}" data-fc-node-kind="container"><p data-fc-node-id="${PARAGRAPH_ID}" data-fc-node-kind="paragraph">正文</p></div>`,
+        )
+        const planned = createComponentRemovalPatch(source, component(source), [
+            {
+                targetObjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                targetNodeId: nodeId(PARAGRAPH_ID),
+                degraded: false,
+            },
+        ])
+        assert.equal(planned.status, 'ready')
+        if (planned.status !== 'ready') return
+        assert.deepEqual(planned.remappedReferences, [
+            {
+                targetObjectId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                targetNodeId: null,
+                degraded: true,
+            },
+        ])
     })
 })

@@ -14,6 +14,7 @@ import {
     type ComponentHandle,
     type NodeId,
 } from '../contracts/identity.ts'
+import {componentInstanceIdentity} from '../contracts/nodeIdentityPolicy.ts'
 import type {DocumentNodeKind} from '../contracts/primitives.ts'
 import type {SourceOrigin} from '../contracts/source.ts'
 import {
@@ -137,7 +138,7 @@ export function createComponentIndex(
         const handle: ComponentHandle = Object.freeze({
             handleId: componentHandleId(`component:${ordinal}:${id}`),
             nodeId: id,
-            instanceId: `${options.instanceNamespace}:${id}`,
+            instanceId: instanceIdentity(element, kind, id, options.instanceNamespace),
             kind,
             origin,
             analysisStamp: options.analysisStamp,
@@ -198,6 +199,25 @@ export function createComponentIndex(
             ) ?? null,
     }
     return Object.freeze(index)
+}
+
+function instanceIdentity(
+    element: HtmlCompositionElement,
+    kind: DocumentNodeKind,
+    nodeIdValue: NodeId,
+    instanceNamespace: string,
+): string {
+    if (kind === 'component') {
+        const rawInstanceId = attribute(element, 'data-fc-instance')
+        if (rawInstanceId) {
+            try {
+                return componentInstanceIdentity(nodeIdValue, rawInstanceId).instanceId
+            } catch {
+                // HTML 契约会先拒绝非法实例；索引仍须能为诊断构造稳定句柄。
+            }
+        }
+    }
+    return `${instanceNamespace}:${nodeIdValue}`
 }
 
 function countUnmanagedDirectContent(

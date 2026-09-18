@@ -47,6 +47,40 @@ function intent(
 }
 
 describe('canvas input operation', () => {
+    it('粘贴入口按身份契约区分同文档复制、剪切移动与跨文档粘贴', () => {
+        const source = intent(
+            '10111111-1111-7111-8111-111111111111',
+            'insertFromPaste',
+            0,
+            0,
+            '',
+            '甲\n\n乙',
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const run = (
+            sameDocument: boolean,
+            operation: 'copy' | 'move',
+            createdId: string,
+        ) => createCanvasInputKernelOperation(
+            [source],
+            `canvas-input:paste:${sameDocument ? 'same' : 'cross'}:${operation}`,
+            'paragraph',
+            () => createdId,
+            {sourceNodeIds: [NODE_ID], sameDocument, operation},
+        ).request.createIntents(new Map([[NODE_ID, handle]]))
+
+        const copied = run(true, 'copy', '77777777-7777-7777-8777-777777777777')
+        const moved = run(true, 'move', '88888888-8888-7888-8888-888888888888')
+        const crossDocument = run(false, 'move', '99999999-9999-7999-8999-999999999999')
+
+        assert.equal(copied.at(-1)?.kind, 'split-text-block')
+        assert.equal(moved.at(-1)?.kind, 'split-text-block')
+        assert.equal(crossDocument.at(-1)?.kind, 'split-text-block')
+        assert.equal(copied.at(-1)?.kind === 'split-text-block' ? copied.at(-1).newNodeId : null, '77777777-7777-7777-8777-777777777777')
+        assert.equal(moved.at(-1)?.kind === 'split-text-block' ? moved.at(-1).newNodeId : null, NODE_ID)
+        assert.equal(crossDocument.at(-1)?.kind === 'split-text-block' ? crossDocument.at(-1).newNodeId : null, '99999999-9999-7999-8999-999999999999')
+    })
+
     it('输入意图映射为 current-candidate replace-text 且不携带 HTML', () => {
         const message = intent('11111111-1111-7111-8111-111111111111', 'insertText', 2, 4, '旧文', '新文')
         const request = createCanvasInputKernelRequest([message], 'canvas-input-history:test')

@@ -7,7 +7,14 @@ import type {
     SourceFileName,
     SourceFileSet,
 } from '../domain/contract.ts'
-import type {EditImpact} from '../domain/kernel/index.ts'
+import {
+    validateAiCandidateNodeIdentities,
+    type DocumentNodeKind,
+    type EditImpact,
+    nodeId,
+    type NodeIdentityDescriptor,
+} from '../domain/kernel/index.ts'
+import {createLayerProjection, type LayerProjectionNode} from '../domain/layerProjection.ts'
 import type {
     SourceDraftModel,
     SourceEditorPhase,
@@ -640,7 +647,51 @@ export function applyAiDraftSources(
             ],
         }
     }
+    const identityDiagnostics = validateAiDraftNodeIdentities(model, batch)
+    if (identityDiagnostics.length > 0) {
+        return {model, applied: false, diagnostics: identityDiagnostics}
+    }
     return applyDraftSources(model, batch, label, 'ai')
+}
+
+function validateAiDraftNodeIdentities(
+    model: DocumentDraftModel,
+    batch: AiDraftSourceBatch,
+): DocumentDiagnostic[] {
+    const diagnostics: DocumentDiagnostic[] = []
+    for (const scope of ['entry', 'project'] as const) {
+        const current = managedNodeIdentityDescriptors(model[scope].sources['article.html'])
+        const candidate = managedNodeIdentityDescriptors(batch[`${scope}Sources`]['article.html'])
+        const result = validateAiCandidateNodeIdentities(current, candidate, [])
+        if (result.status === 'rejected') {
+            diagnostics.push({
+                severity: 'error',
+                category: 'capability',
+                code: result.code,
+                message: result.message,
+                file: 'article.html',
+            })
+        }
+    }
+    return diagnostics
+}
+
+function managedNodeIdentityDescriptors(source: string): NodeIdentityDescriptor[] {
+    const result: NodeIdentityDescriptor[] = []
+    const visit = (nodes: readonly LayerProjectionNode[]): void => {
+        for (const node of nodes) {
+            if (node.managed && node.kind !== 'source' && node.kind !== 'operation') {
+                try {
+                    result.push({id: nodeId(node.id), kind: node.kind as DocumentNodeKind})
+                } catch {
+                    // 归一化或校验会报告无效身份；AI 身份策略只处理可解析的托管节点。
+                }
+            }
+            visit(node.children)
+        }
+    }
+    visit(createLayerProjection(source).nodes)
+    return result
 }
 
 export function applyVisualDraftSources(

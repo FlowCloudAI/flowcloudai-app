@@ -1,7 +1,13 @@
 // 本模块把单个托管组件子树删除编译为一个精确 HTML 补丁，并报告需要同步回收样式的全部身份。
 
 import type {HtmlCompositionElement} from '../composition/index.ts'
-import {isDocumentNodeKind, nodeId, type NodeId} from '../contracts/identity.ts'
+import {
+    isDocumentNodeKind,
+    nodeId,
+    planNodeDeletion,
+    type NodeId,
+    type NodeIdentityReference,
+} from '../contracts/index.ts'
 import {utf16Range, type SourceDocument} from '../contracts/source.ts'
 import {elementRange, getAttribute, walkElements} from '../syntax/index.ts'
 import type {SourcePatch} from './sourcePatches.ts'
@@ -11,12 +17,14 @@ export type ComponentRemovalPatchResult =
           readonly status: 'ready'
           readonly patch: SourcePatch
           readonly removedNodeIds: readonly NodeId[]
+          readonly remappedReferences: readonly NodeIdentityReference[]
       }
     | {readonly status: 'rejected'; readonly code: string; readonly message: string}
 
 export function createComponentRemovalPatch(
     document: SourceDocument,
     component: HtmlCompositionElement,
+    references: readonly NodeIdentityReference[] = [],
 ): ComponentRemovalPatchResult {
     if (document.key.file !== 'article.html') {
         return rejected('component-source-invalid', '组件结构只能从 article.html 删除。')
@@ -36,6 +44,13 @@ export function createComponentRemovalPatch(
     if (removedNodeIds.length === 0) {
         return rejected('component-identity-missing', '待删除源码不再包含托管组件身份。')
     }
+    let remappedReferences = references
+    const retiredNodeIds: NodeId[] = []
+    for (const removedNodeId of removedNodeIds) {
+        const planned = planNodeDeletion(removedNodeId, remappedReferences)
+        retiredNodeIds.push(...planned.retiredNodeIds)
+        remappedReferences = planned.references
+    }
     return Object.freeze({
         status: 'ready',
         patch: Object.freeze({
@@ -44,7 +59,8 @@ export function createComponentRemovalPatch(
             expected: document.content.slice(range.from, range.to),
             insert: '',
         }),
-        removedNodeIds: Object.freeze(removedNodeIds),
+        removedNodeIds: Object.freeze(retiredNodeIds),
+        remappedReferences: Object.freeze([...remappedReferences]),
     })
 }
 

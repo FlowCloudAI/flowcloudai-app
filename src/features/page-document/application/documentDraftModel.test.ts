@@ -289,6 +289,31 @@ function readEffectiveStyleForTest(
 }
 
 describe('document draft model', () => {
+    it('AI 候选沿真实草稿入口拒绝复用既有节点身份的不同种类', () => {
+        const initial = createDocumentDraft(snapshot())
+        const candidate = {
+            ...initial.entry.sources,
+            'article.html': initial.entry.sources['article.html'].replace(
+                'data-fc-node-kind="paragraph"',
+                'data-fc-node-kind="heading"',
+            ),
+        }
+        const update = applyAiDraftSources(
+            initial,
+            {
+                expectedEntrySources: initial.entry.sources,
+                expectedProjectSources: initial.project.sources,
+                entrySources: candidate,
+                projectSources: initial.project.sources,
+                diagnostics: [],
+            },
+            'AI：改写节点种类',
+        )
+        assert.equal(update.applied, false)
+        assert.equal(update.diagnostics[0]?.code, 'ai-candidate-node-kind-mismatch')
+        assert.equal(update.model, initial)
+    })
+
     it('AI 分段 CSS 与人工布局、字符编辑交替五轮，撤销重做始终回到各自真值', () => {
         let model = createDocumentDraft(snapshot())
         const selector = `[data-fc-node-id="${ROOT_ID}"][data-fc-node-kind="container"]`
