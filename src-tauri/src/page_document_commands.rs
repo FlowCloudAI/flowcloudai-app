@@ -183,11 +183,17 @@ fn schema_name(value: &str) -> bool {
         && bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
-fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError> {
-    if input.name.trim().is_empty()
-        || input.name.trim().len() > 128
-        || input.category.trim().is_empty()
-        || input.category.trim().len() > 128
+pub(crate) fn validate_component_definition_metadata(
+    name: &str,
+    category: &str,
+    property_schema: &[ComponentPropertySchemaInput],
+    part_schema: &[ComponentPartSchemaInput],
+    style_variable_schema: &[ComponentStyleVariableSchemaInput],
+) -> Result<(), ApiError> {
+    if name.trim().is_empty()
+        || name.trim().len() > 128
+        || category.trim().is_empty()
+        || category.trim().len() > 128
     {
         return Err(ApiError::new(
             ErrorCode::ValidationFormatError,
@@ -195,7 +201,7 @@ fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError>
         ));
     }
     let mut names = HashSet::new();
-    for property in &input.property_schema {
+    for property in property_schema {
         if !schema_name(&property.name)
             || !schema_name(&property.value_type)
             || !names.insert(property.name.as_str())
@@ -207,7 +213,7 @@ fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError>
         }
     }
     names.clear();
-    for part in &input.part_schema {
+    for part in part_schema {
         let mut accepts = HashSet::new();
         if !schema_name(&part.name)
             || !names.insert(part.name.as_str())
@@ -224,7 +230,7 @@ fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError>
         }
     }
     names.clear();
-    for variable in &input.style_variable_schema {
+    for variable in style_variable_schema {
         let suffix = variable.name.strip_prefix("--").unwrap_or_default();
         if !schema_name(suffix)
             || !names.insert(variable.name.as_str())
@@ -241,6 +247,16 @@ fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError>
         }
     }
     Ok(())
+}
+
+fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError> {
+    validate_component_definition_metadata(
+        &input.name,
+        &input.category,
+        &input.property_schema,
+        &input.part_schema,
+        &input.style_variable_schema,
+    )
 }
 
 async fn create_component_definition(

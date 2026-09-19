@@ -73,6 +73,7 @@ pub struct FcworldImportResult {
     pub has_history: bool,
     pub file_size: u64,
     pub imported_rows: FcworldImportRows,
+    pub skipped_component_definitions: usize,
     pub warnings: Vec<String>,
 }
 
@@ -2446,6 +2447,7 @@ async fn import_fcworld_package_to_db(
         has_history: !prepared.history_files.is_empty(),
         file_size: prepared.input_file_size,
         imported_rows: actual_rows,
+        skipped_component_definitions: prepared.skipped_component_definitions,
         warnings,
     })
 }
@@ -2716,6 +2718,7 @@ async fn import_fcworld_package_to_world_store(
         has_history: !prepared.history_files.is_empty(),
         file_size: prepared.input_file_size,
         imported_rows: actual_rows,
+        skipped_component_definitions: prepared.skipped_component_definitions,
         warnings,
     })
 }
@@ -2947,12 +2950,12 @@ mod tests {
     use std::io::{Cursor, Read};
     use tempfile::TempDir;
     use worldflow_core::{
-        CategoryOps, EntryOps, EntryTypeOps, PageAssetOps, PageDocumentOps, ProjectOps, SqliteDb,
-        TagSchemaOps, WorldStore, WorldStoreConfig,
+        CategoryOps, ComponentOps, EntryOps, EntryTypeOps, PageAssetOps, PageDocumentOps,
+        ProjectOps, SqliteDb, TagSchemaOps, WorldStore, WorldStoreConfig,
         models::{
-            CreateCategory, CreateCustomEntryType, CreateEntry, CreateProject, CreateTagSchema,
-            EntryFilter, EntryTag, FCImage, PageDocumentAsset, PageDocumentProjection,
-            PageTextBlock, SaveEntryLinkTarget,
+            CreateCategory, CreateComponentDefinition, CreateCustomEntryType, CreateEntry,
+            CreateProject, CreateTagSchema, EntryFilter, EntryTag, FCImage, PageDocumentAsset,
+            PageDocumentProjection, PageTextBlock, SaveEntryLinkTarget,
         },
     };
     use zip::ZipArchive;
@@ -3067,9 +3070,50 @@ mod tests {
         std::fs::create_dir_all(asset_path.parent().unwrap()).unwrap();
         std::fs::write(&asset_path, &bytes).unwrap();
         source_db.register_page_asset(&asset).await.unwrap();
+        let component_id = Uuid::now_v7();
+        source_db
+            .create_component_definition(CreateComponentDefinition {
+                component_id,
+                scope_kind: "project".into(),
+                scope_id: project.id,
+                html: format!("<section><img src='fcasset://{asset_id}'><p>组件旧版</p></section>"),
+                css: format!("@layer fc-component {{ [data-fc-component=\"{component_id}\"] {{ display: grid; }} }}"),
+                property_schema: json!([]),
+                part_schema: json!([]),
+                style_variable_schema: json!([]),
+                asset_dependencies: vec![asset_id],
+                name: "世界组件".into(),
+                category: "测试".into(),
+                preview_asset_id: Some(asset_id),
+                expected_revision: None,
+            })
+            .await
+            .unwrap();
+        source_db
+            .create_component_definition(CreateComponentDefinition {
+                component_id,
+                scope_kind: "project".into(),
+                scope_id: project.id,
+                html: format!("<section><img src='fcasset://{asset_id}'><p>组件新版</p></section>"),
+                css: format!("@layer fc-component {{ [data-fc-component=\"{component_id}\"] {{ display: grid; gap: 1rem; }} }}"),
+                property_schema: json!([]),
+                part_schema: json!([]),
+                style_variable_schema: json!([]),
+                asset_dependencies: vec![asset_id],
+                name: "世界组件".into(),
+                category: "测试".into(),
+                preview_asset_id: Some(asset_id),
+                expected_revision: Some(1),
+            })
+            .await
+            .unwrap();
         let node_id = Uuid::now_v7();
+        let latest_component_node = Uuid::now_v7();
+        let fixed_component_node = Uuid::now_v7();
+        let latest_instance = Uuid::now_v7();
+        let fixed_instance = Uuid::now_v7();
         let html = format!(
-            "<p data-fc-node-id='{node_id}' data-fc-node-kind='paragraph'>海潮正文 <a href='entry://{}'>目标</a></p><img src='fcasset://{asset_id}'>",
+            "<p data-fc-node-id='{node_id}' data-fc-node-kind='paragraph'>海潮正文 <a href='entry://{}'>目标</a></p><img src='fcasset://{asset_id}'><div data-fc-node-id='{latest_component_node}' data-fc-node-kind='component' data-fc-component='{component_id}' data-fc-component-revision='latest' data-fc-instance='{latest_instance}'></div><div data-fc-node-id='{fixed_component_node}' data-fc-node-kind='component' data-fc-component='{component_id}' data-fc-component-revision='1' data-fc-instance='{fixed_instance}'></div>",
             target.id
         );
         let validation =
@@ -3169,6 +3213,7 @@ mod tests {
         );
 
         let (_target_dir, target_db, target_paths) = new_test_db("page_world_target").await;
+        let mut imported_component_ids = Vec::new();
         for index in 0..2 {
             let result = import_fcworld_package_to_db(
                 &target_db,
@@ -3205,6 +3250,37 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
+            let definitions = target_db
+                .list_component_definition_revisions(&imported_project)
+                .await
+                .unwrap();
+            assert_eq!(definitions.len(), 2);
+            let imported_component = definitions[0].component_id;
+            imported_component_ids.push(imported_component);
+            assert_ne!(imported_component, component_id);
+            assert_eq!(definitions[0].revision, 1);
+            assert_eq!(definitions[1].revision, 2);
+            assert_eq!(definitions[0].asset_dependencies, vec![asset_id]);
+            assert_eq!(definitions[1].preview_asset_id, Some(asset_id));
+            assert!(
+                page.html
+                    .contains(&format!("data-fc-component=\"{imported_component}\""))
+            );
+            assert!(page.html.contains("data-fc-component-revision='latest'"));
+            assert!(page.html.contains("data-fc-component-revision='1'"));
+            let instances = target_db
+                .list_component_instances(&imported_component)
+                .await
+                .unwrap();
+            assert_eq!(instances.len(), 2);
+            assert_eq!(
+                instances.iter().filter(|item| item.follows_latest).count(),
+                1
+            );
+            assert_eq!(
+                instances.iter().filter(|item| !item.follows_latest).count(),
+                1
+            );
             assert!(page.html.contains(&format!("entry://{imported_target}")));
             assert!(page.html.contains(&format!("fcasset://{asset_id}")));
             assert_eq!(
@@ -3243,6 +3319,7 @@ mod tests {
                 1
             );
         }
+        assert_ne!(imported_component_ids[0], imported_component_ids[1]);
         let (world_dir, index_db, world_paths) = new_test_db("page_world_store_target").await;
         let state = AppState {
             sqlite_db: tokio::sync::Mutex::new(index_db.clone()),
@@ -3381,6 +3458,62 @@ mod tests {
                 .unwrap();
             assert_eq!(after, before, "{case} 不得留下项目");
         }
+
+        let mut invalid_component_layer =
+            prepare_page_document_export(&source_db, &source_paths, project.id)
+                .await
+                .unwrap();
+        let mut invalid_value: Value = serde_json::from_str(&invalid_component_layer.json).unwrap();
+        for row in invalid_value["component_definitions"]
+            .as_array_mut()
+            .unwrap()
+        {
+            row["html"] = json!("<section onclick='alert(1)'>不可信组件</section>");
+        }
+        invalid_component_layer.json = serde_json::to_string(&invalid_value).unwrap();
+        let invalid_component_package = prepare_fcworld_package_with_progress(
+            &source_paths,
+            project.clone(),
+            source_db.export_project_csvs(project.id).await.unwrap(),
+            false,
+            Some(invalid_component_layer),
+            |_| {},
+        )
+        .unwrap();
+        let invalid_component_path = source_dir.path().join("坏组件可降级.fcworld");
+        write_fcworld_package(&invalid_component_package, &invalid_component_path).unwrap();
+        let degraded = import_fcworld_package_to_db(
+            &target_db,
+            &target_paths,
+            &invalid_component_path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Rename,
+                project_name: Some("坏组件降级项目".into()),
+                overwrite_project_id: None,
+            }),
+            disabled_import_progress(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(degraded.skipped_component_definitions, 2);
+        assert_eq!(degraded.warnings.len(), 2);
+        let degraded_project = Uuid::parse_str(&degraded.project_id).unwrap();
+        assert!(
+            target_db
+                .list_component_definition_revisions(&degraded_project)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let degraded_page: String = sqlx::query_scalar(
+            "SELECT d.html FROM entry_page_documents d JOIN entries e ON e.id=d.entry_id
+             WHERE e.project_id=? AND e.title='来源词条'",
+        )
+        .bind(degraded_project)
+        .fetch_one(&target_db.pool)
+        .await
+        .unwrap();
+        assert!(degraded_page.contains("data-fc-component"));
     }
 
     #[tokio::test]
@@ -3716,6 +3849,7 @@ mod tests {
             map_count: 0,
             input_file_size: 0,
             warnings: Vec::new(),
+            skipped_component_definitions: 0,
             id_maps: import::ImportIdMaps::default(),
         };
 

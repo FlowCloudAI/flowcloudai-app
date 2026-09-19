@@ -47,10 +47,12 @@ export interface AppendResult {
   entryTypes: number
   ideaNotes: number
   preservedLegacyPageDocuments: number
+  preservedLegacyComponentDefinitions: number
 }
 
 export interface SnapshotRestoreReport {
   preservedLegacyPageDocuments: number
+  preservedLegacyComponentDefinitions: number
   warning: string | null
 }
 

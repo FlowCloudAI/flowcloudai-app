@@ -174,6 +174,7 @@ export interface FcworldImportResult {
     hasHistory: boolean
     fileSize: number
     importedRows: FcworldImportRows
+    skippedComponentDefinitions: number
     warnings: string[]
 }
 

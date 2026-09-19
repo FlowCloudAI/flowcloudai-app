@@ -6,6 +6,7 @@ use worldflow_core::{AppendResult, SnapshotBranchInfo, SnapshotInfo, SnapshotRes
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotRestoreReportDto {
     pub preserved_legacy_page_documents: usize,
+    pub preserved_legacy_component_definitions: usize,
     pub warning: Option<String>,
 }
 
@@ -13,6 +14,7 @@ impl From<SnapshotRestoreReport> for SnapshotRestoreReportDto {
     fn from(report: SnapshotRestoreReport) -> Self {
         Self {
             preserved_legacy_page_documents: report.preserved_legacy_page_documents,
+            preserved_legacy_component_definitions: report.preserved_legacy_component_definitions,
             warning: report.warning,
         }
     }
@@ -68,6 +70,7 @@ pub struct AppendResultDto {
     pub entry_types: usize,
     pub idea_notes: usize,
     pub preserved_legacy_page_documents: usize,
+    pub preserved_legacy_component_definitions: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -112,6 +115,7 @@ impl From<AppendResult> for AppendResultDto {
             entry_types: r.entry_types,
             idea_notes: r.idea_notes,
             preserved_legacy_page_documents: r.preserved_legacy_page_documents,
+            preserved_legacy_component_definitions: r.preserved_legacy_component_definitions,
         }
     }
 }

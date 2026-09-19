@@ -52,6 +52,8 @@ pub(super) struct ImportIdMaps {
     pub entry_relations: HashMap<String, String>,
     pub entry_links: HashMap<String, String>,
     pub idea_notes: HashMap<String, String>,
+    pub components: HashMap<String, String>,
+    pub page_assets: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +78,7 @@ pub(super) struct PreparedFcworldImport {
     pub map_count: usize,
     pub input_file_size: u64,
     pub warnings: Vec<String>,
+    pub skipped_component_definitions: usize,
     #[cfg(test)]
     pub id_maps: ImportIdMaps,
 }
@@ -650,7 +653,7 @@ fn validate_object_layer_in_package(
     }
     let value: Value =
         serde_json::from_str(&json).map_err(|error| format!("页面文档对象层载荷无效：{error}"))?;
-    if value["version"].as_u64() != Some(2) {
+    if !matches!(value["version"].as_u64(), Some(2 | 3)) {
         return Err("不支持的页面文档对象层载荷版本".into());
     }
     let assets = value["assets"]
@@ -942,6 +945,57 @@ fn collect_import_id_maps(
         }
         Ok(ids)
     };
+    let mut components = HashMap::new();
+    let mut page_assets = HashMap::new();
+    if let Some(json) = &package.object_layer_json {
+        let value: Value =
+            serde_json::from_str(json).map_err(|error| format!("解析对象层身份失败：{error}"))?;
+        for row in value
+            .get("component_definitions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let id = row
+                .get("component_id")
+                .and_then(Value::as_str)
+                .ok_or("组件定义缺少 component_id")?;
+            Uuid::parse_str(id).map_err(|_| format!("组件定义 ID 无效：{id}"))?;
+            components
+                .entry(id.to_ascii_lowercase())
+                .or_insert_with(|| Uuid::now_v7().to_string());
+        }
+        for row in value
+            .get("registry")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|row| row.get("kind").and_then(Value::as_str) == Some("component_definition"))
+        {
+            let id = row
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or("组件对象登记缺少 ID")?;
+            Uuid::parse_str(id).map_err(|_| format!("组件对象 ID 无效：{id}"))?;
+            components
+                .entry(id.to_ascii_lowercase())
+                .or_insert_with(|| Uuid::now_v7().to_string());
+        }
+        for row in value
+            .get("assets")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let id = row
+                .get("id")
+                .and_then(Value::as_str)
+                .ok_or("页面资产缺少 ID")?;
+            Uuid::parse_str(id).map_err(|_| format!("页面资产 ID 无效：{id}"))?;
+            // 页面资产身份全局稳定；同 ID 内容冲突仍由对象层导入整体拒绝。
+            page_assets.insert(id.to_ascii_lowercase(), id.to_ascii_lowercase());
+        }
+    }
     Ok(ImportIdMaps {
         projects,
         categories: fresh(WorldflowCsvTable::Categories)?,
@@ -951,6 +1005,8 @@ fn collect_import_id_maps(
         entry_relations: fresh(WorldflowCsvTable::EntryRelations)?,
         entry_links: fresh(WorldflowCsvTable::EntryLinks)?,
         idea_notes: fresh(WorldflowCsvTable::IdeaNotes)?,
+        components,
+        page_assets,
     })
 }
 
@@ -1886,7 +1942,7 @@ pub(super) fn prepare_fcworld_import(
     let (csv_items, project_name) =
         rewrite_csv_items_for_import(&package, &id_maps, &asset_targets, import_project_name)?;
     let (maps_json, map_count) = rewrite_maps_json_for_import(&package, &id_maps, &new_project_id)?;
-    let (object_layer_json, page_assets) =
+    let (object_layer_json, page_assets, warnings, skipped_component_definitions) =
         object_layer::prepare(&package, &id_maps, paths, new_project_id)?;
 
     Ok(PreparedFcworldImport {
@@ -1903,7 +1959,8 @@ pub(super) fn prepare_fcworld_import(
         asset_count: package.assets_index.assets.len() + package.page_asset_bytes_by_path.len(),
         map_count,
         input_file_size: package.input_file_size,
-        warnings: Vec::new(),
+        warnings,
+        skipped_component_definitions,
         #[cfg(test)]
         id_maps,
     })
