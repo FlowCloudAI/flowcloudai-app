@@ -19,6 +19,7 @@ function sourceFromProbe(probe: CanvasProbeCase) {
         validationHtml: probe.validationHtml,
         html: probe.html,
         css: probe.css,
+        projectCss: probe.projectCss,
         assetIds: probe.assetIds,
     }
 }
@@ -35,7 +36,7 @@ export function PageDocumentProbeSection({
     const source = useMemo(() => probe ? sourceFromProbe(probe) : null, [probe])
     const compiled = useMemo(() => source ? compileCanvasPreview({
         projectArticleHtml: CANVAS_PROBE_PROJECT.html,
-        projectStyleCss: CANVAS_PROBE_PROJECT.css,
+        projectStyleCss: source.projectCss,
         entryArticleHtml: source.validationHtml,
         entryStyleCss: source.css,
         metadata: CANVAS_PROBE_PROJECT.metadata,

@@ -1,4 +1,4 @@
-// 本模块把词条页面文档接入既有草稿模型；项目模板只作为只读编译基线，不参与本批保存。
+// 本模块把词条页面文档接入既有草稿模型；项目模板在会话内共享同一草稿，持久化仍由项目模板存储接口负责。
 
 import type {
     PageDocument,
@@ -126,8 +126,8 @@ function compileState(
     state: Pick<EntryDocumentSessionState, 'identity' | 'model'>,
 ): CompiledCanvasPreview {
     return compileCanvasPreview({
-        projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
-        projectStyleCss: CANVAS_BASE_PROJECT_CSS,
+        projectArticleHtml: state.model.project.sources['article.html'] || CANVAS_BASE_PROJECT_HTML,
+        projectStyleCss: state.model.project.sources['style.css'] || CANVAS_BASE_PROJECT_CSS,
         entryArticleHtml: state.model.entry.sources['article.html'],
         entryStyleCss: state.model.entry.sources['style.css'],
         metadata: {

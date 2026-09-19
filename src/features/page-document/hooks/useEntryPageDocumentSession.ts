@@ -67,6 +67,7 @@ import {
     type CanvasInputResolution,
     type CanvasLinkCandidateIntentMessage,
 } from '../canvas/protocol/index.ts'
+import type {KernelThemeTokenInspectionRequest} from '../application/documentKernelDraftRuntime.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -301,6 +302,20 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             })
         }
         return kernelRuntimeRef.current.inspectTextRange(current.model, current.snapshot, request)
+    }, [])
+
+    const inspectThemeTokens = useCallback((request: KernelThemeTokenInspectionRequest) => {
+        const current = stateRef.current
+        if (!current) {
+            return Object.freeze({
+                status: 'rejected' as const,
+                tokens: Object.freeze({}),
+                failures: Object.freeze([
+                    Object.freeze({code: 'document-snapshot-unavailable', property: ''}),
+                ]),
+            })
+        }
+        return kernelRuntimeRef.current.inspectThemeTokens(current.model, current.snapshot, request)
     }, [])
 
     const prepareKernelEntry = useCallback(
@@ -613,6 +628,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         visualError,
         inspectComponent,
         inspectTextRange,
+        inspectThemeTokens,
         prepareKernelEntry,
         applyPreparedKernelEntry,
         applyKernelEntry,

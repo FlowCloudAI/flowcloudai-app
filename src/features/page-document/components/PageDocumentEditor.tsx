@@ -604,6 +604,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 onApplyLayout={(request, label) => {
                                     void session.applyVisualPropertyEntry(request, label, {immediate: true})
                                 }}
+                                sourceVersion={state.model.changeVersion}
+                                inspectThemeTokens={session.inspectThemeTokens}
+                                applyThemeToken={session.applyKernelEntry}
                             />
                         ) : visibleRibbonTab === 'view' ? (
                             <ViewRibbonControls

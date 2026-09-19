@@ -14,12 +14,14 @@ export interface CanvasProbeCase {
     validationHtml: string
     html: string
     css: string
+    projectCss: string
     assetIds: string[]
 }
 
 interface CanvasProbeSources {
     fixtureHtml: string
     fixtureCss: string
+    projectCss: string
     assetIds: string[]
     maliciousCases: CanvasProbeMutation[]
 }
@@ -80,6 +82,15 @@ const LEGAL_STRUCTURED_CONTENT_MUTATION: CanvasProbeMutation = {
     replace: {
         needle: '潮汐观测',
         value: '潮汐观测 · 结构化功能区样例',
+    },
+}
+
+const LEGAL_THEME_TOKEN_MUTATION: CanvasProbeMutation = {
+    id: 'legal-project-theme-token',
+    file: 'project/style.css',
+    replace: {
+        needle: '--fc-entry-accent: #8f5b3d;',
+        value: '--fc-entry-accent: #a45a32;',
     },
 }
 
@@ -145,6 +156,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
         LEGAL_STRUCTURED_CONTENT_MUTATION,
         '合法',
     )
+    const themeProjectCss = mutate(sources.projectCss, LEGAL_THEME_TOKEN_MUTATION, '合法')
     return [
         {
             id: 'legal-shared-fixture',
@@ -152,6 +164,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: sources.fixtureHtml,
             html: extractCanvasRenderableHtml(sources.fixtureHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -160,6 +173,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: inlineStyleHtml,
             html: extractCanvasRenderableHtml(inlineStyleHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -168,6 +182,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: publicComponentHtml,
             html: extractCanvasRenderableHtml(publicComponentHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -176,6 +191,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: ribbonFormattingHtml,
             html: extractCanvasRenderableHtml(ribbonFormattingHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -184,6 +200,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: contextualRibbonHtml,
             html: extractCanvasRenderableHtml(contextualRibbonHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -192,6 +209,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: containerLayoutHtml,
             html: extractCanvasRenderableHtml(containerLayoutHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
             assetIds: sources.assetIds,
         },
         {
@@ -200,6 +218,16 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             validationHtml: structuredContentHtml,
             html: extractCanvasRenderableHtml(structuredContentHtml),
             css: sources.fixtureCss,
+            projectCss: sources.projectCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_THEME_TOKEN_MUTATION.id,
+            label: '合法：项目主题令牌功能区',
+            validationHtml: sources.fixtureHtml,
+            html: extractCanvasRenderableHtml(sources.fixtureHtml),
+            css: sources.fixtureCss,
+            projectCss: themeProjectCss,
             assetIds: sources.assetIds,
         },
         ...sources.maliciousCases.map(item => {
@@ -215,6 +243,7 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
                 validationHtml: html,
                 html: extractCanvasRenderableHtml(html),
                 css,
+                projectCss: sources.projectCss,
                 assetIds: sources.assetIds,
             }
         }),

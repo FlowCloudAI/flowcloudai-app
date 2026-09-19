@@ -29,6 +29,7 @@ import {
     type EditImpact,
     type PreparedEdit,
     type SourceScope,
+    type AnalysisStampId,
     type ThemeTokenInspection,
     utf16Range,
 } from '../domain/kernel/index.ts'
@@ -44,6 +45,8 @@ export interface KernelDraftEditRequest {
     readonly idempotencyKey: IdempotencyKey
     readonly interactionId: InteractionId | null
     readonly authorizedScopes: readonly SourceScope[]
+    /** 可选的分析版本 CAS；主题根没有组件句柄，仍需拒绝基于旧读数的写回。 */
+    readonly expectedAnalysisStamp?: AnalysisStampId
     createIntents(handles: KernelComponentBindings): readonly EditIntent[]
 }
 
@@ -239,6 +242,21 @@ export function createDocumentKernelDraftRuntime(): DocumentKernelDraftRuntime {
         acceptance: KernelPreparedDraftEdit['acceptance'],
     ): KernelDraftPreparationResult => {
         const analysis = analyze(model, snapshot)
+        if (
+            request.expectedAnalysisStamp !== undefined &&
+            request.expectedAnalysisStamp !== analysis.stamp.id
+        ) {
+            return Object.freeze({
+                status: 'rejected' as const,
+                diagnostics: Object.freeze([
+                    diagnostic(
+                        'kernel-edit-plan-stale',
+                        '主题令牌读取版本已经变化，请重新读取后再应用。',
+                        undefined,
+                    ),
+                ]),
+            })
+        }
         const nodeIds = Object.freeze([...new Set(request.nodeIds.map(id => id.toLowerCase()))])
         const binding = kernel.bindComponents(analysis, nodeIds)
         if (binding.failures.length > 0 || binding.handles.length !== nodeIds.length) {

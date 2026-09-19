@@ -24,6 +24,7 @@ function createCases(html = fixtureHtml) {
     return createCanvasProbeCases({
         fixtureHtml: html,
         fixtureCss,
+        projectCss,
         assetIds: manifest.assets.map(asset => asset.id),
         maliciousCases: malicious.cases,
     })
@@ -100,4 +101,20 @@ test('图片上下文功能区探针保留受管 asset 节点身份', () => {
     })
     assert.equal(compiled.diagnostics.filter(item => item.severity === 'error').length, 0)
     assert.match(compiled.html ?? '', /data-fc-node-kind="asset"/u)
+})
+
+test('项目主题令牌探针通过 fc-project 根规则编译', () => {
+    const probe = createCases().find(item => item.id === 'legal-project-theme-token')
+    assert.ok(probe)
+    assert.match(probe.projectCss, /--fc-entry-accent: #a45a32;/u)
+    const compiled = compileCanvasPreview({
+        projectArticleHtml: projectHtml,
+        projectStyleCss: probe.projectCss,
+        entryArticleHtml: probe.validationHtml,
+        entryStyleCss: probe.css,
+        metadata: manifest.entry,
+        assetIds: probe.assetIds,
+    })
+    assert.equal(compiled.diagnostics.filter(item => item.severity === 'error').length, 0)
+    assert.match(compiled.css ?? '', /--fc-entry-accent: #a45a32;/u)
 })

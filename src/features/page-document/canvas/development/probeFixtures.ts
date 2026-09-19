@@ -17,6 +17,7 @@ export type {CanvasProbeCase} from './probeCases.ts'
 export const CANVAS_PROBE_CASES: readonly CanvasProbeCase[] = createCanvasProbeCases({
     fixtureHtml,
     fixtureCss,
+    projectCss,
     assetIds: manifest.assets.map(asset => asset.id),
     maliciousCases: (maliciousFixture as {cases: CanvasProbeMutation[]}).cases,
 })
