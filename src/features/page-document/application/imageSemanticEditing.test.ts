@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
 import type {PageDocument} from '../../../api/pageDocument.ts'
+import type {EntryAssetSnapshot} from '../domain/contract.ts'
 import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {
     acceptEntryDocumentSave,
@@ -36,7 +37,14 @@ function document(html = article()): PageDocument {
 function session(html = article()) {
     return createEntryDocumentSessionState({
         entryId: ENTRY_ID, projectId: PROJECT_ID, title: '图片说明', summary: '', markdown: '',
-    }, document(html))
+    }, document(html), [
+        {
+            id: ASSET_ID,
+            mediaType: 'image/png',
+            sizeBytes: 1,
+            sha256: 'a'.repeat(64),
+        } satisfies EntryAssetSnapshot,
+    ])
 }
 
 describe('现有页面图片说明的安全切片', () => {
