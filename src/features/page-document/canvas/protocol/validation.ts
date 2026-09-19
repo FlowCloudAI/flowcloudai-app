@@ -234,6 +234,23 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
             ? value as unknown as CanvasRuntimeMessage
             : null
     }
+    if (value.type === 'text-selection') {
+        const nodeId = value.nodeId
+        const from = value.from
+        const to = value.to
+        const empty = nodeId === null && from === 0 && to === 0 && value.expected === ''
+        const selected = isUuid(nodeId)
+            && Number.isInteger(from)
+            && Number.isInteger(to)
+            && (from as number) >= 0
+            && (to as number) >= (from as number)
+            && (to as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
+            && isBoundedString(value.expected, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
+        return hasOnlyKeys(value, [...envelopeKeys, 'nodeId', 'from', 'to', 'expected'])
+            && (empty || selected)
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
     if (value.type === 'navigation-intent') {
         return hasOnlyKeys(value, [...envelopeKeys, 'href', 'nodeId'])
             && isBoundedString(value.href, CANVAS_HREF_MAX_CODE_UNITS, false)

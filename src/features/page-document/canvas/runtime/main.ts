@@ -52,6 +52,7 @@ let rejectedInputPending = false
 let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
 let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
+let lastTextSelectionKey: string | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
 const linkCandidate = createCanvasLinkCandidateTracker()
@@ -109,6 +110,7 @@ function clearRenderedDocument(): void {
     if (candidateLeave) send(candidateLeave)
     const leave = linkHover.clear()
     if (leave) send(leave)
+    clearTextSelection()
     authorStyle.textContent = ''
     root.replaceChildren()
     assetDisplays = new Map()
@@ -263,6 +265,33 @@ function reportLinkCandidate(): void {
     for (const intent of linkCandidate.update(snapshot)) send(intent)
 }
 
+function reportTextSelection(): void {
+    if (!editingEnabled || composition.isComposing) return
+    const selection = captureSelection()
+    const key = selection
+        ? `${selection.nodeId}:${selection.from}:${selection.to}:${selection.expected}`
+        : null
+    if (key === lastTextSelectionKey) return
+    lastTextSelectionKey = key
+    if (!selection) {
+        send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
+        return
+    }
+    send({
+        type: 'text-selection',
+        nodeId: selection.nodeId,
+        from: selection.from,
+        to: selection.to,
+        expected: selection.expected,
+    })
+}
+
+function clearTextSelection(): void {
+    if (lastTextSelectionKey === null) return
+    lastTextSelectionKey = null
+    send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
+}
+
 function captureInputRange(event: InputEvent): CanvasTextSelectionSnapshot | null {
     const range = event.getTargetRanges?.()[0]
     return range
@@ -411,6 +440,7 @@ function setEditing(enabled: boolean): void {
         if (candidateLeave) send(candidateLeave)
         const leave = linkHover.clear()
         if (leave) send(leave)
+        clearTextSelection()
     }
     editingEnabled = enabled
     if (!enabled && composition.isComposing) {
@@ -525,7 +555,10 @@ function installInputListeners(): void {
     })
 
     document.addEventListener('selectionchange', () => {
-        if (editingEnabled && !composition.isComposing) reportLinkCandidate()
+        if (editingEnabled && !composition.isComposing) {
+            reportTextSelection()
+            reportLinkCandidate()
+        }
     })
 
     document.addEventListener('compositionstart', event => {
@@ -533,6 +566,7 @@ function installInputListeners(): void {
         if (candidateLeave) send(candidateLeave)
         const leave = linkHover.clear()
         if (leave) send(leave)
+        clearTextSelection()
         if (!editingEnabled || composition.isComposing) return
         const node = managedNode(event.target)
         const nodeId = managedNodeId(node)
@@ -693,6 +727,7 @@ function start(): void {
     window.addEventListener('blur', () => {
         const leave = linkHover.clear()
         if (leave) send(leave)
+        clearTextSelection()
     })
 
     installInputListeners()

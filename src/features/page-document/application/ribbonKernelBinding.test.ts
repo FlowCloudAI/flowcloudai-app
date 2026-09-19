@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
-import {createRibbonPropertyRequest} from '../../document-editor/visual/ribbonKernelBinding.ts'
+import {
+    createRibbonPropertyRequest,
+    createRibbonTextRangePropertyRequest,
+} from '../../document-editor/visual/ribbonKernelBinding.ts'
 
 const NODE_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -45,4 +48,24 @@ test('工具栏加粗与对齐分别绑定受限字重和 text-align intent', ()
     assert.deepEqual(weightIntent[0]?.action, {kind: 'set-value', value: '700'})
     assert.equal(alignmentIntent[0]?.property, 'text-align')
     assert.deepEqual(alignmentIntent[0]?.action, {kind: 'set-value', value: 'center'})
+})
+
+test('可信文字选区通过功能区绑定发出 text-range 样式 intent', () => {
+    const request = createRibbonTextRangePropertyRequest({
+        nodeId: NODE_ID,
+        from: 1,
+        to: 3,
+        expected: '文字',
+    }, 'font-weight', '700', () => 'inline-request')
+    const intent = request.createIntents(new Map([[NODE_ID, handle()]]))[0]
+    assert.equal(intent?.kind, 'edit-property')
+    if (intent?.kind !== 'edit-property') return
+    assert.deepEqual(intent.target, {
+        kind: 'text-range',
+        component: handle(),
+        range: utf16Range(1, 3),
+        expected: '文字',
+    })
+    assert.deepEqual(intent.action, {kind: 'set-value', value: '700'})
+    assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
 })

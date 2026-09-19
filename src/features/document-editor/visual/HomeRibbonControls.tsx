@@ -27,6 +27,7 @@ import {
     DocumentRibbonRows,
 } from './DocumentOfficeRibbon.tsx'
 import {createRibbonPropertyRequest} from './ribbonKernelBinding.ts'
+import type {RibbonTextRange} from './ribbonKernelBinding.ts'
 import {InlineRibbonStyleControls} from './InlineRibbonStyleControls.tsx'
 
 export type RibbonApplyKernelEntry = (
@@ -48,6 +49,7 @@ export interface HomeRibbonControlsProps {
     applyKernelEntry: RibbonApplyKernelEntry
     inspectComponent: RibbonInspectComponent
     inspectTextRange: RibbonInspectTextRange
+    activeTextRange: RibbonTextRange | null
     onFind?: () => void
     onOpenDetails?: () => void
 }
@@ -200,6 +202,8 @@ export function HomeRibbonControls({
     selected,
     applyKernelEntry,
     inspectComponent,
+    inspectTextRange,
+    activeTextRange,
     onFind,
     onOpenDetails,
 }: HomeRibbonControlsProps) {
@@ -265,7 +269,11 @@ export function HomeRibbonControls({
             >
                 <RibbonUnavailable label="块操作" reason={availability.block ?? '块移动与删除将在后续工具栏批次接入'} />
             </DocumentRibbonGroup>
-            <InlineRibbonStyleControls />
+            <InlineRibbonStyleControls
+                range={activeTextRange}
+                applyKernelEntry={applyKernelEntry}
+                inspectTextRange={inspectTextRange}
+            />
         </>
     )
 }

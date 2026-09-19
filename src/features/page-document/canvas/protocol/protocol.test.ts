@@ -143,6 +143,42 @@ test('运行时只读消息只接受当前 token、版本与有界字段', () =>
     assert.equal(parseCanvasRuntimeMessage(message('size', {width: Number.NaN, height: 1}), TOKEN), null)
 })
 
+test('文字选区消息固定纯文本 UTF-16 区间与空选区形状', () => {
+    const selection = message('text-selection', {
+        nodeId: NODE_ID,
+        from: 1,
+        to: 3,
+        expected: '😀',
+    })
+    assert.equal(parseCanvasRuntimeMessage(selection, TOKEN)?.type, 'text-selection')
+    assert.equal(parseCanvasRuntimeMessage(message('text-selection', {
+        nodeId: null, from: 0, to: 0, expected: '',
+    }), TOKEN)?.type, 'text-selection')
+    assert.equal(parseCanvasRuntimeMessage({...selection, nodeId: 'invalid'} , TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...selection, from: -1}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...selection, to: 65_537}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...selection, expected: '字'.repeat(65_537)}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...selection, html: '<b>禁止</b>'}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('text-selection', {
+        nodeId: null, from: 1, to: 1, expected: '',
+    }), TOKEN), null)
+})
+
+test('文字选区消息拒绝伪造来源、错误 token、过期序号与超长载荷', () => {
+    const source = {}
+    const gate = createCanvasRuntimeMessageGate(source, TOKEN)
+    const selection = message('text-selection', {
+        nodeId: NODE_ID, from: 0, to: 2, expected: '文字',
+    }, 3)
+    assert.equal(gate.accept({source: {}, data: selection}), null)
+    assert.equal(gate.accept({source, data: {...selection, sessionToken: OTHER_TOKEN}}), null)
+    assert.equal(gate.accept({source, data: selection})?.type, 'text-selection')
+    assert.equal(gate.accept({source, data: {...selection, sequence: 2}}), null)
+    assert.equal(gate.accept({source, data: {
+        ...selection, sequence: 4, expected: '字'.repeat(CANVAS_MESSAGE_MAX_BYTES),
+    }}), null)
+})
+
 test('link-hover 只接受成对的进入或离开状态以及有界画布矩形', () => {
     const rect = {top: -12, left: 30, width: 90, height: 18}
     const enter = message('link-hover', {href: `entry://${NODE_ID}`, nodeId: NODE_ID, rect})

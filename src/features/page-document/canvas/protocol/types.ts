@@ -95,6 +95,15 @@ export interface CanvasSelectionMessage extends CanvasEnvelope {
     nodeId: string
 }
 
+/** 画布提供的可信文字选区；清空时四个字段回到空选区。 */
+export interface CanvasTextSelectionMessage extends CanvasEnvelope {
+    type: 'text-selection'
+    nodeId: string | null
+    from: number
+    to: number
+    expected: string
+}
+
 export interface CanvasNavigationIntentMessage extends CanvasEnvelope {
     type: 'navigation-intent'
     href: string
@@ -166,6 +175,7 @@ export type CanvasRuntimeMessage =
     | CanvasRenderErrorMessage
     | CanvasSizeMessage
     | CanvasSelectionMessage
+    | CanvasTextSelectionMessage
     | CanvasNavigationIntentMessage
     | CanvasLinkHoverMessage
     | CanvasInputIntentMessage

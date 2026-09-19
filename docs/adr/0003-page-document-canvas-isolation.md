@@ -51,6 +51,11 @@ HTML 只保留安全骨架与占位，不含外链脚本、样式表或 `style` 
 为词条内链展示既有信息浮窗；编辑模式不接入浮窗。该消息不携带作者 HTML，不授予画布新的导航、
 存储或网络能力。
 
+文字选择通过只读 `text-selection` 消息回报受管节点 ID、UTF-16 起止偏移与选区纯文本。空状态使用
+`nodeId: null` 和零长度范围。该消息与输入意图复用同一语义偏移计算，并通过相同的来源 Window、
+协议版本、会话 token、单调序号和消息预算校验；宿主仍以当前草稿和 `expected` 复核漂移后，才可
+建立内核 `text-range` 意图。消息不携带 HTML，也不授予画布写入源码或样式的能力。
+
 画布默认保持只读，只有收到通过上述信封、来源 Window 与序号校验的 `set-editing` 命令后，运行时
 才为 paragraph、heading、list-item 和 table-cell 四类受管节点增加
 `contenteditable="plaintext-only"`。作者源码中的 `contenteditable` 仍由隔离层拒绝；运行时授予的

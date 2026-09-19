@@ -14,6 +14,7 @@ import {
     type CanvasInputResolution,
     type CanvasLinkCandidateIntentMessage,
     type CanvasLinkHoverRect,
+    type CanvasTextSelectionMessage,
 } from '../protocol/index.ts'
 import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
 import {createCanvasPageUrl, resolveCanvasHeight} from './canvasPageUrl.ts'
@@ -35,6 +36,7 @@ export interface PageDocumentCanvasProps {
     minimumHeight?: number
     editingEnabled?: boolean
     onSelectionChange?: (nodeId: string) => void
+    onTextSelectionChange?: (message: CanvasTextSelectionMessage) => void
     onNavigationIntent?: (href: string) => void
     onLinkHover?: (hover: {href: string | null; nodeId: string | null; rect: CanvasLinkHoverRect | null}) => void
     onInputIntent?: (
@@ -64,6 +66,7 @@ export function PageDocumentCanvas({
     minimumHeight = 160,
     editingEnabled = false,
     onSelectionChange,
+    onTextSelectionChange,
     onNavigationIntent,
     onLinkHover,
     onInputIntent,
@@ -82,6 +85,7 @@ export function PageDocumentCanvas({
         html,
         css,
         onSelectionChange,
+        onTextSelectionChange,
         onNavigationIntent,
         onLinkHover,
         onInputIntent,
@@ -106,6 +110,7 @@ export function PageDocumentCanvas({
             html,
             css,
             onSelectionChange,
+            onTextSelectionChange,
             onNavigationIntent,
             onLinkHover,
             onInputIntent,
@@ -116,7 +121,7 @@ export function PageDocumentCanvas({
             onRenderError,
             onRendered,
         }
-    }, [css, html, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkCandidateIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange])
+    }, [css, html, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkCandidateIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange, onTextSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
@@ -210,6 +215,7 @@ export function PageDocumentCanvas({
             if (!message) return
             if (message.type === 'size') setHeight(resolveCanvasHeight(message.height, minimumHeight))
             if (message.type === 'selection') latest.current.onSelectionChange?.(message.nodeId)
+            if (message.type === 'text-selection') latest.current.onTextSelectionChange?.(message)
             if (message.type === 'navigation-intent' && canForwardCanvasNavigationIntent(message.href)) {
                 latest.current.onNavigationIntent?.(message.href)
             }

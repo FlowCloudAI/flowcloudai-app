@@ -15,7 +15,11 @@ import {
     type VisualSelectionSource,
 } from '../application/visualSelectionModel.ts'
 import {PageDocumentCanvas, type PageDocumentCanvasHandle} from '../canvas/host/PageDocumentCanvas.tsx'
-import {CANVAS_EDITABLE_KINDS, type CanvasLinkCandidateIntentMessage} from '../canvas/protocol/index.ts'
+import {
+    CANVAS_EDITABLE_KINDS,
+    type CanvasLinkCandidateIntentMessage,
+    type CanvasTextSelectionMessage,
+} from '../canvas/protocol/index.ts'
 import {pageDocumentLinkCandidates} from '../application/linkCandidateSelection.ts'
 import {createImageInsertionRequest, createImageReplacementRequest, isCurrentImageAssetSelection, resolveImageInsertionTarget} from '../application/imageAssetEditing.ts'
 import {readManagedImageDescription} from '../application/imageSemanticEditing.ts'
@@ -53,6 +57,7 @@ import type {
 } from '../../document-editor/visual/pageAndViewRibbonModel.ts'
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
+import type {RibbonTextRange} from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {
     resolveRibbonTab,
     ribbonTabsForNode,
@@ -140,6 +145,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [outlineVisible, setOutlineVisible] = useState(true)
     const [layoutGuidesVisible, setLayoutGuidesVisible] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const [activeTextRange, setActiveTextRange] = useState<RibbonTextRange | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
     const [assetPicker, setAssetPicker] = useState<{mode: 'insert' | 'replace'; contextKey: string; pickerId: string} | null>(null)
@@ -253,6 +259,25 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         setSelectedNodeId(resolveVisualSelection(layerProjection.nodes, nodeId, source))
     }
 
+    const handleTextSelection = (message: CanvasTextSelectionMessage) => {
+        if (message.nodeId === null || message.from === message.to) {
+            setActiveTextRange(null)
+            return
+        }
+        const target = findLayerNode(layerProjection.nodes, message.nodeId)
+        if (!active || mode !== 'visual' || !target || !CANVAS_EDITABLE_KINDS.includes(target.kind as never)) {
+            setActiveTextRange(null)
+            return
+        }
+        setSelectedNodeId(message.nodeId)
+        setActiveTextRange({
+            nodeId: message.nodeId,
+            from: message.from,
+            to: message.to,
+            expected: message.expected,
+        })
+    }
+
     const handleLinkCandidateIntent = (message: CanvasLinkCandidateIntentMessage) => {
         if (committingCandidateRef.current) return
         if (message.query === null) {
@@ -267,6 +292,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
 
     const changeMode = (nextMode: PageDocumentWorkspaceMode) => {
         setLinkCandidateIntent(null)
+        setActiveTextRange(null)
         activeAssetPickerIdRef.current = null
         setAssetPicker(null)
         setMode(nextMode)
@@ -558,6 +584,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 applyKernelEntry={session.applyVisualPropertyEntry}
                                 inspectComponent={session.inspectComponent}
                                 inspectTextRange={session.inspectTextRange}
+                                activeTextRange={activeTextRange}
                             />
                         ) : visibleRibbonTab === 'page' ? (
                             <PageRibbonControls
@@ -641,6 +668,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     selectedNodeId={mode === 'visual' ? selectedNodeId : null}
                                     onSelectionChange={mode === 'visual'
                                         ? nodeId => handleSelection(nodeId, 'canvas')
+                                        : undefined}
+                                    onTextSelectionChange={mode === 'visual'
+                                        ? handleTextSelection
                                         : undefined}
                                     onNavigationIntent={forwardsNavigation ? onNavigationIntent : undefined}
                                     onInputIntent={mode === 'visual'
