@@ -53,6 +53,7 @@ import {
     isPageDocumentPropertiesKey,
     usePageDocumentEditorActive,
 } from '@page-document-editor-runtime'
+import {advancePageDocumentSelectionRequest} from '../../features/page-document/application/searchResultNavigation.ts'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
@@ -98,7 +99,7 @@ type DesktopTabAction =
     | { type: 'reorder-tabs'; tabs: TabItem[] }
     | { type: 'touch-recent'; tabKey: string }
     | { type: 'upsert-project-tab'; tabKey: string; project: { id: string; name: string }; activate?: boolean; touchRecent?: boolean }
-    | { type: 'upsert-entry-tab'; tabKey: string; projectId: string; entry: { id: string; title: string }; activate?: boolean; touchRecent?: boolean }
+    | { type: 'upsert-entry-tab'; tabKey: string; projectId: string; entry: { id: string; title: string; pageDocumentNodeId?: string }; activate?: boolean; touchRecent?: boolean }
     | { type: 'upsert-tool-tab'; tabKey: string; projectId: string; panel: ProjectToolPanel; label: string; activate?: boolean; touchRecent?: boolean }
     | { type: 'rename-tab'; tabKey: string; label: string }
     | { type: 'set-entry-dirty'; tabKey: string; dirty: boolean }
@@ -204,6 +205,11 @@ function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): De
             const nextRecent = action.touchRecent
                 ? touchRecentPageKeys(state.recentPageKeys, action.tabKey)
                 : state.recentPageKeys
+            const previous = state.entryTabMap[action.tabKey]
+            const pageDocumentSelection = advancePageDocumentSelectionRequest(
+                previous?.pageDocumentSelection,
+                action.entry.pageDocumentNodeId,
+            )
             return {
                 ...state,
                 tabs: upsertTab(state.tabs, {key: action.tabKey, label: action.entry.title, closable: true}),
@@ -213,6 +219,7 @@ function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): De
                     [action.tabKey]: {
                         projectId: action.projectId,
                         entryId: action.entry.id,
+                        ...(pageDocumentSelection ? {pageDocumentSelection} : {}),
                     },
                 },
                 recentPageKeys: nextRecent,
@@ -666,7 +673,7 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
             })
     }, [ensureProjectTab, projectTabMap, recordTabActivity, showHomeWorkspace, touchRecentPage])
 
-    const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string }) => {
+    const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string; pageDocumentNodeId?: string }) => {
         ensureProjectTabById(projectId)
         const tabKey = `entry-${projectId}-${entry.id}`
         dispatchTabState({
@@ -1489,6 +1496,9 @@ function DesktopAppContent({platformInfo}: DesktopAppProps) {
                                             aiModel={aiController.selectedModel || null}
                                             activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
                                             activeEntryTitle={activeEntryMeta?.projectId === projectId ? activeEntryTitle : null}
+                                            activeEntryPageDocumentSelection={activeEntryMeta?.projectId === projectId
+                                                ? activeEntryMeta.pageDocumentSelection ?? null
+                                                : null}
                                             openEntryIds={openEntryIdsByProject[projectId] ?? []}
                                             mountedEntryIds={mountedEntryIdsByProject[projectId] ?? []}
                                             onOpenEntry={handleOpenEntry}

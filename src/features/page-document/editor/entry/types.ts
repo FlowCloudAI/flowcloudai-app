@@ -12,6 +12,7 @@ export interface PageDocumentEditorEntryProps {
     markdown: string
     projectEntries: readonly EntryBrief[]
     resetVersion: number
+    selectionRequest?: {nodeId: string; requestId: number} | null
     onDirtyChange: (dirty: boolean) => void
     onSavedDerivedText?: (derivedText: string) => void
     onNavigationIntent: (href: string) => void

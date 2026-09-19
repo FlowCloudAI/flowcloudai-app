@@ -6,6 +6,10 @@
 export type EntryTabMeta = {
     projectId: string
     entryId: string
+    pageDocumentSelection?: {
+        nodeId: string
+        requestId: number
+    }
 }
 
 export function groupEntryIdsByProject(

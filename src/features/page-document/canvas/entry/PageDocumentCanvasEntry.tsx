@@ -39,7 +39,7 @@ function sourceFromDocument(
 }
 
 export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
-    const {projectId, entryId, title, summary, markdown, onNavigationIntent, onLinkHover, compact = false, convertLegacyMarkdown = false} = props
+    const {projectId, entryId, title, summary, markdown, selectedNodeId = null, onNavigationIntent, onLinkHover, compact = false, convertLegacyMarkdown = false} = props
     const [document, setDocument] = useState<PageDocument | null>(null)
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
@@ -100,6 +100,7 @@ export function PageDocumentCanvasEntry(props: PageDocumentCanvasEntryProps) {
                         projectId={projectId}
                         html={compiled.html}
                         css={compiled.css}
+                        selectedNodeId={selectedNodeId}
                         onNavigationIntent={onNavigationIntent}
                         onLinkHover={onLinkHover}
                         onRenderError={setRuntimeError}

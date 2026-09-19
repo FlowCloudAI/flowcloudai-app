@@ -69,6 +69,8 @@ export interface EntryBrief {
     type?: string | null
     cover?: string | null
     updated_at: string
+    search_hit_node_id?: string | null
+    search_hit_snippet?: string | null
 
 }
 

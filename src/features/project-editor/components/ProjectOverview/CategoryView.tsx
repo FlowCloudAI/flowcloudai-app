@@ -30,6 +30,10 @@ import {RenameDialog} from '../../../../shared/ui/overlay'
 import {getMeaningfulCoverMark} from '../../../../shared/lib/defaultCover'
 import EntryTypeIcon from '../EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
+import {
+    pageDocumentSearchDescription,
+    pageDocumentSearchOpenTarget,
+} from '../../../page-document/application/searchResultNavigation.ts'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
 type EntryPageRows = 2 | 5 | 10
@@ -132,7 +136,7 @@ interface EntryCardItemProps {
     entryTypes: EntryTypeView[]
     isStarred: boolean
     onContextMenu?: (event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => void
-    onOpenEntry?: (entry: { id: string; title: string }) => void
+    onOpenEntry?: (entry: { id: string; title: string; pageDocumentNodeId?: string }) => void
 }
 
 function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, onOpenEntry}: EntryCardItemProps) {
@@ -206,7 +210,7 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
                 )
             )}
             title={entry.title}
-            description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
+            description={pageDocumentSearchDescription(entry)}
             extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
             tag={cardTag}
             variant="shadow"
@@ -216,7 +220,7 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
             contentAreaRatio={0.5}
             hoverContentAreaRatio={0.8}
             onContextMenu={event => onContextMenu?.(event, entry)}
-            onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
+            onClick={() => onOpenEntry?.(pageDocumentSearchOpenTarget(entry))}
         />
     )
 }
@@ -254,7 +258,7 @@ interface VirtualEntryGridProps {
     onColumnCountChange?: (columnCount: number) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
     onEntryContextMenu?: (event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => void
-    onOpenEntry?: (entry: { id: string; title: string }) => void
+    onOpenEntry?: (entry: { id: string; title: string; pageDocumentNodeId?: string }) => void
 }
 
 interface VirtualGridViewport {
@@ -468,7 +472,7 @@ interface CategoryViewProps {
     onSelectCategory?: (categoryId: string) => void
     onEntryRenamed?: (entry: { id: string; title: string }) => void
     onEntryDeleted?: (entryId: string) => void
-    onOpenEntry?: (entry: { id: string; title: string }) => void
+    onOpenEntry?: (entry: { id: string; title: string; pageDocumentNodeId?: string }) => void
 }
 
 function CategoryView({

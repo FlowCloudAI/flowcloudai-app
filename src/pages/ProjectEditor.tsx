@@ -103,9 +103,10 @@ interface Props {
     aiModel?: string | null
     activeEntryId?: string | null
     activeEntryTitle?: string | null
+    activeEntryPageDocumentSelection?: {nodeId: string; requestId: number} | null
     openEntryIds?: string[]
     mountedEntryIds?: string[]
-    onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    onOpenEntry?: (projectId: string, entry: { id: string; title: string; pageDocumentNodeId?: string }) => void
     onEntryTitleChange?: (projectId: string, entry: { id: string; title: string }) => void
     onBackHome?: () => void
     onBackToProject?: (projectId: string) => void
@@ -211,6 +212,7 @@ function ProjectEditorInner({
                                 aiModel = null,
                                 activeEntryId = null,
                                 activeEntryTitle = null,
+                                activeEntryPageDocumentSelection = null,
                                 openEntryIds = [],
                                 mountedEntryIds = [],
                                 onOpenEntry,
@@ -1426,6 +1428,9 @@ function ProjectEditorInner({
                                     entryTypes={entryTypes}
                                     tagSchemas={tagSchemas}
                                     initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
+                                    pageDocumentSelection={entryId === activeEntryId
+                                        ? activeEntryPageDocumentSelection
+                                        : null}
                                     onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                     onTitleChange={async (updatedEntry) => {
                                         onEntryTitleChange?.(projectId, {

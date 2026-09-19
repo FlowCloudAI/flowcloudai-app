@@ -107,6 +107,7 @@ interface EntryEditorProps {
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
     initialEditorMode?: EntryEditorMode
+    pageDocumentSelection?: {nodeId: string; requestId: number} | null
     onOpenEntry?: (entry: { id: string; title: string }) => void
     onTitleChange?: (entry: Entry) => void | Promise<void>
     onSaved?: (entry: Entry) => void | Promise<void>
@@ -175,6 +176,7 @@ export default function EntryEditor({
                                         entryTypes,
                                         tagSchemas,
                                         initialEditorMode = 'browse',
+                                        pageDocumentSelection = null,
                                         onOpenEntry,
                                         onTitleChange,
                                         onSaved,
@@ -1287,6 +1289,7 @@ export default function EntryEditor({
                                     summary={draft.summary}
                                     markdown={draft.content}
                                     convertLegacyMarkdown
+                                    selectedNodeId={active ? pageDocumentSelection?.nodeId ?? null : null}
                                     onNavigationIntent={handlePageDocumentNavigation}
                                     onLinkHover={handlePageDocumentLinkHover}
                                 />
@@ -1301,6 +1304,7 @@ export default function EntryEditor({
                                     summary={draft.summary}
                                     markdown={draft.content}
                                     resetVersion={pageDocumentResetVersion}
+                                    selectionRequest={active ? pageDocumentSelection : null}
                                     projectEntries={projectEntries}
                                     onDirtyChange={setPageDocumentDirty}
                                     onSavedDerivedText={setPageDocumentDerivedText}

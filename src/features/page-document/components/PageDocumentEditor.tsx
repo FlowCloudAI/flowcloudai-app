@@ -163,6 +163,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         markdown,
         projectEntries,
         resetVersion,
+        selectionRequest,
         onDirtyChange,
         onSavedDerivedText,
         onNavigationIntent,
@@ -189,6 +190,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
     const interactionKeyRef = useRef('')
+    const appliedSelectionRequestRef = useRef('')
     const activeAssetPickerIdRef = useRef<string | null>(null)
     const session = useEntryPageDocumentSession({
         entryId,
@@ -288,6 +290,15 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             setSelectedNodeId(null)
         }
     }, [layerProjection.nodes, selectedNodeId])
+
+    useEffect(() => {
+        if (!active || !state || !selectionRequest) return
+        const requestKey = `${entryId}:${selectionRequest.requestId}`
+        if (appliedSelectionRequestRef.current === requestKey) return
+        appliedSelectionRequestRef.current = requestKey
+        const nodeId = resolveVisualSelection(layerProjection.nodes, selectionRequest.nodeId, 'layer')
+        if (nodeId) setSelectedNodeId(nodeId)
+    }, [active, entryId, layerProjection.nodes, selectionRequest, state])
 
     useEffect(
         () => () => flushCanvasInput(),
