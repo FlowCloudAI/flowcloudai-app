@@ -600,9 +600,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                             <PublicComponentRibbonControls
                                 definitions={session.componentDefinitions}
                                 assets={session.assets}
+                                projectId={projectId}
                                 selected={selectedNode}
                                 applyKernelEntry={session.applyVisualPropertyEntry}
                                 onInserted={setSelectedNodeId}
+                                onCreate={async input => {
+                                    await session.createComponentDefinition(input)
+                                }}
+                                onDelete={session.deleteComponentDefinition}
                             />
                         ) : visibleRibbonTab === 'page' ? (
                             <PageRibbonControls

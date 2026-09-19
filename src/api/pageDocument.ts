@@ -97,6 +97,18 @@ export interface PageDocumentComponentDefinition {
     ownershipScope: {kind: string; id: string}
 }
 
+export interface CreatePageDocumentComponentInput {
+    projectId: string
+    html: string
+    css: string
+    propertySchema: Array<{name: string; valueType: string; required: boolean}>
+    partSchema: Array<{name: string; accepts: string[]; required: boolean}>
+    styleVariableSchema: Array<{name: string; syntax: string; initialValue: string | null}>
+    name: string
+    category: string
+    previewAssetId?: string
+}
+
 interface PageDocumentComponentDefinitionWire {
     component_id: string
     revision: number
@@ -161,6 +173,27 @@ export async function pageDocumentListComponentRevisions(
         {projectId},
     )
     return definitions.map(fromWireComponentDefinition)
+}
+
+export async function pageDocumentCreateComponent(
+    input: CreatePageDocumentComponentInput,
+): Promise<PageDocumentComponentDefinition> {
+    const definition = await invoke<PageDocumentComponentDefinitionWire>(
+        'page_document_create_component',
+        {input},
+    )
+    return fromWireComponentDefinition(definition)
+}
+
+export function pageDocumentDeleteComponent(
+    projectId: string,
+    componentId: string,
+): Promise<void> {
+    return invoke('page_document_delete_component', {projectId, componentId})
+}
+
+export function pageDocumentComponentErrorMessage(value: unknown): string {
+    return toApiError(value).message
 }
 
 export function pageDocumentListAssets(projectId: string): Promise<PageDocumentAsset[]> {

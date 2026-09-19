@@ -1,0 +1,68 @@
+.public-component-creator {
+    width: min(64rem, calc(100vw - 2 * var(--fc-space-lg)));
+    height: min(48rem, calc(100vh - 2 * var(--fc-space-lg)));
+}
+
+.public-component-creator__body {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    gap: var(--fc-space-md);
+    min-height: 0;
+    padding: var(--fc-space-md);
+    color: var(--fc-color-text);
+}
+
+.public-component-creator__metadata,
+.public-component-creator__schemas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fc-space-md);
+}
+
+.public-component-creator label {
+    display: grid;
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.public-component-creator__sources {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--fc-space-xs) var(--fc-space-md);
+    min-height: 0;
+}
+
+.public-component-creator__editor {
+    min-height: 16rem;
+    overflow: hidden;
+    border: 1px solid var(--fc-color-border-light);
+    background: var(--fc-color-bg-secondary);
+}
+
+.public-component-creator__schemas textarea {
+    min-height: 5rem;
+    resize: vertical;
+    border: 1px solid var(--fc-color-border-light);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+    font: inherit;
+}
+
+.public-component-creator__body > p {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.public-component-creator__error {
+    color: var(--fc-color-danger) !important;
+}
+
+.public-component-creator__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
+}

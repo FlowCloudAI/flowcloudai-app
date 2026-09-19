@@ -4,6 +4,20 @@
     gap: var(--fc-space-sm);
 }
 
+.public-component-ribbon__toolbar {
+    display: grid;
+    align-content: start;
+    gap: var(--fc-space-xs);
+    min-width: 10rem;
+}
+
+.public-component-ribbon__error {
+    max-width: 18rem;
+    margin: 0;
+    color: var(--fc-color-danger);
+    font-size: var(--fc-font-size-caption);
+}
+
 .public-component-ribbon__hint,
 .public-component-ribbon-empty {
     margin: 0;

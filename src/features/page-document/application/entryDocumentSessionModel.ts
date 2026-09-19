@@ -210,6 +210,28 @@ export function updateEntryDocumentMetadata(
     return isRenderable(preview) ? {...next, preview, previewStale: false} : next
 }
 
+/** 更新宿主组件目录并重编译派生预览；页面源码与撤销历史保持不变。 */
+export function updateEntryDocumentComponentDefinitions(
+    state: EntryDocumentSessionState,
+    componentDefinitions: readonly PublicComponentDefinitionContract[],
+): EntryDocumentSessionState {
+    const next = {
+        ...state,
+        snapshot: {
+            ...state.snapshot,
+            componentDefinitions: [...componentDefinitions],
+        },
+    }
+    const preview = compileState(next)
+    const valid = !hasBlockingDiagnostics(preview.diagnostics)
+    return {
+        ...next,
+        model: acceptDraftValidation(next.model, 'entry', valid, preview.diagnostics),
+        preview: isRenderable(preview) ? preview : state.preview,
+        previewStale: !isRenderable(preview),
+    }
+}
+
 export function editEntryDocumentSource(
     state: EntryDocumentSessionState,
     file: SourceFileName,

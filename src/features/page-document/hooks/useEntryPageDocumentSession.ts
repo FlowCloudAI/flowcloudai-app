@@ -5,6 +5,8 @@ import {useAlert} from 'flowcloudai-ui'
 import {
     pageDocumentCheckAsset,
     pageDocumentChooseAndImportAsset,
+    pageDocumentCreateComponent,
+    pageDocumentDeleteComponent,
     pageDocumentListAssets,
     pageDocumentListComponents,
     pageDocumentListComponentRevisions,
@@ -12,6 +14,7 @@ import {
     pageDocumentSaveEntry,
     parsePageDocumentSaveError,
     type PageDocumentAsset,
+    type CreatePageDocumentComponentInput,
 } from '../../../api/pageDocument.ts'
 import {isDocumentScopeDirty, sourceDraftView} from '../application/documentDraftModel.ts'
 import {
@@ -59,6 +62,7 @@ import {
     rejectEntryDocumentSave,
     undoEntryDocumentSession,
     updateEntryDocumentMetadata,
+    updateEntryDocumentComponentDefinitions,
     type EntryDocumentSessionState,
 } from '../application/entryDocumentSessionModel.ts'
 import type {SourceFileName} from '../domain/contract.ts'
@@ -621,6 +625,36 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         [applyKernelEntry, reportVisualFailure],
     )
 
+    const createComponentDefinition = useCallback(async (
+        input: Omit<CreatePageDocumentComponentInput, 'projectId'>,
+    ): Promise<PublicComponentDefinitionContract> => {
+        const created = parsePublicComponentDefinition(await pageDocumentCreateComponent({
+            ...input,
+            projectId,
+        }))
+        const current = stateRef.current
+        if (!current || current.identity.projectId !== projectId) {
+            throw new TypeError('公共组件已创建，但当前页面已切换；请重新打开项目查看。')
+        }
+        publish(updateEntryDocumentComponentDefinitions(current, [
+            ...current.snapshot.componentDefinitions,
+            created,
+        ]))
+        return created
+    }, [projectId, publish])
+
+    const deleteComponentDefinition = useCallback(async (componentId: string): Promise<void> => {
+        await pageDocumentDeleteComponent(projectId, componentId)
+        const current = stateRef.current
+        if (!current || current.identity.projectId !== projectId) return
+        publish(updateEntryDocumentComponentDefinitions(
+            current,
+            current.snapshot.componentDefinitions.filter(
+                definition => definition.componentId.toLowerCase() !== componentId.toLowerCase(),
+            ),
+        ))
+    }, [projectId, publish])
+
     return {
         loadStatus,
         loadError,
@@ -657,5 +691,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         flushCanvasInput,
         applyLinkCandidateSelection,
         adoptOpaqueElement,
+        createComponentDefinition,
+        deleteComponentDefinition,
     }
 }

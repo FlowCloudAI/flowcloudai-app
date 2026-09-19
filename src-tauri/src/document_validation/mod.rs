@@ -54,6 +54,12 @@ const MANAGED_RESOURCE_ATTRIBUTES: &[&str] = &["src", "srcset", "poster"];
 const NON_LINK_MANAGED_RESOURCE_ATTRIBUTES: &[&str] = &["href", "xlink:href"];
 const LINK_ELEMENTS: &[&str] = &["a", "area"];
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ValidationScope {
+    Page,
+    Component,
+}
+
 #[derive(Clone)]
 enum SignificantToken {
     Ident(String),
@@ -70,6 +76,24 @@ struct CssContext {
 }
 
 pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationResult {
+    validate_for_scope(html, css, project_id, ValidationScope::Page)
+}
+
+/// 公共组件定义沿用页面文档的标签、属性与资源边界，并额外收紧组件层和页面节点身份。
+pub fn validate_component_definition(
+    html: &str,
+    css: &str,
+    project_id: Option<&str>,
+) -> ValidationResult {
+    validate_for_scope(html, css, project_id, ValidationScope::Component)
+}
+
+fn validate_for_scope(
+    html: &str,
+    css: &str,
+    project_id: Option<&str>,
+    scope: ValidationScope,
+) -> ValidationResult {
     let mut diagnostics = Vec::new();
     if html.len() > 2_000_000 || css.len() > 1_000_000 {
         diagnostics.push(d("limits", "文档大小超过限制"));
@@ -83,13 +107,14 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
         validate_element(
             element,
             project_id,
+            scope,
             &mut diagnostics,
             &mut link_targets,
             &mut asset_ids,
             &mut component_references,
         );
     }
-    validate_css(css, &mut diagnostics, &mut asset_ids);
+    validate_css(css, scope, &mut diagnostics, &mut asset_ids);
 
     ValidationResult {
         valid: diagnostics.is_empty(),
@@ -151,6 +176,7 @@ fn derive_text_blocks(document: &Html) -> Vec<DerivedTextBlock> {
 fn validate_element(
     element: ElementRef<'_>,
     project_id: Option<&str>,
+    scope: ValidationScope,
     diagnostics: &mut Vec<ValidationDiagnostic>,
     link_targets: &mut Vec<DerivedLinkTarget>,
     asset_ids: &mut Vec<Uuid>,
@@ -200,6 +226,19 @@ fn validate_element(
         let prefix = qualified_name.prefix.as_ref().map(AsRef::as_ref);
         let display_name =
             prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}:{name}"));
+        if scope == ValidationScope::Component
+            && matches!(name, "data-fc-node-id" | "data-fc-node-kind")
+        {
+            diagnostics.push(d("component", "公共组件定义不得携带页面节点身份"));
+        }
+        if scope == ValidationScope::Component
+            && component_placeholder_forbidden_in_attribute(&display_name, value)
+        {
+            diagnostics.push(d(
+                "component",
+                format!("组件属性占位符不得用于 {display_name}"),
+            ));
+        }
         if FORBIDDEN_ATTRIBUTE_PREFIXES.iter().any(|forbidden| {
             name.get(..forbidden.len())
                 .is_some_and(|prefix| prefix.eq_ignore_ascii_case(forbidden))
@@ -271,7 +310,7 @@ fn validate_element(
 
     if tag_name.eq_ignore_ascii_case("style") {
         let embedded_css = element.text().collect::<String>();
-        validate_css(&embedded_css, diagnostics, asset_ids);
+        validate_css(&embedded_css, scope, diagnostics, asset_ids);
     }
 }
 
@@ -528,8 +567,141 @@ fn derive_text(document: &Html) -> String {
     raw_text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn validate_css(css: &str, diagnostics: &mut Vec<ValidationDiagnostic>, asset_ids: &mut Vec<Uuid>) {
+fn component_placeholder_forbidden_in_attribute(name: &str, value: &str) -> bool {
+    if !(value.contains("{{") && value.contains("}}")) {
+        return false;
+    }
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "style"
+            | "href"
+            | "xlink:href"
+            | "src"
+            | "srcset"
+            | "poster"
+            | "background"
+            | "action"
+            | "formaction"
+            | "cite"
+            | "data"
+            | "longdesc"
+            | "usemap"
+    )
+}
+
+fn validate_css(
+    css: &str,
+    scope: ValidationScope,
+    diagnostics: &mut Vec<ValidationDiagnostic>,
+    asset_ids: &mut Vec<Uuid>,
+) {
     validate_css_tokens(css, CssContext::default(), diagnostics, asset_ids);
+    if scope == ValidationScope::Component {
+        validate_component_css_scope(css, diagnostics);
+    }
+}
+
+fn next_significant_token<'i, 't>(parser: &mut Parser<'i, 't>) -> Option<Token<'i>> {
+    loop {
+        let token = parser
+            .next_including_whitespace_and_comments()
+            .ok()?
+            .clone();
+        if !matches!(token, Token::WhiteSpace(_) | Token::Comment(_)) {
+            return Some(token);
+        }
+    }
+}
+
+fn component_selector_starts_correctly(parser: &mut Parser<'_, '_>) -> bool {
+    let Some(Token::Ident(name)) = next_significant_token(parser) else {
+        return false;
+    };
+    if !name.eq_ignore_ascii_case("data-fc-component") {
+        return false;
+    }
+    if !matches!(next_significant_token(parser), Some(Token::Delim('='))) {
+        return false;
+    }
+    matches!(
+        next_significant_token(parser),
+        Some(Token::Ident(value) | Token::QuotedString(value)) if !value.is_empty()
+    )
+}
+
+fn validate_component_layer_rules(
+    parser: &mut Parser<'_, '_>,
+    diagnostics: &mut Vec<ValidationDiagnostic>,
+) {
+    let mut awaiting_selector = true;
+    let mut selector_allowed = false;
+    while let Some(token) = next_significant_token(parser) {
+        if awaiting_selector {
+            if !matches!(token, Token::SquareBracketBlock) {
+                diagnostics.push(d("css", "组件 CSS 选择器必须以 [data-fc-component= 开头"));
+                return;
+            }
+            let parsed: Result<bool, cssparser::ParseError<'_, ()>> =
+                parser.parse_nested_block(|nested| Ok(component_selector_starts_correctly(nested)));
+            selector_allowed = parsed.unwrap_or(false);
+            awaiting_selector = false;
+            continue;
+        }
+        if matches!(token, Token::AtKeyword(_)) {
+            diagnostics.push(d("css", "组件 CSS 不允许在 fc-component 层内嵌套 at-rule"));
+            return;
+        }
+        if matches!(token, Token::CurlyBracketBlock) {
+            if !selector_allowed {
+                diagnostics.push(d("css", "组件 CSS 选择器必须以 [data-fc-component= 开头"));
+            }
+            let _: Result<(), cssparser::ParseError<'_, ()>> =
+                parser.parse_nested_block(|_| Ok(()));
+            awaiting_selector = true;
+            selector_allowed = false;
+        }
+    }
+    if !awaiting_selector {
+        diagnostics.push(d("css", "组件 CSS 规则缺少声明块"));
+    }
+}
+
+fn validate_component_css_scope(css: &str, diagnostics: &mut Vec<ValidationDiagnostic>) {
+    if css.trim().is_empty() {
+        return;
+    }
+    let mut input = ParserInput::new(css);
+    let mut parser = Parser::new(&mut input);
+    while let Some(token) = next_significant_token(&mut parser) {
+        let Token::AtKeyword(name) = token else {
+            diagnostics.push(d("css", "组件 CSS 只能写在 @layer fc-component 中"));
+            return;
+        };
+        if !name.eq_ignore_ascii_case("layer") {
+            diagnostics.push(d("css", "组件 CSS 只能写在 @layer fc-component 中"));
+            return;
+        }
+        let Some(Token::Ident(layer)) = next_significant_token(&mut parser) else {
+            diagnostics.push(d("css", "组件 CSS 必须声明 @layer fc-component"));
+            return;
+        };
+        if !layer.eq_ignore_ascii_case("fc-component") {
+            diagnostics.push(d("css", "组件 CSS 必须声明 @layer fc-component"));
+        }
+        let Some(Token::CurlyBracketBlock) = next_significant_token(&mut parser) else {
+            diagnostics.push(d("css", "组件 CSS 的 fc-component 层缺少规则块"));
+            return;
+        };
+        let result: Result<(), cssparser::ParseError<'_, ()>> =
+            parser.parse_nested_block(|nested| {
+                validate_component_layer_rules(nested, diagnostics);
+                Ok(())
+            });
+        if result.is_err() {
+            diagnostics.push(d("css", "组件 CSS 的 fc-component 层无法解析"));
+            return;
+        }
+    }
 }
 
 fn validate_css_tokens(
@@ -937,5 +1109,37 @@ mod tests {
             Some(PROJECT_ID),
         );
         assert!(result.valid, "{:?}", result.diagnostics);
+    }
+
+    #[test]
+    fn component_definition_reuses_document_guard_and_requires_component_layer() {
+        let accepted = validate_component_definition(
+            "<article><h2>{{title}}</h2></article>",
+            "@layer fc-component { [data-fc-component=template] article { display: grid; } }",
+            Some(PROJECT_ID),
+        );
+        assert!(accepted.valid, "{:?}", accepted.diagnostics);
+
+        for (html, css) in [
+            ("<button>危险控件</button>", ""),
+            ("<article onclick='run()'>危险事件</article>", ""),
+            (
+                "<article data-fc-node-id='11111111-1111-4111-8111-111111111111'>页面身份</article>",
+                "",
+            ),
+            ("<a href='{{target}}'>动态地址</a>", ""),
+            ("<article style='color:{{color}}'>动态样式</article>", ""),
+            (
+                "<article>错误层</article>",
+                "@layer fc-entry { article { color: red; } }",
+            ),
+            (
+                "<article>错误选择器</article>",
+                "@layer fc-component { article { color: red; } }",
+            ),
+        ] {
+            let rejected = validate_component_definition(html, css, Some(PROJECT_ID));
+            assert!(!rejected.valid, "{html} {css} should be rejected");
+        }
     }
 }

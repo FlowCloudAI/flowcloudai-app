@@ -7,12 +7,13 @@ use crate::{
 use flowcloudai_client::ErrorCode;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 use worldflow_core::models::{
-    PageDocument, PageDocumentProjection, PageTextBlock, ProjectHomeDocument, SaveEntryLinkTarget,
-    SavePageDocumentResult,
+    CreateComponentDefinition, PageDocument, PageDocumentProjection, PageTextBlock,
+    ProjectHomeDocument, SaveEntryLinkTarget, SavePageDocumentResult,
 };
 use worldflow_core::{ComponentOps, PageDocumentOps, WorldflowError};
 
@@ -26,6 +27,44 @@ pub struct SaveInput {
     pub expected_revision: Option<i64>,
     pub request_key: String,
     pub modified_by: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentPropertySchemaInput {
+    pub name: String,
+    pub value_type: String,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentPartSchemaInput {
+    pub name: String,
+    pub accepts: Vec<String>,
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentStyleVariableSchemaInput {
+    pub name: String,
+    pub syntax: String,
+    pub initial_value: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateComponentInput {
+    pub project_id: String,
+    pub html: String,
+    pub css: String,
+    pub property_schema: Vec<ComponentPropertySchemaInput>,
+    pub part_schema: Vec<ComponentPartSchemaInput>,
+    pub style_variable_schema: Vec<ComponentStyleVariableSchemaInput>,
+    pub name: String,
+    pub category: String,
+    pub preview_asset_id: Option<String>,
 }
 
 #[tauri::command]
@@ -63,6 +102,202 @@ pub async fn page_document_list_component_revisions(
         .await
         .map_err(ApiError::internal)?;
     db.list_component_definition_revisions(&project_id)
+        .await
+        .map_err(ApiError::from_display)
+}
+
+#[tauri::command]
+pub async fn page_document_create_component(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, crate::PathsState>,
+    input: CreateComponentInput,
+) -> Result<worldflow_core::models::ComponentDefinition, ApiError> {
+    create_component_definition(state.inner(), paths.inner(), &input).await
+}
+
+#[tauri::command]
+pub async fn page_document_delete_component(
+    state: State<'_, Arc<AppState>>,
+    project_id: String,
+    component_id: String,
+) -> Result<(), ApiError> {
+    let project_id = parse_uuid("projectId", &project_id)?;
+    let component_id = parse_uuid("componentId", &component_id)?;
+    delete_component_definition(state.inner(), &project_id, &component_id).await
+}
+
+fn schema_name(value: &str) -> bool {
+    let mut bytes = value.bytes();
+    bytes.next().is_some_and(|byte| byte.is_ascii_lowercase())
+        && value.len() <= 64
+        && bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+fn validate_component_schema(input: &CreateComponentInput) -> Result<(), ApiError> {
+    if input.name.trim().is_empty()
+        || input.name.trim().len() > 128
+        || input.category.trim().is_empty()
+        || input.category.trim().len() > 128
+    {
+        return Err(ApiError::new(
+            ErrorCode::ValidationFormatError,
+            "公共组件名称与分类必须是 1–128 字符",
+        ));
+    }
+    let mut names = HashSet::new();
+    for property in &input.property_schema {
+        if !schema_name(&property.name)
+            || !schema_name(&property.value_type)
+            || !names.insert(property.name.as_str())
+        {
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "组件属性 schema 名称、类型或唯一性无效",
+            ));
+        }
+    }
+    names.clear();
+    for part in &input.part_schema {
+        let mut accepts = HashSet::new();
+        if !schema_name(&part.name)
+            || !names.insert(part.name.as_str())
+            || part.accepts.is_empty()
+            || part
+                .accepts
+                .iter()
+                .any(|item| !schema_name(item) || !accepts.insert(item.as_str()))
+        {
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "组件插槽 schema 名称、内容类型或唯一性无效",
+            ));
+        }
+    }
+    names.clear();
+    for variable in &input.style_variable_schema {
+        let suffix = variable.name.strip_prefix("--").unwrap_or_default();
+        if !schema_name(suffix)
+            || !names.insert(variable.name.as_str())
+            || variable.syntax.len() > 128
+            || variable
+                .initial_value
+                .as_ref()
+                .is_some_and(|value| value.len() > 128)
+        {
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "组件样式变量 schema 无效",
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn create_component_definition(
+    state: &AppState,
+    paths: &crate::PathsState,
+    input: &CreateComponentInput,
+) -> Result<worldflow_core::models::ComponentDefinition, ApiError> {
+    validate_component_schema(input)?;
+    let project_id = parse_uuid("projectId", &input.project_id)?;
+    let validation = document_validation::validate_component_definition(
+        &input.html,
+        &input.css,
+        Some(&input.project_id),
+    );
+    require_valid_component(&validation)?;
+    let db = open_project_db(state, &project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    for asset_id in &validation.asset_ids {
+        page_document_assets::require_asset(&db, paths, &project_id, asset_id).await?;
+    }
+    let preview_asset_id = input
+        .preview_asset_id
+        .as_deref()
+        .map(|value| parse_uuid("previewAssetId", value))
+        .transpose()?;
+    if let Some(asset_id) = preview_asset_id {
+        page_document_assets::require_asset(&db, paths, &project_id, &asset_id).await?;
+    }
+    let property_schema = serde_json::Value::Array(
+        input
+            .property_schema
+            .iter()
+            .map(|item| {
+                serde_json::json!({
+                    "name": item.name,
+                    "valueType": item.value_type,
+                    "required": item.required,
+                })
+            })
+            .collect(),
+    );
+    let part_schema = serde_json::Value::Array(
+        input
+            .part_schema
+            .iter()
+            .map(|item| {
+                serde_json::json!({
+                    "name": item.name,
+                    "accepts": item.accepts,
+                    "required": item.required,
+                })
+            })
+            .collect(),
+    );
+    let style_variable_schema = serde_json::Value::Array(
+        input
+            .style_variable_schema
+            .iter()
+            .map(|item| {
+                serde_json::json!({
+                    "name": item.name,
+                    "syntax": item.syntax,
+                    "initialValue": item.initial_value,
+                })
+            })
+            .collect(),
+    );
+    db.create_component_definition(CreateComponentDefinition {
+        component_id: Uuid::new_v4(),
+        scope_kind: "project".into(),
+        scope_id: project_id,
+        html: input.html.clone(),
+        css: input.css.clone(),
+        property_schema,
+        part_schema,
+        style_variable_schema,
+        asset_dependencies: validation.asset_ids,
+        name: input.name.trim().to_string(),
+        category: input.category.trim().to_string(),
+        preview_asset_id,
+    })
+    .await
+    .map_err(ApiError::from_display)
+}
+
+async fn delete_component_definition(
+    state: &AppState,
+    project_id: &Uuid,
+    component_id: &Uuid,
+) -> Result<(), ApiError> {
+    let db = open_project_db(state, project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    if db
+        .get_component_definition(project_id, component_id, None)
+        .await
+        .map_err(ApiError::from_display)?
+        .is_none()
+    {
+        return Err(ApiError::new(
+            ErrorCode::ValidationFormatError,
+            "当前项目不存在该公共组件定义",
+        ));
+    }
+    // 删除者由本地主机确定，前端不能伪造审计主体。
+    db.delete_component_definition(component_id, "local")
         .await
         .map_err(ApiError::from_display)
 }
@@ -461,6 +696,17 @@ fn require_valid(result: &document_validation::ValidationResult) -> Result<(), A
     )
 }
 
+fn require_valid_component(result: &document_validation::ValidationResult) -> Result<(), ApiError> {
+    if result.valid {
+        return Ok(());
+    }
+    let diagnostics = serde_json::to_value(&result.diagnostics).unwrap_or_default();
+    Err(
+        ApiError::new(ErrorCode::ValidationFormatError, "公共组件定义校验失败")
+            .with_kv("diagnostics", diagnostics),
+    )
+}
+
 fn map_save_error(error: WorldflowError, target: &str) -> ApiError {
     match error {
         WorldflowError::DocumentRevisionConflict { current_revision } => ApiError::new(
@@ -539,6 +785,137 @@ mod tests {
             other_project_id,
             entry_id,
         }
+    }
+
+    fn component_input(project_id: Uuid) -> CreateComponentInput {
+        CreateComponentInput {
+            project_id: project_id.to_string(),
+            html: "<article><h2>{{title}}</h2><div data-fc-part='body'></div></article>".into(),
+            css: "@layer fc-component { [data-fc-component=template] article { display: grid; } }"
+                .into(),
+            property_schema: vec![ComponentPropertySchemaInput {
+                name: "title".into(),
+                value_type: "text".into(),
+                required: false,
+            }],
+            part_schema: vec![ComponentPartSchemaInput {
+                name: "body".into(),
+                accepts: vec!["text".into()],
+                required: false,
+            }],
+            style_variable_schema: Vec::new(),
+            name: "信息卡片".into(),
+            category: "基础".into(),
+            preview_asset_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn creates_component_revision_one_and_records_real_delete_actor() {
+        let fixture = setup().await;
+        let created = create_component_definition(
+            &fixture.state,
+            &fixture.paths,
+            &component_input(fixture.project_id),
+        )
+        .await
+        .unwrap();
+        assert_eq!(created.revision, 1);
+        assert_eq!(created.scope_id, fixture.project_id);
+
+        delete_component_definition(&fixture.state, &fixture.project_id, &created.component_id)
+            .await
+            .unwrap();
+        let world = fixture
+            .state
+            .world_store
+            .open_world(fixture.project_id)
+            .await
+            .unwrap();
+        let deleted_by: String =
+            sqlx::query_scalar("SELECT deleted_by FROM object_registry WHERE id=?")
+                .bind(created.component_id)
+                .fetch_one(&world.pool)
+                .await
+                .unwrap();
+        assert_eq!(deleted_by, "local");
+        assert!(
+            world
+                .list_component_definitions(&fixture.project_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn create_component_rejects_unsafe_source_and_foreign_asset() {
+        let fixture = setup().await;
+        let mut unsafe_input = component_input(fixture.project_id);
+        unsafe_input.html = "<article onclick='run()'>不安全</article>".into();
+        assert!(
+            create_component_definition(&fixture.state, &fixture.paths, &unsafe_input)
+                .await
+                .is_err()
+        );
+
+        let source = fixture._dir.path().join("foreign-component.png");
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([1, 2, 3, 255]))
+            .save(&source)
+            .unwrap();
+        let foreign_asset = page_document_assets::import_asset(
+            &fixture.state,
+            &fixture.paths,
+            &fixture.other_project_id,
+            &source,
+        )
+        .await
+        .unwrap();
+        let mut foreign_input = component_input(fixture.project_id);
+        foreign_input.html = format!("<img src='fcasset://{}'>", foreign_asset.id);
+        assert!(
+            create_component_definition(&fixture.state, &fixture.paths, &foreign_input)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn deleting_referenced_component_returns_domain_reason() {
+        let fixture = setup().await;
+        let created = create_component_definition(
+            &fixture.state,
+            &fixture.paths,
+            &component_input(fixture.project_id),
+        )
+        .await
+        .unwrap();
+        let node_id = Uuid::new_v4();
+        let instance_id = Uuid::new_v4();
+        save_entry(
+            &fixture.state,
+            &fixture.paths,
+            &SaveInput {
+                entry_id: fixture.entry_id.to_string(),
+                project_id: fixture.project_id.to_string(),
+                html: format!(
+                    "<div data-fc-node-id='{node_id}' data-fc-node-kind='component' data-fc-component='{}' data-fc-component-revision='latest' data-fc-instance='{instance_id}'></div>",
+                    created.component_id
+                ),
+                css: String::new(),
+                expected_revision: None,
+                request_key: "component-delete-protection".into(),
+                modified_by: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let error =
+            delete_component_definition(&fixture.state, &fixture.project_id, &created.component_id)
+                .await
+                .unwrap_err();
+        assert!(error.message.contains("仍被页面实例引用"));
     }
 
     #[tokio::test]

@@ -510,6 +510,8 @@ pub fn run() {
             page_document_read_entry,
             page_document_list_components,
             page_document_list_component_revisions,
+            page_document_create_component,
+            page_document_delete_component,
             page_document_save_entry,
             page_document_rebuild_projection,
             page_document_validate,
