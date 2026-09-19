@@ -34,6 +34,7 @@ const REQUEST_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const REQUEST_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const REQUEST_EDIT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
 const LOCAL_ROOT_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+const LOCAL_ARTICLE_ID = 'abababab-abab-4bab-8bab-abababababab'
 const LOCAL_HEADING_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
 const LOCAL_PARAGRAPH_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
 const LOCAL_REQUEST_ID = '12121212-1212-4212-8212-121212121212'
@@ -172,7 +173,13 @@ describe('公共组件实例编辑', () => {
         const node = findLayerNode(createLayerProjection(before).nodes, COMPONENT_NODE_A)
         assert.ok(node?.range)
         const instanceSource = before.slice(node.range.from, node.range.to)
-        const localizationIds = [LOCAL_ROOT_ID, LOCAL_HEADING_ID, LOCAL_PARAGRAPH_ID, LOCAL_REQUEST_ID]
+        const localizationIds = [
+            LOCAL_ROOT_ID,
+            LOCAL_ARTICLE_ID,
+            LOCAL_HEADING_ID,
+            LOCAL_PARAGRAPH_ID,
+            LOCAL_REQUEST_ID,
+        ]
         const operation = createPublicComponentLocalizationRequest(
             COMPONENT_NODE_A,
             COMPONENT_INSTANCE_A,

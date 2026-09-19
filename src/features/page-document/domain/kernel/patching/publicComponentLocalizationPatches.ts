@@ -1,7 +1,7 @@
 // 本模块把一个公共组件实例物化为页面本地结构；身份规划、HTML 替换与组件 CSS 降级在同一内核补丁中完成。
 
 import postcss from 'postcss'
-import {defaultTreeAdapter, html, parseFragment, serializeOuter, type DefaultTreeAdapterTypes} from 'parse5'
+import {defaultTreeAdapter, parseFragment, serializeOuter, type DefaultTreeAdapterTypes} from 'parse5'
 import {canComponentContain, inferComponentKindFromTag} from '../components/index.ts'
 import type {HtmlCompositionElement} from '../composition/index.ts'
 import {
@@ -105,14 +105,14 @@ function stripPartMarkers(node: HtmlNode): void {
     for (const child of children(node)) stripPartMarkers(child)
 }
 
-function mergeInstancePresentation(root: HtmlElement, instance: HtmlElement): void {
-    for (const name of ['style', 'class'] as const) {
-        const value = attribute(instance, name)?.trim()
-        if (!value) continue
-        const current = attribute(root, name)?.trim()
-        setAttribute(root, name, current ? `${current}${name === 'style' ? '; ' : ' '}${value}` : value)
-    }
-    if (attribute(instance, 'hidden') !== undefined) setAttribute(root, 'hidden', '')
+function createLocalizationRoot(instance: HtmlElement): HtmlElement {
+    return defaultTreeAdapter.createElement(
+        instance.tagName,
+        instance.namespaceURI,
+        instance.attrs
+            .filter(item => item.name === 'class' || item.name === 'style' || item.name === 'hidden')
+            .map(item => ({...item})),
+    )
 }
 
 function materialize(instanceSource: string, definition: PublicComponentDefinitionContract): MaterializedTree {
@@ -136,20 +136,15 @@ function materialize(instanceSource: string, definition: PublicComponentDefiniti
     }
     for (const root of roots) stripPartMarkers(root)
 
-    const onlyRoot = roots.length === 1 && isElement(roots[0]) ? roots[0] : null
-    const rootKind = onlyRoot ? inferComponentKindFromTag(onlyRoot.tagName) : null
-    const root = onlyRoot && rootKind
-        ? onlyRoot
-        : defaultTreeAdapter.createElement('div', html.NS.HTML, [])
-    if (root !== onlyRoot) {
-        for (const child of roots) defaultTreeAdapter.appendChild(root, child)
-    }
-    mergeInstancePresentation(root, instance)
+    // 展开预览始终把定义根放在实例容器内；本地化必须保留同一层级，
+    // 否则组件根选择器会从“容器的后代”退化成要求元素是自己的后代。
+    const root = createLocalizationRoot(instance)
+    for (const child of roots) defaultTreeAdapter.appendChild(root, child)
 
     const managed: Array<{element: HtmlElement; kind: DocumentNodeKind}> = []
     const visit = (element: HtmlElement, parentKind: DocumentNodeKind | null, isRoot: boolean): void => {
         const inferred = isRoot
-            ? (rootKind ?? 'container')
+            ? 'container'
             : inferComponentKindFromTag(element.tagName)
         const adopted = inferred && (parentKind === null || canComponentContain(parentKind, inferred))
             ? inferred
