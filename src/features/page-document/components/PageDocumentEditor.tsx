@@ -57,6 +57,10 @@ import type {
 } from '../../document-editor/visual/pageAndViewRibbonModel.ts'
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
+import {
+    createListItemInsertionRequest,
+    resolveStructuredSelectionContext,
+} from '../application/structuredContentEditing.ts'
 import type {RibbonTextRange} from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {
     resolveRibbonTab,
@@ -314,6 +318,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const selectedNode = selectedNodeId
         ? findLayerNode(layerProjection.nodes, selectedNodeId)
         : null
+    const structuredSelection = resolveStructuredSelectionContext(
+        layerProjection.nodes,
+        selectedNodeId,
+    )
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
 
@@ -624,9 +632,19 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         ) : selectedNode && visibleRibbonTab !== 'insert' ? (
                             <ContextualRibbonControls
                                 selected={selectedNode}
-                                tableNode={selectedNode.kind === 'table' || selectedNode.kind === 'table-cell' ? selectedNode : null}
+                                tableNode={structuredSelection.tableNode}
                                 snapshot={state.snapshot}
                                 context={editContext}
+                                canAddListItem={layerProjection.managedNodeCount < state.snapshot.editorLimits.managedNodes}
+                                parentListId={structuredSelection.listNode?.id ?? null}
+                                onAddListItem={(listId, afterId) => {
+                                    const request = createListItemInsertionRequest(
+                                        listId,
+                                        afterId,
+                                        crypto.randomUUID(),
+                                    )
+                                    void session.applyVisualPropertyEntry(request, '添加列表项', {immediate: true})
+                                }}
                                 assetFeedback={session.visualError}
                                 applyKernelEntry={session.applyVisualPropertyEntry}
                                 inspectComponent={session.inspectComponent}

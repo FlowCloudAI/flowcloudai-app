@@ -74,6 +74,15 @@ const LEGAL_CONTAINER_LAYOUT_MUTATION: CanvasProbeMutation = {
     },
 }
 
+const LEGAL_STRUCTURED_CONTENT_MUTATION: CanvasProbeMutation = {
+    id: 'legal-structured-content',
+    file: 'entry/article.html',
+    replace: {
+        needle: '潮汐观测',
+        value: '潮汐观测 · 结构化功能区样例',
+    },
+}
+
 function isElement(node: HtmlNode): node is HtmlElement {
     return 'tagName' in node && 'attrs' in node
 }
@@ -131,6 +140,11 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
         LEGAL_CONTAINER_LAYOUT_MUTATION,
         '合法',
     )
+    const structuredContentHtml = mutate(
+        sources.fixtureHtml,
+        LEGAL_STRUCTURED_CONTENT_MUTATION,
+        '合法',
+    )
     return [
         {
             id: 'legal-shared-fixture',
@@ -177,6 +191,14 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             label: '合法：容器布局功能区',
             validationHtml: containerLayoutHtml,
             html: extractCanvasRenderableHtml(containerLayoutHtml),
+            css: sources.fixtureCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_STRUCTURED_CONTENT_MUTATION.id,
+            label: '合法：结构化内容功能区',
+            validationHtml: structuredContentHtml,
+            html: extractCanvasRenderableHtml(structuredContentHtml),
             css: sources.fixtureCss,
             assetIds: sources.assetIds,
         },
