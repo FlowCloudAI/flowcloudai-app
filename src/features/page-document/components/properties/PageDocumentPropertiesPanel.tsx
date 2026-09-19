@@ -3,6 +3,10 @@
 import {useEffect, useMemo, useState} from 'react'
 import {Button, Input, Select} from 'flowcloudai-ui'
 import type {PageDocumentAsset} from '../../../../api/pageDocument.ts'
+import {
+    selectPublicComponentDefinition,
+    type PublicComponentDefinitionContract,
+} from '../../domain/kernel/contracts/publicComponent.ts'
 import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 import type {
     InspectVisualComponent,
@@ -29,11 +33,13 @@ import {BoxSpacingControls} from './BoxSpacingControls.tsx'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
 import './PageDocumentPropertiesPanel.css'
+import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
 
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
     articleHtml: string
     assets: readonly PageDocumentAsset[]
+    componentDefinitions: readonly PublicComponentDefinitionContract[]
     entryStyleCss: string
     inspectComponent: InspectVisualComponent
     applyKernelEntry: (
@@ -45,6 +51,86 @@ interface PageDocumentPropertiesPanelProps {
     onAdopt: (node: LayerProjectionNode) => Promise<string | null>
     onReplaceImage: () => void
     visualError: string | null
+}
+
+function ComponentInstanceControls({
+    node,
+    definition,
+    applyKernelEntry,
+}: {
+    node: LayerProjectionNode
+    definition: PublicComponentDefinitionContract
+    applyKernelEntry: PageDocumentPropertiesPanelProps['applyKernelEntry']
+}) {
+    const readProperties = () => Object.fromEntries(
+        definition.propertySchema.map(property => [
+            property.name,
+            node.attributes[`data-fc-prop-${property.name}`] ?? '',
+        ]),
+    )
+    const readVariables = () => {
+        const declarations = (node.attributes.style ?? '').split(';').flatMap(item => {
+            const at = item.indexOf(':')
+            return at > 0 ? [[item.slice(0, at).trim(), item.slice(at + 1).trim()] as const] : []
+        })
+        const styles = new Map(declarations)
+        return Object.fromEntries(definition.styleVariableSchema.map(variable => [variable.name, styles.get(variable.name) ?? '']))
+    }
+    const [properties, setProperties] = useState<Record<string, string>>(readProperties)
+    const [variables, setVariables] = useState<Record<string, string>>(readVariables)
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    useEffect(() => {
+        setProperties(readProperties())
+        setVariables(readVariables())
+        setError(null)
+        // 节点或定义变化时重置表单；定义对象本身由会话快照保持稳定。
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [node.id, definition.componentId, definition.revision])
+    const commit = async (kind: 'property' | 'style', name: string) => {
+        const value = kind === 'property' ? properties[name] : variables[name]
+        setBusy(true)
+        setError(null)
+        try {
+            const request = createPublicComponentInstanceEditRequest(
+                node.id,
+                kind === 'property' ? {[name]: value || null} : {},
+                kind === 'style' ? {[name]: value || null} : {},
+            )
+            if (!await applyKernelEntry(request, kind === 'property' ? `修改组件属性 ${name}` : `修改组件样式变量 ${name}`, {immediate: true})) {
+                setError('公共组件实例未修改；当前源码保持不变。')
+            }
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : '公共组件实例未修改。')
+        } finally {
+            setBusy(false)
+        }
+    }
+    return <section className="page-document-component-details" aria-label="公共组件实例">
+        <strong>{definition.name}</strong>
+        <p>此组件来自公共模板；编辑公共组件和转为本地组件暂未开放。</p>
+        {definition.propertySchema.map(property => <label key={property.name}>
+            {property.name}{property.required ? ' · 必填' : ''}
+            <Input
+                aria-label={`组件属性 ${property.name}`}
+                disabled={busy}
+                value={properties[property.name] ?? ''}
+                onValueChange={value => setProperties(current => ({...current, [property.name]: value}))}
+                onBlur={() => void commit('property', property.name)}
+            />
+        </label>)}
+        {definition.styleVariableSchema.map(variable => <label key={variable.name}>
+            {variable.name}
+            <Input
+                aria-label={`组件样式变量 ${variable.name}`}
+                disabled={busy}
+                value={variables[variable.name] ?? ''}
+                onValueChange={value => setVariables(current => ({...current, [variable.name]: value}))}
+                onBlur={() => void commit('style', variable.name)}
+            />
+        </label>)}
+        {error && <p role="alert">{error}</p>}
+    </section>
 }
 
 function ImageDescriptionControls({
@@ -179,6 +265,7 @@ export function PageDocumentPropertiesPanel({
     node,
     articleHtml,
     assets,
+    componentDefinitions,
     entryStyleCss,
     inspectComponent,
     applyKernelEntry,
@@ -197,6 +284,13 @@ export function PageDocumentPropertiesPanel({
         ? readManagedImageDescription(articleHtml, node.id, assets.map(asset => asset.id))
         : null, [articleHtml, assets, node])
     const selectedNodeId = node?.id ?? null
+    const componentDefinition = node?.managed && node.kind === 'component'
+        ? selectPublicComponentDefinition(
+            componentDefinitions,
+            node.attributes['data-fc-component'],
+            node.attributes['data-fc-component-revision'],
+        )
+        : null
     useEffect(
         () => () => flushPendingChanges(),
         [flushPendingChanges, selectedNodeId],
@@ -228,12 +322,17 @@ export function PageDocumentPropertiesPanel({
                 applyKernelEntry={applyKernelEntry}
                 onReplaceImage={onReplaceImage}
             />}
+            {componentDefinition && node && <ComponentInstanceControls
+                node={node}
+                definition={componentDefinition}
+                applyKernelEntry={applyKernelEntry}
+            />}
             {node?.managed && node.kind === 'asset' && !image && (
                 <p className="page-document-image-details" role="alert">
                     当前图片结构没有唯一的受管图片，不能安全编辑说明或替换资源。
                 </p>
             )}
-            {node?.managed && (
+            {node?.managed && node.kind !== 'component' && (
                 <div className="page-document-properties-panel__tabs" role="tablist" aria-label="属性分类">
                     {TABS.map(item => (
                         <button
@@ -259,6 +358,10 @@ export function PageDocumentPropertiesPanel({
                         </Button>
                     )}
                 </div>
+            ) : node.kind === 'component' ? (
+                !componentDefinition && <p className="page-document-component-details" role="alert">
+                    公共组件定义缺失，当前实例只能保留引用，不能编辑属性。
+                </p>
             ) : (
                 <div className="page-document-properties-panel__fields">
                     {tab === 'text' && (

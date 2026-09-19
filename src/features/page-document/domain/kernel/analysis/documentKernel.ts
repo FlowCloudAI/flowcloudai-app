@@ -21,6 +21,7 @@ import type {
 } from '../contracts/analysis.ts'
 import {parseReadContext, type EditTarget, type ReadContext} from '../contracts/context.ts'
 import type {EditBatch, PrepareEditResult, PreparedEdit} from '../contracts/edit.ts'
+import type {PublicComponentDefinitionContract} from '../contracts/publicComponent.ts'
 import {documentFingerprint} from '../contracts/hash.ts'
 import {analysisStampId, editPlanId, type ComponentHandle} from '../contracts/identity.ts'
 import {parseEditBatch, parseEditTarget} from '../contracts/runtime.ts'
@@ -65,6 +66,7 @@ export interface DocumentAnalyzeRequest {
     readonly componentRegistryVersion: string
     readonly policyVersion: string
     readonly writableScopes?: readonly SourceScope[]
+    readonly componentDefinitions?: readonly PublicComponentDefinitionContract[]
 }
 
 export interface ComponentInspectionRequest {
@@ -326,6 +328,7 @@ function analyzeDocument(request: DocumentAnalyzeRequest): {
         assetHash: request.assetHash,
         componentRegistryVersion: request.componentRegistryVersion,
         policyVersion: request.policyVersion,
+        componentDefinitions: request.componentDefinitions ?? [],
     })
     let components: ComponentIndex | null = null
     let properties: PropertyAnalyzer | null = null
@@ -404,6 +407,7 @@ function planningRuntime(
         components: runtime.components,
         properties: runtime.properties,
         themeTokens: runtime.themeTokens,
+        componentDefinitions: runtime.request.componentDefinitions ?? [],
     })
 }
 

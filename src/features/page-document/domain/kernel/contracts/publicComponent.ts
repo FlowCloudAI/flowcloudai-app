@@ -52,6 +52,24 @@ export interface PublicComponentDefinitionContract {
     readonly ownershipScope: PublicComponentOwnershipScope
 }
 
+/** 按实例声明的修订解析定义；缺省或 latest 跟随当前最高修订。 */
+export function selectPublicComponentDefinition(
+    definitions: readonly PublicComponentDefinitionContract[],
+    componentId: string | undefined,
+    revision: string | undefined,
+): PublicComponentDefinitionContract | null {
+    if (!componentId) return null
+    const matching = definitions.filter(item => item.componentId.toLowerCase() === componentId.toLowerCase())
+    if (matching.length === 0) return null
+    if (!revision || revision === 'latest') {
+        return matching.reduce((latest, item) => item.revision > latest.revision ? item : latest)
+    }
+    if (!/^\d+$/u.test(revision)) return null
+    const parsed = Number(revision)
+    if (!Number.isSafeInteger(parsed) || parsed < 1) return null
+    return matching.find(item => item.revision === parsed) ?? null
+}
+
 export function createProjectComponentOwnershipScope(
     projectId: string,
 ): PublicComponentOwnershipScope {

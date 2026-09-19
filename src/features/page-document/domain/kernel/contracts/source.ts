@@ -6,7 +6,7 @@ import {utf8ByteLength} from '../../utf8.ts'
 
 declare const COORDINATE_BRAND: unique symbol
 
-export type SourceScope = 'project' | 'entry'
+export type SourceScope = 'project' | 'entry' | 'component'
 export type SourceOriginKind = 'author' | 'metadata-binding' | 'renderer-generated'
 export type Utf16Offset = number & {readonly [COORDINATE_BRAND]: 'Utf16Offset'}
 export type Utf8ByteOffset = number & {readonly [COORDINATE_BRAND]: 'Utf8ByteOffset'}
@@ -57,8 +57,8 @@ export function sourceKeyString(key: SourceKey): string {
 
 export function parseSourceKey(value: unknown): SourceKey {
     if (!isRecord(value)) throw new TypeError('SourceKey 必须是对象。')
-    if (value.scope !== 'project' && value.scope !== 'entry') {
-        throw new TypeError('SourceKey.scope 必须是 project 或 entry。')
+    if (value.scope !== 'project' && value.scope !== 'entry' && value.scope !== 'component') {
+        throw new TypeError('SourceKey.scope 必须是 project、entry 或 component。')
     }
     if (!SOURCE_FILE_NAMES.includes(value.file as SourceFileName)) {
         throw new TypeError('SourceKey.file 不是受支持的逻辑文件。')

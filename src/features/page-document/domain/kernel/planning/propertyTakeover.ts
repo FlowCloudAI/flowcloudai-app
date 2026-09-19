@@ -228,6 +228,9 @@ function context(target: PropertyEditIntent, viewport: ReadContext['viewport']):
 }
 
 function destination(scope: SourceScope, viewport: ReadContext['viewport']): WriteDestination {
+    if (scope === 'component') {
+        throw new TypeError('公共组件作用域不能通过通用属性接管入口写回。')
+    }
     return {
         scope,
         channel:

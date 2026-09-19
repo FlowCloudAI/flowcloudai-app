@@ -57,6 +57,7 @@ import type {
 } from '../../document-editor/visual/pageAndViewRibbonModel.ts'
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
+import {PublicComponentRibbonControls} from '../../document-editor/visual/PublicComponentRibbonControls.tsx'
 import {
     createListItemInsertionRequest,
     resolveStructuredSelectionContext,
@@ -120,7 +121,7 @@ function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRi
         label: RIBBON_TAB_LABELS[tab],
         icon: RIBBON_TAB_ICONS[tab],
         contextual: !['home', 'insert', 'page', 'view'].includes(tab),
-        disabled: tab === 'insert',
+        disabled: false,
     }))
 }
 
@@ -458,6 +459,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     node={selectedNode}
                     articleHtml={scope.sources['article.html']}
                     assets={session.assets}
+                    componentDefinitions={session.componentDefinitions}
                     entryStyleCss={scope.sources['style.css']}
                     inspectComponent={session.inspectComponent}
                     applyKernelEntry={session.applyVisualPropertyEntry}
@@ -594,6 +596,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectTextRange={session.inspectTextRange}
                                 activeTextRange={activeTextRange}
                             />
+                        ) : visibleRibbonTab === 'insert' ? (
+                            <PublicComponentRibbonControls
+                                definitions={session.componentDefinitions}
+                                assets={session.assets}
+                                selected={selectedNode}
+                                applyKernelEntry={session.applyVisualPropertyEntry}
+                                onInserted={setSelectedNodeId}
+                            />
                         ) : visibleRibbonTab === 'page' ? (
                             <PageRibbonControls
                                 scope={pageScope}
@@ -632,7 +642,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 onOpenGridDetails={() => undefined}
                                 onOpenSpacingDetails={() => undefined}
                             />
-                        ) : selectedNode && visibleRibbonTab !== 'insert' ? (
+                        ) : selectedNode ? (
                             <ContextualRibbonControls
                                 selected={selectedNode}
                                 tableNode={structuredSelection.tableNode}

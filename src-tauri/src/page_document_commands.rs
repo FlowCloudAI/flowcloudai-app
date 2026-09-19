@@ -14,7 +14,7 @@ use worldflow_core::models::{
     PageDocument, PageDocumentProjection, PageTextBlock, ProjectHomeDocument, SaveEntryLinkTarget,
     SavePageDocumentResult,
 };
-use worldflow_core::{PageDocumentOps, WorldflowError};
+use worldflow_core::{ComponentOps, PageDocumentOps, WorldflowError};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +35,36 @@ pub async fn page_document_read_entry(
 ) -> Result<Option<PageDocument>, ApiError> {
     let entry_id = parse_uuid("entryId", &entry_id)?;
     read_entry(state.inner(), &entry_id).await
+}
+
+/// 读取当前项目的公共组件最新修订；定义本身只在宿主侧进入编译快照。
+#[tauri::command]
+pub async fn page_document_list_components(
+    state: State<'_, Arc<AppState>>,
+    project_id: String,
+) -> Result<Vec<worldflow_core::models::ComponentDefinition>, ApiError> {
+    let project_id = parse_uuid("projectId", &project_id)?;
+    let db = open_project_db(state.inner(), &project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    db.list_component_definitions(&project_id)
+        .await
+        .map_err(ApiError::from_display)
+}
+
+/// 读取项目范围内全部组件修订；固定修订实例也必须能在预览中解析。
+#[tauri::command]
+pub async fn page_document_list_component_revisions(
+    state: State<'_, Arc<AppState>>,
+    project_id: String,
+) -> Result<Vec<worldflow_core::models::ComponentDefinition>, ApiError> {
+    let project_id = parse_uuid("projectId", &project_id)?;
+    let db = open_project_db(state.inner(), &project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    db.list_component_definition_revisions(&project_id)
+        .await
+        .map_err(ApiError::from_display)
 }
 
 #[tauri::command]
@@ -386,6 +416,14 @@ fn projection_from_validation(
             })
             .collect(),
         asset_ids: validation.asset_ids.clone(),
+        component_references: validation
+            .component_references
+            .iter()
+            .map(|reference| worldflow_core::models::PageComponentReference {
+                node_id: reference.node_id,
+                component_id: reference.component_id,
+            })
+            .collect(),
     }
 }
 

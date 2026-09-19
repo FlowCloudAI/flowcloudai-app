@@ -1,0 +1,52 @@
+.public-component-ribbon {
+    display: flex;
+    min-width: 0;
+    gap: var(--fc-space-sm);
+}
+
+.public-component-ribbon__hint,
+.public-component-ribbon-empty {
+    margin: 0;
+    padding: var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.public-component-ribbon__list {
+    display: flex;
+    gap: var(--fc-space-sm);
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.public-component-ribbon__item {
+    display: grid;
+    justify-items: center;
+    gap: var(--fc-space-xs);
+    min-width: 7rem;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-caption);
+}
+
+.public-component-ribbon__item > strong {
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.public-component-ribbon__item .page-document-asset-picker__thumbnail,
+.public-component-ribbon__placeholder {
+    display: grid;
+    width: 3.5rem;
+    height: 2.5rem;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--fc-color-border-light);
+    background: var(--fc-color-bg-secondary);
+}
+
+.public-component-ribbon__item canvas {
+    max-width: 100%;
+    max-height: 100%;
+}

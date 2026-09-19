@@ -221,15 +221,17 @@ export function createDocumentKernelDraftRuntime(): DocumentKernelDraftRuntime {
         model: DocumentDraftModel,
         snapshot: EntrySourceSnapshot,
     ): DocumentAnalysisSnapshot => {
+        const componentDefinitions = snapshot.componentDefinitions ?? []
         const signature = draftSignature(model, snapshot)
         if (cached?.signature === signature) return cached.analysis
         const analysis = kernel.analyze({
             sourceSnapshot: draftSourceSnapshot(model),
             metadata: snapshot.entry,
             assetHash: documentFingerprint(JSON.stringify(snapshot.assets)),
-            componentRegistryVersion: `components:${snapshot.documentVersion}`,
+            componentRegistryVersion: `components:${documentFingerprint(JSON.stringify(componentDefinitions))}`,
             policyVersion: `policy:${documentFingerprint(JSON.stringify(snapshot.editorLimits))}`,
             writableScopes: ['project', 'entry'],
+            componentDefinitions,
         })
         cached = Object.freeze({signature, analysis})
         return analysis
@@ -624,6 +626,7 @@ function validateCandidateSources(
             assetIds: knownAssetIds,
             paragraphLimit: snapshot.editorLimits.paragraph,
             assetLimit: snapshot.editorLimits.asset,
+            componentDefinitions: snapshot.componentDefinitions ?? [],
         }).diagnostics,
     )
 }
@@ -692,6 +695,7 @@ function draftSignature(model: DocumentDraftModel, snapshot: EntrySourceSnapshot
             metadata: snapshot.entry,
             assets: snapshot.assets,
             limits: snapshot.editorLimits,
+            componentDefinitions: snapshot.componentDefinitions ?? [],
             documentVersion: snapshot.documentVersion,
         }),
     )

@@ -82,6 +82,87 @@ export interface PageDocumentAssetFrame {
     rgbaBase64: string
 }
 
+export interface PageDocumentComponentDefinition {
+    componentId: string
+    revision: number
+    html: string
+    css: string
+    propertySchema: Array<{name: string; valueType: string; required: boolean}>
+    partSchema: Array<{name: string; accepts: string[]; required: boolean}>
+    styleVariableSchema: Array<{name: string; syntax: string; initialValue: string | null}>
+    assetDependencies: string[]
+    name: string
+    category: string
+    preview: {assetId: string; mediaType: 'image/webp'} | null
+    ownershipScope: {kind: string; id: string}
+}
+
+interface PageDocumentComponentDefinitionWire {
+    component_id: string
+    revision: number
+    scope_kind: string
+    scope_id: string
+    html: string
+    css: string
+    property_schema: Array<{name: string; value_type?: string; valueType?: string; required: boolean}>
+    part_schema: Array<{name: string; accepts: string[]; required: boolean}>
+    style_variable_schema: Array<{name: string; syntax: string; initial_value?: string | null; initialValue?: string | null}>
+    asset_dependencies: string[]
+    name: string
+    category: string
+    preview_asset_id: string | null
+    created_at: string
+}
+
+function fromWireComponentDefinition(
+    definition: PageDocumentComponentDefinitionWire,
+): PageDocumentComponentDefinition {
+    return {
+        componentId: definition.component_id,
+        revision: definition.revision,
+        html: definition.html,
+        css: definition.css,
+        propertySchema: definition.property_schema.map(item => ({
+            name: item.name,
+            valueType: item.value_type ?? item.valueType ?? 'text',
+            required: item.required,
+        })),
+        partSchema: definition.part_schema,
+        styleVariableSchema: definition.style_variable_schema.map(item => ({
+            name: item.name,
+            syntax: item.syntax,
+            initialValue: item.initial_value ?? item.initialValue ?? null,
+        })),
+        assetDependencies: definition.asset_dependencies,
+        name: definition.name,
+        category: definition.category,
+        preview: definition.preview_asset_id
+            ? {assetId: definition.preview_asset_id, mediaType: 'image/webp' as const}
+            : null,
+        ownershipScope: {kind: definition.scope_kind, id: definition.scope_id},
+    }
+}
+
+export async function pageDocumentListComponents(
+    projectId: string,
+): Promise<PageDocumentComponentDefinition[]> {
+    const definitions = await invoke<PageDocumentComponentDefinitionWire[]>(
+        'page_document_list_components',
+        {projectId},
+    )
+    return definitions.map(fromWireComponentDefinition)
+}
+
+export async function pageDocumentListComponentRevisions(
+    projectId: string,
+): Promise<PageDocumentComponentDefinition[]> {
+    const definitions = await invoke<PageDocumentComponentDefinitionWire[]>(
+        'page_document_list_component_revisions',
+        {projectId},
+    )
+    return definitions.map(fromWireComponentDefinition)
+}
+
 export function pageDocumentListAssets(projectId: string): Promise<PageDocumentAsset[]> {
     return invoke('page_document_list_assets', {projectId})
 }

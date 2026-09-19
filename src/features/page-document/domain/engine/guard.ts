@@ -257,7 +257,7 @@ function validateResourceFunctions(
 
 function validateInlineStyle(
     element: HtmlElement,
-    scope: 'project' | 'entry',
+    scope: 'project' | 'entry' | 'component',
     diagnostics: DocumentDiagnostic[],
     referenced: Set<string>,
     knownAssets: ReadonlySet<string> | undefined,
@@ -622,13 +622,15 @@ function nearestLayer(rule: Rule): string | undefined {
 function selectorAllowed(
     selector: string,
     layer: string | undefined,
-    scope: 'project' | 'entry',
+    scope: 'project' | 'entry' | 'component',
 ): boolean {
     const trimmed = selector.trim()
     // P0F 暂不开放同级组合器，避免从受管根选择到其外部兄弟节点。
     if (trimmed.includes('+') || trimmed.includes('~')) return false
-    // fc-component 只允许未来的编译期组件定义注入；作者 project/entry CSS 没有该入口，先一律拒绝。
-    if (layer === 'fc-component') return false
+    // 公共组件 CSS 只由编译期注入，且只能选中该定义的根；作者层的 project/entry 解析永远拒绝。
+    if (layer === 'fc-component') {
+        return scope === 'component' && trimmed.startsWith('[data-fc-component=')
+    }
     if (layer === 'fc-node') return trimmed.startsWith('[data-fc-node-id=')
     if (layer === 'fc-entry') {
         return (

@@ -3,7 +3,9 @@
 import type {SourceScope} from '../contracts/source.ts'
 
 export function themeTokenSelector(scope: SourceScope, entryId: string): string {
-    return scope === 'project' ? ':root' : `[data-fc-entry-id="${entryId.toLowerCase()}"]`
+    if (scope === 'project') return ':root'
+    if (scope === 'entry') return `[data-fc-entry-id="${entryId.toLowerCase()}"]`
+    throw new TypeError('组件作用域不支持主题令牌写回。')
 }
 
 export function matchesThemeTokenSelector(
@@ -13,6 +15,7 @@ export function matchesThemeTokenSelector(
 ): boolean {
     const selector = selectorInput.trim()
     if (scope === 'project') return selector === ':root'
+    if (scope === 'component') return false
     const match = /^\[\s*data-fc-entry-id\s*=\s*(["'])([^"']+)\1\s*\]$/iu.exec(selector)
     return match?.[2]?.toLowerCase() === entryId.toLowerCase()
 }

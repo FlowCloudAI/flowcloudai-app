@@ -38,6 +38,9 @@ export function createOpaqueElementAdoptionPatch(
     if (document.key.file !== 'article.html') {
         return rejected('opaque-adoption-source-invalid', '源码节点接管只能写入 article.html。')
     }
+    if (document.key.scope === 'component') {
+        return rejected('opaque-adoption-component-source', '公共组件定义不能通过页面接管入口写入。')
+    }
     if (document.content.slice(range.from, range.to) !== expected) {
         return rejected('source-precondition-failed', '待接管源码与 expected 不一致。')
     }

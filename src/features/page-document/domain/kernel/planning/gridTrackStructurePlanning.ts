@@ -710,6 +710,9 @@ function context(viewport: ChangeGridTrackStructureIntent['context']) {
 }
 
 function destination(scope: SourceScope, viewport: ChangeGridTrackStructureIntent['context']) {
+    if (scope === 'component') {
+        throw new TypeError('公共组件作用域不能通过通用 Grid 结构入口写回。')
+    }
     return Object.freeze({
         scope,
         channel:

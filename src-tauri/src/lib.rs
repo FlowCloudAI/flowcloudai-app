@@ -508,6 +508,8 @@ pub fn run() {
             get_app_update_changelog,
             // 项目
             page_document_read_entry,
+            page_document_list_components,
+            page_document_list_component_revisions,
             page_document_save_entry,
             page_document_rebuild_projection,
             page_document_validate,

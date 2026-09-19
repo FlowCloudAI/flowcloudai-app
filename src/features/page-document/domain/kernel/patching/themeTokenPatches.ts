@@ -20,6 +20,9 @@ export function createThemeTokenPatches(
     propertyInput: string,
     value: string | null,
 ): ThemeTokenPatchResult {
+    if (document.key.scope === 'component') {
+        return rejected('theme-token-component-scope', '公共组件作用域不能通过主题令牌入口写回。')
+    }
     if (document.key.file !== 'style.css') {
         return rejected('theme-token-source-invalid', '主题令牌只能写入 style.css。')
     }

@@ -29,6 +29,9 @@ export function checkComponentInsertionPolicy(
     componentKind: DocumentNodeKind,
     destinationScope: SourceScope,
 ): ComponentInsertionPolicyResult {
+    if (destinationScope === 'component') {
+        return rejected('component-scope-not-writable', '公共组件定义不能通过页面结构入口插入页面组件。')
+    }
     const parent = components.components.find(
         component => component.handle.handleId === parentHandle.handleId,
     )

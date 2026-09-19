@@ -25,6 +25,13 @@ pub struct DerivedTextBlock {
     pub text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DerivedComponentReference {
+    pub node_id: Uuid,
+    pub component_id: Uuid,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationResult {
@@ -34,6 +41,7 @@ pub struct ValidationResult {
     pub text_blocks: Vec<DerivedTextBlock>,
     pub link_targets: Vec<DerivedLinkTarget>,
     pub asset_ids: Vec<Uuid>,
+    pub component_references: Vec<DerivedComponentReference>,
 }
 
 const FORBIDDEN_TAGS: &[&str] = &[
@@ -70,6 +78,7 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
     let document = Html::parse_fragment(html);
     let mut link_targets = Vec::new();
     let mut asset_ids = Vec::new();
+    let mut component_references = Vec::new();
     for element in document.root_element().descendent_elements() {
         validate_element(
             element,
@@ -77,6 +86,7 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
             &mut diagnostics,
             &mut link_targets,
             &mut asset_ids,
+            &mut component_references,
         );
     }
     validate_css(css, &mut diagnostics, &mut asset_ids);
@@ -88,6 +98,7 @@ pub fn validate(html: &str, css: &str, project_id: Option<&str>) -> ValidationRe
         text_blocks: derive_text_blocks(&document),
         link_targets,
         asset_ids,
+        component_references,
     }
 }
 
@@ -98,11 +109,35 @@ fn derive_text_blocks(document: &Html) -> Vec<DerivedTextBlock> {
         .descendent_elements()
         .filter_map(|element| {
             let kind = element.value().attr("data-fc-node-kind")?;
-            if !matches!(kind, "paragraph" | "heading" | "list-item" | "table-cell") {
-                return None;
-            }
             let node_id = parse_document_uuid(element.value().attr("data-fc-node-id")?).ok()?;
             if !seen.insert(node_id) {
+                return None;
+            }
+            if kind == "component" {
+                let mut parts = element
+                    .value()
+                    .attrs()
+                    .filter_map(|(name, value)| {
+                        name.strip_prefix("data-fc-prop-")
+                            .filter(|_| !value.trim().is_empty())
+                            .map(|_| value.to_string())
+                    })
+                    .collect::<Vec<_>>();
+                parts.extend(
+                    element
+                        .children()
+                        .filter_map(ElementRef::wrap)
+                        .filter(|part| part.value().attr("data-fc-part").is_some())
+                        .map(|part| part.text().collect::<String>())
+                        .filter(|text| !text.trim().is_empty()),
+                );
+                let text = parts.join(" ");
+                if text.trim().is_empty() {
+                    return None;
+                }
+                return Some(DerivedTextBlock { node_id, text });
+            }
+            if !matches!(kind, "paragraph" | "heading" | "list-item" | "table-cell") {
                 return None;
             }
             Some(DerivedTextBlock {
@@ -119,6 +154,7 @@ fn validate_element(
     diagnostics: &mut Vec<ValidationDiagnostic>,
     link_targets: &mut Vec<DerivedLinkTarget>,
     asset_ids: &mut Vec<Uuid>,
+    component_references: &mut Vec<DerivedComponentReference>,
 ) {
     let tag_name = element.value().name();
     if FORBIDDEN_TAGS
@@ -136,6 +172,26 @@ fn validate_element(
                     "img 的 data-fc-asset-id 必须与 src UUID 一致",
                 ));
             }
+        }
+    }
+    if element
+        .value()
+        .attr("data-fc-node-kind")
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("component"))
+    {
+        let node_id = element
+            .value()
+            .attr("data-fc-node-id")
+            .and_then(|raw| parse_document_uuid(raw).ok());
+        let component_id = element
+            .value()
+            .attr("data-fc-component")
+            .and_then(|raw| parse_document_uuid(raw).ok());
+        if let (Some(node_id), Some(component_id)) = (node_id, component_id) {
+            component_references.push(DerivedComponentReference {
+                node_id,
+                component_id,
+            });
         }
     }
 
@@ -816,6 +872,22 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn indexes_public_component_instance_properties_and_parts_under_instance_node() {
+        let node_id = "11111111-1111-4111-8111-111111111111";
+        let result = validate(
+            &format!(
+                "<div data-fc-node-id=\"{node_id}\" data-fc-node-kind=\"component\" data-fc-component=\"22222222-2222-4222-8222-222222222222\" data-fc-component-revision=\"latest\" data-fc-instance=\"33333333-3333-4333-8333-333333333333\" data-fc-prop-title=\"属性标题\"><span data-fc-part=\"body\">插槽正文</span></div>"
+            ),
+            "",
+            Some(PROJECT_ID),
+        );
+        assert!(result.valid, "{:?}", result.diagnostics);
+        assert_eq!(result.text_blocks.len(), 1);
+        assert_eq!(result.text_blocks[0].node_id.to_string(), node_id);
+        assert_eq!(result.text_blocks[0].text, "属性标题 插槽正文");
     }
 
     #[test]

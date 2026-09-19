@@ -96,17 +96,21 @@ export function createTextBlocks(parsed: ParsedHtmlSource): DocumentTextBlock[] 
         })
     }
 
-    function visit(node: HtmlNode, run: TextRun): void {
+    function visit(node: HtmlNode, run: TextRun, staticInherited = false): void {
         if (!isElement(node)) {
-            if (node.nodeName === '#text' && 'value' in node) run.parts.push(node.value)
+            if (!staticInherited && node.nodeName === '#text' && 'value' in node) run.parts.push(node.value)
             return
         }
         if (SKIPPED_TAGS.has(node.tagName) || getAttribute(node, 'hidden') !== undefined) return
+        const instanceContent = getAttribute(node, 'data-fc-component-instance-content') !== undefined
+        const componentStatic =
+            getAttribute(node, 'data-fc-component-static') !== undefined && !instanceContent
         if (node.tagName === 'br') {
-            run.parts.push('\n')
+            if (!staticInherited && !componentStatic) run.parts.push('\n')
             return
         }
         if (node.tagName === 'img') {
+            if (staticInherited || componentStatic) return
             flush(run)
             const image = contextFor(node, run)
             image.parts.push(getAttribute(node, 'alt') ?? '')
@@ -117,7 +121,8 @@ export function createTextBlocks(parsed: ParsedHtmlSource): DocumentTextBlock[] 
             BLOCK_TAGS.has(node.tagName) || getAttribute(node, 'data-fc-bind') !== undefined
         if (separate) flush(run)
         const next = separate ? contextFor(node, run) : run
-        for (const child of childNodes(node)) visit(child, next)
+        const childStatic = instanceContent ? false : staticInherited || componentStatic
+        for (const child of childNodes(node)) visit(child, next, childStatic)
         if (separate) flush(next)
     }
 

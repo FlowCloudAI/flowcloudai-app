@@ -20,8 +20,10 @@ import type {
     ComponentTagIntent,
     EditBatch,
     EditIntent,
+    EditPublicComponentInstanceIntent,
     LinkEditIntent,
     InsertComponentIntent,
+    InsertPublicComponentIntent,
     MoveComponentIntent,
     PropertyEditAction,
     PropertyEditIntent,
@@ -101,6 +103,8 @@ function parseEditIntent(value: unknown): EditIntent {
     if (value.kind === 'remove-component') return parseRemoveComponentIntent(value)
     if (value.kind === 'move-component') return parseMoveComponentIntent(value)
     if (value.kind === 'insert-component') return parseInsertComponentIntent(value)
+    if (value.kind === 'insert-public-component') return parseInsertPublicComponentIntent(value)
+    if (value.kind === 'edit-public-component-instance') return parseEditPublicComponentInstanceIntent(value)
     if (value.kind === 'adopt-opaque-element') return parseAdoptOpaqueElementIntent(value)
     if (value.kind === 'apply-source-edits') return parseApplySourceEditsIntent(value)
     if (value.kind === 'edit-theme-token') return parseThemeTokenEditIntent(value)
@@ -334,6 +338,98 @@ function parseInsertComponentIntent(value: unknown): InsertComponentIntent {
         assetId: record.assetId === null ? null : nodeId(record.assetId),
         destinationScope: parseSourceScope(record.destinationScope),
     })
+}
+
+function parseInsertPublicComponentIntent(value: unknown): InsertPublicComponentIntent {
+    const record = exactRecord(value, [
+        'kind',
+        'target',
+        'after',
+        'componentId',
+        'revision',
+        'instanceId',
+        'newNodeId',
+        'properties',
+        'parts',
+        'destinationScope',
+    ])
+    const target = parseEditTarget(record.target)
+    if (target.kind !== 'component-root') {
+        throw new TypeError('insert-public-component.target 必须是父组件根。')
+    }
+    return Object.freeze({
+        kind: 'insert-public-component',
+        target,
+        after: record.after === null ? null : parseComponentHandle(record.after),
+        componentId: nodeId(record.componentId),
+        revision: record.revision === 'latest'
+            ? 'latest'
+            : positiveInteger(record.revision, '公共组件 revision'),
+        instanceId: nodeId(record.instanceId),
+        newNodeId: nodeId(record.newNodeId),
+        properties: parseStringRecord(record.properties, '公共组件属性'),
+        parts: parseStringRecord(record.parts, '公共组件插槽'),
+        destinationScope: parseSourceScope(record.destinationScope),
+    })
+}
+
+function parseEditPublicComponentInstanceIntent(value: unknown): EditPublicComponentInstanceIntent {
+    const record = exactRecord(value, ['kind', 'target', 'properties', 'styleVariables', 'destinationScope'])
+    const target = parseEditTarget(record.target)
+    if (target.kind !== 'component-root') {
+        throw new TypeError('edit-public-component-instance.target 必须是组件根。')
+    }
+    const parseChanges = (raw: unknown, label: string): Readonly<Record<string, string | null>> => {
+        if (!isRecord(raw)) throw new TypeError(`${label} 必须是对象。`)
+        const result: Record<string, string | null> = {}
+        for (const [name, item] of Object.entries(raw)) {
+            if (!/^[a-z][a-z0-9-]{0,63}$/u.test(name) && label === 'properties') {
+                throw new TypeError('公共组件属性名称格式无效。')
+            }
+            if (!/^--[a-z][a-z0-9-]{0,62}$/u.test(name) && label === 'styleVariables') {
+                throw new TypeError('公共组件样式变量名称格式无效。')
+            }
+            if (item !== null && typeof item !== 'string') {
+                throw new TypeError(`${label} 的值必须是字符串或 null。`)
+            }
+            if (typeof item === 'string' && item.length > 4096) {
+                throw new TypeError(`${label} 的值过长。`)
+            }
+            result[name] = item
+        }
+        return Object.freeze(result)
+    }
+    return Object.freeze({
+        kind: 'edit-public-component-instance',
+        target,
+        properties: parseChanges(record.properties, 'properties'),
+        styleVariables: parseChanges(record.styleVariables, 'styleVariables'),
+        destinationScope: parseSourceScope(record.destinationScope),
+    })
+}
+
+function positiveInteger(value: unknown, label: string): number {
+    if (!Number.isSafeInteger(value) || Number(value) < 1) {
+        throw new TypeError(`${label} 必须是正安全整数。`)
+    }
+    return Number(value)
+}
+
+function parseStringRecord(value: unknown, label: string): Readonly<Record<string, string>> {
+    if (!isRecord(value)) throw new TypeError(`${label} 必须是对象。`)
+    const entries = Object.entries(value)
+    if (entries.length > 64) throw new TypeError(`${label} 项数不能超过 64。`)
+    const result: Record<string, string> = {}
+    for (const [name, item] of entries) {
+        if (!/^[a-z][a-z0-9-]{0,63}$/u.test(name)) {
+            throw new TypeError(`${label} 名称格式无效。`)
+        }
+        if (typeof item !== 'string' || item.length > 32768) {
+            throw new TypeError(`${label} 值必须是不超过 32768 字符的字符串。`)
+        }
+        result[name] = item
+    }
+    return Object.freeze(result)
 }
 
 function parseMoveComponentIntent(value: unknown): MoveComponentIntent {
@@ -754,8 +850,8 @@ function parseWriteDestination(value: unknown): WriteDestination {
 }
 
 function parseSourceScope(value: unknown): SourceScope {
-    if (value !== 'project' && value !== 'entry') {
-        throw new TypeError('源码作用域必须是 project 或 entry。')
+    if (value !== 'project' && value !== 'entry' && value !== 'component') {
+        throw new TypeError('源码作用域必须是 project、entry 或 component。')
     }
     return value
 }

@@ -37,6 +37,7 @@ export function createThemeTokenAnalyzer({
 }): ThemeTokenAnalyzer {
     return Object.freeze({
         inspect: (scope: SourceScope, propertyInput: string) => {
+            if (scope === 'component') return null
             const property = propertyInput.toLowerCase()
             if (!THEME_TOKEN_PATTERN.test(property)) return null
             const inspected = properties.inspectElement(effectiveRoot, property, CONTEXT)

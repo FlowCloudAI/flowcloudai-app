@@ -13,4 +13,9 @@ describe('fc-component 作者 CSS scope', () => {
         const result = guardDocumentSources([], [parseCssSource('@layer fc-component { [data-fc-component="card"] { display: grid; } }', 'project')])
         assert.ok(result.diagnostics.some(item => item.code === 'selector_scope_violation'))
     })
+
+    it('编译期 component scope 允许以公共组件根为起点的选择器', () => {
+        const result = guardDocumentSources([], [parseCssSource('@layer fc-component { [data-fc-component="card"] { display: grid; } }', 'component')])
+        assert.deepEqual(result.diagnostics, [])
+    })
 })

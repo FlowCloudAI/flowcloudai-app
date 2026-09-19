@@ -15,7 +15,7 @@ export const CSS_LAYER_ORDER = [
 ] as const
 // 旧项目的四层声明已落库；画布运行时先声明完整顺序后，它不会重排任何层。
 const LEGACY_CSS_LAYER_ORDER = ['fc-renderer', 'fc-project', 'fc-entry', 'fc-node'] as const
-export type CssAuthorScope = 'project' | 'entry'
+export type CssAuthorScope = 'project' | 'entry' | 'component'
 
 export interface ParsedCssSource {
     source: string
@@ -69,12 +69,15 @@ function validateLayerBlock(
     const allowed =
         scope === 'project'
             ? new Set(['fc-component', 'fc-project', 'fc-node'])
-            : new Set(['fc-entry', 'fc-node'])
+            : scope === 'entry'
+              ? new Set(['fc-entry', 'fc-node'])
+              : new Set(['fc-component'])
     if (!allowed.has(names[0])) {
+        const scopeLabel = scope === 'project' ? '项目' : scope === 'entry' ? '词条' : '组件'
         diagnostics.push(
             diagnosticForNode(
                 'layer_scope_violation',
-                `${scope === 'project' ? '项目' : '词条'} CSS 不能写入 ${names[0]} layer。`,
+                `${scopeLabel} CSS 不能写入 ${names[0]} layer。`,
                 rule,
             ),
         )

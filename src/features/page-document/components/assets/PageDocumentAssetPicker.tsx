@@ -10,7 +10,7 @@ import {
 } from '../../../../api/pageDocument.ts'
 import './PageDocumentAssetPicker.css'
 
-function AssetThumbnail({asset}: {asset: PageDocumentAsset}) {
+export function PageDocumentAssetThumbnail({asset}: {asset: PageDocumentAsset}) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [status, setStatus] = useState('正在读取…')
     useEffect(() => {
@@ -74,7 +74,7 @@ export function PageDocumentAssetPicker({
                         disabled={busy}
                         onClick={() => onChoose(asset)}
                     >
-                        <AssetThumbnail asset={asset} />
+                        <PageDocumentAssetThumbnail asset={asset} />
                         <span>{asset.mediaType} · {asset.width} × {asset.height}<small>{asset.id}</small></span>
                     </button>)}
                 </div>

@@ -152,6 +152,9 @@ export function inspectComponentChildListPolicy(
     anchorHandle: ComponentHandle | null,
     scope: SourceScope | null,
 ): ComponentChildListPolicyResult {
+    if (scope === 'component') {
+        return rejected('component-scope-not-writable', '公共组件定义不能通过页面结构入口重排。')
+    }
     const parent = descriptorForHandle(components, parentHandle)
     const parentElement = components.resolveElement(parentHandle)
     if (!parent || !parentElement) return rejected('stale-component-handle', '目标父组件已经失效。')

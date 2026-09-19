@@ -19,6 +19,7 @@ import {
     type ManagedNodeStyleContext,
     type SourceFileName,
 } from './kernel/contracts/primitives.ts'
+import type {PublicComponentDefinitionContract} from './kernel/contracts/publicComponent.ts'
 
 export {
     DOCUMENT_DIAGNOSTIC_CATEGORIES,
@@ -119,6 +120,7 @@ export interface EntrySourceSnapshot {
     articleHtml: string
     styleCss: string
     assets: EntryAssetSnapshot[]
+    componentDefinitions: PublicComponentDefinitionContract[]
     editorLimits: EntryEditorLimits
     diagnostics: DocumentDiagnostic[]
     sourceStatus: DocumentSourceStatus

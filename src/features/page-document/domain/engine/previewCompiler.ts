@@ -8,6 +8,8 @@ import {findFirstElementByTagName, hasBlockingDiagnostics, parseHtmlSource} from
 import {createTextProjection} from './textProjection.ts'
 import {createTextBlocks, type DocumentTextBlock} from './textBlocks.ts'
 import {mergeEntryTemplate, type EntryMetadataInput} from './templateMerge.ts'
+import {expandPublicComponentInstances} from './componentExpansion.ts'
+import type {PublicComponentDefinitionContract} from '../kernel/contracts/publicComponent.ts'
 
 // 画布是 opaque-origin 独立文档，无法继承宿主字体 token；这里有意使用系统字体字面栈作为渲染基线。
 const RENDERER_BASELINE_CSS = `@layer fc-renderer {
@@ -51,6 +53,7 @@ export interface PreviewCompileInput {
     assetIds?: readonly string[]
     paragraphLimit?: number
     assetLimit?: number
+    componentDefinitions?: readonly PublicComponentDefinitionContract[]
 }
 
 export interface PreviewArtifact {
@@ -64,7 +67,7 @@ export interface PreviewArtifact {
 
 function appendStyle(
     head: NonNullable<ReturnType<typeof findFirstElementByTagName>>,
-    scope: 'renderer' | 'project' | 'entry',
+    scope: 'renderer' | 'component' | 'project' | 'entry',
     css: string,
 ): void {
     const style = defaultTreeAdapter.createElement('style', head.namespaceURI, [
@@ -111,6 +114,12 @@ export function compilePreviewArtifact(input: PreviewCompileInput): PreviewArtif
 
     const merged = merge.parsedHtml
     const previewRoot = cloneHtmlTree(merged.root)
+    const expansion = expandPublicComponentInstances(
+        previewRoot,
+        input.componentDefinitions ?? [],
+        knownAssetIds,
+    )
+    diagnostics.push(...expansion.diagnostics)
     const head = findFirstElementByTagName(previewRoot, 'head')
     if (!head) {
         diagnostics.push({
@@ -132,17 +141,19 @@ export function compilePreviewArtifact(input: PreviewCompileInput): PreviewArtif
         }
     }
 
-    const textProjection = createTextProjection(merged)
-    const textBlocks = createTextBlocks(merged)
+    const expanded = parseHtmlSource(serialize(previewRoot), {mode: 'document', scope: 'project'})
+    const textProjection = createTextProjection(expanded)
+    const textBlocks = createTextBlocks(expanded)
     appendStyle(head, 'renderer', RENDERER_BASELINE_CSS)
     appendStyle(head, 'project', input.projectStyleCss)
     appendStyle(head, 'entry', input.entryStyleCss)
+    for (const css of expansion.styles) appendStyle(head, 'component', css)
     return {
         srcdoc: serialize(previewRoot),
         textProjection,
         textBlocks,
         diagnostics,
-        referencedAssetIds: guard.referencedAssetIds,
+        referencedAssetIds: [...new Set([...guard.referencedAssetIds, ...expansion.referencedAssetIds])].sort(),
         templateVersion: merge.templateVersion,
     }
 }

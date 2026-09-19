@@ -9,6 +9,10 @@ import {
     type ComponentSemanticPartId,
 } from '../components/index.ts'
 import type {DocumentAnalysisSnapshot} from '../contracts/analysis.ts'
+import {
+    selectPublicComponentDefinition,
+    type PublicComponentDefinitionContract,
+} from '../contracts/publicComponent.ts'
 import type {EditTarget} from '../contracts/context.ts'
 import type {
     AssetAltIntent,
@@ -22,6 +26,8 @@ import type {
     EditIntent,
     EditImpact,
     InsertComponentIntent,
+    InsertPublicComponentIntent,
+    EditPublicComponentInstanceIntent,
     LinkEditIntent,
     MoveComponentIntent,
     PropertyEditIntent,
@@ -42,6 +48,7 @@ import {
     sourceKeyString,
     utf16RangeFromUtf8ByteRange,
     type SourceDocument,
+    type SourceScope,
     type SourceSnapshot,
 } from '../contracts/source.ts'
 import {
@@ -62,6 +69,8 @@ import {createComponentTagPatches} from '../patching/componentTagPatches.ts'
 import {createComponentRemovalPatch} from '../patching/componentRemovalPatches.ts'
 import {createComponentMovePatches} from '../patching/componentMovePatches.ts'
 import {createComponentInsertionPatches} from '../patching/componentInsertionPatches.ts'
+import {createPublicComponentInsertionPatch} from '../patching/publicComponentInsertionPatches.ts'
+import {createPublicComponentInstancePatches} from '../patching/publicComponentInstancePatches.ts'
 import {createOpaqueElementAdoptionPatch} from '../patching/opaqueElementAdoptionPatches.ts'
 import {createThemeTokenPatches} from '../patching/themeTokenPatches.ts'
 import {createTextRangeLinkPatches, textRangeHasHref} from '../patching/linkPatches.ts'
@@ -108,6 +117,7 @@ export interface PlanningAnalysisRuntime {
     readonly components: ComponentIndex | null
     readonly properties: PropertyAnalyzer | null
     readonly themeTokens: ThemeTokenAnalyzer | null
+    readonly componentDefinitions: readonly PublicComponentDefinitionContract[]
 }
 
 export interface PropertyPlanningEnvironment {
@@ -163,6 +173,20 @@ type PlannedVerification =
           readonly newChildNodeIds: readonly NodeId[]
           readonly parentNodeId: NodeId
           readonly previousSiblingNodeId: NodeId | null
+      }
+    | {
+          readonly kind: 'public-component-inserted'
+          readonly componentId: NodeId
+          readonly revision: number | 'latest'
+          readonly instanceId: NodeId
+          readonly newNodeId: NodeId
+          readonly parentNodeId: NodeId
+          readonly previousSiblingNodeId: NodeId | null
+      }
+    | {
+          readonly kind: 'public-component-instance-edited'
+          readonly properties: Readonly<Record<string, string | null>>
+          readonly styleVariables: Readonly<Record<string, string | null>>
       }
     | {
           readonly kind: 'component-adopted'
@@ -448,6 +472,28 @@ export function planPropertyEditBatch(
                     afterHandle,
                 )
             }
+        } else if (planned.verification.kind === 'public-component-inserted') {
+            if (
+                intent.kind !== 'insert-public-component' ||
+                !verifyPublicComponentInsertionCandidate(analyzed.components, planned.verification)
+            ) {
+                return rejected(
+                    'public-component-insertion-postcondition-failed',
+                    '候选没有在请求位置创建完整的公共组件实例。',
+                    afterHandle,
+                )
+            }
+        } else if (planned.verification.kind === 'public-component-instance-edited') {
+            if (
+                intent.kind !== 'edit-public-component-instance' ||
+                !verifyPublicComponentInstanceCandidate(analyzed.components, afterHandle, planned.verification)
+            ) {
+                return rejected(
+                    'public-component-instance-postcondition-failed',
+                    '候选没有保留公共组件实例并应用公开属性。',
+                    afterHandle,
+                )
+            }
         } else if (planned.verification.kind === 'grid-auto-placement') {
             if (
                 intent.kind !== 'set-grid-auto-placement' ||
@@ -600,7 +646,7 @@ function propertyVerificationKey(intent: PropertyEditIntent): string {
 function planSingleEdit(
     current: PlanningAnalysisRuntime,
     intent: EditIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     if (intent.kind === 'apply-source-edits') {
         return planSourceEdits(current, intent, authorizedScopes)
@@ -645,6 +691,12 @@ function planSingleEdit(
     if (intent.kind === 'insert-component') {
         return planComponentInsertion(current, intent, authorizedScopes)
     }
+    if (intent.kind === 'insert-public-component') {
+        return planPublicComponentInsertion(current, intent, authorizedScopes)
+    }
+    if (intent.kind === 'edit-public-component-instance') {
+        return planPublicComponentInstanceEdit(current, intent, authorizedScopes)
+    }
     if (intent.kind === 'set-grid-auto-placement') {
         return planGridAutoPlacement(current, intent, authorizedScopes)
     }
@@ -657,12 +709,12 @@ function planSingleEdit(
 function planSourceEdits(
     current: PlanningAnalysisRuntime,
     intent: ApplySourceEditsIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const patches: Parameters<typeof applySourcePatches>[1][number][] = []
     let structuralChange: SourcePatchIntent['structuralChange'] = 'none'
     for (const edit of intent.edits) {
-        if (!authorizedScopes.has(edit.source.scope)) {
+        if (!hasWritableScope(authorizedScopes, edit.source.scope)) {
             return rejected('write-scope-denied', `未授权写入 ${edit.source.scope} 作用域。`)
         }
         const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(edit.source))
@@ -693,10 +745,10 @@ function planSourceEdits(
 function planThemeTokenEdit(
     current: PlanningAnalysisRuntime,
     intent: ThemeTokenEditIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const scope = intent.target.scope
-    if (!authorizedScopes.has(scope)) {
+    if (!hasWritableScope(authorizedScopes, scope)) {
         return rejected('write-scope-denied', `未授权写入 ${scope} 作用域。`)
     }
     if (!current.themeTokens) {
@@ -726,9 +778,9 @@ function planThemeTokenEdit(
 function planOpaqueElementAdoption(
     current: PlanningAnalysisRuntime,
     intent: AdoptOpaqueElementIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.source.scope)) {
+    if (!hasWritableScope(authorizedScopes, intent.source.scope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.source.scope} 作用域。`)
     }
     if (intent.source.file !== 'article.html') {
@@ -759,9 +811,9 @@ function planOpaqueElementAdoption(
 function planGridAutoPlacement(
     current: PlanningAnalysisRuntime,
     intent: SetGridAutoPlacementIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     if (!current.components || !current.properties) {
@@ -839,9 +891,9 @@ function planGridAutoPlacement(
 function planComponentInsertion(
     current: PlanningAnalysisRuntime,
     intent: InsertComponentIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     if (!current.components) return rejected('candidate-analysis-failed', '候选缺少组件索引。')
@@ -921,12 +973,128 @@ function planComponentInsertion(
     })
 }
 
+function planPublicComponentInsertion(
+    current: PlanningAnalysisRuntime,
+    intent: InsertPublicComponentIntent,
+    authorizedScopes: ReadonlySet<SourceScope>,
+): PlannedSingleEdit {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
+        return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
+    }
+    if (!current.components) return rejected('candidate-analysis-failed', '候选缺少组件索引。')
+    const definition = selectPublicComponentDefinition(
+        current.componentDefinitions,
+        intent.componentId,
+        String(intent.revision),
+    )
+    if (!definition) {
+        return rejected('component-definition-not-found', '公共组件定义或指定修订不存在。')
+    }
+    const parentHandle = rebindHandle(current.components, intent.target.component)
+    const afterHandle = intent.after ? rebindHandle(current.components, intent.after) : null
+    if (!parentHandle || (intent.after && !afterHandle)) {
+        return rejected('stale-component-handle', '插入父级或相邻组件已经失效。')
+    }
+    if (!componentHasCapability(parentHandle.kind, 'structure.children')) {
+        return rejected('component-insertion-unavailable', `${parentHandle.kind} 不支持插入公共组件。`, parentHandle)
+    }
+    if (intent.instanceId === intent.newNodeId) {
+        return rejected('component-instance-identity-conflict', '组件页面节点与实例身份必须彼此独立。')
+    }
+    if (current.components.components.some(component => component.handle.nodeId === intent.newNodeId)) {
+        return rejected('component-identity-conflict', '新公共组件页面节点身份已经被当前文档使用。')
+    }
+    const policy = checkComponentInsertionPolicy(
+        current.components,
+        parentHandle,
+        afterHandle,
+        'component',
+        intent.destinationScope,
+    )
+    if (policy.status === 'rejected') return rejected(policy.code, policy.message, parentHandle)
+    const destinationKey = `${intent.destinationScope}:article.html`
+    if (sourceKeyString(policy.childList.source) !== destinationKey) {
+        return rejected('component-insertion-source-mismatch', '插入位置不属于请求的作者 HTML 作用域。', parentHandle)
+    }
+    const article = findDocument(current.snapshot.sourceSnapshot, destinationKey)
+    const after = afterHandle ? current.components.resolveElement(afterHandle) : null
+    if (!article || (afterHandle && !after)) {
+        return rejected('source-not-found', '公共组件插入所需的作者源码不完整。', parentHandle)
+    }
+    const patch = createPublicComponentInsertionPatch(
+        article,
+        policy.childList.sourceContainer,
+        after,
+        intent.componentId,
+        intent.revision,
+        intent.instanceId,
+        intent.newNodeId,
+        intent.properties,
+        intent.parts,
+    )
+    if ('status' in patch) return rejected(patch.code, patch.message, parentHandle)
+    return readyPatches([patch], 'component-tree', {
+        kind: 'public-component-inserted',
+        componentId: intent.componentId,
+        revision: intent.revision,
+        instanceId: intent.instanceId,
+        newNodeId: intent.newNodeId,
+        parentNodeId: parentHandle.nodeId,
+        previousSiblingNodeId: afterHandle?.nodeId ?? null,
+    })
+}
+
+function planPublicComponentInstanceEdit(
+    current: PlanningAnalysisRuntime,
+    intent: EditPublicComponentInstanceIntent,
+    authorizedScopes: ReadonlySet<SourceScope>,
+): PlannedSingleEdit {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
+        return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
+    }
+    if (!current.components) return rejected('candidate-analysis-failed', '候选缺少组件索引。')
+    const handle = rebindHandle(current.components, intent.target.component)
+    if (!handle || handle.kind !== 'component') {
+        return rejected('public-component-instance-required', '只能修改公共组件实例的公开属性。', handle ?? undefined)
+    }
+    const element = current.components.resolveElement(handle)
+    const source = element ? current.components.originOfNode(element)?.source : null
+    if (!element || !source || source.scope !== intent.destinationScope || source.file !== 'article.html') {
+        return rejected('source-origin-unavailable', '公共组件实例没有可写的词条 HTML 来源。', handle)
+    }
+    const componentId = element.attrs.find(item => item.name === 'data-fc-component')?.value
+    const definition = selectPublicComponentDefinition(
+        current.componentDefinitions,
+        componentId,
+        element.attrs.find(item => item.name === 'data-fc-component-revision')?.value,
+    )
+    if (!definition) return rejected('component-definition-not-found', '公共组件定义不存在。', handle)
+    const propertyNames = new Set(definition.propertySchema.map(item => item.name))
+    if (Object.keys(intent.properties).some(name => !propertyNames.has(name))) {
+        return rejected('component-property-not-declared', '只能修改公共组件定义声明的属性。', handle)
+    }
+    const styleNames = new Set(definition.styleVariableSchema.map(item => item.name))
+    if (Object.keys(intent.styleVariables).some(name => !styleNames.has(name))) {
+        return rejected('component-style-variable-not-declared', '只能修改公共组件定义声明的样式变量。', handle)
+    }
+    const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
+    if (!document) return rejected('source-not-found', '公共组件实例作者源码不在当前快照中。', handle)
+    const changed = createPublicComponentInstancePatches(document, element, intent.properties, intent.styleVariables)
+    if (changed.status === 'rejected') return rejected(changed.code, changed.message, handle)
+    if (changed.status === 'unchanged') return {status: 'unchanged'}
+    return readyPatches(changed.patches, 'none', {
+        kind: 'public-component-instance-edited',
+        properties: intent.properties,
+        styleVariables: intent.styleVariables,
+    })
+}
+
 function planComponentMove(
     current: PlanningAnalysisRuntime,
     intent: MoveComponentIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     if (!current.components) return rejected('candidate-analysis-failed', '候选缺少组件索引。')
@@ -1006,9 +1174,9 @@ function planComponentMove(
 function planComponentRemoval(
     current: PlanningAnalysisRuntime,
     intent: RemoveComponentIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     const handle = rebindHandle(current.components, intent.target.component)
@@ -1069,9 +1237,9 @@ function planComponentRemoval(
 function planTableResize(
     current: PlanningAnalysisRuntime,
     intent: ResizeTableIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     const handle = rebindHandle(current.components, intent.target.component)
@@ -1137,7 +1305,7 @@ function planTableResize(
 function planAssetReference(
     current: PlanningAnalysisRuntime,
     intent: AssetReferenceIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const target = resolveAssetContentTarget(
         current,
@@ -1167,7 +1335,7 @@ function planAssetReference(
 function planAssetAlt(
     current: PlanningAnalysisRuntime,
     intent: AssetAltIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const target = resolveAssetContentTarget(
         current,
@@ -1189,7 +1357,7 @@ function planAssetAlt(
 function planAssetCaption(
     current: PlanningAnalysisRuntime,
     intent: AssetCaptionIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const target = resolveAssetContentTarget(
         current,
@@ -1227,8 +1395,8 @@ function planAssetCaption(
 function resolveAssetContentTarget(
     current: PlanningAnalysisRuntime,
     originalHandle: ComponentHandle,
-    destinationScope: 'project' | 'entry',
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    destinationScope: SourceScope,
+    authorizedScopes: ReadonlySet<SourceScope>,
     capability: 'asset.alt' | 'asset.caption' | 'asset.reference',
 ):
     | {
@@ -1237,7 +1405,7 @@ function resolveAssetContentTarget(
           readonly document: SourceDocument
       }
     | Extract<PropertyPlanningResult, {status: 'rejected'}> {
-    if (!authorizedScopes.has(destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${destinationScope} 作用域。`)
     }
     const handle = rebindHandle(current.components, originalHandle)
@@ -1272,9 +1440,9 @@ function resolveAssetContentTarget(
 function planComponentTag(
     current: PlanningAnalysisRuntime,
     intent: ComponentTagIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     const handle = rebindHandle(current.components, intent.target.component)
@@ -1318,9 +1486,9 @@ function planComponentTag(
 function planComponentVisibility(
     current: PlanningAnalysisRuntime,
     intent: ComponentVisibilityIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
-    if (!authorizedScopes.has(intent.destinationScope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
     }
     const handle = rebindHandle(current.components, intent.target.component)
@@ -1367,7 +1535,7 @@ function planComponentVisibility(
 function planSinglePropertyEdit(
     current: PlanningAnalysisRuntime,
     intent: PropertyEditIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     if (!PROPERTY_PATTERN.test(intent.property)) {
         return rejected('invalid-property-name', 'CSS 属性名无效。')
@@ -1399,7 +1567,7 @@ function planSinglePropertyEdit(
             handle,
         )
     }
-    if (!authorizedScopes.has(intent.destination.scope)) {
+    if (!hasWritableScope(authorizedScopes, intent.destination.scope)) {
         return rejected('write-scope-denied', `未授权写入 ${intent.destination.scope} 作用域。`)
     }
     if (intent.target.kind === 'text-range') {
@@ -1552,7 +1720,7 @@ function planTextRangePropertyEdit(
 function planTextReplacement(
     current: PlanningAnalysisRuntime,
     intent: TextReplacementIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const handle = rebindHandle(current.components, intent.target.component)
     if (!handle || !current.components) {
@@ -1575,7 +1743,7 @@ function planTextReplacement(
     if (!source || source.file !== 'article.html' || !element) {
         return rejected('source-origin-unavailable', '文本组件没有作者 HTML 来源。', handle)
     }
-    if (!authorizedScopes.has(source.scope)) {
+    if (!hasWritableScope(authorizedScopes, source.scope)) {
         return rejected('write-scope-denied', `未授权写入 ${source.scope} 作用域。`, handle)
     }
     const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
@@ -1599,7 +1767,7 @@ function planTextReplacement(
 function planTextLinkEdit(
     current: PlanningAnalysisRuntime,
     intent: LinkEditIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const handle = rebindHandle(current.components, intent.target.component)
     if (!handle || !current.components) {
@@ -1613,7 +1781,7 @@ function planTextLinkEdit(
     if (!source || source.file !== 'article.html' || !element) {
         return rejected('source-origin-unavailable', '文本组件没有作者 HTML 来源。', handle)
     }
-    if (!authorizedScopes.has(source.scope)) {
+    if (!hasWritableScope(authorizedScopes, source.scope)) {
         return rejected('write-scope-denied', `未授权写入 ${source.scope} 作用域。`, handle)
     }
     const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
@@ -1637,7 +1805,7 @@ function planTextLinkEdit(
 function planTextBlockSplit(
     current: PlanningAnalysisRuntime,
     intent: SplitTextBlockIntent,
-    authorizedScopes: ReadonlySet<'project' | 'entry'>,
+    authorizedScopes: ReadonlySet<SourceScope>,
 ): PlannedSingleEdit {
     const handle = rebindHandle(current.components, intent.target.component)
     if (!handle || !current.components) {
@@ -1668,7 +1836,7 @@ function planTextBlockSplit(
     if (!source || source.file !== 'article.html' || !element) {
         return rejected('source-origin-unavailable', '文本组件没有作者 HTML 来源。', handle)
     }
-    if (!authorizedScopes.has(source.scope)) {
+    if (!hasWritableScope(authorizedScopes, source.scope)) {
         return rejected('write-scope-denied', `未授权写入 ${source.scope} 作用域。`, handle)
     }
     const document = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
@@ -1968,6 +2136,50 @@ function verifyComponentInsertionCandidate(
     )
 }
 
+function verifyPublicComponentInsertionCandidate(
+    components: ComponentIndex | null,
+    expected: Extract<PlannedVerification, {readonly kind: 'public-component-inserted'}>,
+): boolean {
+    if (!components) return false
+    const binding = components.bind([expected.newNodeId])
+    const handle = binding.handles[0]
+    if (
+        binding.failures.length > 0 ||
+        !handle ||
+        handle.kind !== 'component' ||
+        handle.instanceId !== expected.instanceId
+    ) {
+        return false
+    }
+    const movement = inspectComponentMovementPolicy(components, handle)
+    if (movement.status === 'rejected' || movement.parentNodeId !== expected.parentNodeId) {
+        return false
+    }
+    const previous = movement.currentIndex > 0 ? movement.siblingNodeIds[movement.currentIndex - 1] : null
+    return previous === expected.previousSiblingNodeId
+}
+
+function verifyPublicComponentInstanceCandidate(
+    components: ComponentIndex | null,
+    handle: ComponentHandle,
+    expected: Extract<PlannedVerification, {readonly kind: 'public-component-instance-edited'}>,
+): boolean {
+    if (!components || handle.kind !== 'component') return false
+    const element = components.resolveElement(handle)
+    if (!element) return false
+    for (const [name, value] of Object.entries(expected.properties)) {
+        const actual = element.attrs.find(item => item.name === `data-fc-prop-${name}`)?.value
+        if ((value ?? null) !== (actual ?? null)) return false
+    }
+    for (const [name, value] of Object.entries(expected.styleVariables)) {
+        const style = element.attrs.find(item => item.name === 'style')?.value ?? ''
+        const declaration = style.split(';').map(item => item.trim()).find(item => item.toLowerCase().startsWith(`${name.toLowerCase()}:`))
+        const actual = declaration ? declaration.slice(declaration.indexOf(':') + 1).trim() : null
+        if ((value ?? null) !== actual) return false
+    }
+    return true
+}
+
 function verifyOpaqueElementAdoptionCandidate(
     components: ComponentIndex,
     expected: Extract<PlannedVerification, {readonly kind: 'component-adopted'}>,
@@ -1988,6 +2200,7 @@ function verifyThemeTokenCandidate(
     analyzed: PlanningAnalysisRuntime,
     expected: Extract<PlannedVerification, {readonly kind: 'theme-token'}>,
 ): boolean {
+    if (expected.scope === 'component') return false
     const inspection = analyzed.themeTokens?.inspect(expected.scope, expected.property)
     if (!inspection) return false
     const actual = inspection.managedValue?.rawValue ?? null
@@ -2056,4 +2269,9 @@ function diagnostic(code: string, message: string, handle?: ComponentHandle): Do
         message,
         nodeId: handle?.nodeId,
     })
+}
+
+function hasWritableScope(scopes: ReadonlySet<SourceScope>, scope: SourceScope): boolean {
+    if (scope === 'component') return false
+    return scopes.has(scope)
 }

@@ -189,6 +189,7 @@ function collectThemeDeclarations(
     covered: readonly SourceRange[],
 ): Map<string, ThemeDeclaration[]> {
     const declarations = new Map<string, ThemeDeclaration[]>()
+    if (scope === 'component') return declarations
     if (scope === 'entry' && !entryId) return declarations
     const layerName = `fc-${scope}`
     const canonicalSelector =

@@ -6,6 +6,8 @@ import {
     pageDocumentCheckAsset,
     pageDocumentChooseAndImportAsset,
     pageDocumentListAssets,
+    pageDocumentListComponents,
+    pageDocumentListComponentRevisions,
     pageDocumentReadEntry,
     pageDocumentSaveEntry,
     parsePageDocumentSaveError,
@@ -68,6 +70,7 @@ import {
     type CanvasLinkCandidateIntentMessage,
 } from '../canvas/protocol/index.ts'
 import type {KernelThemeTokenInspectionRequest} from '../application/documentKernelDraftRuntime.ts'
+import {parsePublicComponentDefinition, type PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -118,13 +121,27 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         setAssets([])
         setLoadStatus('loading')
         setLoadError(null)
-        void Promise.all([pageDocumentReadEntry(entryId), pageDocumentListAssets(projectId)])
-            .then(([document, catalog]) => {
+        void Promise.all([
+            pageDocumentReadEntry(entryId),
+            pageDocumentListAssets(projectId),
+            pageDocumentListComponents(projectId),
+            pageDocumentListComponentRevisions(projectId),
+        ])
+            .then(([document, catalog, rawLatestDefinitions, rawRevisionDefinitions]) => {
                 if (cancelled) return
+                const parseDefinitions = (items: typeof rawLatestDefinitions) => items.flatMap(item => {
+                    try {
+                        return [parsePublicComponentDefinition(item)]
+                    } catch {
+                        return []
+                    }
+                }) as PublicComponentDefinitionContract[]
+                const latestDefinitions = parseDefinitions(rawLatestDefinitions)
+                const definitions = parseDefinitions(rawRevisionDefinitions)
                 setAssets(catalog)
                 publish(createEntryDocumentSessionState(inputRef.current, document, catalog.map(asset => ({
                     id: asset.id, mediaType: asset.mediaType, sizeBytes: asset.sizeBytes, sha256: asset.sha256,
-                }))))
+                })), definitions.length > 0 ? definitions : latestDefinitions))
                 setLoadStatus('ready')
             })
             .catch(error => {
@@ -609,6 +626,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         loadError,
         state,
         assets,
+        componentDefinitions: state?.snapshot.componentDefinitions ?? [],
         source,
         dirty,
         canSave: state ? canSaveEntryDocument(state) : false,

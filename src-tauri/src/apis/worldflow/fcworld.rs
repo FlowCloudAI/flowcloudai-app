@@ -3085,6 +3085,14 @@ mod tests {
                 })
                 .collect(),
             asset_ids: validation.asset_ids.clone(),
+            component_references: validation
+                .component_references
+                .iter()
+                .map(|reference| worldflow_core::models::PageComponentReference {
+                    node_id: reference.node_id,
+                    component_id: reference.component_id,
+                })
+                .collect(),
         };
         source_db
             .save_entry_page_document(

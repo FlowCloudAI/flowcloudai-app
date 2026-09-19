@@ -46,7 +46,7 @@ export interface ComponentDescriptor {
 
 export interface ComponentQuery {
     readonly kinds?: readonly DocumentNodeKind[]
-    readonly sourceScope?: 'project' | 'entry'
+    readonly sourceScope?: 'project' | 'entry' | 'component'
     readonly parentNodeId?: NodeId | null
 }
 

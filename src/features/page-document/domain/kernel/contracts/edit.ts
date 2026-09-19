@@ -146,6 +146,30 @@ export interface InsertComponentIntent {
     readonly destinationScope: SourceScope
 }
 
+export interface InsertPublicComponentIntent {
+    readonly kind: 'insert-public-component'
+    readonly target: Extract<EditTarget, {readonly kind: 'component-root'}>
+    readonly after: ComponentHandle | null
+    readonly componentId: NodeId
+    /** latest 由宿主解析为当前最高修订；具体正整数用于固定旧修订。 */
+    readonly revision: number | 'latest'
+    readonly instanceId: NodeId
+    readonly newNodeId: NodeId
+    readonly properties: Readonly<Record<string, string>>
+    readonly parts: Readonly<Record<string, string>>
+    readonly destinationScope: SourceScope
+}
+
+export interface EditPublicComponentInstanceIntent {
+    readonly kind: 'edit-public-component-instance'
+    readonly target: Extract<EditTarget, {readonly kind: 'component-root'}>
+    /** null 删除公开属性，字符串写入 data-fc-prop-*；未知属性保持不变。 */
+    readonly properties: Readonly<Record<string, string | null>>
+    /** null 删除覆盖，字符串写入实例 style 中的自定义属性。 */
+    readonly styleVariables: Readonly<Record<string, string | null>>
+    readonly destinationScope: SourceScope
+}
+
 /** 将作者 HTML 中一个尚未托管的完整元素纳入组件身份体系；目标在接管前没有 ComponentHandle。 */
 export interface AdoptOpaqueElementIntent {
     readonly kind: 'adopt-opaque-element'
@@ -232,6 +256,8 @@ export type EditIntent =
     | RemoveComponentIntent
     | MoveComponentIntent
     | InsertComponentIntent
+    | InsertPublicComponentIntent
+    | EditPublicComponentInstanceIntent
     | AdoptOpaqueElementIntent
     | ApplySourceEditsIntent
     | ThemeTokenEditIntent

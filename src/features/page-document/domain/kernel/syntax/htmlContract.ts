@@ -22,7 +22,7 @@ const COMPONENT_REVISION_PATTERN = /^(?:latest|[1-9]\d*)$/u
 const ALLOWED_BINDINGS = new Set(['title', 'summary', 'tags'])
 
 export type HtmlSourceMode = 'document' | 'fragment'
-export type HtmlContractScope = 'project' | 'entry'
+export type HtmlContractScope = 'project' | 'entry' | 'component'
 export type HtmlRoot = DefaultTreeAdapterTypes.Document | DefaultTreeAdapterTypes.DocumentFragment
 export type HtmlElement = DefaultTreeAdapterTypes.Element
 export type HtmlTemplate = DefaultTreeAdapterTypes.Template
@@ -464,6 +464,7 @@ function validatePublicComponentInstances(parsed: ParsedHtmlSource): void {
         const owner = [...ancestors]
             .reverse()
             .find(ancestor => getAttribute(ancestor, 'data-fc-node-kind') === 'component')
+        if (!owner && parsed.scope === 'component') return
         if (!owner) {
             parsed.diagnostics.push(
                 diagnosticForElement(
