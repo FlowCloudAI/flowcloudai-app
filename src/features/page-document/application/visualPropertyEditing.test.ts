@@ -225,6 +225,14 @@ describe('visual property editing', () => {
         assert.throws(() => serializeVisualPropertyValue('font-size', {kind: 'numeric', value: 18, unit: '' as 'px', numberText: '18'}), /单位/u)
         assert.throws(() => serializeVisualPropertyValue('padding-block-start', {kind: 'numeric', value: -1, unit: 'px', numberText: '-1'}), /负数/u)
         assert.throws(() => serializeVisualPropertyValue('font-weight', {kind: 'color', value: '#112233', opacity: 100}), /颜色结构/u)
+        assert.equal(serializeVisualPropertyValue('display', {kind: 'display', value: 'grid'}), 'grid')
+        assert.equal(serializeVisualPropertyValue('grid-template-columns', {kind: 'grid-columns', value: 'repeat(2, minmax(0, 1fr))'}), 'repeat(2, minmax(0, 1fr))')
+        assert.equal(serializeVisualPropertyValue('align-items', {kind: 'align-items', value: 'center'}), 'center')
+        assert.equal(serializeVisualPropertyValue('justify-content', {kind: 'justify-content', value: 'space-between'}), 'space-between')
+        assert.throws(() => serializeVisualPropertyValue('display', {kind: 'display', value: 'inline' as never}), /布局方式/u)
+        assert.throws(() => serializeVisualPropertyValue('grid-template-columns', {kind: 'grid-columns', value: 'repeat(9, 1fr)' as never}), /分栏/u)
+        assert.throws(() => serializeVisualPropertyValue('align-items', {kind: 'align-items', value: 'space-around' as never}), /纵向/u)
+        assert.throws(() => serializeVisualPropertyValue('justify-content', {kind: 'justify-content', value: 'unsafe' as never}), /横向/u)
     })
 
     it('半透明标准色与主题色写回后仍能由调节控件精确回读', () => {

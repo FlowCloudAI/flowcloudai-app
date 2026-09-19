@@ -27,7 +27,11 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'font-size', label: '字号', group: 'text'},
     {property: 'font-weight', label: '字重', group: 'text'},
     {property: 'line-height', label: '行高', group: 'text'},
+    {property: 'display', label: '布局方式', group: 'layout'},
     {property: 'text-align', label: '对齐', group: 'layout'},
+    {property: 'grid-template-columns', label: '分栏数', group: 'layout'},
+    {property: 'align-items', label: '纵向对齐', group: 'layout'},
+    {property: 'justify-content', label: '横向分布', group: 'layout'},
     {property: 'margin-block-start', label: '外距上', group: 'layout'},
     {property: 'margin-block-end', label: '外距下', group: 'layout'},
     {property: 'margin-inline-start', label: '外距左', group: 'layout'},
@@ -214,7 +218,7 @@ export function inspectVisualProperties(
     inspect: InspectVisualComponent,
     entryStyleCss = '',
 ): readonly VisualPropertyState[] {
-    const properties = [...VISUAL_PROPERTY_FIELDS.map(field => field.property), 'display']
+    const properties = [...new Set([...VISUAL_PROPERTY_FIELDS.map(field => field.property), 'display'])]
     const result = inspect({nodeId: node.id, properties, context: ALL_WIDTHS_READ_CONTEXT})
     const desktopResult = inspect({
         nodeId: node.id,
@@ -291,6 +295,24 @@ export interface VisualNumericPropertyValue {
     readonly numberText: string
 }
 
+export const VISUAL_DISPLAY_VALUES = ['block', 'flow-root', 'grid', 'flex'] as const
+export type VisualDisplayValue = (typeof VISUAL_DISPLAY_VALUES)[number]
+export const VISUAL_GRID_COLUMNS_VALUES = [
+    'minmax(0, 1fr)',
+    'repeat(2, minmax(0, 1fr))',
+    'repeat(3, minmax(0, 1fr))',
+] as const
+export type VisualGridColumnsValue = (typeof VISUAL_GRID_COLUMNS_VALUES)[number]
+export const VISUAL_ALIGN_ITEMS_VALUES = ['stretch', 'start', 'center', 'end'] as const
+export type VisualAlignItemsValue = (typeof VISUAL_ALIGN_ITEMS_VALUES)[number]
+export const VISUAL_JUSTIFY_CONTENT_VALUES = [
+    'start',
+    'center',
+    'end',
+    'space-between',
+] as const
+export type VisualJustifyContentValue = (typeof VISUAL_JUSTIFY_CONTENT_VALUES)[number]
+
 export interface VisualColorPropertyValue {
     readonly kind: 'color'
     readonly value: string
@@ -328,6 +350,10 @@ export type VisualPropertyEditValue =
     | VisualNumericPropertyValue
     | {readonly kind: 'font-weight'; readonly value: VisualFontWeight}
     | {readonly kind: 'choice'; readonly value: 'left' | 'center' | 'right' | 'justify'}
+    | {readonly kind: 'display'; readonly value: VisualDisplayValue}
+    | {readonly kind: 'grid-columns'; readonly value: VisualGridColumnsValue}
+    | {readonly kind: 'align-items'; readonly value: VisualAlignItemsValue}
+    | {readonly kind: 'justify-content'; readonly value: VisualJustifyContentValue}
     | VisualColorPropertyValue
     | {readonly kind: 'clear-override'}
 
@@ -383,6 +409,30 @@ export function serializeVisualPropertyValue(
     }
     if (value.kind === 'choice') {
         if (property !== 'text-align') throw new TypeError('选择值结构与目标属性不匹配。')
+        return value.value
+    }
+    if (value.kind === 'display') {
+        if (property !== 'display' || !VISUAL_DISPLAY_VALUES.includes(value.value)) {
+            throw new TypeError('布局方式结构与目标属性不匹配。')
+        }
+        return value.value
+    }
+    if (value.kind === 'grid-columns') {
+        if (property !== 'grid-template-columns' || !VISUAL_GRID_COLUMNS_VALUES.includes(value.value)) {
+            throw new TypeError('分栏结构与目标属性不匹配。')
+        }
+        return value.value
+    }
+    if (value.kind === 'align-items') {
+        if (property !== 'align-items' || !VISUAL_ALIGN_ITEMS_VALUES.includes(value.value)) {
+            throw new TypeError('纵向对齐结构与目标属性不匹配。')
+        }
+        return value.value
+    }
+    if (value.kind === 'justify-content') {
+        if (property !== 'justify-content' || !VISUAL_JUSTIFY_CONTENT_VALUES.includes(value.value)) {
+            throw new TypeError('横向分布结构与目标属性不匹配。')
+        }
         return value.value
     }
     if (value.kind === 'color') {

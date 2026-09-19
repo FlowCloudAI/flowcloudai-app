@@ -65,6 +65,15 @@ const LEGAL_CONTEXTUAL_RIBBON_MUTATION: CanvasProbeMutation = {
     },
 }
 
+const LEGAL_CONTAINER_LAYOUT_MUTATION: CanvasProbeMutation = {
+    id: 'legal-container-layout',
+    file: 'entry/article.html',
+    replace: {
+        needle: 'data-fc-layout="stack"',
+        value: 'data-fc-layout="grid"',
+    },
+}
+
 function isElement(node: HtmlNode): node is HtmlElement {
     return 'tagName' in node && 'attrs' in node
 }
@@ -117,6 +126,11 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
         LEGAL_CONTEXTUAL_RIBBON_MUTATION,
         '合法',
     )
+    const containerLayoutHtml = mutate(
+        sources.fixtureHtml,
+        LEGAL_CONTAINER_LAYOUT_MUTATION,
+        '合法',
+    )
     return [
         {
             id: 'legal-shared-fixture',
@@ -155,6 +169,14 @@ export function createCanvasProbeCases(sources: CanvasProbeSources): readonly Ca
             label: '合法：上下文图片功能区',
             validationHtml: contextualRibbonHtml,
             html: extractCanvasRenderableHtml(contextualRibbonHtml),
+            css: sources.fixtureCss,
+            assetIds: sources.assetIds,
+        },
+        {
+            id: LEGAL_CONTAINER_LAYOUT_MUTATION.id,
+            label: '合法：容器布局功能区',
+            validationHtml: containerLayoutHtml,
+            html: extractCanvasRenderableHtml(containerLayoutHtml),
             css: sources.fixtureCss,
             assetIds: sources.assetIds,
         },
