@@ -599,6 +599,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         ) : visibleRibbonTab === 'insert' ? (
                             <PublicComponentRibbonControls
                                 definitions={session.componentDefinitions}
+                                warning={session.componentDefinitionsWarning}
                                 assets={session.assets}
                                 projectId={projectId}
                                 selected={selectedNode}

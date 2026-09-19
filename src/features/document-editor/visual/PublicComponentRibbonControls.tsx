@@ -19,6 +19,7 @@ import './PublicComponentRibbonControls.css'
 
 export function PublicComponentRibbonControls({
     definitions,
+    warning,
     assets,
     projectId,
     selected,
@@ -28,6 +29,7 @@ export function PublicComponentRibbonControls({
     onDelete,
 }: {
     definitions: readonly PublicComponentDefinitionContract[]
+    warning: string | null
     assets: readonly PageDocumentAsset[]
     projectId: string
     selected: LayerProjectionNode | null
@@ -89,6 +91,7 @@ export function PublicComponentRibbonControls({
                 <Plus size={13} /> 新建组件
             </Button>
             {!canInsert && <p className="public-component-ribbon__hint">先选择一个容器作为公共组件插入位置。</p>}
+            {warning && <p className="public-component-ribbon__hint" role="status">{warning}</p>}
             {error && <p className="public-component-ribbon__error" role="alert">{error}</p>}
         </div>
         {latestDefinitions.length === 0 && <div className="public-component-ribbon-empty" role="status">当前项目没有可用的公共组件定义。</div>}

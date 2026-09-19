@@ -139,6 +139,53 @@ function missingDiagnostic(
     }
 }
 
+function invalidDiagnostic(
+    instance: HtmlElement,
+    definition: PublicComponentDefinitionContract,
+): DocumentDiagnostic {
+    return {
+        severity: 'warning',
+        category: 'security',
+        code: 'invalid_component_definition',
+        message: `公共组件 ${definition.name} 的修订 ${definition.revision} 未通过安全校验，已保留实例并显示无效状态。`,
+        file: 'article.html',
+        nodeId: getAttribute(instance, 'data-fc-node-id'),
+    }
+}
+
+interface ValidatedDefinition {
+    readonly valid: boolean
+    readonly assetIds: readonly string[]
+}
+
+function validateDefinition(
+    definition: PublicComponentDefinitionContract,
+    knownAssetIds: ReadonlySet<string>,
+): ValidatedDefinition {
+    const html = parseHtmlSource(definition.html, {mode: 'fragment', scope: 'component'})
+    const css = parseCssSource(definition.css, 'component')
+    const guard = guardDocumentSources([html], [css], {knownAssetIds})
+    const identityNodes: HtmlElement[] = []
+    walkDefinitionElements(parseFragment(definition.html, {scriptingEnabled: false}), identityNodes)
+    const containsPageIdentity = identityNodes.some(node =>
+        getAttribute(node, 'data-fc-node-id') !== undefined ||
+        getAttribute(node, 'data-fc-node-kind') !== undefined,
+    )
+    return Object.freeze({
+        valid:
+            !containsPageIdentity &&
+            html.diagnostics.length === 0 &&
+            css.diagnostics.length === 0 &&
+            guard.diagnostics.length === 0,
+        assetIds: Object.freeze([
+            ...new Set([
+                ...guard.referencedAssetIds,
+                ...definition.assetDependencies.map(id => id.toLowerCase()),
+            ]),
+        ]),
+    })
+}
+
 export interface ComponentExpansionResult {
     readonly diagnostics: readonly DocumentDiagnostic[]
     readonly styles: readonly string[]
@@ -161,39 +208,7 @@ export function expandPublicComponentInstances(
     const styles = new Map<string, string>()
     const assetIds = new Set<string>()
     const diagnostics: DocumentDiagnostic[] = []
-    const validDefinitions = new Set<string>()
-    const definitionAssetIds = new Map<string, readonly string[]>()
-    for (const definition of definitions) {
-        const html = parseHtmlSource(definition.html, {mode: 'fragment', scope: 'component'})
-        const css = parseCssSource(definition.css, 'component')
-        const guard = guardDocumentSources([html], [css], {knownAssetIds})
-        const identityNodes: HtmlElement[] = []
-        walkDefinitionElements(parseFragment(definition.html, {scriptingEnabled: false}), identityNodes)
-        if (identityNodes.some(node => getAttribute(node, 'data-fc-node-id') !== undefined || getAttribute(node, 'data-fc-node-kind') !== undefined)) {
-            diagnostics.push({
-                severity: 'error',
-                category: 'security',
-                code: 'component_definition_contains_page_identity',
-                message: `公共组件 ${definition.name} 的定义不能携带页面节点身份。`,
-                file: 'article.html',
-            })
-        }
-        if (html.diagnostics.length === 0 && css.diagnostics.length === 0 && guard.diagnostics.length === 0) {
-            const key = `${definition.componentId.toLowerCase()}:${definition.revision}`
-            validDefinitions.add(key)
-            definitionAssetIds.set(
-                key,
-                Object.freeze([
-                    ...new Set([
-                        ...guard.referencedAssetIds,
-                        ...definition.assetDependencies.map(id => id.toLowerCase()),
-                    ]),
-                ]),
-            )
-        } else {
-            diagnostics.push(...html.diagnostics, ...css.diagnostics, ...guard.diagnostics)
-        }
-    }
+    const validationCache = new Map<string, ValidatedDefinition>()
     const visit = (node: HtmlNode): void => {
         if (isElement(node) && getAttribute(node, 'data-fc-node-kind') === 'component') {
             const componentId = getAttribute(node, 'data-fc-component')?.toLowerCase()
@@ -203,13 +218,22 @@ export function expandPublicComponentInstances(
                     ? byId.get(componentId)
                     : byRevision.get(`${componentId}:${Number(requestedRevision)}`)
                 : undefined
-            if (!definition || !validDefinitions.has(`${definition.componentId.toLowerCase()}:${definition.revision}`)) {
+            if (!definition) {
                 setAttribute(node, 'data-fc-component-state', 'missing')
                 if (componentId) diagnostics.push(missingDiagnostic(node, componentId, requestedRevision))
                 return
             }
+            const definitionKey = `${definition.componentId.toLowerCase()}:${definition.revision}`
+            const validation = validationCache.get(definitionKey) ??
+                validateDefinition(definition, knownAssetIds)
+            validationCache.set(definitionKey, validation)
+            if (!validation.valid) {
+                setAttribute(node, 'data-fc-component-state', 'invalid')
+                diagnostics.push(invalidDiagnostic(node, definition))
+                return
+            }
             setAttribute(node, 'data-fc-component-state', 'resolved')
-            for (const assetId of definitionAssetIds.get(`${definition.componentId.toLowerCase()}:${definition.revision}`) ?? []) {
+            for (const assetId of validation.assetIds) {
                 assetIds.add(assetId)
             }
             const fragment = parseFragment(definition.html, {scriptingEnabled: false})

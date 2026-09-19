@@ -44,6 +44,7 @@ import {
 } from '../application/liveVisualCommitScheduler.ts'
 import {createOpaqueElementAdoptionKernelRequest} from '../application/opaqueElementAdoption.ts'
 import {createLinkCandidateKernelRequest} from '../application/linkCandidateSelection.ts'
+import {resolvePublicComponentCatalog} from '../application/publicComponentCatalog.ts'
 import type {EntryBrief} from '../../../api/worldflow.ts'
 import {
     acceptEntryDocumentSave,
@@ -100,6 +101,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const [loadAttempt, setLoadAttempt] = useState(0)
     const [state, setState] = useState<EntryDocumentSessionState | null>(null)
     const [visualError, setVisualError] = useState<string | null>(null)
+    const [componentDefinitionsWarning, setComponentDefinitionsWarning] = useState<string | null>(null)
     const [assets, setAssets] = useState<PageDocumentAsset[]>([])
     const stateRef = useRef<EntryDocumentSessionState | null>(null)
     const inputRef = useRef(input)
@@ -125,27 +127,29 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         setAssets([])
         setLoadStatus('loading')
         setLoadError(null)
+        setComponentDefinitionsWarning(null)
         void Promise.all([
             pageDocumentReadEntry(entryId),
             pageDocumentListAssets(projectId),
-            pageDocumentListComponents(projectId),
-            pageDocumentListComponentRevisions(projectId),
+            Promise.allSettled([
+                pageDocumentListComponents(projectId),
+                pageDocumentListComponentRevisions(projectId),
+            ]),
         ])
-            .then(([document, catalog, rawLatestDefinitions, rawRevisionDefinitions]) => {
+            .then(([document, catalog, componentResults]) => {
                 if (cancelled) return
-                const parseDefinitions = (items: typeof rawLatestDefinitions) => items.flatMap(item => {
-                    try {
-                        return [parsePublicComponentDefinition(item)]
-                    } catch {
-                        return []
-                    }
-                }) as PublicComponentDefinitionContract[]
-                const latestDefinitions = parseDefinitions(rawLatestDefinitions)
-                const definitions = parseDefinitions(rawRevisionDefinitions)
+                const resolvedComponents = resolvePublicComponentCatalog(
+                    componentResults[0],
+                    componentResults[1],
+                )
                 setAssets(catalog)
+                setComponentDefinitionsWarning(resolvedComponents.warning)
+                if (resolvedComponents.warning) {
+                    void showAlert(resolvedComponents.warning, 'warning', 'nonInvasive', 3200)
+                }
                 publish(createEntryDocumentSessionState(inputRef.current, document, catalog.map(asset => ({
                     id: asset.id, mediaType: asset.mediaType, sizeBytes: asset.sizeBytes, sha256: asset.sha256,
-                })), definitions.length > 0 ? definitions : latestDefinitions))
+                })), resolvedComponents.definitions))
                 setLoadStatus('ready')
             })
             .catch(error => {
@@ -157,7 +161,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             cancelled = true
         }
         // 标题与摘要变化只更新预览元数据，不能重新读取并覆盖本地页面草稿。
-    }, [entryId, loadAttempt, projectId, publish])
+    }, [entryId, loadAttempt, projectId, publish, showAlert])
 
     useEffect(() => {
         const current = stateRef.current
@@ -640,6 +644,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             ...current.snapshot.componentDefinitions,
             created,
         ]))
+        setComponentDefinitionsWarning(null)
         return created
     }, [projectId, publish])
 
@@ -653,6 +658,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                 definition => definition.componentId.toLowerCase() !== componentId.toLowerCase(),
             ),
         ))
+        setComponentDefinitionsWarning(null)
     }, [projectId, publish])
 
     return {
@@ -661,6 +667,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         state,
         assets,
         componentDefinitions: state?.snapshot.componentDefinitions ?? [],
+        componentDefinitionsWarning,
         source,
         dirty,
         canSave: state ? canSaveEntryDocument(state) : false,

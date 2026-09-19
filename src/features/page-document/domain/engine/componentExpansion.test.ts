@@ -108,11 +108,40 @@ describe('公共组件编译期展开', () => {
         assert.doesNotMatch(result.srcdoc ?? '', /新模板/u)
     })
 
-    it('定义携带页面节点身份时拒绝展开，不把身份泄漏到组件内部', () => {
+    it('未引用的坏定义不参与当前页面校验', () => {
+        const result = compile(article(instance(NODE_A, INSTANCE_A, '甲', '插槽甲')), [
+            definition(),
+            definition({
+                componentId: '99999999-9999-4999-8999-999999999999',
+                html: '<article onclick="run()">未引用坏定义</article>',
+                name: '坏定义',
+            }),
+        ])
+        assert.ok(result.srcdoc)
+        assert.match(result.srcdoc, /data-fc-component-state="resolved"/u)
+        assert.equal(result.diagnostics.some(item => item.code === 'invalid_component_definition'), false)
+    })
+
+    it('被引用的坏定义只把对应实例标为无效，页面其余部分继续编译', () => {
+        const result = compile(article(instance(NODE_A, INSTANCE_A, '甲', '插槽甲')), [
+            definition({html: '<article onclick="run()">不应展开</article>'}),
+        ])
+        assert.ok(result.srcdoc)
+        assert.match(result.srcdoc, /data-fc-component-state="invalid"/u)
+        assert.match(result.srcdoc, /页尾/u)
+        assert.doesNotMatch(result.srcdoc, /不应展开/u)
+        const diagnostic = result.diagnostics.find(item => item.code === 'invalid_component_definition')
+        assert.equal(diagnostic?.severity, 'warning')
+        assert.equal(diagnostic?.nodeId, NODE_A)
+    })
+
+    it('定义携带页面节点身份时标记实例无效，不把身份泄漏到组件内部', () => {
         const result = compile(article(instance(NODE_A, INSTANCE_A, '甲', '插槽甲')), [
             definition({html: `<div data-fc-node-id="${NODE_B}"><p>不应展开</p></div>`}),
         ])
-        assert.equal(result.diagnostics.some(item => item.code === 'component_definition_contains_page_identity'), true)
-        assert.equal(result.srcdoc, null)
+        assert.ok(result.srcdoc)
+        assert.match(result.srcdoc, /data-fc-component-state="invalid"/u)
+        assert.doesNotMatch(result.srcdoc, /不应展开/u)
+        assert.equal(result.diagnostics.some(item => item.code === 'invalid_component_definition'), true)
     })
 })
