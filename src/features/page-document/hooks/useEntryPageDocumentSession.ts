@@ -6,6 +6,8 @@ import {
     pageDocumentCheckAsset,
     pageDocumentChooseAndImportAsset,
     pageDocumentCreateComponent,
+    pageDocumentUpdateComponent,
+    pageDocumentComponentImpact,
     pageDocumentDeleteComponent,
     pageDocumentListAssets,
     pageDocumentListComponents,
@@ -15,6 +17,7 @@ import {
     parsePageDocumentSaveError,
     type PageDocumentAsset,
     type CreatePageDocumentComponentInput,
+    type PageDocumentComponentImpact,
 } from '../../../api/pageDocument.ts'
 import {isDocumentScopeDirty, sourceDraftView} from '../application/documentDraftModel.ts'
 import {
@@ -67,7 +70,6 @@ import {
     type EntryDocumentSessionState,
 } from '../application/entryDocumentSessionModel.ts'
 import type {SourceFileName} from '../domain/contract.ts'
-import type {LayerProjectionNode} from '../domain/layerProjection.ts'
 import {
     type CanvasInputBlockedMessage,
     type CanvasInputIntentMessage,
@@ -75,7 +77,14 @@ import {
     type CanvasLinkCandidateIntentMessage,
 } from '../canvas/protocol/index.ts'
 import type {KernelThemeTokenInspectionRequest} from '../application/documentKernelDraftRuntime.ts'
-import {parsePublicComponentDefinition, type PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
+import {
+    parsePublicComponentDefinition,
+    selectPublicComponentDefinition,
+    type PublicComponentDefinitionContract,
+} from '../domain/kernel/contracts/publicComponent.ts'
+import {captureSelectedNodeAsPublicComponent} from '../application/publicComponentCapture.ts'
+import {createPublicComponentLocalizationRequest} from '../application/publicComponentEditing.ts'
+import {createLayerProjection, type LayerProjectionNode} from '../domain/layerProjection.ts'
 
 export type EntryPageDocumentLoadStatus = 'loading' | 'ready' | 'error'
 
@@ -648,6 +657,94 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         return created
     }, [projectId, publish])
 
+    const updateComponentDefinition = useCallback(async (
+        input: Omit<CreatePageDocumentComponentInput, 'projectId'> & {expectedRevision: number},
+    ): Promise<PublicComponentDefinitionContract> => {
+        const updated = parsePublicComponentDefinition(await pageDocumentUpdateComponent({
+            ...input,
+            projectId,
+        }))
+        const current = stateRef.current
+        if (!current || current.identity.projectId !== projectId) {
+            throw new TypeError('公共组件已更新，但当前页面已切换；请重新打开项目查看。')
+        }
+        publish(updateEntryDocumentComponentDefinitions(current, [
+            ...current.snapshot.componentDefinitions,
+            updated,
+        ]))
+        setComponentDefinitionsWarning(null)
+        return updated
+    }, [projectId, publish])
+
+    const getComponentImpact = useCallback(async (
+        componentId: string,
+    ): Promise<PageDocumentComponentImpact> => {
+        const capturedProjectId = projectId
+        const impact = await pageDocumentComponentImpact(capturedProjectId, componentId)
+        if (stateRef.current?.identity.projectId !== capturedProjectId) {
+            throw new TypeError('影响范围返回时项目已经切换，请重新操作。')
+        }
+        return impact
+    }, [projectId])
+
+    const captureSelectedComponent = useCallback((nodeId: string) => {
+        const current = stateRef.current
+        if (!current) throw new TypeError('当前页面文档草稿不可用。')
+        return captureSelectedNodeAsPublicComponent(
+            current.model.entry.sources['article.html'],
+            current.model.entry.sources['style.css'],
+            nodeId,
+            crypto.randomUUID(),
+        )
+    }, [])
+
+    const localizePublicComponent = useCallback(async (
+        node: LayerProjectionNode,
+    ): Promise<string | null> => {
+        const current = stateRef.current
+        if (!current || !node.managed || node.kind !== 'component' || !node.range) {
+            return reportVisualFailure('当前选择不是可本地化的公共组件实例。').then(() => null)
+        }
+        const definition = selectPublicComponentDefinition(
+            current.snapshot.componentDefinitions,
+            node.attributes['data-fc-component'],
+            node.attributes['data-fc-component-revision'],
+        )
+        const instanceId = node.attributes['data-fc-instance']
+        if (!definition || !instanceId) {
+            return reportVisualFailure('公共组件定义或实例身份缺失，不能创建本地副本。').then(() => null)
+        }
+        const article = current.model.entry.sources['article.html']
+        const instanceSource = article.slice(node.range.from, node.range.to)
+        const projection = createLayerProjection(article)
+        const unavailable: string[] = []
+        const collect = (items: readonly LayerProjectionNode[]) => {
+            for (const item of items) {
+                if (item.managed) unavailable.push(item.id)
+                collect(item.children)
+            }
+        }
+        collect(projection.nodes)
+        try {
+            const operation = createPublicComponentLocalizationRequest(
+                node.id,
+                instanceId,
+                instanceSource,
+                definition,
+                unavailable,
+            )
+            const applied = await applyKernelEntry(
+                operation.request,
+                `将公共组件 ${definition.name} 转为本地内容`,
+                {historyGroupId: `public-component-localize:${crypto.randomUUID()}`},
+            )
+            return applied ? operation.newRootNodeId : null
+        } catch (error) {
+            await reportVisualFailure(error instanceof Error ? error.message : '公共组件本地化失败。')
+            return null
+        }
+    }, [applyKernelEntry, reportVisualFailure])
+
     const deleteComponentDefinition = useCallback(async (componentId: string): Promise<void> => {
         await pageDocumentDeleteComponent(projectId, componentId)
         const current = stateRef.current
@@ -685,6 +782,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         verifyImageAsset,
         importImageAsset,
         visualError,
+        reportVisualFailure,
         inspectComponent,
         inspectTextRange,
         inspectThemeTokens,
@@ -699,6 +797,10 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         applyLinkCandidateSelection,
         adoptOpaqueElement,
         createComponentDefinition,
+        updateComponentDefinition,
+        getComponentImpact,
+        captureSelectedComponent,
+        localizePublicComponent,
         deleteComponentDefinition,
     }
 }

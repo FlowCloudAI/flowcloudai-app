@@ -13,8 +13,13 @@ import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {
     createPublicComponentInstanceEditRequest,
     createPublicComponentInsertionRequest,
+    createPublicComponentLocalizationRequest,
 } from './publicComponentEditing.ts'
 import type {PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
+import {createLayerProjection} from '../domain/layerProjection.ts'
+import {findLayerNode} from './visualSelectionModel.ts'
+import {compilePreviewArtifact} from '../domain/engine/previewCompiler.ts'
+import {CANVAS_BASE_PROJECT_CSS, CANVAS_BASE_PROJECT_HTML} from '../canvas/host/compiledPreview.ts'
 
 const ENTRY_ID = '11111111-1111-4111-8111-111111111111'
 const PROJECT_ID = '22222222-2222-4222-8222-222222222222'
@@ -28,11 +33,15 @@ const COMPONENT_INSTANCE_B = '99999999-9999-4999-8999-999999999999'
 const REQUEST_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const REQUEST_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const REQUEST_EDIT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+const LOCAL_ROOT_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+const LOCAL_HEADING_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+const LOCAL_PARAGRAPH_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+const LOCAL_REQUEST_ID = '12121212-1212-4212-8212-121212121212'
 
 const definition: PublicComponentDefinitionContract = {
     componentId: COMPONENT_ID,
     revision: 1,
-    html: '<article><h2>{{title}}</h2><p data-fc-part="body">默认内容</p></article>',
+    html: '<article><h2>模板标题 {{title}}</h2><p data-fc-part="body">默认内容</p></article>',
     css: `@layer fc-component { [data-fc-component="${COMPONENT_ID}"] { display: grid; } }`,
     propertySchema: [{name: 'title', valueType: 'text', required: false}],
     partSchema: [{name: 'body', accepts: ['text'], required: false}],
@@ -147,5 +156,61 @@ describe('公共组件实例编辑', () => {
         assert.equal(result.status, 'rejected')
         assert.equal(original.model.entry.sources['article.html'], article())
         assert.equal(original.persistedRevision, 1)
+    })
+
+    it('把实例一次物化为带新身份的本地内容并可一次撤销', () => {
+        const insertionIds = [COMPONENT_NODE_A, COMPONENT_INSTANCE_A, REQUEST_A]
+        const inserted = apply(
+            session(),
+            createPublicComponentInsertionRequest(ROOT_ID, definition, () => insertionIds.shift()!, {
+                parts: {body: '实例插槽'},
+                properties: {title: '实例标题'},
+            }).request,
+            '插入公共组件',
+        )
+        const before = inserted.model.entry.sources['article.html']
+        const node = findLayerNode(createLayerProjection(before).nodes, COMPONENT_NODE_A)
+        assert.ok(node?.range)
+        const instanceSource = before.slice(node.range.from, node.range.to)
+        const localizationIds = [LOCAL_ROOT_ID, LOCAL_HEADING_ID, LOCAL_PARAGRAPH_ID, LOCAL_REQUEST_ID]
+        const operation = createPublicComponentLocalizationRequest(
+            COMPONENT_NODE_A,
+            COMPONENT_INSTANCE_A,
+            instanceSource,
+            definition,
+            [ROOT_ID, PARAGRAPH_ID, COMPONENT_NODE_A, COMPONENT_INSTANCE_A],
+            [],
+            () => localizationIds.shift()!,
+        )
+        const localized = apply(inserted, operation.request, '转为本地内容')
+        const html = localized.model.entry.sources['article.html']
+        const style = localized.model.entry.sources['style.css']
+        assert.equal(operation.newRootNodeId, LOCAL_ROOT_ID)
+        assert.doesNotMatch(html, new RegExp(COMPONENT_NODE_A, 'u'))
+        assert.doesNotMatch(html, new RegExp(COMPONENT_INSTANCE_A, 'u'))
+        assert.doesNotMatch(html, /data-fc-component/u)
+        assert.match(html, new RegExp(`data-fc-node-id="${LOCAL_ROOT_ID}"`, 'u'))
+        assert.match(html, new RegExp(`data-fc-node-id="${LOCAL_HEADING_ID}"`, 'u'))
+        assert.match(html, new RegExp(`data-fc-node-id="${LOCAL_PARAGRAPH_ID}"`, 'u'))
+        assert.match(html, /模板标题 实例标题/u)
+        assert.match(html, /实例插槽/u)
+        assert.match(style, /@layer fc-node/u)
+        assert.match(style, new RegExp(`\\[data-fc-node-id="${LOCAL_ROOT_ID}"\\]`, 'u'))
+
+        const preview = compilePreviewArtifact({
+            projectArticleHtml: CANVAS_BASE_PROJECT_HTML,
+            projectStyleCss: CANVAS_BASE_PROJECT_CSS,
+            entryArticleHtml: html,
+            entryStyleCss: style,
+            metadata: {id: ENTRY_ID, title: '组件', summary: '', tags: []},
+            componentDefinitions: [{...definition, revision: 2, html: '<section>新版不应影响本地副本</section>'}],
+        })
+        assert.ok(preview.srcdoc, JSON.stringify(preview.diagnostics))
+        assert.equal(preview.textBlocks?.some(block => block.text.includes('模板标题 实例标题')), true)
+        assert.doesNotMatch(preview.srcdoc ?? '', /新版不应影响本地副本/u)
+
+        const undone = undoEntryDocumentSession(localized)
+        assert.equal(undone.model.entry.sources['article.html'], before)
+        assert.equal(undone.model.entry.sources['style.css'], inserted.model.entry.sources['style.css'])
     })
 })

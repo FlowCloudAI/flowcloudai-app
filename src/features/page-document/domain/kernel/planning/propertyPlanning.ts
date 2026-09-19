@@ -28,6 +28,7 @@ import type {
     InsertComponentIntent,
     InsertPublicComponentIntent,
     EditPublicComponentInstanceIntent,
+    LocalizePublicComponentIntent,
     LinkEditIntent,
     MoveComponentIntent,
     PropertyEditIntent,
@@ -71,6 +72,7 @@ import {createComponentMovePatches} from '../patching/componentMovePatches.ts'
 import {createComponentInsertionPatches} from '../patching/componentInsertionPatches.ts'
 import {createPublicComponentInsertionPatch} from '../patching/publicComponentInsertionPatches.ts'
 import {createPublicComponentInstancePatches} from '../patching/publicComponentInstancePatches.ts'
+import {createPublicComponentLocalizationPatches} from '../patching/publicComponentLocalizationPatches.ts'
 import {createOpaqueElementAdoptionPatch} from '../patching/opaqueElementAdoptionPatches.ts'
 import {createThemeTokenPatches} from '../patching/themeTokenPatches.ts'
 import {createTextRangeLinkPatches, textRangeHasHref} from '../patching/linkPatches.ts'
@@ -187,6 +189,12 @@ type PlannedVerification =
           readonly kind: 'public-component-instance-edited'
           readonly properties: Readonly<Record<string, string | null>>
           readonly styleVariables: Readonly<Record<string, string | null>>
+      }
+    | {
+          readonly kind: 'public-component-localized'
+          readonly oldNodeId: NodeId
+          readonly newNodeIds: readonly NodeId[]
+          readonly retiredInstanceId: NodeId
       }
     | {
           readonly kind: 'component-adopted'
@@ -365,6 +373,20 @@ export function planPropertyEditBatch(
                 return rejected(
                     'component-removal-postcondition-failed',
                     '候选没有完整删除目标组件子树，或连带删除了其父组件。',
+                    beforeHandle,
+                )
+            }
+            current = analyzed
+            continue
+        }
+        if (planned.verification.kind === 'public-component-localized') {
+            if (
+                intent.kind !== 'localize-public-component' ||
+                !verifyPublicComponentLocalizationCandidate(analyzed, planned.verification)
+            ) {
+                return rejected(
+                    'public-component-localization-postcondition-failed',
+                    '候选没有完整移除公共组件实例并建立本地节点身份。',
                     beforeHandle,
                 )
             }
@@ -696,6 +718,9 @@ function planSingleEdit(
     }
     if (intent.kind === 'edit-public-component-instance') {
         return planPublicComponentInstanceEdit(current, intent, authorizedScopes)
+    }
+    if (intent.kind === 'localize-public-component') {
+        return planPublicComponentLocalization(current, intent, authorizedScopes)
     }
     if (intent.kind === 'set-grid-auto-placement') {
         return planGridAutoPlacement(current, intent, authorizedScopes)
@@ -1086,6 +1111,59 @@ function planPublicComponentInstanceEdit(
         kind: 'public-component-instance-edited',
         properties: intent.properties,
         styleVariables: intent.styleVariables,
+    })
+}
+
+function planPublicComponentLocalization(
+    current: PlanningAnalysisRuntime,
+    intent: LocalizePublicComponentIntent,
+    authorizedScopes: ReadonlySet<SourceScope>,
+): PlannedSingleEdit {
+    if (!hasWritableScope(authorizedScopes, intent.destinationScope)) {
+        return rejected('write-scope-denied', `未授权写入 ${intent.destinationScope} 作用域。`)
+    }
+    if (!current.components) return rejected('candidate-analysis-failed', '候选缺少组件索引。')
+    const handle = rebindHandle(current.components, intent.target.component)
+    if (!handle || handle.kind !== 'component') {
+        return rejected('public-component-instance-required', '只能把公共组件实例转为本地内容。', handle ?? undefined)
+    }
+    const element = current.components.resolveElement(handle)
+    const source = element ? current.components.originOfNode(element)?.source : null
+    if (!element || !source || source.scope !== intent.destinationScope || source.file !== 'article.html') {
+        return rejected('source-origin-unavailable', '公共组件实例没有可写的词条 HTML 来源。', handle)
+    }
+    const componentId = element.attrs.find(item => item.name === 'data-fc-component')?.value
+    const revision = element.attrs.find(item => item.name === 'data-fc-component-revision')?.value
+    const resolved = selectPublicComponentDefinition(current.componentDefinitions, componentId, revision)
+    if (!resolved ||
+        resolved.componentId !== intent.definition.componentId ||
+        resolved.revision !== intent.definition.revision) {
+        return rejected('component-definition-stale', '组件定义在本地化前已经变化，请重新读取。', handle)
+    }
+    const article = findDocument(current.snapshot.sourceSnapshot, sourceKeyString(source))
+    const style = findDocument(
+        current.snapshot.sourceSnapshot,
+        sourceKeyString({scope: intent.destinationScope, file: 'style.css'}),
+    )
+    if (!article || !style) return rejected('source-not-found', '组件本地化所需的页面源码不完整。', handle)
+    const changed = createPublicComponentLocalizationPatches(
+        article,
+        style,
+        element,
+        resolved,
+        intent.allocatedNodeIds,
+        intent.references,
+        current.components.components.flatMap(component => [
+            component.handle.nodeId,
+            ...(component.handle.instanceId ? [component.handle.instanceId] : []),
+        ]),
+    )
+    if (changed.status === 'rejected') return rejected(changed.code, changed.message, handle)
+    return readyPatches(changed.patches, 'component-tree', {
+        kind: 'public-component-localized',
+        oldNodeId: handle.nodeId,
+        newNodeIds: changed.identity.expandedNodeIds,
+        retiredInstanceId: changed.identity.retiredInstanceId,
     })
 }
 
@@ -2090,6 +2168,20 @@ function verifyComponentRemovalCandidate(
     const removed = components.bind(expected.removedNodeIds)
     const parent = components.bind([expected.parentNodeId])
     return removed.handles.length === 0 && parent.handles.length === 1
+}
+
+function verifyPublicComponentLocalizationCandidate(
+    analyzed: PlanningAnalysisRuntime,
+    expected: Extract<PlannedVerification, {readonly kind: 'public-component-localized'}>,
+): boolean {
+    if (!analyzed.components) return false
+    if (analyzed.components.bind([expected.oldNodeId]).handles.length !== 0) return false
+    const localized = analyzed.components.bind(expected.newNodeIds)
+    if (localized.handles.length !== expected.newNodeIds.length) return false
+    return !analyzed.snapshot.sourceSnapshot.documents.some(document =>
+        document.key.file === 'article.html' &&
+        document.content.includes(`data-fc-instance="${expected.retiredInstanceId}"`),
+    )
 }
 
 function verifyComponentMoveCandidate(

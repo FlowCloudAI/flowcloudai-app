@@ -99,6 +99,8 @@ export interface PageDocumentComponentDefinition {
 
 export interface CreatePageDocumentComponentInput {
     projectId: string
+    componentId: string
+    expectedRevision?: number
     html: string
     css: string
     propertySchema: Array<{name: string; valueType: string; required: boolean}>
@@ -107,6 +109,12 @@ export interface CreatePageDocumentComponentInput {
     name: string
     category: string
     previewAssetId?: string
+}
+
+export interface PageDocumentComponentImpact {
+    entryPages: number
+    projectHomes: number
+    instances: number
 }
 
 interface PageDocumentComponentDefinitionWire {
@@ -183,6 +191,37 @@ export async function pageDocumentCreateComponent(
         {input},
     )
     return fromWireComponentDefinition(definition)
+}
+
+export async function pageDocumentUpdateComponent(
+    input: CreatePageDocumentComponentInput & {expectedRevision: number},
+): Promise<PageDocumentComponentDefinition> {
+    const definition = await invoke<PageDocumentComponentDefinitionWire>(
+        'page_document_update_component',
+        {input},
+    )
+    return fromWireComponentDefinition(definition)
+}
+
+interface PageDocumentComponentImpactWire {
+    entry_pages: number
+    project_homes: number
+    instances: number
+}
+
+export async function pageDocumentComponentImpact(
+    projectId: string,
+    componentId: string,
+): Promise<PageDocumentComponentImpact> {
+    const impact = await invoke<PageDocumentComponentImpactWire>(
+        'page_document_component_impact',
+        {projectId, componentId},
+    )
+    return {
+        entryPages: impact.entry_pages,
+        projectHomes: impact.project_homes,
+        instances: impact.instances,
+    }
 }
 
 export function pageDocumentDeleteComponent(

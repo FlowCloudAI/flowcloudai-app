@@ -20,6 +20,8 @@ import type {
     Utf8SourceRange,
 } from './source.ts'
 import type {DocumentMutableNodeTag, DocumentNodeKind} from './primitives.ts'
+import type {NodeIdentityReference} from './nodeIdentityPolicy.ts'
+import type {PublicComponentDefinitionContract} from './publicComponent.ts'
 
 export type PropertyEditAction =
     {readonly kind: 'set-value'; readonly value: string} | {readonly kind: 'clear-override'}
@@ -170,6 +172,16 @@ export interface EditPublicComponentInstanceIntent {
     readonly destinationScope: SourceScope
 }
 
+export interface LocalizePublicComponentIntent {
+    readonly kind: 'localize-public-component'
+    readonly target: Extract<EditTarget, {readonly kind: 'component-root'}>
+    readonly definition: PublicComponentDefinitionContract
+    /** 页面身份由宿主在发起意图前分配；内核按展开后的可接管节点逐一消费。 */
+    readonly allocatedNodeIds: readonly NodeId[]
+    readonly references: readonly NodeIdentityReference[]
+    readonly destinationScope: SourceScope
+}
+
 /** 将作者 HTML 中一个尚未托管的完整元素纳入组件身份体系；目标在接管前没有 ComponentHandle。 */
 export interface AdoptOpaqueElementIntent {
     readonly kind: 'adopt-opaque-element'
@@ -258,6 +270,7 @@ export type EditIntent =
     | InsertComponentIntent
     | InsertPublicComponentIntent
     | EditPublicComponentInstanceIntent
+    | LocalizePublicComponentIntent
     | AdoptOpaqueElementIntent
     | ApplySourceEditsIntent
     | ThemeTokenEditIntent

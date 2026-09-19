@@ -55,8 +55,10 @@ pub struct ComponentStyleVariableSchemaInput {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateComponentInput {
+pub struct SaveComponentInput {
     pub project_id: String,
+    pub component_id: String,
+    pub expected_revision: Option<i64>,
     pub html: String,
     pub css: String,
     pub property_schema: Vec<ComponentPropertySchemaInput>,
@@ -110,9 +112,57 @@ pub async fn page_document_list_component_revisions(
 pub async fn page_document_create_component(
     state: State<'_, Arc<AppState>>,
     paths: State<'_, crate::PathsState>,
-    input: CreateComponentInput,
+    input: SaveComponentInput,
 ) -> Result<worldflow_core::models::ComponentDefinition, ApiError> {
+    if input.expected_revision.is_some() {
+        return Err(ApiError::new(
+            ErrorCode::ValidationFormatError,
+            "新建公共组件不能携带基准修订",
+        ));
+    }
     create_component_definition(state.inner(), paths.inner(), &input).await
+}
+
+#[tauri::command]
+pub async fn page_document_update_component(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, crate::PathsState>,
+    input: SaveComponentInput,
+) -> Result<worldflow_core::models::ComponentDefinition, ApiError> {
+    if !input.expected_revision.is_some_and(|revision| revision > 0) {
+        return Err(ApiError::new(
+            ErrorCode::ValidationFormatError,
+            "编辑公共组件必须携带正整数基准修订",
+        ));
+    }
+    create_component_definition(state.inner(), paths.inner(), &input).await
+}
+
+#[tauri::command]
+pub async fn page_document_component_impact(
+    state: State<'_, Arc<AppState>>,
+    project_id: String,
+    component_id: String,
+) -> Result<worldflow_core::models::ComponentImpact, ApiError> {
+    let project_id = parse_uuid("projectId", &project_id)?;
+    let component_id = parse_uuid("componentId", &component_id)?;
+    let db = open_project_db(state.inner(), &project_id)
+        .await
+        .map_err(ApiError::internal)?;
+    if db
+        .get_component_definition(&project_id, &component_id, None)
+        .await
+        .map_err(ApiError::from_display)?
+        .is_none()
+    {
+        return Err(ApiError::new(
+            ErrorCode::ValidationFormatError,
+            "当前项目不存在该公共组件定义",
+        ));
+    }
+    db.get_component_impact(&component_id)
+        .await
+        .map_err(ApiError::from_display)
 }
 
 #[tauri::command]
@@ -133,7 +183,7 @@ fn schema_name(value: &str) -> bool {
         && bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
-fn validate_component_schema(input: &CreateComponentInput) -> Result<(), ApiError> {
+fn validate_component_schema(input: &SaveComponentInput) -> Result<(), ApiError> {
     if input.name.trim().is_empty()
         || input.name.trim().len() > 128
         || input.category.trim().is_empty()
@@ -196,10 +246,11 @@ fn validate_component_schema(input: &CreateComponentInput) -> Result<(), ApiErro
 async fn create_component_definition(
     state: &AppState,
     paths: &crate::PathsState,
-    input: &CreateComponentInput,
+    input: &SaveComponentInput,
 ) -> Result<worldflow_core::models::ComponentDefinition, ApiError> {
     validate_component_schema(input)?;
     let project_id = parse_uuid("projectId", &input.project_id)?;
+    let component_id = parse_uuid("componentId", &input.component_id)?;
     let validation = document_validation::validate_component_definition(
         &input.html,
         &input.css,
@@ -260,7 +311,7 @@ async fn create_component_definition(
             .collect(),
     );
     db.create_component_definition(CreateComponentDefinition {
-        component_id: Uuid::new_v4(),
+        component_id,
         scope_kind: "project".into(),
         scope_id: project_id,
         html: input.html.clone(),
@@ -272,9 +323,10 @@ async fn create_component_definition(
         name: input.name.trim().to_string(),
         category: input.category.trim().to_string(),
         preview_asset_id,
+        expected_revision: input.expected_revision,
     })
     .await
-    .map_err(ApiError::from_display)
+    .map_err(map_component_save_error)
 }
 
 async fn delete_component_definition(
@@ -657,6 +709,7 @@ fn projection_from_validation(
             .map(|reference| worldflow_core::models::PageComponentReference {
                 node_id: reference.node_id,
                 component_id: reference.component_id,
+                follows_latest: reference.follows_latest,
             })
             .collect(),
     }
@@ -712,6 +765,17 @@ fn map_save_error(error: WorldflowError, target: &str) -> ApiError {
         WorldflowError::DocumentRevisionConflict { current_revision } => ApiError::new(
             ErrorCode::DocumentRevisionConflict,
             format!("{target} revision 冲突"),
+        )
+        .with_kv("currentRevision", serde_json::json!(current_revision)),
+        other => ApiError::from_display(other),
+    }
+}
+
+fn map_component_save_error(error: WorldflowError) -> ApiError {
+    match error {
+        WorldflowError::ComponentRevisionConflict { current_revision } => ApiError::new(
+            ErrorCode::DocumentRevisionConflict,
+            "公共组件 revision 已变化，请重新打开编辑",
         )
         .with_kv("currentRevision", serde_json::json!(current_revision)),
         other => ApiError::from_display(other),
@@ -787,9 +851,11 @@ mod tests {
         }
     }
 
-    fn component_input(project_id: Uuid) -> CreateComponentInput {
-        CreateComponentInput {
+    fn component_input(project_id: Uuid) -> SaveComponentInput {
+        SaveComponentInput {
             project_id: project_id.to_string(),
+            component_id: Uuid::new_v4().to_string(),
+            expected_revision: None,
             html: "<article><h2>{{title}}</h2><div data-fc-part='body'></div></article>".into(),
             css: "@layer fc-component { [data-fc-component=template] article { display: grid; } }"
                 .into(),
@@ -846,6 +912,32 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn component_update_appends_revision_and_rejects_stale_baseline() {
+        let fixture = setup().await;
+        let initial = component_input(fixture.project_id);
+        let created = create_component_definition(&fixture.state, &fixture.paths, &initial)
+            .await
+            .unwrap();
+        let mut update = component_input(fixture.project_id);
+        update.component_id = created.component_id.to_string();
+        update.expected_revision = Some(created.revision);
+        update.html = "<section><p>修订二</p></section>".into();
+        let revised = create_component_definition(&fixture.state, &fixture.paths, &update)
+            .await
+            .unwrap();
+        assert_eq!(revised.revision, 2);
+
+        let mut stale = update;
+        stale.html = "<section><p>过期修订</p></section>".into();
+        let error = create_component_definition(&fixture.state, &fixture.paths, &stale)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, ErrorCode::DocumentRevisionConflict.as_str());
+        assert!(error.message.contains("重新打开编辑"));
+        assert_eq!(error.detail["currentRevision"], 2);
     }
 
     #[tokio::test]

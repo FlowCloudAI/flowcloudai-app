@@ -24,6 +24,7 @@ import type {
     LinkEditIntent,
     InsertComponentIntent,
     InsertPublicComponentIntent,
+    LocalizePublicComponentIntent,
     MoveComponentIntent,
     PropertyEditAction,
     PropertyEditIntent,
@@ -56,6 +57,7 @@ import {
     type DocumentMutableNodeTag,
     type ManagedNodeStyleContext,
 } from './primitives.ts'
+import {parsePublicComponentDefinition} from './publicComponent.ts'
 
 const MAX_EDIT_INTENTS = 512
 const MAX_SOURCE_EDITS_PER_INTENT = 256
@@ -105,6 +107,7 @@ function parseEditIntent(value: unknown): EditIntent {
     if (value.kind === 'insert-component') return parseInsertComponentIntent(value)
     if (value.kind === 'insert-public-component') return parseInsertPublicComponentIntent(value)
     if (value.kind === 'edit-public-component-instance') return parseEditPublicComponentInstanceIntent(value)
+    if (value.kind === 'localize-public-component') return parseLocalizePublicComponentIntent(value)
     if (value.kind === 'adopt-opaque-element') return parseAdoptOpaqueElementIntent(value)
     if (value.kind === 'apply-source-edits') return parseApplySourceEditsIntent(value)
     if (value.kind === 'edit-theme-token') return parseThemeTokenEditIntent(value)
@@ -404,6 +407,52 @@ function parseEditPublicComponentInstanceIntent(value: unknown): EditPublicCompo
         target,
         properties: parseChanges(record.properties, 'properties'),
         styleVariables: parseChanges(record.styleVariables, 'styleVariables'),
+        destinationScope: parseSourceScope(record.destinationScope),
+    })
+}
+
+function parseLocalizePublicComponentIntent(value: unknown): LocalizePublicComponentIntent {
+    const record = exactRecord(value, [
+        'kind',
+        'target',
+        'definition',
+        'allocatedNodeIds',
+        'references',
+        'destinationScope',
+    ])
+    const target = parseEditTarget(record.target)
+    if (target.kind !== 'component-root') {
+        throw new TypeError('localize-public-component.target 必须是组件根。')
+    }
+    if (!Array.isArray(record.allocatedNodeIds) || record.allocatedNodeIds.length < 1 ||
+        record.allocatedNodeIds.length > MAX_EDIT_INTENTS) {
+        throw new TypeError('localize-public-component.allocatedNodeIds 数量无效。')
+    }
+    const allocatedNodeIds = record.allocatedNodeIds.map(nodeId)
+    if (new Set(allocatedNodeIds).size !== allocatedNodeIds.length) {
+        throw new TypeError('localize-public-component.allocatedNodeIds 不能重复。')
+    }
+    if (!Array.isArray(record.references) || record.references.length > MAX_EDIT_INTENTS) {
+        throw new TypeError('localize-public-component.references 数量无效。')
+    }
+    const references = record.references.map(value => {
+        const reference = exactRecord(value, ['targetObjectId', 'targetNodeId', 'degraded'])
+        if (typeof reference.targetObjectId !== 'string' || reference.targetObjectId.length < 1 ||
+            reference.targetObjectId.length > 256 || typeof reference.degraded !== 'boolean') {
+            throw new TypeError('localize-public-component.references 字段无效。')
+        }
+        return Object.freeze({
+            targetObjectId: reference.targetObjectId,
+            targetNodeId: reference.targetNodeId === null ? null : nodeId(reference.targetNodeId),
+            degraded: reference.degraded,
+        })
+    })
+    return Object.freeze({
+        kind: 'localize-public-component',
+        target,
+        definition: parsePublicComponentDefinition(record.definition),
+        allocatedNodeIds: Object.freeze(allocatedNodeIds),
+        references: Object.freeze(references),
         destinationScope: parseSourceScope(record.destinationScope),
     })
 }

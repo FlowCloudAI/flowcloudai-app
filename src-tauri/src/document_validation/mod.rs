@@ -30,6 +30,7 @@ pub struct DerivedTextBlock {
 pub struct DerivedComponentReference {
     pub node_id: Uuid,
     pub component_id: Uuid,
+    pub follows_latest: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,10 +214,20 @@ fn validate_element(
             .value()
             .attr("data-fc-component")
             .and_then(|raw| parse_document_uuid(raw).ok());
+        let revision = element.value().attr("data-fc-component-revision");
+        let follows_latest = revision == Some("latest");
+        let fixed_revision = revision
+            .filter(|value| *value != "latest")
+            .and_then(|value| value.parse::<i64>().ok())
+            .is_some_and(|value| value > 0);
+        if !follows_latest && !fixed_revision {
+            diagnostics.push(d("component", "公共组件修订必须是 latest 或正整数"));
+        }
         if let (Some(node_id), Some(component_id)) = (node_id, component_id) {
             component_references.push(DerivedComponentReference {
                 node_id,
                 component_id,
+                follows_latest,
             });
         }
     }
@@ -637,6 +648,37 @@ fn validate_component_layer_rules(
     let mut selector_allowed = false;
     while let Some(token) = next_significant_token(parser) {
         if awaiting_selector {
+            if let Token::AtKeyword(name) = &token {
+                if !matches!(
+                    name.to_ascii_lowercase().as_ref(),
+                    "media" | "supports" | "container"
+                ) {
+                    diagnostics.push(d(
+                        "css",
+                        format!("组件 CSS 不允许在 fc-component 层使用 @{name}"),
+                    ));
+                    return;
+                }
+                let mut block_found = false;
+                while let Some(prelude) = next_significant_token(parser) {
+                    if matches!(prelude, Token::CurlyBracketBlock) {
+                        let result: Result<(), cssparser::ParseError<'_, ()>> = parser
+                            .parse_nested_block(|nested| {
+                                validate_component_layer_rules(nested, diagnostics);
+                                Ok(())
+                            });
+                        if result.is_err() {
+                            diagnostics.push(d("css", "组件 CSS 条件规则无法解析"));
+                        }
+                        block_found = true;
+                        break;
+                    }
+                }
+                if !block_found {
+                    diagnostics.push(d("css", "组件 CSS 条件规则缺少规则块"));
+                }
+                continue;
+            }
             if !matches!(token, Token::SquareBracketBlock) {
                 diagnostics.push(d("css", "组件 CSS 选择器必须以 [data-fc-component= 开头"));
                 return;
@@ -648,7 +690,7 @@ fn validate_component_layer_rules(
             continue;
         }
         if matches!(token, Token::AtKeyword(_)) {
-            diagnostics.push(d("css", "组件 CSS 不允许在 fc-component 层内嵌套 at-rule"));
+            diagnostics.push(d("css", "组件 CSS 选择器语法无效"));
             return;
         }
         if matches!(token, Token::CurlyBracketBlock) {
@@ -1060,6 +1102,30 @@ mod tests {
         assert_eq!(result.text_blocks.len(), 1);
         assert_eq!(result.text_blocks[0].node_id.to_string(), node_id);
         assert_eq!(result.text_blocks[0].text, "属性标题 插槽正文");
+        assert_eq!(result.component_references.len(), 1);
+        assert!(result.component_references[0].follows_latest);
+    }
+
+    #[test]
+    fn distinguishes_latest_and_fixed_component_references() {
+        let component_id = "22222222-2222-4222-8222-222222222222";
+        let result = validate(
+            &format!(
+                "<div data-fc-node-id=\"11111111-1111-4111-8111-111111111111\" data-fc-node-kind=\"component\" data-fc-component=\"{component_id}\" data-fc-component-revision=\"latest\" data-fc-instance=\"33333333-3333-4333-8333-333333333333\"></div><div data-fc-node-id=\"44444444-4444-4444-8444-444444444444\" data-fc-node-kind=\"component\" data-fc-component=\"{component_id}\" data-fc-component-revision=\"1\" data-fc-instance=\"55555555-5555-4555-8555-555555555555\"></div>"
+            ),
+            "",
+            Some(PROJECT_ID),
+        );
+        assert!(result.valid, "{:?}", result.diagnostics);
+        assert_eq!(result.component_references.len(), 2);
+        assert_eq!(
+            result
+                .component_references
+                .iter()
+                .filter(|reference| reference.follows_latest)
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -1119,6 +1185,12 @@ mod tests {
             Some(PROJECT_ID),
         );
         assert!(accepted.valid, "{:?}", accepted.diagnostics);
+        let conditional = validate_component_definition(
+            "<article><p>响应式正文</p></article>",
+            "@layer fc-component { @media (min-width: 40rem) { [data-fc-component=template] p:hover { color: red; } } }",
+            Some(PROJECT_ID),
+        );
+        assert!(conditional.valid, "{:?}", conditional.diagnostics);
 
         for (html, css) in [
             ("<button>危险控件</button>", ""),

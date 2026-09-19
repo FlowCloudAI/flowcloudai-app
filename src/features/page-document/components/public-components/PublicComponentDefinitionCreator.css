@@ -51,6 +51,50 @@
     font: inherit;
 }
 
+.public-component-creator__preview {
+    display: grid;
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.public-component-creator__preview > div {
+    display: flex;
+    gap: var(--fc-space-xs);
+    overflow-x: auto;
+}
+
+.public-component-creator__preview button {
+    display: grid;
+    flex: 0 0 6rem;
+    gap: var(--fc-space-xs);
+    place-items: center;
+    min-height: 3.5rem;
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text-secondary);
+}
+
+.public-component-creator__preview button.is-selected {
+    border-color: var(--fc-color-primary);
+    color: var(--fc-color-text);
+}
+
+.public-component-creator__preview .page-document-asset-picker__thumbnail {
+    display: grid;
+    width: 4rem;
+    height: 2.5rem;
+    place-items: center;
+    overflow: hidden;
+}
+
+.public-component-creator__preview canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
 .public-component-creator__body > p {
     margin: 0;
     color: var(--fc-color-text-secondary);

@@ -2,64 +2,88 @@
 
 import {useEffect, useState} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
-import type {CreatePageDocumentComponentInput} from '../../../../api/pageDocument.ts'
+import type {CreatePageDocumentComponentInput, PageDocumentAsset} from '../../../../api/pageDocument.ts'
 import {pageDocumentComponentErrorMessage} from '../../../../api/pageDocument.ts'
 import {FloatingPanel} from '../../../../shared/ui/overlay'
-import {buildPublicComponentCreationInput} from '../../application/publicComponentDefinitionForm.ts'
+import {
+    buildPublicComponentCreationInput,
+    type PublicComponentDefinitionFormValue,
+} from '../../application/publicComponentDefinitionForm.ts'
 import {CodeSourceEditor} from '../source/CodeSourceEditor.tsx'
+import {PageDocumentAssetThumbnail} from '../assets/PageDocumentAssetPicker.tsx'
 import './PublicComponentDefinitionCreator.css'
 
 const INITIAL_HTML = '<article>\n  <h2>{{title}}</h2>\n  <div data-fc-part="body"></div>\n</article>'
-const INITIAL_CSS = '@layer fc-component {\n  [data-fc-component="template"] {\n    display: block;\n  }\n}'
+
+function initialCss(componentId: string): string {
+    return `@layer fc-component {\n  [data-fc-component="${componentId}"] {\n    display: block;\n  }\n}`
+}
 
 export function PublicComponentDefinitionCreator({
     open,
     projectId,
+    componentId,
+    expectedRevision,
+    initialValue,
+    initialPreviewAssetId,
+    assets,
     onClose,
-    onCreate,
+    onSave,
 }: {
     open: boolean
     projectId: string
+    componentId: string
+    expectedRevision?: number
+    initialValue?: PublicComponentDefinitionFormValue
+    initialPreviewAssetId?: string | null
+    assets: readonly PageDocumentAsset[]
     onClose: () => void
-    onCreate: (input: Omit<CreatePageDocumentComponentInput, 'projectId'>) => Promise<void>
+    onSave: (input: Omit<CreatePageDocumentComponentInput, 'projectId'>) => Promise<void>
 }) {
     const [name, setName] = useState('')
     const [category, setCategory] = useState('基础')
     const [html, setHtml] = useState(INITIAL_HTML)
-    const [css, setCss] = useState(INITIAL_CSS)
+    const [css, setCss] = useState(() => initialCss(componentId))
     const [propertyLines, setPropertyLines] = useState('title | text | optional')
     const [partLines, setPartLines] = useState('body | text | optional')
+    const [styleVariableLines, setStyleVariableLines] = useState('')
+    const [previewAssetId, setPreviewAssetId] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         if (!open) return
         queueMicrotask(() => {
-            setName('')
-            setCategory('基础')
-            setHtml(INITIAL_HTML)
-            setCss(INITIAL_CSS)
-            setPropertyLines('title | text | optional')
-            setPartLines('body | text | optional')
+            setName(initialValue?.name ?? '')
+            setCategory(initialValue?.category ?? '基础')
+            setHtml(initialValue?.html ?? INITIAL_HTML)
+            setCss(initialValue?.css ?? initialCss(componentId))
+            setPropertyLines(initialValue?.propertyLines ?? 'title | text | optional')
+            setPartLines(initialValue?.partLines ?? 'body | text | optional')
+            setStyleVariableLines(initialValue?.styleVariableLines ?? '')
+            setPreviewAssetId(initialPreviewAssetId ?? null)
             setBusy(false)
             setError(null)
         })
-    }, [open])
+    }, [componentId, initialPreviewAssetId, initialValue, open])
 
     const submit = async () => {
         if (busy) return
         setBusy(true)
         setError(null)
         try {
-            const input = buildPublicComponentCreationInput(projectId, {
+            const input = buildPublicComponentCreationInput(projectId, componentId, {
                 name,
                 category,
                 html,
                 css,
                 propertyLines,
                 partLines,
+                styleVariableLines,
             })
-            await onCreate({
+            await onSave({
+                componentId: input.componentId,
+                expectedRevision,
                 name: input.name,
                 category: input.category,
                 html: input.html,
@@ -67,6 +91,7 @@ export function PublicComponentDefinitionCreator({
                 propertySchema: input.propertySchema,
                 partSchema: input.partSchema,
                 styleVariableSchema: input.styleVariableSchema,
+                previewAssetId: previewAssetId ?? undefined,
             })
             onClose()
         } catch (cause) {
@@ -80,7 +105,7 @@ export function PublicComponentDefinitionCreator({
         open={open}
         onClose={onClose}
         dismissible={!busy}
-        title="新建公共组件"
+        title={expectedRevision ? `编辑公共组件 · 基于 r${expectedRevision}` : '新建公共组件'}
         className="public-component-creator"
     >
         <div className="public-component-creator__body">
@@ -105,13 +130,32 @@ export function PublicComponentDefinitionCreator({
                 <label>插槽 schema（名称 | 类型列表 | required/optional）
                     <textarea value={partLines} disabled={busy} onChange={event => setPartLines(event.target.value)} />
                 </label>
+                <label>样式变量 schema（--名称 | 语法 | 初始值）
+                    <textarea value={styleVariableLines} disabled={busy} onChange={event => setStyleVariableLines(event.target.value)} />
+                </label>
             </div>
-            <p>本入口只创建修订 1；已有组件追加修订将在“编辑公共组件”中开放。</p>
+            <section className="public-component-creator__preview" aria-label="组件预览图">
+                <strong>预览图（可选）</strong>
+                <div>
+                    <button type="button" className={previewAssetId === null ? 'is-selected' : ''} disabled={busy} onClick={() => setPreviewAssetId(null)}>不使用预览图</button>
+                    {assets.map(asset => <button
+                        type="button"
+                        key={asset.id}
+                        className={previewAssetId === asset.id ? 'is-selected' : ''}
+                        disabled={busy}
+                        onClick={() => setPreviewAssetId(asset.id)}
+                    >
+                        <PageDocumentAssetThumbnail asset={asset} />
+                        <span>{asset.width} × {asset.height}</span>
+                    </button>)}
+                </div>
+            </section>
+            <p>{expectedRevision ? '保存会追加新修订；旧修订继续供固定实例使用。' : '创建后生成修订 1；当前页面不会因创建定义而自动改变。'}</p>
             {error && <p role="alert" className="public-component-creator__error">{error}</p>}
             <div className="public-component-creator__actions">
                 <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose}>取消</Button>
                 <Button type="button" size="sm" disabled={busy || !name.trim() || !category.trim()} onClick={() => void submit()}>
-                    {busy ? '创建中…' : '创建组件'}
+                    {busy ? '保存中…' : expectedRevision ? '发布新修订' : '创建组件'}
                 </Button>
             </div>
         </div>

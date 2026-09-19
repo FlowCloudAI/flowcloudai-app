@@ -3091,6 +3091,7 @@ mod tests {
                 .map(|reference| worldflow_core::models::PageComponentReference {
                     node_id: reference.node_id,
                     component_id: reference.component_id,
+                    follows_latest: reference.follows_latest,
                 })
                 .collect(),
         };

@@ -50,6 +50,8 @@ interface PageDocumentPropertiesPanelProps {
     flushPendingChanges: () => void
     onAdopt: (node: LayerProjectionNode) => Promise<string | null>
     onReplaceImage: () => void
+    onManagePublicComponent: (node: LayerProjectionNode) => void
+    onSaveAsPublicComponent: (node: LayerProjectionNode) => void
     visualError: string | null
 }
 
@@ -57,10 +59,12 @@ function ComponentInstanceControls({
     node,
     definition,
     applyKernelEntry,
+    onManage,
 }: {
     node: LayerProjectionNode
     definition: PublicComponentDefinitionContract
     applyKernelEntry: PageDocumentPropertiesPanelProps['applyKernelEntry']
+    onManage: () => void
 }) {
     const readProperties = () => Object.fromEntries(
         definition.propertySchema.map(property => [
@@ -108,7 +112,7 @@ function ComponentInstanceControls({
     }
     return <section className="page-document-component-details" aria-label="公共组件实例">
         <strong>{definition.name}</strong>
-        <p>此组件来自公共模板；编辑公共组件和转为本地组件暂未开放。</p>
+        <p>此组件来自公共模板；实例只允许修改定义公开的属性与样式变量。</p>
         {definition.propertySchema.map(property => <label key={property.name}>
             {property.name}{property.required ? ' · 必填' : ''}
             <Input
@@ -129,6 +133,11 @@ function ComponentInstanceControls({
                 onBlur={() => void commit('style', variable.name)}
             />
         </label>)}
+        <div className="page-document-component-details__advanced">
+            <strong>高级</strong>
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onManage}>编辑公共组件</Button>
+            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onManage}>仅为当前内容创建本地副本</Button>
+        </div>
         {error && <p role="alert">{error}</p>}
     </section>
 }
@@ -272,6 +281,8 @@ export function PageDocumentPropertiesPanel({
     flushPendingChanges,
     onAdopt,
     onReplaceImage,
+    onManagePublicComponent,
+    onSaveAsPublicComponent,
     visualError,
 }: PageDocumentPropertiesPanelProps) {
     const [tab, setTab] = useState<VisualPropertyGroup>('text')
@@ -326,6 +337,7 @@ export function PageDocumentPropertiesPanel({
                 node={node}
                 definition={componentDefinition}
                 applyKernelEntry={applyKernelEntry}
+                onManage={() => onManagePublicComponent(node)}
             />}
             {node?.managed && node.kind === 'asset' && !image && (
                 <p className="page-document-image-details" role="alert">
@@ -364,6 +376,9 @@ export function PageDocumentPropertiesPanel({
                 </p>
             ) : (
                 <div className="page-document-properties-panel__fields">
+                    <Button type="button" size="sm" variant="outline" onClick={() => onSaveAsPublicComponent(node)}>
+                        保存选中内容为公共组件
+                    </Button>
                     {tab === 'text' && (
                         <>
                             <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>

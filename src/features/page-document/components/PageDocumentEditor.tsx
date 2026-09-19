@@ -4,7 +4,12 @@ import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {Eye, FilePlus2, Home, Image, LayoutPanelTop, Table2, type LucideIcon} from 'lucide-react'
-import {pageDocumentAssetErrorMessage, type PageDocumentAsset} from '../../../api/pageDocument.ts'
+import {
+    pageDocumentAssetErrorMessage,
+    pageDocumentComponentErrorMessage,
+    type PageDocumentAsset,
+    type PageDocumentComponentImpact,
+} from '../../../api/pageDocument.ts'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {useEntryPageDocumentSession} from '../hooks/useEntryPageDocumentSession.ts'
 import type {SourceFileSet} from '../domain/contract.ts'
@@ -58,6 +63,12 @@ import type {
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
 import {PublicComponentRibbonControls} from '../../document-editor/visual/PublicComponentRibbonControls.tsx'
+import {PublicComponentDefinitionCreator} from './public-components/PublicComponentDefinitionCreator.tsx'
+import {
+    publicComponentDefinitionFormValue,
+    type PublicComponentDefinitionFormValue,
+} from '../application/publicComponentDefinitionForm.ts'
+import type {PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
 import {
     createListItemInsertionRequest,
     resolveStructuredSelectionContext,
@@ -125,6 +136,22 @@ function ribbonTabOptions(node: LayerProjectionNode | null): readonly DocumentRi
     }))
 }
 
+interface ComponentDefinitionEditorState {
+    readonly componentId: string
+    readonly expectedRevision?: number
+    readonly initialValue?: PublicComponentDefinitionFormValue
+    readonly initialPreviewAssetId?: string | null
+}
+
+interface ComponentActionState {
+    readonly definition: PublicComponentDefinitionContract
+    readonly node: LayerProjectionNode | null
+    readonly impact: PageDocumentComponentImpact | null
+    readonly loading: boolean
+    readonly busy: boolean
+    readonly error: string | null
+}
+
 export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const {
         entryId,
@@ -156,6 +183,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [assetPicker, setAssetPicker] = useState<{mode: 'insert' | 'replace'; contextKey: string; pickerId: string} | null>(null)
     const [assetPickerBusy, setAssetPickerBusy] = useState(false)
     const [assetPickerError, setAssetPickerError] = useState<string | null>(null)
+    const [componentEditor, setComponentEditor] = useState<ComponentDefinitionEditorState | null>(null)
+    const [componentAction, setComponentAction] = useState<ComponentActionState | null>(null)
     const canvasRef = useRef<PageDocumentCanvasHandle>(null)
     const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
@@ -203,6 +232,11 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         appliedResetVersionRef.current = resetVersion
         discard()
     }, [discard, resetVersion])
+
+    useEffect(() => {
+        setComponentEditor(null)
+        setComponentAction(null)
+    }, [entryId, projectId])
 
     useEffect(() => {
         if (!active) return
@@ -325,6 +359,83 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     )
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
+
+    const openComponentEditor = (definition?: PublicComponentDefinitionContract) => {
+        setComponentAction(null)
+        setComponentEditor(definition ? {
+            componentId: definition.componentId,
+            expectedRevision: definition.revision,
+            initialValue: publicComponentDefinitionFormValue(definition),
+            initialPreviewAssetId: definition.preview?.assetId ?? null,
+        } : {componentId: crypto.randomUUID()})
+    }
+
+    const openCapturedComponentEditor = (node: LayerProjectionNode | null) => {
+        if (!node?.managed || node.kind === 'component') return
+        try {
+            const captured = session.captureSelectedComponent(node.id)
+            setComponentAction(null)
+            setComponentEditor({
+                componentId: captured.componentId,
+                initialValue: captured.form,
+            })
+        } catch (error) {
+            void session.reportVisualFailure(
+                error instanceof Error ? error.message : '无法把选中内容保存为公共组件。',
+            )
+        }
+    }
+
+    const openComponentActions = (
+        definition: PublicComponentDefinitionContract,
+        node: LayerProjectionNode | null,
+    ) => {
+        const componentId = definition.componentId
+        const nodeId = node?.id ?? null
+        setComponentAction({definition, node, impact: null, loading: true, busy: false, error: null})
+        void session.getComponentImpact(componentId).then(impact => {
+            setComponentAction(current => current &&
+                current.definition.componentId === componentId && (current.node?.id ?? null) === nodeId
+                ? {...current, impact, loading: false}
+                : current)
+        }).catch(error => {
+            setComponentAction(current => current &&
+                current.definition.componentId === componentId && (current.node?.id ?? null) === nodeId
+                ? {...current, loading: false, error: pageDocumentComponentErrorMessage(error)}
+                : current)
+        })
+    }
+
+    const openSelectedComponentActions = (node: LayerProjectionNode) => {
+        const definition = session.componentDefinitions
+            .filter(item => item.componentId.toLowerCase() === node.attributes['data-fc-component']?.toLowerCase())
+            .reduce<PublicComponentDefinitionContract | null>(
+                (latest, item) => !latest || item.revision > latest.revision ? item : latest,
+                null,
+            )
+        if (!definition) {
+            void session.reportVisualFailure('公共组件定义缺失，不能编辑或创建本地副本。')
+            return
+        }
+        openComponentActions(definition, node)
+    }
+
+    const localizeSelectedComponent = async () => {
+        const current = componentAction
+        if (!current?.node || current.busy) return
+        setComponentAction({...current, busy: true, error: null})
+        const localizedNodeId = await session.localizePublicComponent(current.node)
+        if (localizedNodeId) {
+            setSelectedNodeId(localizedNodeId)
+            setComponentAction(null)
+            return
+        }
+        setComponentAction(latest => latest ? {
+            ...latest,
+            busy: false,
+            error: session.visualError ?? '公共组件没有转换为本地内容；页面草稿保持不变。',
+        } : latest)
+    }
 
     if (loadView === 'error') {
         return (
@@ -470,11 +581,62 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         return adoptedNodeId
                     }}
                     onReplaceImage={() => openAssetPicker('replace')}
+                    onManagePublicComponent={openSelectedComponentActions}
+                    onSaveAsPublicComponent={openCapturedComponentEditor}
                     visualError={session.visualError}
                 />,
                 dockPortalHost,
             )}
             <section className="page-document-editor">
+            {componentEditor && <PublicComponentDefinitionCreator
+                open
+                projectId={projectId}
+                componentId={componentEditor.componentId}
+                expectedRevision={componentEditor.expectedRevision}
+                initialValue={componentEditor.initialValue}
+                initialPreviewAssetId={componentEditor.initialPreviewAssetId}
+                assets={session.assets}
+                onClose={() => setComponentEditor(null)}
+                onSave={async input => {
+                    if (input.expectedRevision) await session.updateComponentDefinition({...input, expectedRevision: input.expectedRevision})
+                    else await session.createComponentDefinition(input)
+                }}
+            />}
+            {componentAction && <FloatingPanel
+                open
+                onClose={() => componentAction.busy ? undefined : setComponentAction(null)}
+                dismissible={!componentAction.busy}
+                title="公共组件操作"
+                className="page-document-editor__component-action"
+            >
+                <div className="page-document-editor__component-action-body">
+                    <strong>{componentAction.definition.name}</strong>
+                    {componentAction.loading ? <p role="status">正在统计影响范围…</p> : componentAction.impact ? <>
+                        <p>此组件来自公共模板，修改会影响 {componentAction.impact.entryPages} 个词条。</p>
+                        <p>另有 {componentAction.impact.projectHomes} 个项目首页，共 {componentAction.impact.instances} 个跟随最新修订的实例会受影响；固定修订实例不受影响。</p>
+                    </> : null}
+                    {componentAction.error && <p role="alert">{componentAction.error}</p>}
+                    <div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={componentAction.loading || componentAction.busy || componentAction.impact === null}
+                            onClick={() => openComponentEditor(
+                                session.componentDefinitions
+                                    .filter(item => item.componentId.toLowerCase() === componentAction.definition.componentId.toLowerCase())
+                                    .reduce((latest, item) => item.revision > latest.revision ? item : latest, componentAction.definition),
+                            )}
+                        >编辑公共组件</Button>
+                        {componentAction.node && <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={componentAction.loading || componentAction.busy || componentAction.impact === null}
+                            onClick={() => void localizeSelectedComponent()}
+                        >{componentAction.busy ? '正在创建本地副本…' : '仅为当前内容创建本地副本'}</Button>}
+                    </div>
+                </div>
+            </FloatingPanel>}
             {assetPicker && <PageDocumentAssetPicker
                 mode={assetPicker.mode}
                 assets={session.assets}
@@ -601,13 +763,12 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 definitions={session.componentDefinitions}
                                 warning={session.componentDefinitionsWarning}
                                 assets={session.assets}
-                                projectId={projectId}
                                 selected={selectedNode}
                                 applyKernelEntry={session.applyVisualPropertyEntry}
                                 onInserted={setSelectedNodeId}
-                                onCreate={async input => {
-                                    await session.createComponentDefinition(input)
-                                }}
+                                onOpenCreate={() => openComponentEditor()}
+                                onOpenEdit={definition => openComponentActions(definition, null)}
+                                onSaveSelected={() => openCapturedComponentEditor(selectedNode)}
                                 onDelete={session.deleteComponentDefinition}
                             />
                         ) : visibleRibbonTab === 'page' ? (

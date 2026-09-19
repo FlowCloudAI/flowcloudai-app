@@ -1,11 +1,10 @@
 // 本组件把项目公共组件定义接入插入页签；实例只写入稳定引用，预览通过受管资产帧显示。
 
 import {useState} from 'react'
-import {Component, Plus, Trash2} from 'lucide-react'
+import {Component, PackagePlus, Pencil, Plus, Trash2} from 'lucide-react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {
     pageDocumentComponentErrorMessage,
-    type CreatePageDocumentComponentInput,
     type PageDocumentAsset,
 } from '../../../api/pageDocument.ts'
 import type {LayerProjectionNode} from '../../page-document/domain/layerProjection.ts'
@@ -13,7 +12,6 @@ import type {PublicComponentDefinitionContract} from '../../page-document/domain
 import type {KernelDraftEditRequest} from '../../page-document/application/documentKernelDraftRuntime.ts'
 import {createPublicComponentInsertionRequest} from '../../page-document/application/publicComponentEditing.ts'
 import {PageDocumentAssetThumbnail} from '../../page-document/components/assets/PageDocumentAssetPicker.tsx'
-import {PublicComponentDefinitionCreator} from '../../page-document/components/public-components/PublicComponentDefinitionCreator.tsx'
 import {DocumentRibbonGroup} from './DocumentOfficeRibbon.tsx'
 import './PublicComponentRibbonControls.css'
 
@@ -21,24 +19,25 @@ export function PublicComponentRibbonControls({
     definitions,
     warning,
     assets,
-    projectId,
     selected,
     applyKernelEntry,
     onInserted,
-    onCreate,
+    onOpenCreate,
+    onOpenEdit,
+    onSaveSelected,
     onDelete,
 }: {
     definitions: readonly PublicComponentDefinitionContract[]
     warning: string | null
     assets: readonly PageDocumentAsset[]
-    projectId: string
     selected: LayerProjectionNode | null
     applyKernelEntry: (request: KernelDraftEditRequest, label: string, options?: {immediate?: boolean}) => Promise<boolean>
     onInserted: (nodeId: string) => void
-    onCreate: (input: Omit<CreatePageDocumentComponentInput, 'projectId'>) => Promise<void>
+    onOpenCreate: () => void
+    onOpenEdit: (definition: PublicComponentDefinitionContract) => void
+    onSaveSelected: () => void
     onDelete: (componentId: string) => Promise<void>
 }) {
-    const [creatorOpen, setCreatorOpen] = useState(false)
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const {showAlert} = useAlert()
@@ -79,16 +78,14 @@ export function PublicComponentRibbonControls({
             setDeletingId(null)
         }
     }
+    const canCapture = Boolean(selected?.managed && selected.kind !== 'component')
     return <div className="public-component-ribbon">
-        <PublicComponentDefinitionCreator
-            open={creatorOpen}
-            projectId={projectId}
-            onClose={() => setCreatorOpen(false)}
-            onCreate={onCreate}
-        />
         <div className="public-component-ribbon__toolbar">
-            <Button type="button" size="sm" variant="outline" onClick={() => setCreatorOpen(true)}>
+            <Button type="button" size="sm" variant="outline" onClick={onOpenCreate}>
                 <Plus size={13} /> 新建组件
+            </Button>
+            <Button type="button" size="sm" variant="outline" disabled={!canCapture} onClick={onSaveSelected}>
+                <PackagePlus size={13} /> 保存选中内容
             </Button>
             {!canInsert && <p className="public-component-ribbon__hint">先选择一个容器作为公共组件插入位置。</p>}
             {warning && <p className="public-component-ribbon__hint" role="status">{warning}</p>}
@@ -106,6 +103,9 @@ export function PublicComponentRibbonControls({
                         <strong title={definition.name}>{definition.name}</strong>
                         <Button type="button" size="sm" disabled={!canInsert} onClick={() => void insert(definition)}>
                             <Plus size={13} /> 插入
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => onOpenEdit(definition)}>
+                            <Pencil size={13} /> 编辑
                         </Button>
                         <Button
                             type="button"

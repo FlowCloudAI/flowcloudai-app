@@ -1,6 +1,7 @@
 // 本模块把公共组件创建表单的逐行 schema 收敛为后端契约；源码安全仍由 Rust 创建命令裁决。
 
 import type {CreatePageDocumentComponentInput} from '../../../api/pageDocument.ts'
+import type {PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
 
 const SCHEMA_NAME = /^[a-z][a-z0-9-]{0,63}$/u
 
@@ -11,6 +12,7 @@ export interface PublicComponentDefinitionFormValue {
     readonly css: string
     readonly propertyLines: string
     readonly partLines: string
+    readonly styleVariableLines: string
 }
 
 function meaningfulLines(value: string): Array<{line: number; value: string}> {
@@ -35,6 +37,7 @@ function schemaToken(value: string, label: string, line: number): string {
 
 export function buildPublicComponentCreationInput(
     projectId: string,
+    componentId: string,
     value: PublicComponentDefinitionFormValue,
 ): CreatePageDocumentComponentInput {
     const name = value.name.trim()
@@ -66,21 +69,53 @@ export function buildPublicComponentCreationInput(
             required: requiredFlag(fields[2], line),
         }
     })
+    const styleVariableSchema = meaningfulLines(value.styleVariableLines).map(({line, value: source}) => {
+        const fields = source.split('|').map(item => item.trim())
+        if (fields.length !== 3 || !/^--[a-z][a-z0-9-]{0,62}$/u.test(fields[0])) {
+            throw new TypeError(`样式变量 schema 第 ${line} 行应为“--名称 | 语法 | 初始值（可空）”。`)
+        }
+        if (fields[1].length > 128 || fields[2].length > 128) {
+            throw new TypeError(`样式变量 schema 第 ${line} 行的语法或初始值过长。`)
+        }
+        return {name: fields[0], syntax: fields[1], initialValue: fields[2] || null}
+    })
     const unique = (items: readonly string[], label: string) => {
         if (new Set(items).size !== items.length) throw new TypeError(`${label}不能重复。`)
     }
     unique(propertySchema.map(item => item.name), '属性名')
     unique(partSchema.map(item => item.name), '插槽名')
+    unique(styleVariableSchema.map(item => item.name), '样式变量名')
     for (const part of partSchema) unique(part.accepts, `插槽 ${part.name} 的内容类型`)
 
     return {
         projectId,
+        componentId,
         name,
         category,
         html: value.html,
         css: value.css,
         propertySchema,
         partSchema,
-        styleVariableSchema: [],
+        styleVariableSchema,
+    }
+}
+
+export function publicComponentDefinitionFormValue(
+    definition: PublicComponentDefinitionContract,
+): PublicComponentDefinitionFormValue {
+    return {
+        name: definition.name,
+        category: definition.category,
+        html: definition.html,
+        css: definition.css,
+        propertyLines: definition.propertySchema
+            .map(item => `${item.name} | ${item.valueType} | ${item.required ? 'required' : 'optional'}`)
+            .join('\n'),
+        partLines: definition.partSchema
+            .map(item => `${item.name} | ${item.accepts.join(', ')} | ${item.required ? 'required' : 'optional'}`)
+            .join('\n'),
+        styleVariableLines: definition.styleVariableSchema
+            .map(item => `${item.name} | ${item.syntax} | ${item.initialValue ?? ''}`)
+            .join('\n'),
     }
 }

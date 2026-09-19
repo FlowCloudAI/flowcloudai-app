@@ -98,14 +98,14 @@ describe('公共组件编译期展开', () => {
             revision: 2,
             html: '<article><h2>新模板 {{title}}</h2><p data-fc-part="body">默认</p></article>',
         })
-        const result = compile(
-            article(instance(NODE_A, INSTANCE_A, '甲', '旧插槽'))
-                .replace('data-fc-component-revision="latest"', 'data-fc-component-revision="1"'),
-            [older, latest],
-        )
+        const instances = (
+            instance(NODE_A, INSTANCE_A, '甲', '旧插槽') +
+            instance(NODE_B, INSTANCE_B, '乙', '新插槽')
+        ).replace('data-fc-component-revision="latest"', 'data-fc-component-revision="1"')
+        const result = compile(article(instances), [older, latest])
         assert.equal(result.diagnostics.filter(item => item.severity === 'error').length, 0)
         assert.match(result.srcdoc ?? '', /旧模板/u)
-        assert.doesNotMatch(result.srcdoc ?? '', /新模板/u)
+        assert.match(result.srcdoc ?? '', /新模板/u)
     })
 
     it('未引用的坏定义不参与当前页面校验', () => {
