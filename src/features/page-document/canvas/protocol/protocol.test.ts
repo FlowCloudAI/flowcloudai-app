@@ -256,6 +256,22 @@ test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单'
     )
 })
 
+test('画布快捷键意图只接受保存、撤销重做与打开查找的冻结形状', () => {
+    for (const action of ['undo', 'redo', 'save']) {
+        assert.equal(
+            parseCanvasRuntimeMessage(message('history-intent', {action}), TOKEN)?.type,
+            'history-intent',
+        )
+    }
+    assert.equal(parseCanvasRuntimeMessage(message('history-intent', {action: 'find'}), TOKEN), null)
+    assert.equal(
+        parseCanvasRuntimeMessage(message('find-intent', {action: 'open'}), TOKEN)?.type,
+        'find-intent',
+    )
+    assert.equal(parseCanvasRuntimeMessage(message('find-intent', {action: 'close'}), TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('find-intent', {action: 'open', query: 'x'}), TOKEN), null)
+})
+
 test('消息超过统一字节预算时拒绝', () => {
     const oversized = message('navigation-intent', {
         href: `https://example.invalid/${'你'.repeat(CANVAS_MESSAGE_MAX_BYTES)}`,

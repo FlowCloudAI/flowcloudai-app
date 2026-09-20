@@ -7,6 +7,7 @@ import {
     createRibbonPropertyRequest,
     createRibbonTextRangePropertyRequest,
 } from '../../document-editor/visual/ribbonKernelBinding.ts'
+import {refreshCanvasTextSelection} from '../canvas/runtime/inputPolicy.ts'
 
 const NODE_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -102,4 +103,41 @@ test('行内样式功能区按当前档位读取且始终写入 inline 通道', 
         assert.equal(intent.readContext.viewport, styleContext)
         assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
     }
+})
+
+test('写回重采集后同一文字选区可连续发出两次行内样式请求', () => {
+    const original = {
+        nodeId: NODE_ID,
+        from: 1,
+        to: 3,
+        expected: '旧值',
+        collapsed: false,
+    } as const
+    const firstRange = refreshCanvasTextSelection(original, 'A文字B')
+    const secondRange = refreshCanvasTextSelection(firstRange, 'A文字B')
+    assert.ok(firstRange && secondRange)
+    const bindings = new Map([[NODE_ID, handle()]])
+    const first = createRibbonTextRangePropertyRequest(
+        firstRange,
+        'font-weight',
+        '700',
+        'mobile',
+        () => 'inline-request-first',
+    ).createIntents(bindings)[0]
+    const second = createRibbonTextRangePropertyRequest(
+        secondRange,
+        'font-weight',
+        '400',
+        'mobile',
+        () => 'inline-request-second',
+    ).createIntents(bindings)[0]
+    assert.equal(first?.kind, 'edit-property')
+    assert.equal(second?.kind, 'edit-property')
+    if (first?.kind !== 'edit-property' || second?.kind !== 'edit-property') return
+    assert.equal(first.target.kind, 'text-range')
+    assert.equal(second.target.kind, 'text-range')
+    if (first.target.kind !== 'text-range' || second.target.kind !== 'text-range') return
+    assert.equal(first.target.expected, '文字')
+    assert.equal(second.target.expected, '文字')
+    assert.deepEqual(second.action, {kind: 'set-value', value: '400'})
 })

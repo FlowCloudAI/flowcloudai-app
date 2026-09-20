@@ -285,7 +285,13 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
     }
     if (value.type === 'history-intent') {
         return hasOnlyKeys(value, [...envelopeKeys, 'action'])
-            && (value.action === 'undo' || value.action === 'redo')
+            && (value.action === 'undo' || value.action === 'redo' || value.action === 'save')
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
+    if (value.type === 'find-intent') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'action'])
+            && value.action === 'open'
             ? value as unknown as CanvasRuntimeMessage
             : null
     }

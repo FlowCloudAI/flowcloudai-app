@@ -16,10 +16,13 @@ import {applyCanvasEditingState, isCanvasEditableElement} from './editingState.t
 import {
     canvasBeforeInputDecision,
     canvasBlockedInputDetail,
+    canvasEnterIntent,
+    canvasKeyboardIntent,
     canvasPasteDecision,
     createCanvasCompositionTracker,
     expandCollapsedCanvasDeletion,
     isCanvasSplittableKind,
+    refreshCanvasTextSelection,
     shouldDeferCanvasRender,
     type CanvasTextSelectionSnapshot,
 } from './inputPolicy.ts'
@@ -53,6 +56,7 @@ let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
 let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
 let lastTextSelectionKey: string | null = null
+let activeTextSelection: CanvasTextSelectionSnapshot | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
 const linkCandidate = createCanvasLinkCandidateTracker()
@@ -126,7 +130,9 @@ function applyRender(
     if (leave) send(leave)
     latestRequestId = command.requestId
     // 晚于输入回执到达的规范化预览仍需挂载；先记住纯文本选区，避免全量安全挂载打断连续输入。
-    const textSelection = editingEnabled && !resolvedSelection ? captureSelection() : null
+    const textSelection = editingEnabled && !resolvedSelection
+        ? captureSelection() ?? activeTextSelection
+        : null
     const result = isolatePageDocument(command.html, command.css)
     if (!result.artifact) {
         clearRenderedDocument()
@@ -148,17 +154,22 @@ function applyRender(
         if (missingAssetIds.length > CANVAS_ASSET_REQUEST_MAX_COUNT) throw new Error('画布图片引用超过上限。')
         applyCanvasEditingState(root, editingEnabled)
         setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
+        let restoredSelection: CanvasTextSelectionSnapshot | null = null
         if (resolvedSelection) {
             // 结构提交会替换原 contenteditable；重新聚焦宿主指定的新块，下一次输入才不会落回旧节点。
             findManagedNode(resolvedSelection.nodeId)?.focus({preventScroll: true})
-            restoreTextSelection({
+            const nextSelection = {
                 nodeId: resolvedSelection.nodeId,
                 from: resolvedSelection.offset,
                 to: resolvedSelection.offset,
                 expected: '',
                 collapsed: true,
-            })
-        } else if (textSelection) restoreTextSelection(textSelection)
+            }
+            if (restoreTextSelection(nextSelection)) restoredSelection = nextSelection
+        } else if (textSelection && restoreTextSelection(textSelection)) {
+            restoredSelection = textSelection
+        }
+        reportTextSelection(restoredSelection, true)
         send({
             type: 'rendered',
             requestId: command.requestId,
@@ -265,18 +276,28 @@ function reportLinkCandidate(): void {
     for (const intent of linkCandidate.update(snapshot)) send(intent)
 }
 
-function reportTextSelection(): void {
+function refreshedTextSelection(snapshot: CanvasTextSelectionSnapshot | null): CanvasTextSelectionSnapshot | null {
+    const node = snapshot ? findManagedNode(snapshot.nodeId) : null
+    return refreshCanvasTextSelection(snapshot, node ? semanticText(node) : null)
+}
+
+function reportTextSelection(
+    fallback: CanvasTextSelectionSnapshot | null = null,
+    force = false,
+): void {
     if (!editingEnabled || composition.isComposing) return
-    const selection = captureSelection()
+    const selection = refreshedTextSelection(captureSelection() ?? fallback)
     const key = selection
         ? `${selection.nodeId}:${selection.from}:${selection.to}:${selection.expected}`
         : null
-    if (key === lastTextSelectionKey) return
+    if (!force && key === lastTextSelectionKey) return
     lastTextSelectionKey = key
     if (!selection) {
+        activeTextSelection = null
         send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
         return
     }
+    activeTextSelection = selection.collapsed ? null : selection
     send({
         type: 'text-selection',
         nodeId: selection.nodeId,
@@ -287,6 +308,7 @@ function reportTextSelection(): void {
 }
 
 function clearTextSelection(): void {
+    activeTextSelection = null
     if (lastTextSelectionKey === null) return
     lastTextSelectionKey = null
     send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
@@ -326,19 +348,20 @@ function locateTextOffset(rootNode: Node, offset: number): {node: Node; offset: 
     return locate(rootNode)
 }
 
-function restoreTextSelection(snapshot: CanvasTextSelectionSnapshot): void {
+function restoreTextSelection(snapshot: CanvasTextSelectionSnapshot): boolean {
     const node = findManagedNode(snapshot.nodeId)
     const current = node ? semanticText(node) : ''
-    if (!node || snapshot.to > current.length) return
+    if (!node || snapshot.to > current.length) return false
     const start = locateTextOffset(node, snapshot.from)
     const end = locateTextOffset(node, snapshot.to)
     const selection = getSelection()
-    if (!start || !end || !selection) return
+    if (!start || !end || !selection) return false
     const range = document.createRange()
     range.setStart(start.node, start.offset)
     range.setEnd(end.node, end.offset)
     selection.removeAllRanges()
     selection.addRange(range)
+    return true
 }
 
 function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: string): boolean {
@@ -556,10 +579,19 @@ function installInputListeners(): void {
 
     document.addEventListener('selectionchange', () => {
         if (editingEnabled && !composition.isComposing) {
-            reportTextSelection()
+            // WebKit 在焦点移向宿主工具栏的瞬间可能暂时读不到 Range；保留上一次
+            // 已认证选区，直到明确采集到新选区或会话主动清除。
+            reportTextSelection(activeTextSelection)
             reportLinkCandidate()
         }
     })
+
+    const reportSettledTextSelection = () => {
+        const fallback = activeTextSelection
+        requestAnimationFrame(() => reportTextSelection(fallback, true))
+    }
+    document.addEventListener('pointerup', reportSettledTextSelection)
+    document.addEventListener('pointercancel', reportSettledTextSelection)
 
     document.addEventListener('compositionstart', event => {
         const candidateLeave = linkCandidate.clear()
@@ -631,17 +663,31 @@ function installInputListeners(): void {
             if (leave) send(leave)
             return
         }
-        if (event.defaultPrevented || event.isComposing) return
-        if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-        const key = event.key.toLowerCase()
-        if (key === 'z') {
+        const keyboardIntent = canvasKeyboardIntent(event)
+        if (keyboardIntent) {
             event.preventDefault()
-            send({type: 'history-intent', action: event.shiftKey ? 'redo' : 'undo'})
-        } else if (key === 'y' && !event.shiftKey) {
-            // Windows 习惯：Ctrl+Y 也触发 redo
-            event.preventDefault()
-            send({type: 'history-intent', action: 'redo'})
+            // iframe 的键盘事件不会冒泡到宿主 Window；这里只发送一次带会话鉴权的意图。
+            if (keyboardIntent === 'find') send({type: 'find-intent', action: 'open'})
+            else send({type: 'history-intent', action: keyboardIntent})
+            return
         }
+        if (event.defaultPrevented || event.isComposing || composition.isComposing || !editingEnabled) return
+        if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey) return
+        const node = managedNode(event.target)
+        const nodeId = managedNodeId(node)
+        if (!isCanvasEditableElement(node) || !nodeId) return
+        const snapshot = captureSelection()
+        const intent = canvasEnterIntent(node.getAttribute('data-fc-node-kind'), event.shiftKey)
+        event.preventDefault()
+        if (!snapshot || snapshot.nodeId !== nodeId) {
+            reportBlockedInput(intent.inputType, 'invalid-selection', nodeId)
+            return
+        }
+        if (intent.inputType === 'insertParagraph' && !snapshot.collapsed) {
+            reportBlockedInput(intent.inputType, 'invalid-selection', nodeId)
+            return
+        }
+        submitInputIntent(snapshot, intent.inputType, intent.text)
     })
 
     document.addEventListener('focusout', event => {
@@ -727,7 +773,6 @@ function start(): void {
     window.addEventListener('blur', () => {
         const leave = linkHover.clear()
         if (leave) send(leave)
-        clearTextSelection()
     })
 
     installInputListeners()

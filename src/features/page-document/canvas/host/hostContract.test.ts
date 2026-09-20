@@ -68,6 +68,16 @@ test('双链候选消息只经已鉴权 gate 转交给宿主回调', () => {
     assert.match(source.slice(callbackIndex), /latest\.current\.onLinkCandidateIntent\?\.\(message\)/u)
 })
 
+test('保存与查找快捷键只经已鉴权 gate 转交一次宿主回调', () => {
+    const source = readFileSync(new URL('./PageDocumentCanvas.tsx', import.meta.url), 'utf8')
+    const gateIndex = source.indexOf('const message = gate.accept(event)')
+    const historyIndex = source.indexOf("if (message.type === 'history-intent')")
+    const findIndex = source.indexOf("if (message.type === 'find-intent')")
+    assert.ok(gateIndex >= 0 && historyIndex > gateIndex && findIndex > historyIndex)
+    assert.match(source.slice(historyIndex, findIndex), /latest\.current\.onHistoryIntent\?\.\(message\.action\)/u)
+    assert.match(source.slice(findIndex), /latest\.current\.onFindIntent\?\.\(\)/u)
+})
+
 test('画布 HTML 源文件只保留内联哈希构建所需的安全骨架和占位', () => {
     const source = readFileSync(new URL('../../../../../canvas.html', import.meta.url), 'utf8')
     assert.match(source, /default-src 'none'/u)

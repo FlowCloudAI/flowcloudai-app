@@ -45,6 +45,52 @@ export function isCanvasSplittableKind(kind: string | null): boolean {
     return kind !== null && splittableKinds.has(kind)
 }
 
+export interface CanvasEnterIntent {
+    readonly inputType: 'insertParagraph' | 'insertLineBreak'
+    readonly text: '' | '\n'
+}
+
+/** Enter 由 keydown 归一，不能信任 WebKit 对 beforeinput.inputType 的平台映射。 */
+export function canvasEnterIntent(kind: string | null, shiftKey: boolean): CanvasEnterIntent {
+    return !shiftKey && isCanvasSplittableKind(kind)
+        ? {inputType: 'insertParagraph', text: ''}
+        : {inputType: 'insertLineBreak', text: '\n'}
+}
+
+export type CanvasKeyboardIntent = 'undo' | 'redo' | 'save' | 'find'
+
+export function canvasKeyboardIntent(input: {
+    readonly key: string
+    readonly metaKey: boolean
+    readonly ctrlKey: boolean
+    readonly altKey: boolean
+    readonly shiftKey: boolean
+    readonly isComposing: boolean
+    readonly defaultPrevented: boolean
+}): CanvasKeyboardIntent | null {
+    if (input.defaultPrevented || input.isComposing || input.altKey || !(input.metaKey || input.ctrlKey)) return null
+    const key = input.key.toLowerCase()
+    if (key === 'z') return input.shiftKey ? 'redo' : 'undo'
+    if (key === 'y' && !input.shiftKey) return 'redo'
+    if (key === 's' && !input.shiftKey) return 'save'
+    if (key === 'f' && !input.shiftKey) return 'find'
+    return null
+}
+
+/** DOM 重挂后按当前语义文本刷新 expected；节点或区间失效时不伪造选区。 */
+export function refreshCanvasTextSelection(
+    snapshot: CanvasTextSelectionSnapshot | null,
+    currentText: string | null,
+): CanvasTextSelectionSnapshot | null {
+    if (!snapshot || currentText === null || snapshot.from < 0 || snapshot.to < snapshot.from
+        || snapshot.to > currentText.length) return null
+    return {
+        ...snapshot,
+        expected: currentText.slice(snapshot.from, snapshot.to),
+        collapsed: snapshot.from === snapshot.to,
+    }
+}
+
 export type CanvasPasteDecision =
     | {readonly kind: 'ignore'}
     | {readonly kind: 'block'; readonly reason: CanvasInputBlockedReason}

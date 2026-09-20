@@ -1,14 +1,18 @@
 // 本测试固定 beforeinput 白名单、组合期一次提交和渲染延迟，不依赖浏览器修改 DOM。
 
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import test from 'node:test'
 import {
     canvasBeforeInputDecision,
     canvasBlockedInputDetail,
+    canvasEnterIntent,
+    canvasKeyboardIntent,
     canvasPasteDecision,
     createCanvasCompositionTracker,
     expandCollapsedCanvasDeletion,
     isCanvasSplittableKind,
+    refreshCanvasTextSelection,
     shouldDeferCanvasRender,
 } from './inputPolicy.ts'
 import {CANVAS_INPUT_TYPES} from '../protocol/index.ts'
@@ -91,6 +95,60 @@ test('分段只开放 paragraph、heading 与 list-item', () => {
     assert.equal(isCanvasSplittableKind('heading'), true)
     assert.equal(isCanvasSplittableKind('list-item'), true)
     assert.equal(isCanvasSplittableKind('table-cell'), false)
+})
+
+test('keydown Enter 在可拆分块分段，在表格单元格与 Shift 变体中保留块内换行', () => {
+    assert.deepEqual(canvasEnterIntent('paragraph', false), {inputType: 'insertParagraph', text: ''})
+    assert.deepEqual(canvasEnterIntent('heading', false), {inputType: 'insertParagraph', text: ''})
+    assert.deepEqual(canvasEnterIntent('list-item', false), {inputType: 'insertParagraph', text: ''})
+    assert.deepEqual(canvasEnterIntent('paragraph', true), {inputType: 'insertLineBreak', text: '\n'})
+    assert.deepEqual(canvasEnterIntent('table-cell', false), {inputType: 'insertLineBreak', text: '\n'})
+    assert.deepEqual(canvasEnterIntent('table-cell', true), {inputType: 'insertLineBreak', text: '\n'})
+})
+
+test('画布组合键只产生一次宿主意图并区分保存、查找与历史操作', () => {
+    const keyboard = (key: string, overrides: Partial<Parameters<typeof canvasKeyboardIntent>[0]> = {}) =>
+        canvasKeyboardIntent({
+            key,
+            metaKey: true,
+            ctrlKey: false,
+            altKey: false,
+            shiftKey: false,
+            isComposing: false,
+            defaultPrevented: false,
+            ...overrides,
+        })
+    assert.equal(keyboard('s'), 'save')
+    assert.equal(keyboard('f'), 'find')
+    assert.equal(keyboard('z'), 'undo')
+    assert.equal(keyboard('z', {shiftKey: true}), 'redo')
+    assert.equal(keyboard('y', {metaKey: false, ctrlKey: true}), 'redo')
+    assert.equal(keyboard('s', {altKey: true}), null)
+    assert.equal(keyboard('s', {isComposing: true}), null)
+    assert.equal(keyboard('s', {defaultPrevented: true}), null)
+})
+
+test('写回后按当前语义文本刷新选区 expected，瞬时采集失败仍可使用上一份范围', () => {
+    const selected = {...snapshot, from: 1, to: 3, expected: '旧值', collapsed: false}
+    assert.deepEqual(refreshCanvasTextSelection(selected, 'A文字B'), {
+        ...selected,
+        expected: '文字',
+    })
+    assert.equal(refreshCanvasTextSelection(selected, null), null)
+    assert.equal(refreshCanvasTextSelection({...selected, to: 8}, 'A文字B'), null)
+})
+
+test('运行时把快捷键、Enter、指针结束与写回重采集接进真实监听链路', () => {
+    const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
+    assert.match(source, /const keyboardIntent = canvasKeyboardIntent\(event\)[\s\S]*?type: 'history-intent', action: keyboardIntent/u)
+    assert.match(source, /keyboardIntent === 'find'[\s\S]*?type: 'find-intent', action: 'open'/u)
+    assert.match(source, /const intent = canvasEnterIntent\(node\.getAttribute\('data-fc-node-kind'\), event\.shiftKey\)/u)
+    assert.match(source, /addEventListener\('pointerup', reportSettledTextSelection\)/u)
+    assert.match(source, /addEventListener\('pointercancel', reportSettledTextSelection\)/u)
+    assert.match(source, /reportTextSelection\(restoredSelection, true\)/u)
+    assert.match(source, /selectionchange[\s\S]*?reportTextSelection\(activeTextSelection\)/u)
+    const blurHandler = source.slice(source.indexOf("window.addEventListener('blur'"), source.indexOf("installInputListeners()"))
+    assert.doesNotMatch(blurHandler, /clearTextSelection\(\)/u)
 })
 
 test('四种组合专用 beforeinput 不依赖当前 composing 状态且 WebKit 类型不进入提交白名单', () => {

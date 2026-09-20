@@ -157,7 +157,13 @@ export interface CanvasInputFlushMessage extends CanvasEnvelope {
 /** 画布内快捷键触发的历史操作意图；宿主负责执行并重新渲染。 */
 export interface CanvasHistoryIntentMessage extends CanvasEnvelope {
     type: 'history-intent'
-    action: 'undo' | 'redo'
+    action: 'undo' | 'redo' | 'save'
+}
+
+/** 画布内快捷键只请求宿主打开查找；查找界面与索引仍由宿主拥有。 */
+export interface CanvasFindIntentMessage extends CanvasEnvelope {
+    type: 'find-intent'
+    action: 'open'
 }
 
 /** 只报告双链候选的纯文本范围；null 表示取消同一意图。 */
@@ -182,6 +188,7 @@ export type CanvasRuntimeMessage =
     | CanvasInputBlockedMessage
     | CanvasInputFlushMessage
     | CanvasHistoryIntentMessage
+    | CanvasFindIntentMessage
     | CanvasLinkCandidateIntentMessage
 
 export interface CanvasMessageEventLike {

@@ -959,8 +959,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                         ? flushCanvasInput
                                         : undefined}
                                     onHistoryIntent={mode === 'visual'
-                                        ? action => action === 'undo' ? session.undo() : session.redo()
+                                        ? action => {
+                                            if (action === 'save') {
+                                                if (canSave) void handleSave()
+                                            } else if (action === 'undo') session.undo()
+                                            else session.redo()
+                                        }
                                         : undefined}
+                                    onFindIntent={undefined /* TODO：页面文档尚无查找面板，后续在此消费画布请求。 */}
                                     onLinkCandidateIntent={handleLinkCandidateIntent}
                                 />
                             ) : (
