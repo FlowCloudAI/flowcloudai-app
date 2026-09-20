@@ -61,6 +61,17 @@ function snapshot(display: 'block' | 'grid'): EntrySourceSnapshot {
     }
 }
 
+function snapshotWithAreas(): EntrySourceSnapshot {
+    const source = snapshot('grid')
+    return {
+        ...source,
+        styleCss: source.styleCss.replace(
+            'grid-template-rows: auto;',
+            'grid-template-rows: auto; grid-template-areas: "main side";',
+        ),
+    }
+}
+
 describe('grid visual editing binding', () => {
     it('轨道增删绑定发出带断点上下文的结构意图', () => {
         const inserted = createGridTrackInsertRequest(GRID_ID, 'desktop', 'columns', 2, 'fraction', 'insert')
@@ -149,5 +160,21 @@ describe('grid visual editing binding', () => {
         )
         assert.equal(result.status, 'not-grid')
         assert.match(result.reason ?? '', /不是 Grid/u)
+    })
+
+    it('命名区域沿真实检查入口返回内核拒绝码与作者可执行原因', () => {
+        const source = snapshotWithAreas()
+        const model = createDocumentDraft(source)
+        const runtime = createDocumentKernelDraftRuntime()
+        const result = inspectGridEditor(
+            GRID_ID,
+            request => runtime.inspectComponent(model, source, request),
+            'mobile',
+        )
+        assert.equal(result.status, 'grid')
+        assert.deepEqual(result.trackStructureBlock, {
+            code: 'grid-template-areas-active',
+            reason: '当前断点已定义命名区域；请先清除区域矩阵，再增删轨道。',
+        })
     })
 })

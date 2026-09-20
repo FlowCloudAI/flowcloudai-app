@@ -293,8 +293,14 @@ export function GridLayoutPropertyControls({
             <span>{viewport === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
         </header>
         {node.id === container.id ? <>
-            <GridAxisEditor axis="columns" nodeId={container.id} viewport={viewport} model={inspection.columns} apply={apply}/>
-            <GridAxisEditor axis="rows" nodeId={container.id} viewport={viewport} model={inspection.rows} apply={apply}/>
+            {inspection.trackStructureBlock ? <div className="page-document-grid-editor__block-reason" role="status">
+                <strong>轨道编辑暂不可用</strong>
+                <p>{inspection.trackStructureBlock.reason}</p>
+                <p>请切换到代码模式移除 <code>grid-template-areas</code> 后再编辑轨道。</p>
+            </div> : <>
+                <GridAxisEditor axis="columns" nodeId={container.id} viewport={viewport} model={inspection.columns} apply={apply}/>
+                <GridAxisEditor axis="rows" nodeId={container.id} viewport={viewport} model={inspection.rows} apply={apply}/>
+            </>}
         </> : <GridItemEditor node={node} viewport={viewport} inspectComponent={inspectComponent} apply={apply}/>}
         {error && <p role="alert">{error}</p>}
     </section>

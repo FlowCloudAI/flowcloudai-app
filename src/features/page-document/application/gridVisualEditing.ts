@@ -2,6 +2,7 @@
 
 import {
     documentFingerprint,
+    gridTemplateAreaBlockReason,
     idempotencyKey,
     interactionId,
     parseGridItemPlacementLonghands,
@@ -32,6 +33,10 @@ export interface GridEditorInspection {
     readonly reason: string | null
     readonly columns: ReturnType<typeof parseGridTrackList>
     readonly rows: ReturnType<typeof parseGridTrackList>
+    readonly trackStructureBlock: Readonly<{
+        code: 'grid-template-areas-active'
+        reason: string
+    }> | null
 }
 
 export interface GridSelectionContext {
@@ -113,7 +118,7 @@ export function inspectGridEditor(
 ): GridEditorInspection {
     const result = inspect({
         nodeId,
-        properties: ['display', 'grid-template-columns', 'grid-template-rows'],
+        properties: ['display', 'grid-template-columns', 'grid-template-rows', 'grid-template-areas'],
         context: readContext(viewport),
     })
     if (result.status !== 'ready') {
@@ -122,15 +127,22 @@ export function inspectGridEditor(
             reason: '当前布局状态无法读取。',
             columns: parseGridTrackList(null),
             rows: parseGridTrackList(null),
+            trackStructureBlock: null,
         })
     }
     const display = effectiveValue(result, 'display').trim().toLowerCase()
     const grid = /^(?:inline-)?grid$/u.test(display)
+    const areaBlockReason = grid
+        ? gridTemplateAreaBlockReason(result.inspection.properties['grid-template-areas'] ?? null)
+        : null
     return Object.freeze({
         status: grid ? 'grid' : 'not-grid',
         reason: grid ? null : '当前容器不是 Grid；轨道设置尚未生效。',
         columns: parseGridTrackList(effectiveValue(result, 'grid-template-columns')),
         rows: parseGridTrackList(effectiveValue(result, 'grid-template-rows')),
+        trackStructureBlock: areaBlockReason
+            ? Object.freeze({code: 'grid-template-areas-active' as const, reason: areaBlockReason})
+            : null,
     })
 }
 

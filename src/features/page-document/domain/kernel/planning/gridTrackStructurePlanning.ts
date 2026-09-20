@@ -86,7 +86,7 @@ function expandGridTrackStructureIntent(
         )
     }
     const areas = runtime.properties.inspect(parent.handle, 'grid-template-areas', readContext)
-    const areaBlock = templateAreaBlockReason(areas)
+    const areaBlock = gridTemplateAreaBlockReason(areas)
     if (areaBlock) return rejected('grid-template-areas-active', areaBlock, parent)
 
     const property = intent.axis === 'columns' ? 'grid-template-columns' : 'grid-template-rows'
@@ -665,7 +665,8 @@ function sameOrigin(left: SourceOrigin, right: SourceOrigin): boolean {
     )
 }
 
-function templateAreaBlockReason(inspection: PropertyInspection | null): string | null {
+/** 与轨道结构规划共用同一判断，供检查器在提交前解释为什么不呈现轨道编辑。 */
+export function gridTemplateAreaBlockReason(inspection: PropertyInspection | null): string | null {
     if (!inspection) return '无法读取当前断点的命名区域。'
     if (inspection.confidence.kind !== 'proven') return inspection.confidence.reason
     const effective = inspection.effectiveValue
