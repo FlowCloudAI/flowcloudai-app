@@ -1,26 +1,14 @@
 .entry-editor-page {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     flex: 1;
+    width: 100%;
     height: 100%;
+    min-width: var(--workspace-page-content-min-width);
     min-height: 0;
     overflow: hidden;
     background: var(--fc-color-bg);
-}
-
-.entry-editor-page__scroll {
-    flex: 1;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.entry-editor-shell {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    min-height: 100%;
     user-select: none;
 }
 
@@ -510,6 +498,15 @@
     line-height: var(--fc-line-height-normal);
 }
 
+.entry-editor-feedback {
+    position: absolute;
+    z-index: 3;
+    top: var(--fc-space-md);
+    left: 50%;
+    max-width: calc(100% - 2 * var(--fc-space-xl));
+    transform: translateX(-50%);
+}
+
 .entry-editor-feedback.is-error {
     color: var(--fc-color-danger, #e53e3e);
     border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 35%, transparent);
@@ -517,58 +514,68 @@
 }
 
 .entry-editor-workspace {
-    --entry-editor-page-toolbar-height: 3.85rem;
-
     position: relative;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 42rem;
-    border-bottom: 1px solid var(--fc-color-border);
-}
-
-.entry-editor-workspace.is-editing {
-    flex: 0 0 auto;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .entry-editor-workspace__header {
-    position: sticky;
-    top: 0;
     z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    background: color-mix(in srgb, var(--fc-color-bg) 90%, transparent);
-    border-bottom: 1px solid var(--fc-color-border);
-    box-shadow: var(--fc-shadow-sm);
-    backdrop-filter: blur(1.25rem) saturate(125%);
-}
-
-.entry-editor-workspace__toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
-    gap: var(--fc-space-lg);
+    gap: var(--fc-space-md);
     min-width: 0;
-    padding: 1rem 1.5rem 0.85rem;
+    padding: var(--fc-space-xs) max(var(--fc-space-md), var(--app-drag-handle-width));
+    border-bottom: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-sm);
 }
 
-.entry-editor-workspace__toolbar-main,
+.entry-editor-workspace__header-left,
 .entry-editor-workspace__toolbar-actions {
     display: flex;
     align-items: center;
-    gap: var(--fc-space-md);
+    gap: var(--fc-space-sm);
     min-width: 0;
 }
 
 .entry-editor-workspace__toolbar-actions {
     justify-content: flex-end;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
-.entry-editor-workspace__title {
-    margin: 0;
-    font-size: var(--fc-font-size-md);
+.entry-editor-workspace__toolbar-actions::-webkit-scrollbar {
+    display: none;
+}
+
+.entry-editor-workspace__title-input {
+    width: min(28rem, 100%);
+    min-width: 0;
+    padding: var(--fc-space-xs) var(--fc-space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--fc-radius-md);
+    background: transparent;
     color: var(--fc-color-text);
+    font: inherit;
+    font-weight: 650;
+    text-overflow: ellipsis;
+}
+
+.entry-editor-workspace__title-input:hover,
+.entry-editor-workspace__title-input:focus {
+    border-color: var(--fc-color-border);
+    background: var(--fc-color-bg);
+    outline: none;
+}
+
+.entry-editor-workspace__title-input:disabled {
+    opacity: 1;
+    cursor: default;
 }
 
 .entry-editor-save-state {
@@ -614,17 +621,33 @@
 
 .entry-editor-workspace__body {
     position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-lg);
-    padding: 0.85rem 1.5rem 1.2rem;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
     container-type: inline-size;
 }
 
-.entry-editor-workspace.is-editing .entry-editor-workspace__body {
-    min-height: 44rem;
-    gap: 0;
+.entry-editor-workspace__document {
+    width: 100%;
+    height: 100%;
+    min-width: var(--workspace-page-content-min-width);
+    min-height: 0;
+}
+
+.entry-editor-workspace__document.is-edit {
+    overflow: hidden;
+}
+
+.entry-editor-workspace__document.is-browse {
+    overflow: auto;
+}
+
+.entry-editor-workspace__document.is-browse > .page-document-canvas-entry {
+    min-height: 100%;
+    border: 0;
+    border-radius: 0;
 }
 
 .entry-editor-meta-layout {
@@ -637,6 +660,48 @@
     gap: 0.5rem 1.6rem;
     width: min(100%, 110rem);
     margin-inline: auto;
+}
+
+.entry-editor-information-panel {
+    width: min(74rem, calc(100vw - 2 * var(--fc-space-xl)));
+    max-height: calc(100vh - 2 * var(--fc-space-xl));
+}
+
+.entry-editor-information-panel__body {
+    min-width: 0;
+    min-height: 0;
+    padding: var(--fc-space-lg);
+    overflow: auto;
+    container-type: inline-size;
+}
+
+.entry-editor-relations-panel {
+    width: min(48rem, calc(100vw - 2 * var(--fc-space-xl)));
+    max-height: calc(100vh - 2 * var(--fc-space-xl));
+}
+
+.entry-editor-relations-panel__body,
+.entry-editor-relations-dock {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.entry-editor-relations-panel__body {
+    padding-bottom: var(--fc-space-md);
+}
+
+.entry-editor-relations-dock {
+    height: 100%;
+}
+
+.entry-editor-relations-dock > .entry-editor-relations,
+.entry-editor-relations-dock > .entry-editor-outgoing-links,
+.entry-editor-relations-dock > .entry-editor-backlinks {
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--fc-color-border-light);
 }
 
 @container (max-width: 74rem) {
@@ -1173,19 +1238,6 @@
 }
 
 @media (max-width: 720px) {
-    .entry-editor-workspace__body {
-        padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-lg);
-    }
-
-    .entry-editor-workspace__toolbar {
-        align-items: center;
-        flex-direction: row;
-        padding: var(--fc-space-md) var(--fc-space-lg);
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .entry-editor-workspace__toolbar-main,
     .entry-editor-workspace__toolbar-actions {
         flex: none;
     }

@@ -29,6 +29,7 @@ import {
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 
 interface EntryEditorMetaPanelProps {
+    showTitle?: boolean
     entryId: string
     entry: Entry | null
     draft: {
@@ -77,6 +78,7 @@ interface EntryEditorMetaPanelProps {
 }
 
 export default function EntryEditorMetaPanel({
+                                                 showTitle = true,
                                                  entryId,
                                                  entry,
                                                  draft,
@@ -221,7 +223,7 @@ export default function EntryEditorMetaPanel({
             </div>
 
             <div className="entry-editor-meta-panel entry-editor-meta-panel--primary">
-                <div className="entry-editor-meta-panel__section">
+                {showTitle && <div className="entry-editor-meta-panel__section">
                     <label className="entry-editor-field-label" htmlFor={titleInputId}>
                         标题
                         {!isBrowseMode && (
@@ -252,7 +254,7 @@ export default function EntryEditorMetaPanel({
                             )}
                         </>
                     )}
-                </div>
+                </div>}
 
                 <div className="entry-editor-meta-panel__section">
                     <div className="entry-editor-field-label-row">

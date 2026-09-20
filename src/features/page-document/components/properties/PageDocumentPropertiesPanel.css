@@ -1,6 +1,5 @@
 /* 属性 Dock 使用宿主语义 token；调节范围只约束控件，不改写超出范围的已有源码。 */
 
-.page-document-properties-dock-host,
 .page-document-properties-panel {
     display: flex;
     width: 100%;
