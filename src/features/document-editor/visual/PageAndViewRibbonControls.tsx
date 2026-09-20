@@ -228,7 +228,7 @@ export function ViewRibbonControls({previewMode, editContext, outlineVisible, la
             <small>这里只切换属性读写档位；画布宽度由左侧“预览画布宽度”单独控制。</small>
         </DocumentRibbonGroup>
         <DocumentRibbonGroup label="显示" priority="normal">
-            <DocumentRibbonCommand icon={Eye} label="阅读预览" onClick={onOpenDisplay} />
+            <DocumentRibbonCommand icon={Eye} label="预览草稿" onClick={onOpenDisplay} />
             <DocumentRibbonCommand active={outlineVisible} disabled icon={LayoutPanelLeft} label="文档图层" onClick={() => onOutlineVisibleChange(!outlineVisible)} title="图层可见性切换尚未接入工具栏状态" />
             <DocumentRibbonCommand active={layoutGuidesVisible} disabled icon={layoutGuidesVisible ? Monitor : EyeOff} label="布局线" onClick={() => onLayoutGuidesVisibleChange(!layoutGuidesVisible)} title="布局线渲染尚未接入画布状态" />
         </DocumentRibbonGroup>

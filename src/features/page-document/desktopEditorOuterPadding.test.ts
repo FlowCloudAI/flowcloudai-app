@@ -34,8 +34,15 @@ test('桌面词条页使用满高网格且页面编辑器不再是带外边距�
 test('页面编辑工作条挂入词条常驻顶栏且不再占用第二行', () => {
     const workspace = readFileSync(new URL('../entries/components/EntryEditorWorkspace.tsx', import.meta.url), 'utf8')
     const editor = readFileSync(new URL('components/PageDocumentEditor.tsx', import.meta.url), 'utf8')
+    const viewControls = readFileSync(new URL('../document-editor/visual/PageAndViewRibbonControls.tsx', import.meta.url), 'utf8')
+    const projectEditor = readFileSync(new URL('../../pages/ProjectEditor.tsx', import.meta.url), 'utf8')
+    const workbar = editor.slice(editor.indexOf('const workbarControls'), editor.indexOf('\n\n    return ('))
 
     assert.match(workspace, /entry-editor-workspace__header-center[\s\S]*setPageDocumentWorkbarHost/u)
     assert.match(editor, /workbarPortalHost && createPortal\(workbarControls, workbarPortalHost\)/u)
     assert.match(editor, /!workbarPortalHost && <header className="page-document-editor__workbar"/u)
+    assert.doesNotMatch(workbar, />展示<|插入图片/u)
+    assert.match(editor, /DocumentRibbonGroup label="媒体"[\s\S]*label="图片"/u)
+    assert.match(viewControls, /label="预览草稿"/u)
+    assert.doesNotMatch(projectEditor, /key: `entry-\$\{activeEntryId\}`/u)
 })

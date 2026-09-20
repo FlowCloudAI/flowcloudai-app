@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
-import {Eye, FilePlus2, Home, Image, LayoutPanelTop, Table2, type LucideIcon} from 'lucide-react'
+import {Eye, FilePlus2, Home, Image, LayoutPanelTop, Redo2, Table2, Undo2, type LucideIcon} from 'lucide-react'
 import {
     pageDocumentAssetErrorMessage,
     pageDocumentComponentErrorMessage,
@@ -47,6 +47,8 @@ import {
 } from './pageDocumentEditorWorkspacePolicy.ts'
 import './PageDocumentEditor.css'
 import {
+    DocumentRibbonCommand,
+    DocumentRibbonGroup,
     DocumentOfficeRibbon,
     type DocumentRibbonTabOption,
 } from '../../document-editor/visual/DocumentOfficeRibbon.tsx'
@@ -283,7 +285,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         if (state.model.entry.phase === 'failed') return '保存失败'
         if (state.persistedRevision === undefined) return '未保存'
         if (dirty) return '未保存'
-        return `已保存 · r${state.persistedRevision}`
+        return '已保存'
     }, [dirty, state])
     const canUndo = mode === 'code' ? sourceHistory.canUndo : session.canUndo
     const canRedo = mode === 'code' ? sourceHistory.canRedo : session.canRedo
@@ -621,36 +623,39 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             >可视</button>
             <button
                 type="button"
-                className={mode === 'display' ? 'is-active' : ''}
-                aria-pressed={mode === 'display'}
-                onClick={() => changeMode('display')}
-            >展示</button>
-            <button
-                type="button"
                 className={mode === 'code' ? 'is-active' : ''}
                 aria-pressed={mode === 'code'}
                 onClick={() => changeMode('code')}
             >代码</button>
         </div>
-        {mode === 'visual' && <Button type="button" size="sm" variant="outline" onClick={() => openAssetPicker('insert')}>插入图片</Button>}
         <Button
             type="button"
             size="sm"
             variant="ghost"
+            aria-label="撤销"
+            title="撤销"
             disabled={!canUndo}
             onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.undo() : session.undo()}
-        >撤销</Button>
+        ><Undo2 size={16} /></Button>
         <Button
             type="button"
             size="sm"
             variant="ghost"
+            aria-label="重做"
+            title="重做"
             disabled={!canRedo}
             onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
-        >重做</Button>
+        ><Redo2 size={16} /></Button>
         <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
-        <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void handleSave()}>
-            {scope.phase === 'saving' ? '保存中…' : '保存'}
-        </Button>
+        {(canSave || scope.phase === 'saving') && <Button
+            type="button"
+            size="sm"
+            radius="full"
+            disabled={!canSave}
+            onClick={() => void handleSave()}
+        >
+            {scope.phase === 'saving' ? '保存中…' : '保存页面'}
+        </Button>}
     </div>
 
     return (
@@ -822,6 +827,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     disabledReason={builtInInsertionTarget ? null : '请选择正文容器或其中一个受管节点作为插入位置。'}
                                     onInsert={insertBuiltInStructure}
                                 />
+                                <DocumentRibbonGroup label="媒体" priority="essential">
+                                    <DocumentRibbonCommand
+                                        icon={Image}
+                                        label="图片"
+                                        onClick={() => openAssetPicker('insert')}
+                                        title="插入图片"
+                                    />
+                                </DocumentRibbonGroup>
                                 <PublicComponentRibbonControls
                                     definitions={session.componentDefinitions}
                                     warning={session.componentDefinitionsWarning}

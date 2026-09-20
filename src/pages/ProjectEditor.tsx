@@ -997,14 +997,6 @@ function ProjectEditorInner({
         }
     }, [activeEntryId, activeToolPanel, onBackToProject, projectId])
 
-    const handleBreadcrumbEntryClick = useCallback(() => {
-        if (!activeEntryId) return
-        onOpenEntry?.(projectId, {
-            id: activeEntryId,
-            title: activeEntryTitle || '词条',
-        })
-    }, [activeEntryId, activeEntryTitle, onOpenEntry, projectId])
-
     const handleBreadcrumbToolClick = useCallback(() => {
         if (!activeToolPanel || activeToolPanel === 'overview') return
         handleOpenProjectPanel(activeToolPanel)
@@ -1130,12 +1122,6 @@ function ProjectEditorInner({
             }
         }
         if (activeEntryId) {
-            items.push({
-                key: `entry-${activeEntryId}`,
-                label: activeEntryTitle || '词条',
-                onClick: handleBreadcrumbEntryClick,
-                current: true,
-            })
             return items
         }
         if (activeToolPanel) {
@@ -1150,10 +1136,8 @@ function ProjectEditorInner({
         return items
     }, [
         activeEntryId,
-        activeEntryTitle,
         activeToolPanel,
         handleBreadcrumbCategoryClick,
-        handleBreadcrumbEntryClick,
         handleBreadcrumbProjectClick,
         handleBreadcrumbToolClick,
         project?.name,

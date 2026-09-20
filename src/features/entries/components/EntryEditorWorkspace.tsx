@@ -160,7 +160,7 @@ export default function EntryEditorWorkspace({
 
             <div className="entry-editor-workspace__toolbar-actions">
                 {toolbarExtras}
-                {editorMode === 'edit' && <span
+                {editorMode === 'edit' && saveStatus.kind !== 'saved' && <span
                     className={`entry-editor-save-state is-${saveStatus.kind}`}
                     title={saveStatus.detail}
                     role={saveStatus.kind === 'error' ? 'alert' : 'status'}
@@ -172,13 +172,13 @@ export default function EntryEditorWorkspace({
                     radius="full"
                     onClick={() => setInformationOpen(true)}
                 >词条信息</Button>
-                {editorMode === 'edit' && <Button
+                {editorMode === 'edit' && (canSave || saving) && <Button
                     type="button"
                     size="sm"
                     radius="full"
                     disabled={!canSave}
                     onClick={onSave}
-                >{saving ? '保存中…' : '保存修改'}</Button>}
+                >{saving ? '保存中…' : '保存词条信息'}</Button>}
                 {actionItems.length > 0 && <Button
                     type="button"
                     variant="outline"
