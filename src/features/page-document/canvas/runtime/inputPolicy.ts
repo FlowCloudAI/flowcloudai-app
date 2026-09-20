@@ -10,7 +10,7 @@ export interface CanvasTextSelectionSnapshot {
     readonly collapsed: boolean
 }
 
-export type CanvasBeforeInputDecision = 'ignore' | 'native-composition' | 'submit' | 'block'
+export type CanvasBeforeInputDecision = 'ignore' | 'native-composition' | 'paste-owned' | 'submit' | 'block'
 
 export function canvasBlockedInputDetail(
     inputType: string,
@@ -25,7 +25,6 @@ const beforeInputTypes = new Set<string>([
     'insertReplacementText',
     'insertParagraph',
     'insertLineBreak',
-    'insertFromPaste',
     'deleteContentBackward',
     'deleteContentForward',
     'deleteWordBackward',
@@ -124,6 +123,8 @@ export function canvasBeforeInputDecision(input: {
     // WebKit 的旧式组合事件可能晚于 compositionend；各内核时序不同，不能以当前 isComposing 判定。
     if (nativeCompositionInputTypes.has(input.inputType)) return 'native-composition'
     if (input.isComposing) return 'block'
+    // paste 事件是唯一读取 clipboardData 并提交纯文本的入口；beforeinput 只阻止浏览器重复写入。
+    if (input.inputType === 'insertFromPaste') return 'paste-owned'
     return beforeInputTypes.has(input.inputType) ? 'submit' : 'block'
 }
 

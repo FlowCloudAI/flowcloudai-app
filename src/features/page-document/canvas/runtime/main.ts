@@ -518,6 +518,10 @@ function installInputListeners(): void {
             inputType,
         })
         if (decision === 'ignore' || decision === 'native-composition') return
+        if (decision === 'paste-owned') {
+            event.preventDefault()
+            return
+        }
         if (decision === 'block') {
             event.preventDefault()
             reportBlockedInput(inputType, 'unsupported-input-type', nodeId)
@@ -545,23 +549,6 @@ function installInputListeners(): void {
             }
         } else if (inputType === 'insertLineBreak') {
             text = '\n'
-        } else if (inputType === 'insertFromPaste') {
-            const transferred = event.dataTransfer?.getData('text/plain')
-            const decision = canvasPasteDecision({
-                editingEnabled,
-                editableTarget: true,
-                isComposing: composition.isComposing,
-                selectionValid: true,
-                plainText: typeof transferred === 'string' && transferred.length > 0
-                    ? transferred
-                    : typeof event.data === 'string' ? event.data : null,
-            })
-            if (decision.kind !== 'submit') {
-                event.preventDefault()
-                reportBlockedInput(inputType, decision.kind === 'block' ? decision.reason : 'invalid-selection', nodeId)
-                return
-            }
-            text = decision.text
         } else if (typeof event.data === 'string') {
             text = event.data
         } else {

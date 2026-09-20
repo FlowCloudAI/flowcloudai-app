@@ -15,7 +15,14 @@ import {
     refreshCanvasTextSelection,
     shouldDeferCanvasRender,
 } from './inputPolicy.ts'
-import {CANVAS_INPUT_TYPES} from '../protocol/index.ts'
+import {
+    CANVAS_INPUT_TYPES,
+    PAGE_DOCUMENT_CANVAS_CHANNEL,
+    PAGE_DOCUMENT_CANVAS_VERSION,
+    type CanvasInputIntentMessage,
+} from '../protocol/index.ts'
+import type {ComponentHandle} from '../../domain/kernel/index.ts'
+import {createCanvasInputKernelOperation} from '../../application/canvasInputOperation.ts'
 
 const snapshot = {
     nodeId: '018f47a2-3b4c-7d5e-8f90-123456789abc',
@@ -32,7 +39,6 @@ test('未收到开启命令时不处理输入，开启后只提交受控 beforei
         'insertReplacementText',
         'insertParagraph',
         'insertLineBreak',
-        'insertFromPaste',
         'deleteContentBackward',
         'deleteContentForward',
         'deleteWordBackward',
@@ -41,6 +47,16 @@ test('未收到开启命令时不处理输入，开启后只提交受控 beforei
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'submit')
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
     }
+    assert.equal(canvasBeforeInputDecision({
+        editingEnabled: true,
+        isComposing: false,
+        inputType: 'insertFromPaste',
+    }), 'paste-owned')
+    assert.equal(canvasBeforeInputDecision({
+        editingEnabled: true,
+        isComposing: true,
+        inputType: 'insertFromPaste',
+    }), 'block')
     for (const inputType of ['insertFromDrop', 'formatBold', 'historyUndo']) {
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'block')
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
@@ -88,6 +104,47 @@ test('纯文本粘贴在未编辑或组合期拒绝提交，并规范换行与�
         selectionValid: true,
         plainText: '你'.repeat(65_537),
     }), {kind: 'block', reason: 'input-too-large'})
+})
+
+test('非折叠选区的单段粘贴只由 paste 提交一次替换且不分段', () => {
+    const submittedBy: string[] = []
+    if (canvasBeforeInputDecision({
+        editingEnabled: true,
+        isComposing: false,
+        inputType: 'insertFromPaste',
+    }) === 'submit') submittedBy.push('beforeinput')
+    if (canvasPasteDecision({
+        editingEnabled: true,
+        editableTarget: true,
+        isComposing: false,
+        selectionValid: true,
+        plainText: '替换文字',
+    }).kind === 'submit') submittedBy.push('paste')
+
+    const messages = submittedBy.map((_, index): CanvasInputIntentMessage => ({
+        channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+        version: PAGE_DOCUMENT_CANVAS_VERSION,
+        sessionToken: 'a'.repeat(64),
+        sequence: index + 1,
+        type: 'input-intent',
+        intentId: `11111111-1111-7111-8111-11111111111${index}`,
+        nodeId: snapshot.nodeId,
+        inputType: 'insertFromPaste',
+        from: 1,
+        to: 3,
+        expected: '旧文',
+        text: '替换文字',
+    }))
+    const handle = {nodeId: snapshot.nodeId} as ComponentHandle
+    const intents = createCanvasInputKernelOperation(
+        messages,
+        'canvas-input-history:paste-single-paragraph',
+        'paragraph',
+    ).request.createIntents(new Map([[snapshot.nodeId, handle]]))
+
+    assert.deepEqual(submittedBy, ['paste'])
+    assert.equal(intents.filter(intent => intent.kind === 'replace-text').length, 1)
+    assert.equal(intents.filter(intent => intent.kind === 'split-text-block').length, 0)
 })
 
 test('分段只开放 paragraph、heading 与 list-item', () => {
