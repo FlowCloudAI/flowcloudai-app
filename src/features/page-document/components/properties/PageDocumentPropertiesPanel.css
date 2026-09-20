@@ -139,6 +139,33 @@
     border-radius: var(--fc-radius-sm);
 }
 
+.page-document-interaction-properties {
+    display: grid;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
+}
+
+.page-document-interaction-properties > header {
+    display: grid;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-interaction-properties > header span {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-interaction-properties__contexts {
+    display: flex;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-interaction-properties__contexts button[aria-pressed="true"] {
+    color: var(--fc-color-primary);
+}
+
 .page-document-property + .page-document-property,
 .page-document-spacing-group + .page-document-spacing-group,
 .page-document-spacing-group + .page-document-property {

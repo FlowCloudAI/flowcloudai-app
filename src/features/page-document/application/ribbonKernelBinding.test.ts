@@ -50,6 +50,30 @@ test('工具栏加粗与对齐分别绑定受限字重和 text-align intent', ()
     assert.deepEqual(alignmentIntent[0]?.action, {kind: 'set-value', value: 'center'})
 })
 
+test('断点切换经功能区绑定写入移动基础与桌面条件通道', () => {
+    const bindings = new Map([[NODE_ID, handle()]])
+    const mobile = createRibbonPropertyRequest(
+        NODE_ID,
+        'font-size',
+        {kind: 'numeric', value: 16, unit: 'px', numberText: '16'},
+        'mobile',
+    ).createIntents(bindings)[0]
+    const desktop = createRibbonPropertyRequest(
+        NODE_ID,
+        'font-size',
+        {kind: 'numeric', value: 20, unit: 'px', numberText: '20'},
+        'desktop',
+    ).createIntents(bindings)[0]
+    assert.equal(mobile?.kind, 'edit-property')
+    assert.equal(desktop?.kind, 'edit-property')
+    if (mobile?.kind !== 'edit-property' || desktop?.kind !== 'edit-property') return
+    assert.deepEqual(mobile.readContext.interactions, {hover: false, focusWithin: false})
+    assert.equal(mobile.readContext.viewport, 'mobile')
+    assert.deepEqual(mobile.destination, {scope: 'entry', channel: {kind: 'base-rule'}})
+    assert.equal(desktop.readContext.viewport, 'desktop')
+    assert.deepEqual(desktop.destination, {scope: 'entry', channel: {kind: 'conditional-rule', context: 'desktop'}})
+})
+
 test('可信文字选区通过功能区绑定发出 text-range 样式 intent', () => {
     const request = createRibbonTextRangePropertyRequest({
         nodeId: NODE_ID,

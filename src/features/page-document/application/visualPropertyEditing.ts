@@ -11,6 +11,7 @@ import {
     type AuthorDeclarationState,
     type PropertyInspection,
     type ReadContext,
+    type ManagedNodeStyleContext,
     type WriteDestination,
 } from '../domain/kernel/index.ts'
 import type {LayerProjectionNode} from '../domain/layerProjection.ts'
@@ -97,17 +98,28 @@ export type InspectVisualComponent = (
     request: KernelComponentInspectionRequest,
 ) => KernelComponentInspectionResult
 
-const ALL_WIDTHS_READ_CONTEXT: ReadContext = Object.freeze({
-    viewport: 'mobile',
-    interactions: Object.freeze({hover: false, focusWithin: false}),
-    direction: 'ltr',
-    writingMode: 'horizontal-tb',
-})
+export type VisualStyleContext = ManagedNodeStyleContext
 
-const ALL_WIDTHS_DESTINATION: WriteDestination = Object.freeze({
-    scope: 'entry',
-    channel: Object.freeze({kind: 'base-rule'}),
-})
+function readContextFor(styleContext: VisualStyleContext): ReadContext {
+    return Object.freeze({
+        viewport: styleContext === 'desktop' ? 'desktop' : 'mobile',
+        interactions: Object.freeze({
+            hover: styleContext === 'hover',
+            focusWithin: styleContext === 'focus-within',
+        }),
+        direction: 'ltr',
+        writingMode: 'horizontal-tb',
+    })
+}
+
+function destinationFor(styleContext: VisualStyleContext): WriteDestination {
+    return Object.freeze({
+        scope: 'entry',
+        channel: styleContext === 'mobile'
+            ? Object.freeze({kind: 'base-rule' as const})
+            : Object.freeze({kind: 'conditional-rule' as const, context: styleContext}),
+    })
+}
 
 const CSS_NUMBER_PATTERN = /^[+-]?(?:(?:\d+\.\d+)|(?:\d+)|(?:\.\d+))(?:[eE][+-]?\d+)?$/u
 const HEX_COLOR_PATTERN = /^#[\da-f]{6}$/iu
@@ -152,9 +164,10 @@ function fieldState(
     node: LayerProjectionNode,
     field: (typeof VISUAL_PROPERTY_FIELDS)[number],
     inspection: PropertyInspection | undefined,
-    desktopInspection: PropertyInspection | undefined,
+    fallbackInspection: PropertyInspection | undefined,
     otherViewportProperties: ReadonlySet<string>,
     display: string,
+    styleContext: VisualStyleContext,
 ): VisualPropertyState {
     const base = {
         property: field.property,
@@ -187,13 +200,14 @@ function fieldState(
         inspection.applicability.kind === 'applicable'
             ? null
             : inspection.applicability.reason
-    const baseDeclarations = inspection.directDeclarations.filter(declaration =>
-        matchesManagedRule(declaration, node, field.property, ALL_WIDTHS_DESTINATION),
+    const destination = destinationFor(styleContext)
+    const localDeclarations = inspection.directDeclarations.filter(declaration =>
+        matchesManagedRule(declaration, node, field.property, destination),
     )
-    const localDeclaration = baseDeclarations.at(-1)
-    const important = baseDeclarations.some(declaration => declaration.important)
+    const localDeclaration = localDeclarations.at(-1)
+    const important = localDeclarations.some(declaration => declaration.important)
     const writable = inspection.writeDestinations.some(destination =>
-        sameDestination(destination, ALL_WIDTHS_DESTINATION),
+        sameDestination(destination, destinationFor(styleContext)),
     )
     const reason =
         important
@@ -213,10 +227,10 @@ function fieldState(
         })
     }
     const localValue = localDeclaration?.resolvedValue ?? localDeclaration?.rawValue ?? null
-    const otherViewport =
-        effectiveValue(inspection).trim() !== effectiveValue(desktopInspection).trim() ||
+    const otherViewport = ['mobile', 'desktop'].includes(styleContext) && (
+        effectiveValue(inspection).trim() !== effectiveValue(fallbackInspection).trim() ||
         otherViewportProperties.has(field.property) ||
-        [inspection, desktopInspection].some(candidate =>
+        [inspection, fallbackInspection].some(candidate =>
             candidate?.directDeclarations.some(
                 declaration =>
                     declaration.declaredProperty.toLowerCase() === field.property &&
@@ -225,7 +239,12 @@ function fieldState(
                     normalizeManagedCondition(declaration.media) !== null,
             ),
         )
-    const inherited = '本级未设置 · 继承自词条样式'
+    )
+    const inherited = styleContext === 'desktop'
+        ? '本档未设置 · 继承移动设置'
+        : styleContext === 'mobile'
+          ? '本档未设置 · 继承词条样式'
+          : '当前状态未设置 · 使用常态值'
     return Object.freeze({
         ...base,
         value: localValue ?? effectiveValue(inspection),
@@ -245,28 +264,33 @@ export function inspectVisualProperties(
     node: LayerProjectionNode,
     inspect: InspectVisualComponent,
     entryStyleCss = '',
+    styleContext: VisualStyleContext = 'mobile',
 ): readonly VisualPropertyState[] {
     const properties = [...new Set([...VISUAL_PROPERTY_FIELDS.map(field => field.property), 'display'])]
-    const result = inspect({nodeId: node.id, properties, context: ALL_WIDTHS_READ_CONTEXT})
-    const desktopResult = inspect({
+    const result = inspect({nodeId: node.id, properties, context: readContextFor(styleContext)})
+    const fallbackStyleContext = styleContext === 'desktop' ? 'mobile' : 'desktop'
+    const fallbackResult = inspect({
         nodeId: node.id,
         properties,
-        context: Object.freeze({...ALL_WIDTHS_READ_CONTEXT, viewport: 'desktop'}),
+        context: readContextFor(fallbackStyleContext),
     })
     const inspections = result.status === 'ready' ? result.inspection.properties : {}
-    const desktopInspections =
-        desktopResult.status === 'ready' ? desktopResult.inspection.properties : {}
+    const fallbackInspections =
+        fallbackResult.status === 'ready' ? fallbackResult.inspection.properties : {}
     const display = effectiveValue(inspections.display)
-    const otherViewportProperties = managedOtherViewportProperties(node, entryStyleCss)
+    const otherViewportProperties = ['mobile', 'desktop'].includes(styleContext)
+        ? managedOtherViewportProperties(node, entryStyleCss, styleContext)
+        : new Set<string>()
     return Object.freeze(
         VISUAL_PROPERTY_FIELDS.map(field =>
             fieldState(
                 node,
                 field,
                 inspections[field.property],
-                desktopInspections[field.property],
+                fallbackInspections[field.property],
                 otherViewportProperties,
                 display,
+                styleContext,
             ),
         ),
     )
@@ -275,16 +299,19 @@ export function inspectVisualProperties(
 function managedOtherViewportProperties(
     node: LayerProjectionNode,
     entryStyleCss: string,
+    styleContext: VisualStyleContext,
 ): ReadonlySet<string> {
     if (!entryStyleCss || node.kind === 'source' || node.kind === 'operation') return new Set()
-    const desktopTarget = managedRuleTarget(node.id, node.kind as DocumentNodeKind, {
-        kind: 'conditional-rule',
-        context: 'desktop',
-    })
+    const other = styleContext === 'desktop' ? 'mobile' : 'desktop'
+    const target = managedRuleTarget(
+        node.id,
+        node.kind as DocumentNodeKind,
+        destinationFor(other).channel as Exclude<WriteDestination['channel'], {readonly kind: 'inline'}>,
+    )
     const properties = new Set<string>()
     try {
         postcss.parse(entryStyleCss).walkRules(rule => {
-            if (rule.selector.trim() !== desktopTarget.selector) return
+            if (rule.selector.trim() !== target.selector) return
             let parent: Node | undefined = rule.parent
             let insideMedia = false
             while (parent) {
@@ -299,7 +326,7 @@ function managedOtherViewportProperties(
                 }
                 parent = parent.parent
             }
-            if (!insideMedia) return
+            if ((other === 'desktop') !== insideMedia) return
             rule.walkDecls(declaration => {
                 properties.add(declaration.prop.toLowerCase())
             })
@@ -573,7 +600,7 @@ export function serializeVisualPropertyValue(
 export function createVisualPropertyEditRequest(
     nodeId: string,
     changes: readonly VisualPropertyChange[],
-    history: DocumentHistoryOptions = {},
+    history: DocumentHistoryOptions & {readonly styleContext?: VisualStyleContext} = {},
     allocateRequestId: () => string = () => crypto.randomUUID(),
 ): KernelDraftEditRequest {
     if (changes.length === 0) throw new TypeError('属性修改不能为空。')
@@ -586,6 +613,9 @@ export function createVisualPropertyEditRequest(
     }
     const requestId = allocateRequestId()
     const interactionSeed = history.historyGroupId ?? requestId
+    const styleContext = history.styleContext ?? 'mobile'
+    const readContext = readContextFor(styleContext)
+    const destination = destinationFor(styleContext)
     return Object.freeze({
         nodeIds: Object.freeze([nodeId.toLowerCase()]),
         idempotencyKey: idempotencyKey(`page-property:${requestId}`),
@@ -600,12 +630,31 @@ export function createVisualPropertyEditRequest(
                     action: change.value !== null
                         ? Object.freeze({kind: 'set-value' as const, value: change.value})
                         : Object.freeze({kind: 'clear-override' as const}),
-                    readContext: ALL_WIDTHS_READ_CONTEXT,
-                    destination: ALL_WIDTHS_DESTINATION,
+                    readContext,
+                    destination,
                     ...(change.value !== null
                         ? {takeover: 'preserve-inline-effect' as const}
                         : {}),
                 })))
         },
     })
+}
+
+export function createInteractionColorPropertyEditRequest(
+    nodeId: string,
+    styleContext: Extract<VisualStyleContext, 'hover' | 'focus-within'>,
+    property: Extract<VisualPropertyName, 'color' | 'background-color' | 'border-color'>,
+    value: VisualColorPropertyValue | {readonly kind: 'clear-override'},
+    history: DocumentHistoryOptions = {},
+    allocateRequestId: () => string = () => crypto.randomUUID(),
+): KernelDraftEditRequest {
+    if (!['color', 'background-color', 'border-color'].includes(property)) {
+        throw new TypeError('交互态只开放文字、背景与边框颜色。')
+    }
+    return createVisualPropertyEditRequest(
+        nodeId,
+        [{property, value}],
+        {...history, styleContext},
+        allocateRequestId,
+    )
 }

@@ -211,6 +211,12 @@ export function ColorPropertyControl({
                     )}
                 </div>
             )}
+            {field.sourceState === 'other-viewport' && field.localValue === null && sourceColor && (
+                <Button size="sm" variant="outline" disabled={field.disabled} onClick={() => {
+                    publish(sourceColor, true)
+                    finish()
+                }}>在本档覆盖</Button>
+            )}
             {field.localValue !== null && (
                 <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
                     清除本级设置

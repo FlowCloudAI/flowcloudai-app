@@ -193,7 +193,7 @@ export function ContainerLayoutRibbonControls({
                         disabled={modeDisabled}
                         onValueChange={value => {
                             if (value === 'custom') return
-                            void run(createContainerLayoutRequest(node.id, String(value) as ContainerLayoutMode), '切换容器布局方式')
+                            void run(createContainerLayoutRequest(node.id, String(value) as ContainerLayoutMode, context), '切换容器布局方式')
                         }}
                         options={[
                             ...(mode === 'custom' ? [customOption('custom', '自定义')] : []),
@@ -210,7 +210,7 @@ export function ContainerLayoutRibbonControls({
                         disabled={columnsDisabled}
                         onValueChange={value => {
                             if (value === 'custom') return
-                            void run(createContainerColumnsRequest(node.id, String(value) as ContainerColumnPreset), '修改容器分栏数')
+                            void run(createContainerColumnsRequest(node.id, String(value) as ContainerColumnPreset, context), '修改容器分栏数')
                         }}
                         options={[
                             ...(columns === 'custom' ? [customOption('custom', '自定义')] : []),
@@ -228,7 +228,7 @@ export function ContainerLayoutRibbonControls({
                     <MoveHorizontal aria-hidden="true" size={14} />
                     <Select
                         aria-label="容器间距"
-                        onValueChange={value => void run(createContainerGapRequest(node.id, String(value) as 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem'), '修改容器间距')}
+                        onValueChange={value => void run(createContainerGapRequest(node.id, String(value) as 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem', context), '修改容器间距')}
                         options={[...GAP_OPTIONS]}
                         title="容器间距"
                         value={gapOption}
@@ -241,7 +241,7 @@ export function ContainerLayoutRibbonControls({
                         disabled={alignDisabled}
                         onValueChange={value => {
                             if (value === 'custom') return
-                            void run(createContainerAlignRequest(node.id, String(value) as ContainerAlignPreset), '修改容器纵向对齐')
+                            void run(createContainerAlignRequest(node.id, String(value) as ContainerAlignPreset, context), '修改容器纵向对齐')
                         }}
                         options={[
                             ...(align === 'custom' ? [customOption('custom', '自定义')] : []),
@@ -259,7 +259,7 @@ export function ContainerLayoutRibbonControls({
                     disabled={justifyDisabled}
                     onValueChange={value => {
                         if (value === 'custom') return
-                        void run(createContainerJustifyRequest(node.id, String(value) as ContainerJustifyPreset), '修改容器横向分布')
+                        void run(createContainerJustifyRequest(node.id, String(value) as ContainerJustifyPreset, context), '修改容器横向分布')
                     }}
                     options={[
                         ...(justify === 'custom' ? [customOption('custom', '自定义')] : []),

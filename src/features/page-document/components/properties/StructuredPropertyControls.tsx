@@ -85,6 +85,12 @@ export function KeywordPropertyControl({field, onChange}: {field: VisualProperty
                 void onChange({kind: 'keyword', value: String(value)}, {immediate: true})
             }}
         />
+        {field.sourceState === 'other-viewport' && field.localValue === null && known && <Button
+            size="sm"
+            variant="outline"
+            disabled={field.disabled}
+            onClick={() => void onChange({kind: 'keyword', value: raw}, {immediate: true})}
+        >在本档覆盖</Button>}
     </PropertyShell>
 }
 

@@ -50,6 +50,7 @@ export interface HomeRibbonControlsProps {
     inspectComponent: RibbonInspectComponent
     inspectTextRange: RibbonInspectTextRange
     activeTextRange: RibbonTextRange | null
+    styleContext: 'mobile' | 'desktop'
     onFind?: () => void
     onOpenDetails?: () => void
 }
@@ -85,10 +86,12 @@ function FontControls({
     node,
     states,
     applyKernelEntry,
+    styleContext,
 }: {
     node: LayerProjectionNode
     states: readonly VisualPropertyState[]
     applyKernelEntry: RibbonApplyKernelEntry
+    styleContext: 'mobile' | 'desktop'
 }) {
     const size = stateFor(states, 'font-size')
     const weight = stateFor(states, 'font-weight')
@@ -100,7 +103,7 @@ function FontControls({
     const canWrite = Boolean(size && !size.disabled)
     const canWeight = Boolean(weight && !weight.disabled)
     const apply = (property: VisualPropertyName, value: VisualPropertyEditValue, label: string) => {
-        void applyKernelEntry(createRibbonPropertyRequest(node.id, property, value), label, {immediate: true})
+        void applyKernelEntry(createRibbonPropertyRequest(node.id, property, value, styleContext), label, {immediate: true})
     }
     return (
         <DocumentRibbonRows
@@ -164,10 +167,12 @@ function ParagraphControls({
     node,
     states,
     applyKernelEntry,
+    styleContext,
 }: {
     node: LayerProjectionNode
     states: readonly VisualPropertyState[]
     applyKernelEntry: RibbonApplyKernelEntry
+    styleContext: 'mobile' | 'desktop'
 }) {
     const alignment = stateFor(states, 'text-align')
     const current = propertyValue(alignment) || 'left'
@@ -183,7 +188,7 @@ function ParagraphControls({
                         disabled={!canWrite}
                         key={option.value}
                         onClick={() => void applyKernelEntry(
-                            createRibbonPropertyRequest(node.id, 'text-align', {kind: 'choice', value: option.value}),
+                            createRibbonPropertyRequest(node.id, 'text-align', {kind: 'choice', value: option.value}, styleContext),
                             `修改${option.label}`,
                             {immediate: true},
                         )}
@@ -204,12 +209,13 @@ export function HomeRibbonControls({
     inspectComponent,
     inspectTextRange,
     activeTextRange,
+    styleContext,
     onFind,
     onOpenDetails,
 }: HomeRibbonControlsProps) {
     const availability = homeRibbonGroupAvailability(selected)
     const states = selected?.managed
-        ? inspectVisualProperties(selected, inspectComponent)
+        ? inspectVisualProperties(selected, inspectComponent, '', styleContext)
         : []
     const editableText = Boolean(selected?.managed && ['paragraph', 'heading', 'list-item', 'table-cell'].includes(selected.kind))
     const groupReason = availability.font ?? '先选择一个受管文字节点'
@@ -224,7 +230,7 @@ export function HomeRibbonControls({
                 wide
             >
                 {selected && editableText ? (
-                    <FontControls node={selected} states={states} applyKernelEntry={applyKernelEntry} />
+                    <FontControls node={selected} states={states} applyKernelEntry={applyKernelEntry} styleContext={styleContext} />
                 ) : (
                     <RibbonUnavailable label="整段文字" reason={groupReason} />
                 )}
@@ -238,7 +244,7 @@ export function HomeRibbonControls({
                 wide
             >
                 {selected && editableText ? (
-                    <ParagraphControls node={selected} states={states} applyKernelEntry={applyKernelEntry} />
+                    <ParagraphControls node={selected} states={states} applyKernelEntry={applyKernelEntry} styleContext={styleContext} />
                 ) : (
                     <RibbonUnavailable label="段落对齐" reason={availability.paragraph ?? '当前节点不支持段落命令'} />
                 )}

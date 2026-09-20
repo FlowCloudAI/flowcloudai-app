@@ -265,6 +265,14 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                     ))}
                 </div>
             )}
+            {field.sourceState === 'other-viewport' && field.localValue === null && parsed.kind === 'numeric' && (
+                <Button size="sm" variant="outline" disabled={field.disabled} onClick={() => {
+                    publish(parsed.candidate, true)
+                    finish()
+                }}>
+                    在本档覆盖
+                </Button>
+            )}
             {field.localValue !== null && (
                 <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
                     清除本级设置

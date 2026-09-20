@@ -15,6 +15,7 @@ import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
 import {createLiveVisualCommitScheduler} from './liveVisualCommitScheduler.ts'
 import {
     createVisualPropertyEditRequest,
+    createInteractionColorPropertyEditRequest,
     inspectVisualProperties,
     parseSerializedVisualColor,
     serializeVisualPropertyValue,
@@ -215,6 +216,78 @@ describe('visual property editing', () => {
         assert.match(states.find(item => item.property === 'color')?.statusText ?? '', /其他区间有覆盖/u)
         assert.equal(states.find(item => item.property === 'gap')?.disabled, true)
         assert.match(states.find(item => item.property === 'gap')?.statusText ?? '', /需要 Grid 或 Flex/u)
+    })
+
+    it('桌面覆盖清除后经真实内核回落到移动基础值', () => {
+        const source = snapshot()
+        const runtime = createDocumentKernelDraftRuntime()
+        let model = createDocumentDraft(source)
+        const applyContext = (
+            context: 'mobile' | 'desktop',
+            value: VisualPropertyEditValue,
+            id: string,
+        ) => {
+            const request = createVisualPropertyEditRequest(
+                PARAGRAPH_ID,
+                [{property: 'font-size', value}],
+                {styleContext: context},
+                () => id,
+            )
+            const prepared = runtime.prepare(model, source, request)
+            assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+            if (prepared.status !== 'ready') return
+            const changed = runtime.applyPrepared(model, source, prepared.edit, `修改${context}字号`)
+            assert.equal(changed.applied, true, JSON.stringify(changed.diagnostics))
+            model = changed.model
+        }
+        applyContext('mobile', {kind: 'numeric', value: 16, unit: 'px', numberText: '16'}, 'mobile-font')
+        applyContext('desktop', {kind: 'numeric', value: 24, unit: 'px', numberText: '24'}, 'desktop-font')
+        assert.match(model.entry.sources['style.css'], /@media \(min-width: 48rem\)[\s\S]*font-size: 24px/u)
+        applyContext('desktop', {kind: 'clear-override'}, 'desktop-font-clear')
+        const desktop = inspectVisualProperties(
+            paragraph(model),
+            request => runtime.inspectComponent(model, source, request),
+            model.entry.sources['style.css'],
+            'desktop',
+        ).find(field => field.property === 'font-size')
+        assert.equal(desktop?.localValue, null)
+        assert.equal(desktop?.value, '16px')
+        assert.equal(desktop?.sourceState, 'other-viewport')
+        assert.match(desktop?.statusText ?? '', /继承移动设置/u)
+    })
+
+    it('交互态颜色绑定写入独立 hover 与 focus-within 通道且不携带断点', () => {
+        const bindings = new Map([[PARAGRAPH_ID, {
+            handleId: 'handle:interaction' as ComponentHandle['handleId'],
+            nodeId: PARAGRAPH_ID as ComponentHandle['nodeId'],
+            instanceId: 'instance:interaction',
+            kind: 'paragraph' as const,
+            origin: {kind: 'author' as const, source: {scope: 'entry' as const, file: 'article.html' as const}, range: utf16Range(0, 1)},
+            analysisStamp: 'analysis:interaction' as ComponentHandle['analysisStamp'],
+        }]])
+        for (const context of ['hover', 'focus-within'] as const) {
+            const request = createInteractionColorPropertyEditRequest(
+                PARAGRAPH_ID,
+                context,
+                'border-color',
+                {kind: 'color', value: '#112233', opacity: 100},
+                {},
+                () => `interaction-${context}`,
+            )
+            const intent = request.createIntents(bindings)[0]
+            assert.equal(intent?.kind, 'edit-property')
+            if (intent?.kind !== 'edit-property') continue
+            assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'conditional-rule', context}})
+            assert.equal(intent.readContext.viewport, 'mobile')
+            assert.equal(intent.readContext.interactions.hover, context === 'hover')
+            assert.equal(intent.readContext.interactions.focusWithin, context === 'focus-within')
+        }
+        assert.throws(() => createInteractionColorPropertyEditRequest(
+            PARAGRAPH_ID,
+            'hover',
+            'opacity' as 'color',
+            {kind: 'color', value: '#112233', opacity: 100},
+        ), /只开放/u)
     })
 
     it('结构化属性值只序列化白名单形式并拒绝伪造结构', () => {

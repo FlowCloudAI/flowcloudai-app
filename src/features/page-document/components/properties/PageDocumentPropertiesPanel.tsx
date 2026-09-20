@@ -40,6 +40,7 @@ import {
 } from './StructuredPropertyControls.tsx'
 import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
+import {InteractionStatePropertyControls} from './InteractionStatePropertyControls.tsx'
 
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
@@ -59,6 +60,7 @@ interface PageDocumentPropertiesPanelProps {
     onManagePublicComponent: (node: LayerProjectionNode) => void
     onSaveAsPublicComponent: (node: LayerProjectionNode) => void
     visualError: string | null
+    styleContext: 'mobile' | 'desktop'
 }
 
 function ComponentInstanceControls({
@@ -290,11 +292,12 @@ export function PageDocumentPropertiesPanel({
     onManagePublicComponent,
     onSaveAsPublicComponent,
     visualError,
+    styleContext,
 }: PageDocumentPropertiesPanelProps) {
     const [tab, setTab] = useState<VisualPropertyGroup>('text')
     const fields = useMemo(
-        () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss) : [],
-        [entryStyleCss, inspectComponent, node],
+        () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss, styleContext) : [],
+        [entryStyleCss, inspectComponent, node, styleContext],
     )
     const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
     const image = useMemo(() => node?.managed && node.kind === 'asset'
@@ -318,7 +321,7 @@ export function PageDocumentPropertiesPanel({
         options: PropertyChangeOptions = {},
     ) => {
         if (!node) return Promise.resolve(false)
-        const request = createVisualPropertyEditRequest(node.id, changes, options)
+        const request = createVisualPropertyEditRequest(node.id, changes, {...options, styleContext})
         return applyKernelEntry(request, label, options)
     }
     const applyOne = (
@@ -331,7 +334,7 @@ export function PageDocumentPropertiesPanel({
         <section className="page-document-properties-panel">
             <header>
                 <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
-                <span>修改范围 · 所有宽度</span>
+                <span>修改范围 · {styleContext === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
             </header>
             {image && <ImageDescriptionControls
                 key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
@@ -418,6 +421,12 @@ export function PageDocumentPropertiesPanel({
                     )}
                     {tab === 'appearance' && (
                         <>
+                            <InteractionStatePropertyControls
+                                node={node}
+                                entryStyleCss={entryStyleCss}
+                                inspectComponent={inspectComponent}
+                                applyKernelEntry={applyKernelEntry}
+                            />
                             <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
                             <ColorPropertyControl field={fieldFor(fields, 'background-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}/>
                             <BackgroundImagePropertyControl assets={assets} field={fieldFor(fields, 'background-image')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}/>

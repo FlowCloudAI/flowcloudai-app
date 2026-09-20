@@ -7,28 +7,31 @@ export type ContainerColumnPreset = 'unset' | 'one' | 'two' | 'three'
 export type ContainerAlignPreset = 'unset' | 'stretch' | 'start' | 'center' | 'end'
 export type ContainerJustifyPreset = 'unset' | 'start' | 'center' | 'end' | 'space-between'
 
-export function createContainerGapRequest(nodeId: string, value: 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem'): KernelDraftEditRequest {
-    if (value === 'unset') return createRibbonPropertyRequest(nodeId, 'gap', {kind: 'clear-override'})
+export function createContainerGapRequest(nodeId: string, value: 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem', context: 'mobile' | 'desktop' = 'mobile'): KernelDraftEditRequest {
+    if (value === 'unset') return createRibbonPropertyRequest(nodeId, 'gap', {kind: 'clear-override'}, context)
     const unit = value.endsWith('rem') ? 'rem' : 'px'
     return createRibbonPropertyRequest(nodeId, 'gap', {
         kind: 'numeric', value: Number.parseFloat(value), unit, numberText: value.replace(/(?:rem|px)$/u, ''),
-    })
+    }, context)
 }
 
 export function createContainerLayoutRequest(
     nodeId: string,
     value: ContainerLayoutMode,
+    context: 'mobile' | 'desktop' = 'mobile',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
         'display',
         value === 'unset' ? {kind: 'clear-override'} : {kind: 'display', value},
+        context,
     )
 }
 
 export function createContainerColumnsRequest(
     nodeId: string,
     value: ContainerColumnPreset,
+    context: 'mobile' | 'desktop' = 'mobile',
 ): KernelDraftEditRequest {
     const columns =
         value === 'one'
@@ -42,27 +45,32 @@ export function createContainerColumnsRequest(
         nodeId,
         'grid-template-columns',
         columns === null ? {kind: 'clear-override'} : {kind: 'grid-columns', value: columns},
+        context,
     )
 }
 
 export function createContainerAlignRequest(
     nodeId: string,
     value: ContainerAlignPreset,
+    context: 'mobile' | 'desktop' = 'mobile',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
         'align-items',
         value === 'unset' ? {kind: 'clear-override'} : {kind: 'align-items', value},
+        context,
     )
 }
 
 export function createContainerJustifyRequest(
     nodeId: string,
     value: ContainerJustifyPreset,
+    context: 'mobile' | 'desktop' = 'mobile',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
         'justify-content',
         value === 'unset' ? {kind: 'clear-override'} : {kind: 'justify-content', value},
+        context,
     )
 }
