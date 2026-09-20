@@ -84,6 +84,7 @@ import {
     ribbonTabsForNode,
     type DocumentRibbonTab,
 } from '../../document-editor/visual/documentRibbonModel.ts'
+import {resolveGridSelectionContext} from '../application/gridVisualEditing.ts'
 
 function validationLabel(phase: string): string {
     if (phase === 'valid') return '校验通过'
@@ -373,6 +374,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         layerProjection.nodes,
         selectedNodeId,
     )
+    const gridSelection = resolveGridSelectionContext(layerProjection.nodes, selectedNodeId)
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
 
@@ -602,6 +604,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             {dockPortalHost && createPortal(
                 <PageDocumentPropertiesPanel
                     node={selectedNode}
+                    gridParent={gridSelection.gridParent}
                     articleHtml={scope.sources['article.html']}
                     assets={session.assets}
                     componentDefinitions={session.componentDefinitions}

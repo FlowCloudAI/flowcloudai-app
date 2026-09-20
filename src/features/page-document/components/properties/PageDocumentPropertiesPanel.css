@@ -166,6 +166,82 @@
     color: var(--fc-color-primary);
 }
 
+.page-document-grid-editor,
+.page-document-grid-axis,
+.page-document-grid-track,
+.page-document-grid-item {
+    display: grid;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-grid-editor {
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
+}
+
+.page-document-grid-editor > header,
+.page-document-grid-axis > header,
+.page-document-grid-item > header,
+.page-document-grid-track__heading,
+.page-document-grid-axis__add {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-grid-editor > header span,
+.page-document-grid-axis > header span,
+.page-document-grid-item > header span {
+    margin-left: auto;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-grid-editor p,
+.page-document-grid-axis p,
+.page-document-grid-track__value p {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-grid-track {
+    padding: var(--fc-space-xs);
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
+}
+
+.page-document-grid-track__heading > span {
+    flex: 1;
+}
+
+.page-document-grid-track__value,
+.page-document-grid-item > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fc-space-xs);
+}
+
+.page-document-grid-track__value > label,
+.page-document-grid-item label {
+    display: grid;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+}
+
+.page-document-grid-track__number {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fc-space-xs);
+}
+
+.page-document-grid-axis__add > :first-child {
+    flex: 1;
+}
+
 .page-document-property + .page-document-property,
 .page-document-spacing-group + .page-document-spacing-group,
 .page-document-spacing-group + .page-document-property {

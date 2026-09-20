@@ -38,6 +38,8 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'grid-template-columns', label: '分栏数', group: 'layout'},
     {property: 'align-items', label: '纵向对齐', group: 'layout'},
     {property: 'justify-content', label: '横向分布', group: 'layout'},
+    {property: 'align-self', label: '子项纵向对齐', group: 'layout'},
+    {property: 'justify-self', label: '子项横向对齐', group: 'layout'},
     {property: 'margin-block-start', label: '外距上', group: 'layout'},
     {property: 'margin-block-end', label: '外距下', group: 'layout'},
     {property: 'margin-inline-start', label: '外距左', group: 'layout'},
@@ -384,6 +386,8 @@ export interface VisualShadowLayer {
 }
 
 const VISUAL_KEYWORD_VALUES = Object.freeze({
+    'align-items': ['stretch', 'start', 'center', 'end'],
+    'justify-content': ['start', 'center', 'end', 'space-between'],
     'width': ['auto', 'fit-content', '100%'],
     'height': ['auto', 'fit-content', '100%'],
     'min-width': ['auto', 'min-content', 'fit-content'],
@@ -398,6 +402,8 @@ const VISUAL_KEYWORD_VALUES = Object.freeze({
     'float': ['none', 'inline-start', 'inline-end', 'left', 'right'],
     'list-style-type': ['disc', 'circle', 'square', 'decimal', 'lower-alpha', 'upper-roman', 'none'],
     'list-style-position': ['inside', 'outside'],
+    'align-self': ['auto', 'stretch', 'start', 'center', 'end'],
+    'justify-self': ['auto', 'stretch', 'start', 'center', 'end'],
 } as const satisfies Partial<Record<VisualPropertyName, readonly string[]>>)
 
 export type VisualKeywordPropertyName = keyof typeof VISUAL_KEYWORD_VALUES

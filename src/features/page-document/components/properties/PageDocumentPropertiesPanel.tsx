@@ -41,9 +41,11 @@ import {
 import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
 import {InteractionStatePropertyControls} from './InteractionStatePropertyControls.tsx'
+import {GridLayoutPropertyControls} from './GridLayoutPropertyControls.tsx'
 
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
+    gridParent: LayerProjectionNode | null
     articleHtml: string
     assets: readonly PageDocumentAsset[]
     componentDefinitions: readonly PublicComponentDefinitionContract[]
@@ -280,6 +282,7 @@ function FontWeightControl({
 
 export function PageDocumentPropertiesPanel({
     node,
+    gridParent,
     articleHtml,
     assets,
     componentDefinitions,
@@ -402,6 +405,13 @@ export function PageDocumentPropertiesPanel({
                     )}
                     {tab === 'layout' && (
                         <>
+                            <GridLayoutPropertyControls
+                                node={node}
+                                gridParent={gridParent}
+                                viewport={styleContext}
+                                inspectComponent={inspectComponent}
+                                applyKernelEntry={(request, label) => applyKernelEntry(request, label, {immediate: true})}
+                            />
                             <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
                             <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
                             <NumericPropertyControl field={fieldFor(fields, 'gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'gap'), value, options)}/>
@@ -413,6 +423,16 @@ export function PageDocumentPropertiesPanel({
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
                             />)}
                             {(['float', 'object-fit', 'object-position', 'list-style-type', 'list-style-position'] as const).map(property => <KeywordPropertyControl
+                                key={property}
+                                field={fieldFor(fields, property)}
+                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                            />)}
+                            {node.kind === 'container' && (['align-items', 'justify-content'] as const).map(property => <KeywordPropertyControl
+                                key={property}
+                                field={fieldFor(fields, property)}
+                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                            />)}
+                            {gridParent && (['align-self', 'justify-self'] as const).map(property => <KeywordPropertyControl
                                 key={property}
                                 field={fieldFor(fields, property)}
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
