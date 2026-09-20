@@ -63,6 +63,11 @@ import type {
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
 import {PublicComponentRibbonControls} from '../../document-editor/visual/PublicComponentRibbonControls.tsx'
+import {BuiltInStructureRibbonControls} from '../../document-editor/visual/BuiltInStructureRibbonControls.tsx'
+import {
+    createBuiltInStructureInsertion,
+    type BuiltInStructureKind,
+} from '../application/builtInStructureInsertion.ts'
 import {PublicComponentDefinitionCreator} from './public-components/PublicComponentDefinitionCreator.tsx'
 import {
     publicComponentDefinitionFormValue,
@@ -370,6 +375,24 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     )
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
+
+    const builtInInsertionTarget = mode === 'visual'
+        ? resolveImageInsertionTarget(layerProjection.nodes, selectedNodeId)
+        : null
+    const insertBuiltInStructure = (kind: BuiltInStructureKind) => {
+        if (!builtInInsertionTarget) {
+            void session.reportVisualFailure('请选择正文容器或其中一个受管节点作为插入位置。')
+            return
+        }
+        const insertion = createBuiltInStructureInsertion(builtInInsertionTarget, kind)
+        void session.applyVisualPropertyEntry(
+            insertion.request,
+            `插入${({paragraph: '段落', heading: '标题', list: '列表', table: '表格', divider: '分隔线', container: '容器'} as const)[kind]}`,
+            {immediate: true},
+        ).then(accepted => {
+            if (accepted) setSelectedNodeId(insertion.newNodeId)
+        })
+    }
 
     const openComponentEditor = (definition?: PublicComponentDefinitionContract) => {
         setComponentAction(null)
@@ -770,18 +793,24 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 activeTextRange={activeTextRange}
                             />
                         ) : visibleRibbonTab === 'insert' ? (
-                            <PublicComponentRibbonControls
-                                definitions={session.componentDefinitions}
-                                warning={session.componentDefinitionsWarning}
-                                assets={session.assets}
-                                selected={selectedNode}
-                                applyKernelEntry={session.applyVisualPropertyEntry}
-                                onInserted={setSelectedNodeId}
-                                onOpenCreate={() => openComponentEditor()}
-                                onOpenEdit={definition => openComponentActions(definition, null)}
-                                onSaveSelected={() => openCapturedComponentEditor(selectedNode)}
-                                onDelete={session.deleteComponentDefinition}
-                            />
+                            <>
+                                <BuiltInStructureRibbonControls
+                                    disabledReason={builtInInsertionTarget ? null : '请选择正文容器或其中一个受管节点作为插入位置。'}
+                                    onInsert={insertBuiltInStructure}
+                                />
+                                <PublicComponentRibbonControls
+                                    definitions={session.componentDefinitions}
+                                    warning={session.componentDefinitionsWarning}
+                                    assets={session.assets}
+                                    selected={selectedNode}
+                                    applyKernelEntry={session.applyVisualPropertyEntry}
+                                    onInserted={setSelectedNodeId}
+                                    onOpenCreate={() => openComponentEditor()}
+                                    onOpenEdit={definition => openComponentActions(definition, null)}
+                                    onSaveSelected={() => openCapturedComponentEditor(selectedNode)}
+                                    onDelete={session.deleteComponentDefinition}
+                                />
+                            </>
                         ) : visibleRibbonTab === 'page' ? (
                             <PageRibbonControls
                                 scope={pageScope}
