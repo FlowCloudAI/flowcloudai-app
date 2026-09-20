@@ -1031,6 +1031,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         onSourceChange={session.updateSource}
                         onNavigationIntent={onNavigationIntent}
                         onHistoryChange={setSourceHistory}
+                        readOnly={scope.phase === 'saving'}
                     />
                 )}
             </div>

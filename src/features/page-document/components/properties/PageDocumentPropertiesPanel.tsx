@@ -42,6 +42,7 @@ import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
 import {InteractionStatePropertyControls} from './InteractionStatePropertyControls.tsx'
 import {GridLayoutPropertyControls} from './GridLayoutPropertyControls.tsx'
+import {PropertyDisclosure} from './PropertyDisclosure.tsx'
 import {
     propertyDockVisualTab,
     type PropertyDockNavigationRequest,
@@ -232,6 +233,57 @@ const TABS: readonly {key: VisualPropertyGroup; label: string}[] = [
     {key: 'appearance', label: '颜色与效果'},
 ]
 
+const TEXT_PRIMARY_PROPERTIES = ['font-size', 'font-weight', 'line-height'] as const
+const TEXT_DETAIL_PROPERTIES = [
+    'letter-spacing',
+    'word-spacing',
+    'text-decoration-line',
+    'text-decoration-color',
+    'text-decoration-style',
+] as const
+const LAYOUT_STRUCTURE_PROPERTIES = [
+    'display',
+    'grid-template-columns',
+    'align-items',
+    'justify-content',
+    'align-self',
+    'justify-self',
+] as const
+const LAYOUT_SPACING_PROPERTIES = [
+    'margin-block-start',
+    'margin-block-end',
+    'margin-inline-start',
+    'margin-inline-end',
+    'padding-block-start',
+    'padding-block-end',
+    'padding-inline-start',
+    'padding-inline-end',
+    'gap',
+    'row-gap',
+    'column-gap',
+] as const
+const LAYOUT_SIZE_PROPERTIES = [
+    'width',
+    'height',
+    'min-width',
+    'max-width',
+    'min-height',
+    'max-height',
+    'float',
+    'object-fit',
+    'object-position',
+    'list-style-type',
+    'list-style-position',
+] as const
+const APPEARANCE_COLOR_PROPERTIES = ['color', 'background-color', 'background-image'] as const
+const APPEARANCE_BORDER_PROPERTIES = [
+    'border-width',
+    'border-style',
+    'border-color',
+    'border-radius',
+] as const
+const APPEARANCE_EFFECT_PROPERTIES = ['box-shadow', 'opacity', 'rotate'] as const
+
 export const PAGE_DOCUMENT_NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     container: '容器',
     paragraph: '段落',
@@ -344,9 +396,11 @@ export function PageDocumentPropertiesPanel({
         if (!navigationRequest) return
         setTab(propertyDockVisualTab(navigationRequest.tab))
         const frame = requestAnimationFrame(() => {
-            panelRef.current
+            const target = panelRef.current
                 ?.querySelector<HTMLElement>(`[data-property-section="${navigationRequest.section}"]`)
-                ?.scrollIntoView({block: 'nearest'})
+            const disclosure = target?.closest<HTMLDetailsElement>('.page-document-property-disclosure')
+            if (disclosure) disclosure.open = true
+            target?.scrollIntoView({block: 'nearest'})
         })
         return () => cancelAnimationFrame(frame)
     }, [navigationRequest])
@@ -430,93 +484,109 @@ export function PageDocumentPropertiesPanel({
                     </Button>
                     {tab === 'text' && (
                         <>
-                            <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
-                            <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-weight'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'letter-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'letter-spacing'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'word-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'word-spacing'), value, options)}/>
-                            <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-line')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-line'), value, options)}/>
-                            <ColorPropertyControl field={fieldFor(fields, 'text-decoration-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-color'), value, options)}/>
-                            <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-style'), value, options)}/>
+                            <PropertyDisclosure key={`${node.id}:text-primary`} title="基础文字" fields={fields} properties={TEXT_PRIMARY_PROPERTIES}>
+                                <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
+                                <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-weight'), value, options)}/>
+                                <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
+                            </PropertyDisclosure>
+                            <PropertyDisclosure key={`${node.id}:text-detail`} title="字距与装饰" fields={fields} properties={TEXT_DETAIL_PROPERTIES}>
+                                <NumericPropertyControl field={fieldFor(fields, 'letter-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'letter-spacing'), value, options)}/>
+                                <NumericPropertyControl field={fieldFor(fields, 'word-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'word-spacing'), value, options)}/>
+                                <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-line')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-line'), value, options)}/>
+                                <ColorPropertyControl field={fieldFor(fields, 'text-decoration-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-color'), value, options)}/>
+                                <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-style'), value, options)}/>
+                            </PropertyDisclosure>
                         </>
                     )}
                     {tab === 'layout' && (
                         <>
-                            <div data-property-section="container-layout-preset">
-                                <div data-property-section="grid-layout">
-                                    <GridLayoutPropertyControls
-                                        node={node}
-                                        gridParent={gridParent}
-                                        viewport={styleContext}
-                                        inspectComponent={inspectComponent}
-                                        applyKernelEntry={(request, label) => applyKernelEntry(request, label, {immediate: true})}
-                                    />
+                            <PropertyDisclosure key={`${node.id}:layout-structure`} title="布局结构" fields={fields} properties={LAYOUT_STRUCTURE_PROPERTIES}>
+                                <div data-property-section="container-layout-preset">
+                                    <div data-property-section="grid-layout">
+                                        <GridLayoutPropertyControls
+                                            node={node}
+                                            gridParent={gridParent}
+                                            viewport={styleContext}
+                                            inspectComponent={inspectComponent}
+                                            applyKernelEntry={(request, label) => applyKernelEntry(request, label, {immediate: true})}
+                                        />
+                                    </div>
+                                    {node.kind === 'container' && (['align-items', 'justify-content'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                        key={property}
+                                        field={fieldFor(fields, property)}
+                                        onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                    /> : null)}
                                 </div>
-                                {node.kind === 'container' && (['align-items', 'justify-content'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                {gridParent && (['align-self', 'justify-self'] as const).map(property => applicable(property) ? <KeywordPropertyControl
                                     key={property}
                                     field={fieldFor(fields, property)}
                                     onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
                                 /> : null)}
-                            </div>
-                            <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
-                            <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
-                            <div data-property-section="container-layout-spacing">
-                                {(['gap', 'row-gap', 'column-gap'] as const).map(property => applicable(property) ? <NumericPropertyControl
+                            </PropertyDisclosure>
+                            <PropertyDisclosure key={`${node.id}:layout-spacing`} title="间距" fields={fields} properties={LAYOUT_SPACING_PROPERTIES}>
+                                <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
+                                <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
+                                <div data-property-section="container-layout-spacing">
+                                    {(['gap', 'row-gap', 'column-gap'] as const).map(property => applicable(property) ? <NumericPropertyControl
+                                        key={property}
+                                        field={fieldFor(fields, property)}
+                                        onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                    /> : null)}
+                                </div>
+                            </PropertyDisclosure>
+                            <PropertyDisclosure key={`${node.id}:layout-size`} title="尺寸与环绕" fields={fields} properties={LAYOUT_SIZE_PROPERTIES}>
+                                {(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
+                                    key={property}
+                                    field={fieldFor(fields, property)}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                />)}
+                                {(['float'] as const).map(property => applicable(property) ? <KeywordPropertyControl
                                     key={property}
                                     field={fieldFor(fields, property)}
                                     onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
                                 /> : null)}
-                            </div>
-                            {(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
-                                key={property}
-                                field={fieldFor(fields, property)}
-                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            />)}
-                            {(['float'] as const).map(property => applicable(property) ? <KeywordPropertyControl
-                                key={property}
-                                field={fieldFor(fields, property)}
-                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            /> : null)}
-                            {node.kind === 'asset' && (['object-fit', 'object-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
-                                key={property}
-                                field={fieldFor(fields, property)}
-                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            /> : null)}
-                            {(node.kind === 'list' || node.kind === 'list-item') && (['list-style-type', 'list-style-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
-                                key={property}
-                                field={fieldFor(fields, property)}
-                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            /> : null)}
-                            {gridParent && (['align-self', 'justify-self'] as const).map(property => applicable(property) ? <KeywordPropertyControl
-                                key={property}
-                                field={fieldFor(fields, property)}
-                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            /> : null)}
+                                {node.kind === 'asset' && (['object-fit', 'object-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                    key={property}
+                                    field={fieldFor(fields, property)}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                /> : null)}
+                                {(node.kind === 'list' || node.kind === 'list-item') && (['list-style-type', 'list-style-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                    key={property}
+                                    field={fieldFor(fields, property)}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                /> : null)}
+                            </PropertyDisclosure>
                         </>
                     )}
                     {tab === 'appearance' && (
                         <>
-                            <InteractionStatePropertyControls
-                                node={node}
-                                entryStyleCss={entryStyleCss}
-                                inspectComponent={inspectComponent}
-                                applyKernelEntry={applyKernelEntry}
-                            />
-                            <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
-                            <BackgroundPropertyControl
-                                assets={assets}
-                                colorField={fieldFor(fields, 'background-color')}
-                                imageField={fieldFor(fields, 'background-image')}
-                                onColorChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}
-                                onImageChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}
-                            />
-                            <NumericPropertyControl field={fieldFor(fields, 'border-width')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-width'), value, options)}/>
-                            <KeywordPropertyControl field={fieldFor(fields, 'border-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-style'), value, options)}/>
-                            <ColorPropertyControl field={fieldFor(fields, 'border-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-color'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'border-radius')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-radius'), value, options)}/>
-                            <BoxShadowPropertyControl field={fieldFor(fields, 'box-shadow')} onChange={(value, options) => applyOne(fieldFor(fields, 'box-shadow'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'opacity')} onChange={(value, options) => applyOne(fieldFor(fields, 'opacity'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'rotate')} onChange={(value, options) => applyOne(fieldFor(fields, 'rotate'), value, options)}/>
+                            <PropertyDisclosure key={`${node.id}:appearance-color`} title="颜色与交互" fields={fields} properties={APPEARANCE_COLOR_PROPERTIES}>
+                                <InteractionStatePropertyControls
+                                    node={node}
+                                    entryStyleCss={entryStyleCss}
+                                    inspectComponent={inspectComponent}
+                                    applyKernelEntry={applyKernelEntry}
+                                />
+                                <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
+                                <BackgroundPropertyControl
+                                    assets={assets}
+                                    colorField={fieldFor(fields, 'background-color')}
+                                    imageField={fieldFor(fields, 'background-image')}
+                                    onColorChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}
+                                    onImageChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}
+                                />
+                            </PropertyDisclosure>
+                            <PropertyDisclosure key={`${node.id}:appearance-border`} title="边框与圆角" fields={fields} properties={APPEARANCE_BORDER_PROPERTIES}>
+                                <NumericPropertyControl field={fieldFor(fields, 'border-width')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-width'), value, options)}/>
+                                <KeywordPropertyControl field={fieldFor(fields, 'border-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-style'), value, options)}/>
+                                <ColorPropertyControl field={fieldFor(fields, 'border-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-color'), value, options)}/>
+                                <NumericPropertyControl field={fieldFor(fields, 'border-radius')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-radius'), value, options)}/>
+                            </PropertyDisclosure>
+                            <PropertyDisclosure key={`${node.id}:appearance-effect`} title="阴影与效果" fields={fields} properties={APPEARANCE_EFFECT_PROPERTIES}>
+                                <BoxShadowPropertyControl field={fieldFor(fields, 'box-shadow')} onChange={(value, options) => applyOne(fieldFor(fields, 'box-shadow'), value, options)}/>
+                                <NumericPropertyControl field={fieldFor(fields, 'opacity')} onChange={(value, options) => applyOne(fieldFor(fields, 'opacity'), value, options)}/>
+                                <NumericPropertyControl field={fieldFor(fields, 'rotate')} onChange={(value, options) => applyOne(fieldFor(fields, 'rotate'), value, options)}/>
+                            </PropertyDisclosure>
                         </>
                     )}
                 </div>

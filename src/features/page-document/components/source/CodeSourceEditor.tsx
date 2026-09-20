@@ -20,6 +20,7 @@ interface CodeSourceEditorProps {
     diagnostics: readonly DocumentDiagnostic[]
     onChange: (value: string) => void
     onHistoryChange: (history: CodeSourceEditorHistory) => void
+    readOnly?: boolean
 }
 
 export type {CodeSourceEditorHistory} from './codeSourceEditorState.ts'
@@ -81,7 +82,7 @@ async function loadLanguage(file: SourceFileName): Promise<Extension> {
 }
 
 export const CodeSourceEditor = forwardRef<CodeSourceEditorHandle, CodeSourceEditorProps>(
-function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange}, ref) {
+function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange, readOnly = false}, ref) {
     const hostRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const externalUpdateRef = useRef(false)
@@ -89,6 +90,7 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
     const onHistoryChangeRef = useRef(onHistoryChange)
     const valueRef = useRef(value)
     const diagnosticsRef = useRef(diagnostics)
+    const readOnlyRef = useRef(readOnly)
     const editableCompartmentRef = useRef(new Compartment())
     const stateCacheRef = useRef<CodeSourceEditorStateCache>(new Map())
 
@@ -104,6 +106,14 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
     useEffect(() => {
         diagnosticsRef.current = diagnostics
     }, [diagnostics])
+    useEffect(() => {
+        readOnlyRef.current = readOnly
+        const view = viewRef.current
+        if (!view) return
+        view.dispatch({
+            effects: editableCompartmentRef.current.reconfigure(EditorView.editable.of(!readOnly)),
+        })
+    }, [readOnly])
 
     useEffect(() => {
         const host = hostRef.current
@@ -141,7 +151,7 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
                         lintGutter(),
                         EditorView.lineWrapping,
                         editorTheme,
-                        editableCompartmentRef.current.of(EditorView.editable.of(true)),
+                        editableCompartmentRef.current.of(EditorView.editable.of(!readOnlyRef.current)),
                         EditorView.updateListener.of(update => {
                             if (update.docChanged && !externalUpdateRef.current) {
                                 onChangeRef.current(update.state.doc.toString())
@@ -189,5 +199,10 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
         ))
     }, [diagnostics, file, value])
 
-    return <div ref={hostRef} className="page-document-code-editor" aria-label={`${file} 源码编辑器`} />
+    return <div
+        ref={hostRef}
+        className="page-document-code-editor"
+        aria-label={`${file} 源码编辑器`}
+        aria-readonly={readOnly}
+    />
 })

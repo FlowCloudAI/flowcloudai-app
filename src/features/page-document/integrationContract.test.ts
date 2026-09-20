@@ -220,4 +220,34 @@ describe('page document editor integration boundary', () => {
         assert.match(panel, /\['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'\]/u)
         assert.match(panel, /node\.kind === 'asset'[\s\S]*\['object-fit', 'object-position'\]/u)
     })
+
+    it('属性面板按作者值折叠分组，保存期间源码编辑器进入只读', () => {
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        const disclosure = readFileSync(
+            join(currentDirectory, 'components/properties/PropertyDisclosure.tsx'),
+            'utf8',
+        )
+        const codeEditor = readFileSync(
+            join(currentDirectory, 'components/source/CodeSourceEditor.tsx'),
+            'utf8',
+        )
+        const workspace = readFileSync(
+            join(currentDirectory, 'components/source/SourceWorkspace.tsx'),
+            'utf8',
+        )
+        const editor = readFileSync(
+            join(currentDirectory, 'components/PageDocumentEditor.tsx'),
+            'utf8',
+        )
+
+        assert.match(panel, /PropertyDisclosure[\s\S]*基础文字[\s\S]*字距与装饰[\s\S]*布局结构[\s\S]*间距[\s\S]*尺寸与环绕[\s\S]*颜色与交互[\s\S]*边框与圆角[\s\S]*阴影与效果/u)
+        assert.match(disclosure, /<details[\s\S]*<summary>[\s\S]*已设置 \{presentation\.authorValueCount\}/u)
+        assert.match(codeEditor, /reconfigure\(EditorView\.editable\.of\(!readOnly\)\)/u)
+        assert.match(codeEditor, /aria-readonly=\{readOnly\}/u)
+        assert.match(workspace, /<CodeSourceEditor[\s\S]*readOnly=\{readOnly\}/u)
+        assert.match(editor, /<SourceWorkspace[\s\S]*readOnly=\{scope\.phase === 'saving'\}/u)
+    })
 })

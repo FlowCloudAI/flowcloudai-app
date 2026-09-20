@@ -29,6 +29,7 @@ interface SourceWorkspaceProps {
     onSourceChange: (file: SourceFileName, value: string) => void
     onNavigationIntent: (href: string) => void
     onHistoryChange: (history: CodeSourceEditorHistory) => void
+    readOnly: boolean
 }
 
 export interface SourceWorkspaceHandle {
@@ -49,6 +50,7 @@ function SourceWorkspace({
     onSourceChange,
     onNavigationIntent,
     onHistoryChange,
+    readOnly,
 }, ref) {
     const [activeFile, setActiveFile] = useState<SourceFileName>('article.html')
     const [showDiff, setShowDiff] = useState(false)
@@ -114,6 +116,7 @@ function SourceWorkspace({
                             diagnostics={diagnostics}
                             onChange={value => onSourceChange(activeFile, value)}
                             onHistoryChange={onHistoryChange}
+                            readOnly={readOnly}
                         />
                     )}
                 </div>
