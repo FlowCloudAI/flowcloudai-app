@@ -169,4 +169,15 @@ describe('page document editor integration boundary', () => {
         assert.match(editorCss, /\.page-document-editor__canvas-stage\s*\{[^}]*overflow:\s*auto;[^}]*padding:\s*0;/u)
         assert.match(runtimeCss, /html,\s*body\s*\{[^}]*height:\s*auto;[^}]*overflow:\s*visible;/u)
     })
+
+    it('图片低频说明默认折叠且尺寸与填充仍留在常驻布局面板', () => {
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        assert.match(panel, /<details className="page-document-image-details__description">\s*<summary>替代文本与图注<\/summary>/u)
+        assert.doesNotMatch(panel, /<details[^>]*\sopen(?:=|\s|>)/u)
+        assert.match(panel, /\['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'\]/u)
+        assert.match(panel, /node\.kind === 'asset'[\s\S]*\['object-fit', 'object-position'\]/u)
+    })
 })

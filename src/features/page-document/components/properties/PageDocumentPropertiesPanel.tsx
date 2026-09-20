@@ -192,29 +192,36 @@ function ImageDescriptionControls({
     }
     return (
         <section className="page-document-image-details" aria-label="图片说明">
-            <strong>图片说明</strong>
+            <div className="page-document-image-details__header">
+                <strong>图片</strong>
+                <Button type="button" size="sm" variant="outline" onClick={onReplaceImage}>替换图片</Button>
+            </div>
             <p data-asset-status={image.reference.status} role="status">{image.reference.message}</p>
-            <Button type="button" size="sm" variant="outline" onClick={onReplaceImage}>替换图片</Button>
-            <label>
-                替代文本
-                <Input value={alt} onValueChange={setAlt} aria-label="图片替代文本" />
-            </label>
-            <label>
-                图注
-                <textarea
-                    value={caption}
-                    onChange={event => setCaption(event.target.value)}
-                    disabled={!image.captionEditable}
-                    aria-label="图片图注"
-                    rows={3}
-                />
-            </label>
-            {image.captionReason && <p>{image.captionReason}</p>}
-            {image.captionKind === 'structured' && <p>复杂图注的替换会先要求确认。</p>}
-            <Button type="button" size="sm" disabled={!changed || busy} onClick={() => void commit()}>
-                {busy ? '正在应用…' : '应用图片说明'}
-            </Button>
-            {error && <p role="alert">{error}</p>}
+            <details className="page-document-image-details__description">
+                <summary>替代文本与图注</summary>
+                <div>
+                    <label>
+                        替代文本
+                        <Input value={alt} onValueChange={setAlt} aria-label="图片替代文本" />
+                    </label>
+                    <label>
+                        图注
+                        <textarea
+                            value={caption}
+                            onChange={event => setCaption(event.target.value)}
+                            disabled={!image.captionEditable}
+                            aria-label="图片图注"
+                            rows={3}
+                        />
+                    </label>
+                    {image.captionReason && <p>{image.captionReason}</p>}
+                    {image.captionKind === 'structured' && <p>复杂图注的替换会先要求确认。</p>}
+                    <Button type="button" size="sm" disabled={!changed || busy} onClick={() => void commit()}>
+                        {busy ? '正在应用…' : '应用图片说明'}
+                    </Button>
+                    {error && <p role="alert">{error}</p>}
+                </div>
+            </details>
         </section>
     )
 }

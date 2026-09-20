@@ -65,7 +65,27 @@
     color: var(--fc-color-text);
 }
 
-.page-document-image-details > label {
+.page-document-image-details__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+}
+
+.page-document-image-details__description > summary {
+    padding: var(--fc-space-xs) 0;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    font-size: var(--fc-font-size-sm);
+}
+
+.page-document-image-details__description > div {
+    display: grid;
+    gap: var(--fc-space-sm);
+    padding-top: var(--fc-space-sm);
+}
+
+.page-document-image-details__description label {
     display: grid;
     gap: var(--fc-space-xs);
     font-size: var(--fc-font-size-sm);
@@ -83,13 +103,15 @@
     font: inherit;
 }
 
-.page-document-image-details > p {
+.page-document-image-details > p,
+.page-document-image-details__description p {
     margin: 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption);
 }
 
 .page-document-image-details > p[role="alert"],
+.page-document-image-details__description p[role="alert"],
 .page-document-image-details > p[data-asset-status="invalid"],
 .page-document-image-details > p[data-asset-status="missing"] {
     color: var(--fc-color-warning);
