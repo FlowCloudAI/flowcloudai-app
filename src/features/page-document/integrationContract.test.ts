@@ -155,4 +155,18 @@ describe('page document editor integration boundary', () => {
         assert.match(color, /透明度[\s\S]*onPointerUp=\{finish\}/u)
         assert.match(panel, /\(\) => \(\) => flushPendingChanges\(\)/u)
     })
+
+    it('可视画布只由外层舞台滚动且未达页宽上限时不留内边距', () => {
+        const editorCss = readFileSync(
+            join(currentDirectory, 'components/PageDocumentEditor.css'),
+            'utf8',
+        )
+        const runtimeCss = readFileSync(
+            join(currentDirectory, 'canvas/runtime/runtime.css'),
+            'utf8',
+        )
+
+        assert.match(editorCss, /\.page-document-editor__canvas-stage\s*\{[^}]*overflow:\s*auto;[^}]*padding:\s*0;/u)
+        assert.match(runtimeCss, /html,\s*body\s*\{[^}]*height:\s*auto;[^}]*overflow:\s*visible;/u)
+    })
 })

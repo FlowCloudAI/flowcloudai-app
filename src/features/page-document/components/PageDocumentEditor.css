@@ -290,7 +290,7 @@
 .page-document-editor__canvas-stage {
     height: 100%;
     overflow: auto;
-    padding: clamp(var(--fc-space-md), 3vw, var(--fc-space-2xl));
+    padding: 0;
     background: var(--fc-color-bg-secondary);
 }
 

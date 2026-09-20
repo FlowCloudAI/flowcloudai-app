@@ -16,8 +16,10 @@
 
     html,
     body {
+        height: auto;
         min-width: 0;
         margin: 0;
+        overflow: visible;
         background: var(--fc-entry-surface);
     }
 
