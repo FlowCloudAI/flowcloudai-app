@@ -154,11 +154,7 @@ function FontControls({
                     </button>
                 </>
             }
-            second={
-                <span className="document-ribbon-control-status" role="status">
-                    {size?.reason ?? weight?.reason ?? (node.kind === 'paragraph' ? '整段文字' : '当前节点')}
-                </span>
-            }
+            second={null}
         />
     )
 }

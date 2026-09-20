@@ -102,6 +102,7 @@ export function DocumentOfficeRibbon({
                                 return (
                                     <button
                                         aria-controls="document-ribbon-panel"
+                                        aria-label={tab.label}
                                         aria-selected={activeTab === tab.id}
                                         className={tab.contextual ? 'is-contextual' : undefined}
                                         disabled={tab.disabled}
@@ -114,10 +115,11 @@ export function DocumentOfficeRibbon({
                                         onKeyDown={event => moveTabFocus(event, index)}
                                         role="tab"
                                         tabIndex={activeTab === tab.id ? 0 : -1}
+                                        title={tab.label}
                                         type="button"
                                     >
                                         <Icon size={13} />
-                                        {tab.label}
+                                        <span>{tab.label}</span>
                                     </button>
                                 )
                             })}
@@ -317,11 +319,13 @@ export function DocumentRibbonCommand({
     size?: 'small' | 'large'
     title?: string
 }) {
+    const density = useContext(DocumentRibbonDensityContext)
+    const iconOnly = size === 'small' && density !== 'full'
     return (
         <button
             aria-label={ariaLabel ?? label}
             aria-pressed={active}
-            className={`document-ribbon-command is-${size}${danger ? ' is-danger' : ''}`}
+            className={`document-ribbon-command is-${size}${danger ? ' is-danger' : ''}${iconOnly ? ' is-icon-only' : ''}`}
             disabled={disabled}
             onClick={onClick}
             title={title ?? label}

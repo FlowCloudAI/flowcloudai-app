@@ -9,6 +9,7 @@ import {
     type PageDocumentAsset,
 } from '../../../../api/pageDocument.ts'
 import './PageDocumentAssetPicker.css'
+import {pageDocumentAssetDisplayName, pageDocumentAssetSummary} from './assetPresentation.ts'
 
 export function PageDocumentAssetThumbnail({asset}: {asset: PageDocumentAsset}) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -68,14 +69,14 @@ export function PageDocumentAssetPicker({
             {error && <p role="alert">{error}</p>}
             {assets.length === 0 ? <p>项目还没有页面图片。先导入一张图片。</p> : (
                 <div className="page-document-asset-picker__list">
-                    {assets.map(asset => <button
+                    {assets.map((asset, index) => <button
                         key={asset.id}
                         type="button"
                         disabled={busy}
                         onClick={() => onChoose(asset)}
                     >
                         <PageDocumentAssetThumbnail asset={asset} />
-                        <span>{asset.mediaType} · {asset.width} × {asset.height}<small>{asset.id}</small></span>
+                        <span>{pageDocumentAssetDisplayName(index)}<small>{pageDocumentAssetSummary(asset)}</small></span>
                     </button>)}
                 </div>
             )}

@@ -283,6 +283,7 @@ const APPEARANCE_BORDER_PROPERTIES = [
     'border-radius',
 ] as const
 const APPEARANCE_EFFECT_PROPERTIES = ['box-shadow', 'opacity', 'rotate'] as const
+const APPEARANCE_ROOT_EFFECT_PROPERTIES = ['box-shadow', 'opacity'] as const
 
 export const PAGE_DOCUMENT_NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     container: '容器',
@@ -381,6 +382,7 @@ export function PageDocumentPropertiesPanel({
         ? readManagedImageDescription(articleHtml, node.id, assets.map(asset => asset.id))
         : null, [articleHtml, assets, node])
     const selectedNodeId = node?.id ?? null
+    const fixedRoot = node?.attributes['data-fc-editor-root'] !== undefined
     const componentDefinition = node?.managed && node.kind === 'component'
         ? selectPublicComponentDefinition(
             componentDefinitions,
@@ -424,7 +426,7 @@ export function PageDocumentPropertiesPanel({
     return (
         <section className="page-document-properties-panel" ref={panelRef}>
             <header>
-                <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
+                <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? (node.managed ? '页面元素' : '源码元素')) : '未选择'}</strong>
                 <span>修改范围 · {styleContext === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
             </header>
             {image && <div data-property-section="content"><ImageDescriptionControls
@@ -582,10 +584,10 @@ export function PageDocumentPropertiesPanel({
                                 <ColorPropertyControl field={fieldFor(fields, 'border-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-color'), value, options)}/>
                                 <NumericPropertyControl field={fieldFor(fields, 'border-radius')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-radius'), value, options)}/>
                             </PropertyDisclosure>
-                            <PropertyDisclosure key={`${node.id}:appearance-effect`} title="阴影与效果" fields={fields} properties={APPEARANCE_EFFECT_PROPERTIES}>
+                            <PropertyDisclosure key={`${node.id}:appearance-effect`} title="阴影与效果" fields={fields} properties={fixedRoot ? APPEARANCE_ROOT_EFFECT_PROPERTIES : APPEARANCE_EFFECT_PROPERTIES}>
                                 <BoxShadowPropertyControl field={fieldFor(fields, 'box-shadow')} onChange={(value, options) => applyOne(fieldFor(fields, 'box-shadow'), value, options)}/>
                                 <NumericPropertyControl field={fieldFor(fields, 'opacity')} onChange={(value, options) => applyOne(fieldFor(fields, 'opacity'), value, options)}/>
-                                <NumericPropertyControl field={fieldFor(fields, 'rotate')} onChange={(value, options) => applyOne(fieldFor(fields, 'rotate'), value, options)}/>
+                                {!fixedRoot && <NumericPropertyControl field={fieldFor(fields, 'rotate')} onChange={(value, options) => applyOne(fieldFor(fields, 'rotate'), value, options)}/>}
                             </PropertyDisclosure>
                         </>
                     )}

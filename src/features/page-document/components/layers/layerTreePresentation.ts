@@ -41,7 +41,7 @@ function operationLabel(node: LayerProjectionNode): string {
 
 export function pageDocumentLayerLabel(node: LayerProjectionNode): string {
     const typeLabel = node.managed
-        ? (MANAGED_KIND_LABELS[node.kind] ?? node.kind)
+        ? (MANAGED_KIND_LABELS[node.kind] ?? '页面元素')
         : node.kind === 'operation'
           ? operationLabel(node)
           : sourceTypeLabel(node.tagName)

@@ -44,6 +44,9 @@ function LayerNode({
 }) {
     const hasChildren = node.children.length > 0
     const expanded = hasChildren && !collapsedIds.has(node.id)
+    const editingModeLabel = node.managed
+        ? '可视编辑'
+        : node.kind === 'operation' ? '模板生成' : '仅代码编辑'
     return (
         <li
             aria-expanded={hasChildren ? expanded : undefined}
@@ -76,7 +79,8 @@ function LayerNode({
                     type="button"
                     className="page-document-layer-node__select"
                     tabIndex={-1}
-                    title={node.managed ? '可视编辑组件' : node.kind === 'operation' ? '模板生成节点' : '该元素尚未纳入可视编辑'}
+                    aria-label={`${pageDocumentLayerLabel(node)} · ${editingModeLabel}`}
+                    title={editingModeLabel}
                     onClick={() => {
                         onFocus(node.id)
                         onSelect(node.id)

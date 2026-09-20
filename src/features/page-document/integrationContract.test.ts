@@ -250,4 +250,45 @@ describe('page document editor integration boundary', () => {
         assert.match(workspace, /<CodeSourceEditor[\s\S]*readOnly=\{readOnly\}/u)
         assert.match(editor, /<SourceWorkspace[\s\S]*readOnly=\{scope\.phase === 'saving'\}/u)
     })
+
+    it('作者界面不泄漏内部标识，功能区仅图标档与固定根能力边界保持一致', () => {
+        const assetPicker = readFileSync(
+            join(currentDirectory, 'components/assets/PageDocumentAssetPicker.tsx'),
+            'utf8',
+        )
+        const structured = readFileSync(
+            join(currentDirectory, 'components/properties/StructuredPropertyControls.tsx'),
+            'utf8',
+        )
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        const layers = readFileSync(
+            join(currentDirectory, 'components/layers/PageDocumentLayerTree.tsx'),
+            'utf8',
+        )
+        const ribbon = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/DocumentOfficeRibbon.tsx'),
+            'utf8',
+        )
+        const ribbonCss = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/DocumentOfficeRibbon.css'),
+            'utf8',
+        )
+        const home = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/HomeRibbonControls.tsx'),
+            'utf8',
+        )
+
+        assert.doesNotMatch(assetPicker, /<small>\{asset\.id\}<\/small>/u)
+        assert.doesNotMatch(structured, /asset\.id\.slice/u)
+        assert.doesNotMatch(panel, /PAGE_DOCUMENT_NODE_KIND_LABELS\[node\.kind\] \?\? node\.kind/u)
+        assert.match(layers, /'可视编辑'[\s\S]*'模板生成'[\s\S]*'仅代码编辑'/u)
+        assert.match(ribbon, /iconOnly = size === 'small' && density !== 'full'/u)
+        assert.match(ribbonCss, /\.document-ribbon-tabs\s*\{[^}]*overflow:\s*hidden/u)
+        assert.match(ribbonCss, /\.document-ribbon-command\.is-icon-only > span/u)
+        assert.doesNotMatch(home, /document-ribbon-control-status/u)
+        assert.match(panel, /!fixedRoot && <NumericPropertyControl field=\{fieldFor\(fields, 'rotate'\)\}/u)
+    })
 })

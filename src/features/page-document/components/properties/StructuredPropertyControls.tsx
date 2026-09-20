@@ -3,6 +3,7 @@
 import {Button, Select} from 'flowcloudai-ui'
 import {useEffect, useState, type ReactNode} from 'react'
 import type {PageDocumentAsset} from '../../../../api/pageDocument.ts'
+import {pageDocumentAssetDisplayName, pageDocumentAssetSummary} from '../assets/assetPresentation.ts'
 import {
     visualKeywordOptions,
     type VisualNumericPropertyValue,
@@ -138,9 +139,9 @@ export function BackgroundPropertyControl({
 }) {
     const rawImage = (imageField.localValue ?? imageField.value).trim()
     const controlledGradient = parseControlledBackgroundGradient(rawImage)
-    const assetOptions = assets.map(asset => ({
+    const assetOptions = assets.map((asset, index) => ({
         value: `url("fcasset://${asset.id}")`,
-        label: `项目图片 · ${asset.id.slice(0, 8)}`,
+        label: `${pageDocumentAssetDisplayName(index)} · ${pageDocumentAssetSummary(asset)}`,
     }))
     const selectedAsset = assetOptions.find(option => option.value === rawImage)
     const inferredMode: BackgroundMode = controlledGradient ? 'gradient' : selectedAsset ? 'image' : 'solid'
