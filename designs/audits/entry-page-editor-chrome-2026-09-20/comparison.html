@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>页面编辑器紧凑工具栏 · 视觉对照</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; background: #ecebea; color: #202228; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+h1 { margin: 0 0 16px; font-size: 20px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+figure { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; margin: 0; overflow: hidden; border: 1px solid #d8d7d3; border-radius: 12px; background: white; }
+figure.is-wide { grid-column: 1 / -1; }
+figcaption { padding: 10px 12px; border-bottom: 1px solid #e9e7e3; font-weight: 600; }
+.image { display: grid; place-items: start center; min-height: 0; overflow: hidden; padding: 12px; background: #f7f6f3; }
+img { display: block; max-width: 100%; max-height: 500px; object-fit: contain; object-position: top center; }
+.is-wide img { max-height: 620px; }
+</style>
+</head>
+<body>
+<h1>页面编辑器紧凑工具栏 · 同屏对照</h1>
+<div class="grid">
+  <figure><figcaption>当前 FlowCloudAI：Select、按钮与功能区密度不统一</figcaption><div class="image"><img src="reference-flowcloud-toolbar.png" alt="当前 FlowCloudAI 工具栏"></div></figure>
+  <figure><figcaption>WPS 密度参考：两行紧凑控件、弱边框、少量主色</figcaption><div class="image"><img src="reference-wps-density.png" alt="WPS 工具栏密度参考"></div></figure>
+  <figure class="is-wide"><figcaption>设计稿：28px 功能区控件、32px 属性控件、统一中性边框</figcaption><div class="image"><img src="design-wide-light.png" alt="页面编辑器设计稿"></div></figure>
+</div>
+</body>
+</html>

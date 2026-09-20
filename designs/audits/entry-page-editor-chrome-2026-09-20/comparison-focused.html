@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>页面编辑器紧凑控件 · 局部对照</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; background: #ecebea; color: #202228; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+h1 { margin: 0 0 16px; font-size: 20px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+figure { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; margin: 0; overflow: hidden; border: 1px solid #d8d7d3; border-radius: 12px; background: white; }
+figcaption { padding: 10px 12px; border-bottom: 1px solid #e9e7e3; font-weight: 600; }
+.image { display: grid; place-items: start center; min-height: 0; overflow: hidden; padding: 12px; background: #f7f6f3; }
+img { display: block; max-width: 100%; max-height: 520px; object-fit: contain; object-position: top center; }
+.toolbar img { width: 100%; }
+</style>
+</head>
+<body>
+<h1>页面编辑器紧凑控件 · 局部对照</h1>
+<div class="row toolbar">
+  <figure><figcaption>当前工具栏：默认 Select 撑高、完整边框过多</figcaption><div class="image"><img src="reference-flowcloud-toolbar.png" alt="当前工具栏"></div></figure>
+  <figure><figcaption>设计稿：28px 等高控件、两行排布、默认弱边框</figcaption><div class="image"><img src="design-toolbar-focus.png" alt="紧凑工具栏设计"></div></figure>
+</div>
+<div class="row">
+  <figure><figcaption>当前属性栏：Select 与 sm 输入按钮不等高、蓝框过重</figcaption><div class="image"><img src="reference-flowcloud-properties.png" alt="当前属性栏"></div></figure>
+  <figure><figcaption>设计稿：32px 等高控件、单位固定宽、次要操作降级</figcaption><div class="image"><img src="design-properties-focus.png" alt="紧凑属性栏设计"></div></figure>
+</div>
+</body>
+</html>
