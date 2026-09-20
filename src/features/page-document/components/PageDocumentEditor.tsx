@@ -85,6 +85,10 @@ import {
     type DocumentRibbonTab,
 } from '../../document-editor/visual/documentRibbonModel.ts'
 import {resolveGridSelectionContext} from '../application/gridVisualEditing.ts'
+import {
+    createPropertyDockNavigationRequest,
+    type PropertyDockTab,
+} from '../application/propertyDockNavigation.ts'
 
 function validationLabel(phase: string): string {
     if (phase === 'valid') return '校验通过'
@@ -192,6 +196,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [assetPickerError, setAssetPickerError] = useState<string | null>(null)
     const [componentEditor, setComponentEditor] = useState<ComponentDefinitionEditorState | null>(null)
     const [componentAction, setComponentAction] = useState<ComponentActionState | null>(null)
+    const [propertyDockNavigation, setPropertyDockNavigation] = useState<ReturnType<typeof createPropertyDockNavigationRequest> | null>(null)
     const canvasRef = useRef<PageDocumentCanvasHandle>(null)
     const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
@@ -244,6 +249,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     useEffect(() => {
         setComponentEditor(null)
         setComponentAction(null)
+        setPropertyDockNavigation(null)
     }, [entryId, projectId])
 
     useEffect(() => {
@@ -375,6 +381,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         selectedNodeId,
     )
     const gridSelection = resolveGridSelectionContext(layerProjection.nodes, selectedNodeId)
+    const openPropertyDetails = (tab: PropertyDockTab, section?: string) => {
+        const fallback = tab === 'content' ? 'content' : tab
+        setPropertyDockNavigation(createPropertyDockNavigationRequest(tab, section ?? fallback))
+    }
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
 
@@ -622,6 +632,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     onSaveAsPublicComponent={openCapturedComponentEditor}
                     visualError={session.visualError}
                     styleContext={editContext}
+                    navigationRequest={propertyDockNavigation}
                 />,
                 dockPortalHost,
             )}
@@ -796,6 +807,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectTextRange={session.inspectTextRange}
                                 activeTextRange={activeTextRange}
                                 styleContext={editContext}
+                                onOpenDetails={() => openPropertyDetails('content', 'text')}
                             />
                         ) : visibleRibbonTab === 'insert' ? (
                             <>
@@ -820,8 +832,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                             <PageRibbonControls
                                 scope={pageScope}
                                 onScopeChange={setPageScope}
-                                onOpenTheme={() => undefined}
-                                onOpenPageLayout={() => undefined}
+                                onOpenTheme={() => openPropertyDetails('appearance', 'appearance')}
+                                onOpenPageLayout={() => openPropertyDetails('layout', 'responsive-layout')}
                                 nodeId={selectedNode?.id ?? null}
                                 onApplyLayout={(request, label) => {
                                     void session.applyVisualPropertyEntry(request, label, {immediate: true})
@@ -850,9 +862,9 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 sourceVersion={state.model.changeVersion}
                                 applyKernelEntry={session.applyVisualPropertyEntry}
                                 inspectComponent={session.inspectComponent}
-                                onOpenArrangementDetails={() => undefined}
-                                onOpenGridDetails={() => undefined}
-                                onOpenSpacingDetails={() => undefined}
+                                onOpenArrangementDetails={() => openPropertyDetails('layout', 'container-layout-preset')}
+                                onOpenGridDetails={() => openPropertyDetails('layout', 'grid-layout')}
+                                onOpenSpacingDetails={() => openPropertyDetails('layout', 'container-layout-spacing')}
                             />
                         ) : selectedNode ? (
                             <ContextualRibbonControls
@@ -875,7 +887,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectComponent={session.inspectComponent}
                                 sourceVersion={state.model.changeVersion}
                                 onChooseLocalAsset={() => openAssetPicker('replace')}
-                                onOpenDetails={() => undefined}
+                                onOpenDetails={openPropertyDetails}
                             />
                         ) : (
                             <RibbonUnavailableTab tab={visibleRibbonTab} />

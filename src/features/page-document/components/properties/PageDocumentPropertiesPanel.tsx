@@ -1,6 +1,6 @@
 // 本组件呈现“所有宽度”的有限调节控件；所有结构化修改均由内核适配层序列化和校验。
 
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select} from 'flowcloudai-ui'
 import type {PageDocumentAsset} from '../../../../api/pageDocument.ts'
 import {
@@ -42,6 +42,10 @@ import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
 import {InteractionStatePropertyControls} from './InteractionStatePropertyControls.tsx'
 import {GridLayoutPropertyControls} from './GridLayoutPropertyControls.tsx'
+import {
+    propertyDockVisualTab,
+    type PropertyDockNavigationRequest,
+} from '../../application/propertyDockNavigation.ts'
 
 interface PageDocumentPropertiesPanelProps {
     node: LayerProjectionNode | null
@@ -63,6 +67,7 @@ interface PageDocumentPropertiesPanelProps {
     onSaveAsPublicComponent: (node: LayerProjectionNode) => void
     visualError: string | null
     styleContext: 'mobile' | 'desktop'
+    navigationRequest: PropertyDockNavigationRequest | null
 }
 
 function ComponentInstanceControls({
@@ -296,8 +301,10 @@ export function PageDocumentPropertiesPanel({
     onSaveAsPublicComponent,
     visualError,
     styleContext,
+    navigationRequest,
 }: PageDocumentPropertiesPanelProps) {
     const [tab, setTab] = useState<VisualPropertyGroup>('text')
+    const panelRef = useRef<HTMLElement | null>(null)
     const fields = useMemo(
         () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss, styleContext) : [],
         [entryStyleCss, inspectComponent, node, styleContext],
@@ -318,6 +325,16 @@ export function PageDocumentPropertiesPanel({
         () => () => flushPendingChanges(),
         [flushPendingChanges, selectedNodeId],
     )
+    useEffect(() => {
+        if (!navigationRequest) return
+        setTab(propertyDockVisualTab(navigationRequest.tab))
+        const frame = requestAnimationFrame(() => {
+            panelRef.current
+                ?.querySelector<HTMLElement>(`[data-property-section="${navigationRequest.section}"]`)
+                ?.scrollIntoView({block: 'nearest'})
+        })
+        return () => cancelAnimationFrame(frame)
+    }, [navigationRequest])
     const applyChanges = (
         changes: readonly VisualPropertyChange[],
         label: string,
@@ -332,19 +349,21 @@ export function PageDocumentPropertiesPanel({
         value: VisualPropertyEditValue,
         options?: PropertyChangeOptions,
     ) => applyChanges([{property: field.property, value}], `调整${field.label}`, options)
+    const applicable = (property: VisualPropertyName) =>
+        fieldFor(fields, property).sourceState !== 'not-applicable'
 
     return (
-        <section className="page-document-properties-panel">
+        <section className="page-document-properties-panel" ref={panelRef}>
             <header>
                 <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? node.kind) : '未选择'}</strong>
                 <span>修改范围 · {styleContext === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
             </header>
-            {image && <ImageDescriptionControls
-                key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
-                image={image}
-                applyKernelEntry={applyKernelEntry}
-                onReplaceImage={onReplaceImage}
-            />}
+            {image && <div data-property-section="content"><ImageDescriptionControls
+                    key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
+                    image={image}
+                    applyKernelEntry={applyKernelEntry}
+                    onReplaceImage={onReplaceImage}
+                /></div>}
             {componentDefinition && node && <ComponentInstanceControls
                 node={node}
                 definition={componentDefinition}
@@ -387,7 +406,10 @@ export function PageDocumentPropertiesPanel({
                     公共组件定义缺失，当前实例只能保留引用，不能编辑属性。
                 </p>
             ) : (
-                <div className="page-document-properties-panel__fields">
+                <div
+                    className="page-document-properties-panel__fields"
+                    data-property-section={tab === 'text' ? 'text' : tab === 'appearance' ? 'appearance' : 'responsive-layout'}
+                >
                     <Button type="button" size="sm" variant="outline" onClick={() => onSaveAsPublicComponent(node)}>
                         保存选中内容为公共组件
                     </Button>
@@ -405,38 +427,56 @@ export function PageDocumentPropertiesPanel({
                     )}
                     {tab === 'layout' && (
                         <>
-                            <GridLayoutPropertyControls
-                                node={node}
-                                gridParent={gridParent}
-                                viewport={styleContext}
-                                inspectComponent={inspectComponent}
-                                applyKernelEntry={(request, label) => applyKernelEntry(request, label, {immediate: true})}
-                            />
+                            <div data-property-section="container-layout-preset">
+                                <div data-property-section="grid-layout">
+                                    <GridLayoutPropertyControls
+                                        node={node}
+                                        gridParent={gridParent}
+                                        viewport={styleContext}
+                                        inspectComponent={inspectComponent}
+                                        applyKernelEntry={(request, label) => applyKernelEntry(request, label, {immediate: true})}
+                                    />
+                                </div>
+                                {node.kind === 'container' && (['align-items', 'justify-content'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                    key={property}
+                                    field={fieldFor(fields, property)}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                /> : null)}
+                            </div>
                             <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
                             <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'gap'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'row-gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'row-gap'), value, options)}/>
-                            <NumericPropertyControl field={fieldFor(fields, 'column-gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'column-gap'), value, options)}/>
+                            <div data-property-section="container-layout-spacing">
+                                {(['gap', 'row-gap', 'column-gap'] as const).map(property => applicable(property) ? <NumericPropertyControl
+                                    key={property}
+                                    field={fieldFor(fields, property)}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                                /> : null)}
+                            </div>
                             {(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
                                 key={property}
                                 field={fieldFor(fields, property)}
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
                             />)}
-                            {(['float', 'object-fit', 'object-position', 'list-style-type', 'list-style-position'] as const).map(property => <KeywordPropertyControl
+                            {(['float'] as const).map(property => applicable(property) ? <KeywordPropertyControl
                                 key={property}
                                 field={fieldFor(fields, property)}
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            />)}
-                            {node.kind === 'container' && (['align-items', 'justify-content'] as const).map(property => <KeywordPropertyControl
+                            /> : null)}
+                            {node.kind === 'asset' && (['object-fit', 'object-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
                                 key={property}
                                 field={fieldFor(fields, property)}
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            />)}
-                            {gridParent && (['align-self', 'justify-self'] as const).map(property => <KeywordPropertyControl
+                            /> : null)}
+                            {(node.kind === 'list' || node.kind === 'list-item') && (['list-style-type', 'list-style-position'] as const).map(property => applicable(property) ? <KeywordPropertyControl
                                 key={property}
                                 field={fieldFor(fields, property)}
                                 onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
-                            />)}
+                            /> : null)}
+                            {gridParent && (['align-self', 'justify-self'] as const).map(property => applicable(property) ? <KeywordPropertyControl
+                                key={property}
+                                field={fieldFor(fields, property)}
+                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                            /> : null)}
                         </>
                     )}
                     {tab === 'appearance' && (
