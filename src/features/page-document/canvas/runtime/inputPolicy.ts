@@ -49,9 +49,12 @@ export interface CanvasEnterIntent {
     readonly text: '' | '\n'
 }
 
-/** Enter 由 keydown 归一，不能信任 WebKit 对 beforeinput.inputType 的平台映射。 */
+/**
+ * 文本块模型把块内换行视为高频文本操作、拆块视为低频结构操作，因此 Enter 换行、Shift+Enter 拆块。
+ * 这套分工有意不同于 Word、Docs，且必须由 keydown 归一，不能信任 WebKit 对 beforeinput.inputType 的平台映射。
+ */
 export function canvasEnterIntent(kind: string | null, shiftKey: boolean): CanvasEnterIntent {
-    return !shiftKey && isCanvasSplittableKind(kind)
+    return shiftKey && isCanvasSplittableKind(kind)
         ? {inputType: 'insertParagraph', text: ''}
         : {inputType: 'insertLineBreak', text: '\n'}
 }

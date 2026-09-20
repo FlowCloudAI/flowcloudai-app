@@ -670,6 +670,7 @@ function installInputListeners(): void {
             reportBlockedInput(intent.inputType, 'invalid-selection', nodeId)
             return
         }
+        // 只有 Shift+Enter 的拆块要求折叠光标；Enter 可用换行替换一段选中文字。
         if (intent.inputType === 'insertParagraph' && !snapshot.collapsed) {
             reportBlockedInput(intent.inputType, 'invalid-selection', nodeId)
             return

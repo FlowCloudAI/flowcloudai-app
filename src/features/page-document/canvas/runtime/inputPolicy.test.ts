@@ -154,13 +154,38 @@ test('分段只开放 paragraph、heading 与 list-item', () => {
     assert.equal(isCanvasSplittableKind('table-cell'), false)
 })
 
-test('keydown Enter 在可拆分块分段，在表格单元格与 Shift 变体中保留块内换行', () => {
-    assert.deepEqual(canvasEnterIntent('paragraph', false), {inputType: 'insertParagraph', text: ''})
-    assert.deepEqual(canvasEnterIntent('heading', false), {inputType: 'insertParagraph', text: ''})
-    assert.deepEqual(canvasEnterIntent('list-item', false), {inputType: 'insertParagraph', text: ''})
-    assert.deepEqual(canvasEnterIntent('paragraph', true), {inputType: 'insertLineBreak', text: '\n'})
+test('文本块 Enter 换行、Shift+Enter 拆块，且不可拆分节点的两个变体都换行', () => {
+    assert.deepEqual(canvasEnterIntent('paragraph', false), {inputType: 'insertLineBreak', text: '\n'})
+    assert.deepEqual(canvasEnterIntent('paragraph', true), {inputType: 'insertParagraph', text: ''})
     assert.deepEqual(canvasEnterIntent('table-cell', false), {inputType: 'insertLineBreak', text: '\n'})
     assert.deepEqual(canvasEnterIntent('table-cell', true), {inputType: 'insertLineBreak', text: '\n'})
+})
+
+test('非折叠选区按 Enter 用块内换行替换选中文字', () => {
+    const enter = canvasEnterIntent('paragraph', false)
+    const message: CanvasInputIntentMessage = {
+        channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+        version: PAGE_DOCUMENT_CANVAS_VERSION,
+        sessionToken: 'a'.repeat(64),
+        sequence: 1,
+        type: 'input-intent',
+        intentId: '21111111-1111-7111-8111-111111111111',
+        nodeId: snapshot.nodeId,
+        inputType: enter.inputType,
+        from: 1,
+        to: 3,
+        expected: '旧文',
+        text: enter.text,
+    }
+    const handle = {nodeId: snapshot.nodeId} as ComponentHandle
+    const intents = createCanvasInputKernelOperation(
+        [message],
+        'canvas-input-history:enter-selection',
+        'paragraph',
+    ).request.createIntents(new Map([[snapshot.nodeId, handle]]))
+
+    assert.equal(intents.filter(intent => intent.kind === 'replace-text').length, 1)
+    assert.equal(intents.filter(intent => intent.kind === 'split-text-block').length, 0)
 })
 
 test('画布组合键只产生一次宿主意图并区分保存、查找与历史操作', () => {
@@ -200,6 +225,7 @@ test('运行时把快捷键、Enter、指针结束与写回重采集接进真实
     assert.match(source, /const keyboardIntent = canvasKeyboardIntent\(event\)[\s\S]*?type: 'history-intent', action: keyboardIntent/u)
     assert.match(source, /keyboardIntent === 'find'[\s\S]*?type: 'find-intent', action: 'open'/u)
     assert.match(source, /const intent = canvasEnterIntent\(node\.getAttribute\('data-fc-node-kind'\), event\.shiftKey\)/u)
+    assert.match(source, /intent\.inputType === 'insertParagraph' && !snapshot\.collapsed/u)
     assert.match(source, /addEventListener\('pointerup', reportSettledTextSelection\)/u)
     assert.match(source, /addEventListener\('pointercancel', reportSettledTextSelection\)/u)
     assert.match(source, /reportTextSelection\(restoredSelection, true\)/u)

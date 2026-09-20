@@ -239,7 +239,7 @@ describe('页面编辑生产项目基线', () => {
         }
     })
 
-    it('真实会话按 Enter 分段后立即输入落在宿主新节点，两个交互可依次撤销并保存', () => {
+    it('真实会话按 Shift+Enter 分段后立即输入落在宿主新节点，两个交互可依次撤销并保存', () => {
         const initial = createEntryDocumentSessionState(identity, document())
         let state = initial
         const runtime = createDocumentKernelDraftRuntime()
@@ -381,7 +381,7 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
     })
 
-    it('真实会话拒绝在 table-cell 分段且草稿保持不变', () => {
+    it('真实会话拒绝在 table-cell 进行 Shift+Enter 拆块且草稿保持不变', () => {
         const cellId = '87777777-7777-7777-8777-777777777777'
         const cellDocument = {
             ...document(),
