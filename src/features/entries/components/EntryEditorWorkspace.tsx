@@ -1,19 +1,14 @@
 // 桌面词条工作台只组织常驻顶栏、满高主体与浮层；草稿、保存和页面编辑状态仍由 EntryEditor 持有。
 
 import {type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {ActionMenu, FloatingPanel} from '../../../shared/ui/overlay'
-import {
-    setPageDocumentWorkbarHost,
-    usePageDocumentWorkspace,
-} from '../../page-document/editor/workspace/pageDocumentWorkspaceStore.ts'
+import {setPageDocumentWorkbarHost} from '../../page-document/editor/workspace/pageDocumentWorkspaceStore.ts'
 import type {EntryEditorMode} from '../lib/entryEditorShortcutModel.ts'
 
 interface EntryEditorWorkspaceProps {
     active: boolean
     entryId: string
-    projectId: string
     editorMode: EntryEditorMode
     modeSwitch: ReactNode
     title: string
@@ -75,7 +70,6 @@ function EntryEditorTitleInput({
 export default function EntryEditorWorkspace({
     active,
     entryId,
-    projectId,
     editorMode,
     modeSwitch,
     title,
@@ -97,19 +91,10 @@ export default function EntryEditorWorkspace({
     onDelete,
 }: EntryEditorWorkspaceProps) {
     const [informationOpen, setInformationOpen] = useState(false)
-    const [relationsOpen, setRelationsOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
-    const {active: activeWorkspace, relationsDockHost} = usePageDocumentWorkspace()
-    const relationsPortalHost = active
-        && editorMode === 'edit'
-        && activeWorkspace?.projectId === projectId
-        && activeWorkspace.entryId === entryId
-        ? relationsDockHost
-        : null
 
     useEffect(() => {
         setInformationOpen(false)
-        setRelationsOpen(false)
         setActionMenuOpen(false)
     }, [active, editorMode, entryId])
 
@@ -117,7 +102,7 @@ export default function EntryEditorWorkspace({
         ...(editorMode === 'browse' ? [{
             key: 'entry-relations',
             label: '词条关系',
-            onSelect: () => setRelationsOpen(true),
+            onSelect: () => setInformationOpen(true),
         }] : []),
         ...(onDelete ? [{
             key: 'delete-entry',
@@ -202,11 +187,6 @@ export default function EntryEditorWorkspace({
             </div>
         </main>
 
-        {relationsPortalHost && createPortal(
-            <div className="entry-editor-relations-dock">{relationsPanel}</div>,
-            relationsPortalHost,
-        )}
-
         <FloatingPanel
             open={active && informationOpen}
             onClose={() => setInformationOpen(false)}
@@ -214,17 +194,12 @@ export default function EntryEditorWorkspace({
             ariaLabel="词条信息"
             className="entry-editor-information-panel"
         >
-            <div className="entry-editor-information-panel__body">{informationPanel}</div>
-        </FloatingPanel>
-
-        <FloatingPanel
-            open={active && editorMode === 'browse' && relationsOpen}
-            onClose={() => setRelationsOpen(false)}
-            title="词条关系"
-            ariaLabel="词条关系"
-            className="entry-editor-relations-panel"
-        >
-            <div className="entry-editor-relations-panel__body">{relationsPanel}</div>
+            <div className="entry-editor-information-panel__body">
+                {informationPanel}
+                <section className="entry-editor-information-panel__relations" aria-label="词条关系">
+                    {relationsPanel}
+                </section>
+            </div>
         </FloatingPanel>
 
         <ActionMenu

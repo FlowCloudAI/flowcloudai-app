@@ -68,3 +68,16 @@ test('页面功能区允许 Select 菜单浮在画布上方', () => {
     assert.equal(panel.nodes.some(node => node.type === 'decl'
         && node.prop === 'overflow-x' && node.value !== 'visible'), false)
 })
+
+test('词条关系只挂在词条信息浮层且页面 Dock 恢复单一属性宿主', () => {
+    const workspace = readFileSync(new URL('../entries/components/EntryEditorWorkspace.tsx', import.meta.url), 'utf8')
+    const dock = readFileSync(new URL('editor/workspace/PageDocumentPropertiesDockHost.tsx', import.meta.url), 'utf8')
+    const store = readFileSync(new URL('editor/workspace/pageDocumentWorkspaceStore.ts', import.meta.url), 'utf8')
+
+    assert.match(workspace, /entry-editor-information-panel__body[\s\S]*informationPanel[\s\S]*entry-editor-information-panel__relations[\s\S]*relationsPanel/u)
+    assert.match(workspace, /label: '词条关系',[\s\S]*setInformationOpen\(true\)/u)
+    assert.doesNotMatch(workspace, /relationsOpen|relationsDockHost|entry-editor-relations-panel/u)
+    assert.match(dock, /aria-label="页面属性"[\s\S]*ref=\{setPageDocumentDockHost\}/u)
+    assert.doesNotMatch(dock, /role="tab"|>关系<|setPageDocumentRelationsDockHost/u)
+    assert.doesNotMatch(store, /relationsDockHost|setPageDocumentRelationsDockHost/u)
+})

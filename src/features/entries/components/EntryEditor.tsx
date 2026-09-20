@@ -602,7 +602,6 @@ export default function EntryEditor(props: EntryEditorProps) {
     return <EntryEditorWorkspace
         active={active}
         entryId={entryId}
-        projectId={projectId}
         editorMode={editorMode}
         modeSwitch={<div className="entry-editor-mode-switch" role="group" aria-label="词条查看模式">
             <button type="button" className={`entry-editor-mode-chip${editorMode === 'browse' ? ' active' : ''}`}
