@@ -26,7 +26,14 @@ import {
     type CanvasTextSelectionMessage,
 } from '../canvas/protocol/index.ts'
 import {pageDocumentLinkCandidates} from '../application/linkCandidateSelection.ts'
-import {createImageInsertionRequest, createImageReplacementRequest, isCurrentImageAssetSelection, resolveImageInsertionTarget} from '../application/imageAssetEditing.ts'
+import {
+    createImageInsertionRequest,
+    createImageReplacementRequest,
+    isCurrentImageAssetSelection,
+    resolvePageDocumentInsertionTargets,
+    type ImageInsertionTarget,
+    type PageDocumentInsertionPlacement,
+} from '../application/imageAssetEditing.ts'
 import {readManagedImageDescription} from '../application/imageSemanticEditing.ts'
 import type {EntryBrief} from '../../../api/worldflow.ts'
 import {SourceWorkspace, type SourceWorkspaceHandle} from './source/SourceWorkspace.tsx'
@@ -65,7 +72,10 @@ import type {
 import {ContainerLayoutRibbonControls} from '../../document-editor/visual/ContainerLayoutRibbonControls.tsx'
 import {ContextualRibbonControls} from '../../document-editor/visual/ContextualRibbonControls.tsx'
 import {PublicComponentRibbonControls} from '../../document-editor/visual/PublicComponentRibbonControls.tsx'
-import {BuiltInStructureRibbonControls} from '../../document-editor/visual/BuiltInStructureRibbonControls.tsx'
+import {
+    BuiltInStructureRibbonControls,
+    InsertionPlacementRibbonControls,
+} from '../../document-editor/visual/BuiltInStructureRibbonControls.tsx'
 import {
     createBuiltInStructureInsertion,
     type BuiltInStructureKind,
@@ -187,13 +197,19 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [pageScope, setPageScope] = useState<DocumentQuickScope>('entry')
     const [previewWidth, setPreviewWidth] = useState<LayoutPreviewViewportMode>('auto')
     const [editContext, setEditContext] = useState<ResponsiveViewportContext>('mobile')
+    const [insertionPlacement, setInsertionPlacement] = useState<PageDocumentInsertionPlacement>('inside')
     const [outlineVisible, setOutlineVisible] = useState(true)
     const [layoutGuidesVisible, setLayoutGuidesVisible] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [activeTextRange, setActiveTextRange] = useState<RibbonTextRange | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
-    const [assetPicker, setAssetPicker] = useState<{mode: 'insert' | 'replace'; contextKey: string; pickerId: string} | null>(null)
+    const [assetPicker, setAssetPicker] = useState<{
+        mode: 'insert' | 'replace'
+        contextKey: string
+        pickerId: string
+        insertionTarget: ImageInsertionTarget | null
+    } | null>(null)
     const [assetPickerBusy, setAssetPickerBusy] = useState(false)
     const [assetPickerError, setAssetPickerError] = useState<string | null>(null)
     const [componentEditor, setComponentEditor] = useState<ComponentDefinitionEditorState | null>(null)
@@ -391,9 +407,13 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const visibleRibbonTab = resolveRibbonTab(ribbonTab, selectedNode)
     const ribbonTabs = ribbonTabOptions(selectedNode)
 
-    const builtInInsertionTarget = mode === 'visual'
-        ? resolveImageInsertionTarget(layerProjection.nodes, selectedNodeId)
+    const insertionTargets = mode === 'visual'
+        ? resolvePageDocumentInsertionTargets(layerProjection.nodes, selectedNodeId)
         : null
+    const effectiveInsertionPlacement = insertionTargets?.[insertionPlacement]
+        ? insertionPlacement
+        : insertionTargets?.defaultPlacement ?? insertionPlacement
+    const builtInInsertionTarget = insertionTargets?.[effectiveInsertionPlacement] ?? null
     const insertBuiltInStructure = (kind: BuiltInStructureKind) => {
         if (!builtInInsertionTarget) {
             void session.reportVisualFailure('请选择正文容器或其中一个受管节点作为插入位置。')
@@ -511,7 +531,12 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         if (pickerMode === 'replace' && selectedNode?.kind !== 'asset') return
         const pickerId = crypto.randomUUID()
         activeAssetPickerIdRef.current = pickerId
-        setAssetPicker({mode: pickerMode, contextKey: interactionKey, pickerId})
+        setAssetPicker({
+            mode: pickerMode,
+            contextKey: interactionKey,
+            pickerId,
+            insertionTarget: pickerMode === 'insert' ? builtInInsertionTarget : null,
+        })
         setAssetPickerError(null)
         void session.refreshAssets().catch(error => {
             if (interactionKeyRef.current === interactionKey) setAssetPickerError(pageDocumentAssetErrorMessage(error))
@@ -519,7 +544,12 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     }
     const applyChosenAsset = async (
         asset: PageDocumentAsset,
-        importedPicker?: {mode: 'insert' | 'replace'; contextKey: string; pickerId: string},
+        importedPicker?: {
+            mode: 'insert' | 'replace'
+            contextKey: string
+            pickerId: string
+            insertionTarget: ImageInsertionTarget | null
+        },
     ) => {
         const picker = importedPicker ?? assetPicker
         if (!picker || (assetPickerBusy && !importedPicker)) return
@@ -546,7 +576,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 if (!image) throw new TypeError('选中的图片已变化，请重新选择。')
                 request = createImageReplacementRequest(image, checked.id)
             } else {
-                const target = resolveImageInsertionTarget(layerProjection.nodes, selectedNodeId)
+                const target = picker.insertionTarget
                 if (!target) throw new TypeError('请选择正文容器或其中一个受管节点作为插入位置。')
                 newNodeId = crypto.randomUUID()
                 request = createImageInsertionRequest(target, checked.id, newNodeId)
@@ -823,16 +853,27 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                             />
                         ) : visibleRibbonTab === 'insert' ? (
                             <>
+                                <InsertionPlacementRibbonControls
+                                    placement={effectiveInsertionPlacement}
+                                    insideDisabledReason={insertionTargets?.inside
+                                        ? null
+                                        : '只有受管容器可以接收内部内容；普通节点请使用“容器后”。'}
+                                    afterDisabledReason={insertionTargets?.after
+                                        ? null
+                                        : '所选容器没有可插入其后的受管父容器。'}
+                                    onChange={setInsertionPlacement}
+                                />
                                 <BuiltInStructureRibbonControls
                                     disabledReason={builtInInsertionTarget ? null : '请选择正文容器或其中一个受管节点作为插入位置。'}
                                     onInsert={insertBuiltInStructure}
                                 />
                                 <DocumentRibbonGroup label="媒体" priority="essential">
                                     <DocumentRibbonCommand
+                                        disabled={!builtInInsertionTarget}
                                         icon={Image}
                                         label="图片"
                                         onClick={() => openAssetPicker('insert')}
-                                        title="插入图片"
+                                        title={builtInInsertionTarget ? '插入图片' : '当前插入位置不可用'}
                                     />
                                 </DocumentRibbonGroup>
                                 <PublicComponentRibbonControls
@@ -840,6 +881,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                     warning={session.componentDefinitionsWarning}
                                     assets={session.assets}
                                     selected={selectedNode}
+                                    insertionTarget={builtInInsertionTarget}
                                     applyKernelEntry={session.applyVisualPropertyEntry}
                                     onInserted={setSelectedNodeId}
                                     onOpenCreate={() => openComponentEditor()}

@@ -1,7 +1,8 @@
 // 本组件只把一步式内置结构命令交给已绑定的插入函数；精确属性留在右侧任务窗格。
 
-import {Heading2, List, Minus, Pilcrow, Rows3, Square} from 'lucide-react'
+import {ArrowDownToLine, Box, Heading2, List, Minus, Pilcrow, Rows3, Square} from 'lucide-react'
 import type {BuiltInStructureKind} from '../../page-document/application/builtInStructureInsertion.ts'
+import type {PageDocumentInsertionPlacement} from '../../page-document/application/imageAssetEditing.ts'
 import {DocumentRibbonCommand, DocumentRibbonGroup} from './DocumentOfficeRibbon.tsx'
 
 const COMMANDS = Object.freeze([
@@ -12,6 +13,37 @@ const COMMANDS = Object.freeze([
     {kind: 'divider', label: '分隔线', icon: Minus},
     {kind: 'container', label: '容器', icon: Square},
 ] satisfies readonly {kind: BuiltInStructureKind; label: string; icon: typeof Pilcrow}[])
+
+export function InsertionPlacementRibbonControls({
+    placement,
+    insideDisabledReason,
+    afterDisabledReason,
+    onChange,
+}: {
+    readonly placement: PageDocumentInsertionPlacement
+    readonly insideDisabledReason: string | null
+    readonly afterDisabledReason: string | null
+    readonly onChange: (placement: PageDocumentInsertionPlacement) => void
+}) {
+    return <DocumentRibbonGroup label="插入位置" priority="essential">
+        <DocumentRibbonCommand
+            active={placement === 'inside'}
+            disabled={Boolean(insideDisabledReason)}
+            icon={Box}
+            label="容器内"
+            onClick={() => onChange('inside')}
+            title={insideDisabledReason ?? '插入到所选容器末尾'}
+        />
+        <DocumentRibbonCommand
+            active={placement === 'after'}
+            disabled={Boolean(afterDisabledReason)}
+            icon={ArrowDownToLine}
+            label="容器后"
+            onClick={() => onChange('after')}
+            title={afterDisabledReason ?? '插入到所选节点之后'}
+        />
+    </DocumentRibbonGroup>
+}
 
 export function BuiltInStructureRibbonControls({
     disabledReason,

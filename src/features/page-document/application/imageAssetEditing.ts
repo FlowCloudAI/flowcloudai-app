@@ -11,6 +11,14 @@ export interface ImageInsertionTarget {
     afterId: string | null
 }
 
+export type PageDocumentInsertionPlacement = 'inside' | 'after'
+
+export interface PageDocumentInsertionTargets {
+    readonly inside: ImageInsertionTarget | null
+    readonly after: ImageInsertionTarget | null
+    readonly defaultPlacement: PageDocumentInsertionPlacement
+}
+
 export function isCurrentImageAssetSelection(
     openedContext: string,
     currentContext: string,
@@ -36,17 +44,33 @@ export function resolveImageInsertionTarget(
     nodes: readonly LayerProjectionNode[],
     selectedNodeId: string | null,
 ): ImageInsertionTarget | null {
-    const visit = (items: readonly LayerProjectionNode[], parent: LayerProjectionNode | null): ImageInsertionTarget | null => {
+    const targets = resolvePageDocumentInsertionTargets(nodes, selectedNodeId)
+    return targets?.[targets.defaultPlacement] ?? null
+}
+
+export function resolvePageDocumentInsertionTargets(
+    nodes: readonly LayerProjectionNode[],
+    selectedNodeId: string | null,
+): PageDocumentInsertionTargets | null {
+    const visit = (
+        items: readonly LayerProjectionNode[],
+        parent: LayerProjectionNode | null,
+    ): PageDocumentInsertionTargets | null => {
         for (const node of items) {
             if (node.id === selectedNodeId) {
                 if (!node.managed) return null
-                if (node.kind === 'container') {
-                    const last = [...node.children].reverse().find(child => child.managed)
-                    return {parentId: node.id, afterId: last?.id ?? null}
-                }
-                return parent?.managed && parent.kind === 'container'
+                const after = parent?.managed && parent.kind === 'container'
                     ? {parentId: parent.id, afterId: node.id}
                     : null
+                if (node.kind === 'container') {
+                    const last = [...node.children].reverse().find(child => child.managed)
+                    return {
+                        inside: {parentId: node.id, afterId: last?.id ?? null},
+                        after,
+                        defaultPlacement: 'inside',
+                    }
+                }
+                return after ? {inside: null, after, defaultPlacement: 'after'} : null
             }
             const found = visit(node.children, node)
             if (found) return found
@@ -57,7 +81,11 @@ export function resolveImageInsertionTarget(
     const root = firstEditorContainer(nodes)
     if (!root) return null
     const last = [...root.children].reverse().find(child => child.managed)
-    return {parentId: root.id, afterId: last?.id ?? null}
+    return {
+        inside: {parentId: root.id, afterId: last?.id ?? null},
+        after: null,
+        defaultPlacement: 'inside',
+    }
 }
 
 function requireAssetId(value: string): string {

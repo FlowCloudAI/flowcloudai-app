@@ -15,6 +15,7 @@ import {
     type KernelDraftEditRequest,
 } from './documentKernelDraftRuntime.ts'
 import type {PublicComponentDefinitionContract} from '../domain/kernel/contracts/publicComponent.ts'
+import type {ImageInsertionTarget} from './imageAssetEditing.ts'
 import {countPublicComponentLocalizationNodes} from '../domain/kernel/patching/publicComponentLocalizationPatches.ts'
 
 export interface PublicComponentInsertionRequest {
@@ -54,7 +55,7 @@ export function createPublicComponentInstanceEditRequest(
 }
 
 export function createPublicComponentInsertionRequest(
-    parentNodeId: string,
+    target: ImageInsertionTarget,
     definition: PublicComponentDefinitionContract,
     allocateId: () => string = () => crypto.randomUUID(),
     initial: {
@@ -67,17 +68,20 @@ export function createPublicComponentInsertionRequest(
     if (newNodeId === instanceId) throw new TypeError('公共组件页面节点与实例身份不能重复。')
     const requestId = allocateId()
     const request: KernelDraftEditRequest = Object.freeze({
-        nodeIds: Object.freeze([parentNodeId.toLowerCase()]),
+        nodeIds: Object.freeze(target.afterId
+            ? [target.parentId.toLowerCase(), target.afterId.toLowerCase()]
+            : [target.parentId.toLowerCase()]),
         idempotencyKey: idempotencyKey(`public-component-insert:${requestId}`),
         interactionId: interactionId(`public-component-insert:${documentFingerprint(requestId)}`),
         authorizedScopes: Object.freeze(['entry'] as const),
         createIntents(handles: KernelComponentBindings): readonly EditIntent[] {
-            const parent = requireKernelComponentHandle(handles, parentNodeId)
+            const parent = requireKernelComponentHandle(handles, target.parentId)
+            const after = target.afterId ? requireKernelComponentHandle(handles, target.afterId) : null
             return Object.freeze([
                 Object.freeze({
                     kind: 'insert-public-component' as const,
                     target: Object.freeze({kind: 'component-root' as const, component: parent}),
-                    after: null,
+                    after,
                     componentId: definition.componentId,
                     // 面板插入的是跟随定义的实例；固定旧修订由后续明确操作产生。
                     revision: 'latest' as const,

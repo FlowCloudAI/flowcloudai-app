@@ -11,6 +11,7 @@ import type {LayerProjectionNode} from '../../page-document/domain/layerProjecti
 import type {PublicComponentDefinitionContract} from '../../page-document/domain/kernel/contracts/publicComponent.ts'
 import type {KernelDraftEditRequest} from '../../page-document/application/documentKernelDraftRuntime.ts'
 import {createPublicComponentInsertionRequest} from '../../page-document/application/publicComponentEditing.ts'
+import type {ImageInsertionTarget} from '../../page-document/application/imageAssetEditing.ts'
 import {PageDocumentAssetThumbnail} from '../../page-document/components/assets/PageDocumentAssetPicker.tsx'
 import {DocumentRibbonGroup} from './DocumentOfficeRibbon.tsx'
 import './PublicComponentRibbonControls.css'
@@ -20,6 +21,7 @@ export function PublicComponentRibbonControls({
     warning,
     assets,
     selected,
+    insertionTarget,
     applyKernelEntry,
     onInserted,
     onOpenCreate,
@@ -31,6 +33,7 @@ export function PublicComponentRibbonControls({
     warning: string | null
     assets: readonly PageDocumentAsset[]
     selected: LayerProjectionNode | null
+    insertionTarget: ImageInsertionTarget | null
     applyKernelEntry: (request: KernelDraftEditRequest, label: string, options?: {immediate?: boolean}) => Promise<boolean>
     onInserted: (nodeId: string) => void
     onOpenCreate: () => void
@@ -41,7 +44,7 @@ export function PublicComponentRibbonControls({
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const {showAlert} = useAlert()
-    const canInsert = selected?.managed && selected.kind === 'container'
+    const canInsert = insertionTarget !== null
     const latestDefinitions = [...definitions.reduce((latest, definition) => {
         const key = definition.componentId.toLowerCase()
         const current = latest.get(key)
@@ -55,8 +58,8 @@ export function PublicComponentRibbonControls({
         byCategory.set(definition.category, group)
     }
     const insert = async (definition: PublicComponentDefinitionContract) => {
-        if (!selected || !canInsert) return
-        const allocated = createPublicComponentInsertionRequest(selected.id, definition)
+        if (!insertionTarget) return
+        const allocated = createPublicComponentInsertionRequest(insertionTarget, definition)
         if (await applyKernelEntry(allocated.request, `插入公共组件 ${definition.name}`, {immediate: true})) {
             onInserted(allocated.newNodeId)
         }
@@ -87,7 +90,7 @@ export function PublicComponentRibbonControls({
             <Button type="button" size="sm" variant="outline" disabled={!canCapture} onClick={onSaveSelected}>
                 <PackagePlus size={13} /> 保存选中内容
             </Button>
-            {!canInsert && <p className="public-component-ribbon__hint">先选择一个容器作为公共组件插入位置。</p>}
+            {!canInsert && <p className="public-component-ribbon__hint">当前插入位置不可用，请选择正文容器或其中的受管节点。</p>}
             {warning && <p className="public-component-ribbon__hint" role="status">{warning}</p>}
             {error && <p className="public-component-ribbon__error" role="alert">{error}</p>}
         </div>

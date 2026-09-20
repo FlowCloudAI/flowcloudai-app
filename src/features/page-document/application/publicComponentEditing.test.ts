@@ -96,13 +96,13 @@ function apply(
 describe('公共组件实例编辑', () => {
     it('宿主分配身份后可连续插入同一定义，并隔离同名 part', () => {
         let ids = [COMPONENT_NODE_A, COMPONENT_INSTANCE_A, REQUEST_A]
-        const first = createPublicComponentInsertionRequest(ROOT_ID, definition, () => ids.shift()!, {
+        const first = createPublicComponentInsertionRequest({parentId: ROOT_ID, afterId: null}, definition, () => ids.shift()!, {
             parts: {body: '第一实例'},
             properties: {title: '甲'},
         })
         const inserted = apply(session(), first.request, '插入公共组件')
         ids = [COMPONENT_NODE_B, COMPONENT_INSTANCE_B, REQUEST_B]
-        const second = createPublicComponentInsertionRequest(ROOT_ID, definition, () => ids.shift()!, {
+        const second = createPublicComponentInsertionRequest({parentId: ROOT_ID, afterId: null}, definition, () => ids.shift()!, {
             parts: {body: '第二实例'},
             properties: {title: '乙'},
         })
@@ -120,7 +120,7 @@ describe('公共组件实例编辑', () => {
         const ids = [COMPONENT_NODE_A, COMPONENT_INSTANCE_A, REQUEST_A]
         const inserted = apply(
             session(),
-            createPublicComponentInsertionRequest(ROOT_ID, definition, () => ids.shift()!, {
+            createPublicComponentInsertionRequest({parentId: ROOT_ID, afterId: null}, definition, () => ids.shift()!, {
                 parts: {body: '插槽'},
                 properties: {title: '旧标题'},
             }).request,
@@ -150,7 +150,7 @@ describe('公共组件实例编辑', () => {
             componentId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
         }
         const ids = [COMPONENT_NODE_A, COMPONENT_INSTANCE_A, REQUEST_A]
-        const request = createPublicComponentInsertionRequest(ROOT_ID, missing, () => ids.shift()!).request
+        const request = createPublicComponentInsertionRequest({parentId: ROOT_ID, afterId: null}, missing, () => ids.shift()!).request
         const original = session()
         const result = createDocumentKernelDraftRuntime().prepare(original.model, original.snapshot, request)
         assert.equal(result.status, 'rejected')
@@ -162,7 +162,7 @@ describe('公共组件实例编辑', () => {
         const insertionIds = [COMPONENT_NODE_A, COMPONENT_INSTANCE_A, REQUEST_A]
         const inserted = apply(
             session(),
-            createPublicComponentInsertionRequest(ROOT_ID, definition, () => insertionIds.shift()!, {
+            createPublicComponentInsertionRequest({parentId: ROOT_ID, afterId: null}, definition, () => insertionIds.shift()!, {
                 parts: {body: '实例插槽'},
                 properties: {title: '实例标题'},
             }).request,

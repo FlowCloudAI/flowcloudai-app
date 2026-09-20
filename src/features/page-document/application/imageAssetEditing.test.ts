@@ -17,7 +17,13 @@ import {
     undoEntryDocumentSession,
     type EntryDocumentSessionState,
 } from './entryDocumentSessionModel.ts'
-import {createImageInsertionRequest, createImageReplacementRequest, isCurrentImageAssetSelection, resolveImageInsertionTarget} from './imageAssetEditing.ts'
+import {
+    createImageInsertionRequest,
+    createImageReplacementRequest,
+    isCurrentImageAssetSelection,
+    resolveImageInsertionTarget,
+    resolvePageDocumentInsertionTargets,
+} from './imageAssetEditing.ts'
 import {readManagedImageDescription} from './imageSemanticEditing.ts'
 import {CANVAS_BASE_PROJECT_CSS, CANVAS_BASE_PROJECT_HTML, compileCanvasPreview} from '../canvas/host/compiledPreview.ts'
 import {isolatePageDocument} from '../canvas/runtime/isolationPolicy.ts'
@@ -29,6 +35,7 @@ const PARAGRAPH = '33333333-3333-7333-8333-333333333333'
 const IMAGE = '44444444-4444-7444-8444-444444444444'
 const ASSET_A = '55555555-5555-7555-8555-555555555555'
 const ASSET_B = '66666666-6666-7666-8666-666666666666'
+const NESTED = '77777777-7777-7777-8777-777777777777'
 
 const identity = {entryId: ENTRY, projectId: PROJECT, title: '图片', summary: '', markdown: ''}
 const article = `<template data-fc-entry-patch data-fc-document-version="1" data-fc-entry-id="${ENTRY}" data-fc-base-template-version="1"><template data-fc-fill="entry-body"><div data-fc-node-id="${ROOT}" data-fc-node-kind="container" data-fc-editor-root><p data-fc-node-id="${PARAGRAPH}" data-fc-node-kind="paragraph">正文</p><!-- 保留作者注释 --></div></template></template>`
@@ -131,6 +138,30 @@ describe('项目页面图片生产会话', () => {
         assert.equal(saved.persistedRevision, 3)
         const reopened = createEntryDocumentSessionState(identity, persisted, initial.snapshot.assets)
         assert.equal(readManagedImageDescription(reopened.model.entry.sources['article.html'], IMAGE)?.reference.assetId, ASSET_A)
+    })
+
+    it('插入位置对容器提供内部与之后，对普通节点只提供之后', () => {
+        const nestedArticle = article.replace(
+            `<p data-fc-node-id="${PARAGRAPH}"`,
+            `<section data-fc-node-id="${NESTED}" data-fc-node-kind="container"><p data-fc-node-id="${PARAGRAPH}"`,
+        ).replace('</p><!-- 保留作者注释 -->', '</p></section><!-- 保留作者注释 -->')
+        const nodes = createLayerProjection(nestedArticle).nodes
+
+        assert.deepEqual(resolvePageDocumentInsertionTargets(nodes, NESTED), {
+            inside: {parentId: NESTED, afterId: PARAGRAPH},
+            after: {parentId: ROOT, afterId: NESTED},
+            defaultPlacement: 'inside',
+        })
+        assert.deepEqual(resolvePageDocumentInsertionTargets(nodes, PARAGRAPH), {
+            inside: null,
+            after: {parentId: NESTED, afterId: PARAGRAPH},
+            defaultPlacement: 'after',
+        })
+        assert.deepEqual(resolvePageDocumentInsertionTargets(nodes, ROOT), {
+            inside: {parentId: ROOT, afterId: NESTED},
+            after: null,
+            defaultPlacement: 'inside',
+        })
     })
 
     it('无可选编辑根标记时，优先沿选中的受管容器解析并完成真实插入', () => {
