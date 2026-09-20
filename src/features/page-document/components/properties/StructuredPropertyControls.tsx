@@ -1,7 +1,7 @@
 // 本组件呈现有限关键字、受管背景与结构化阴影；不把任意 CSS 文本交给属性内核。
 
 import {Button, Select} from 'flowcloudai-ui'
-import type {ReactNode} from 'react'
+import {useEffect, useState, type ReactNode} from 'react'
 import type {PageDocumentAsset} from '../../../../api/pageDocument.ts'
 import {
     visualKeywordOptions,
@@ -12,6 +12,15 @@ import {
 } from '../../application/visualPropertyEditing.ts'
 import type {PropertyChangeOptions} from './NumericPropertyControl.tsx'
 import {NumericPropertyControl} from './NumericPropertyControl.tsx'
+import {ColorPropertyControl} from './ColorPropertyControl.tsx'
+import {
+    BACKGROUND_GRADIENT_ANGLES,
+    BACKGROUND_GRADIENT_END_STOPS,
+    BACKGROUND_GRADIENT_STOPS,
+    parseControlledBackgroundGradient,
+    serializeControlledBackgroundGradient,
+    type ControlledBackgroundGradient,
+} from './backgroundPropertyModel.ts'
 
 type ChangeProperty = (
     value: VisualPropertyEditValue,
@@ -106,38 +115,140 @@ export function DimensionPropertyControl({field, onChange}: {field: VisualProper
     </div>
 }
 
-export function BackgroundImagePropertyControl({
+type BackgroundMode = 'solid' | 'gradient' | 'image'
+
+const DEFAULT_GRADIENT: ControlledBackgroundGradient = {
+    angle: 135,
+    start: 'var(--fc-entry-accent)',
+    end: 'transparent',
+}
+
+export function BackgroundPropertyControl({
     assets,
-    field,
-    onChange,
+    colorField,
+    imageField,
+    onColorChange,
+    onImageChange,
 }: {
     assets: readonly PageDocumentAsset[]
-    field: VisualPropertyState
-    onChange: ChangeProperty
+    colorField: VisualPropertyState
+    imageField: VisualPropertyState
+    onColorChange: ChangeProperty
+    onImageChange: ChangeProperty
 }) {
-    const raw = (field.localValue ?? field.value).trim()
-    const options = [
-        {value: 'linear-gradient(135deg, var(--fc-entry-accent), transparent)', label: '强调色渐隐'},
-        {value: 'linear-gradient(90deg, var(--fc-entry-surface), var(--fc-entry-muted))', label: '页面底色渐变'},
-        ...assets.map(asset => ({value: `url("fcasset://${asset.id}")`, label: `项目图片 · ${asset.id.slice(0, 8)}`})),
-    ]
-    const known = options.some(option => option.value === raw)
-    return <PropertyShell field={field} onChange={onChange}>
-        {!known && raw && raw !== 'none' && <p className="page-document-property__message">自定义背景源码会原样保留。</p>}
-        <Select
-            aria-label="背景图与渐变"
-            disabled={field.disabled}
-            value={known ? raw : 'custom'}
+    const rawImage = (imageField.localValue ?? imageField.value).trim()
+    const controlledGradient = parseControlledBackgroundGradient(rawImage)
+    const assetOptions = assets.map(asset => ({
+        value: `url("fcasset://${asset.id}")`,
+        label: `项目图片 · ${asset.id.slice(0, 8)}`,
+    }))
+    const selectedAsset = assetOptions.find(option => option.value === rawImage)
+    const inferredMode: BackgroundMode = controlledGradient ? 'gradient' : selectedAsset ? 'image' : 'solid'
+    const [mode, setMode] = useState<BackgroundMode>(inferredMode)
+    const [gradient, setGradient] = useState<ControlledBackgroundGradient>(controlledGradient ?? DEFAULT_GRADIENT)
+    useEffect(() => {
+        setMode(inferredMode)
+        const nextGradient = parseControlledBackgroundGradient(rawImage)
+        if (nextGradient) setGradient(nextGradient)
+    }, [inferredMode, rawImage])
+
+    const changeGradient = (next: ControlledBackgroundGradient) => {
+        setGradient(next)
+        void onImageChange({kind: 'background-image', value: serializeControlledBackgroundGradient(next)}, {immediate: true})
+    }
+    const chooseMode = (next: BackgroundMode) => {
+        setMode(next)
+        if (next === 'solid' && imageField.localValue !== null) {
+            void onImageChange({kind: 'clear-override'}, {immediate: true})
+        } else if (next === 'gradient' && !controlledGradient) {
+            changeGradient(gradient)
+        }
+    }
+    const customImage = rawImage && rawImage !== 'none' && !controlledGradient && !selectedAsset
+
+    return <section className={`page-document-property page-document-background-property${colorField.disabled && imageField.disabled ? ' is-disabled' : ''}`}>
+        <div className="page-document-property__heading">
+            <span>背景</span>
+            <span data-source-state={mode === 'solid' ? colorField.sourceState : imageField.sourceState}>
+                {mode === 'solid' ? colorField.statusText : imageField.statusText}
+            </span>
+        </div>
+        <div className="page-document-background-property__modes" role="group" aria-label="背景类型">
+            {([
+                ['solid', '纯色'],
+                ['gradient', '渐变'],
+                ['image', '图片'],
+            ] as const).map(([value, label]) => <Button
+                aria-pressed={mode === value}
+                disabled={value === 'solid' ? colorField.disabled : imageField.disabled}
+                key={value}
+                size="sm"
+                variant={mode === value ? 'primary' : 'outline'}
+                onClick={() => chooseMode(value)}
+            >{label}</Button>)}
+        </div>
+        {mode === 'solid' && <ColorPropertyControl embedded field={colorField} onChange={onColorChange}/>}
+        {mode === 'gradient' && <div className="page-document-background-property__gradient">
+            <label>
+                <span>角度</span>
+                <Select
+                    aria-label="渐变角度"
+                    disabled={imageField.disabled}
+                    value={String(gradient.angle)}
+                    options={BACKGROUND_GRADIENT_ANGLES.map(value => ({value: String(value), label: `${value}°`}))}
+                    onValueChange={value => changeGradient({...gradient, angle: Number(value) as ControlledBackgroundGradient['angle']})}
+                />
+            </label>
+            <label>
+                <span>起始颜色</span>
+                <Select
+                    aria-label="渐变起始颜色"
+                    disabled={imageField.disabled}
+                    value={gradient.start}
+                    options={[...BACKGROUND_GRADIENT_STOPS]}
+                    onValueChange={value => changeGradient({...gradient, start: String(value) as ControlledBackgroundGradient['start']})}
+                />
+            </label>
+            <label>
+                <span>结束颜色</span>
+                <Select
+                    aria-label="渐变结束颜色"
+                    disabled={imageField.disabled}
+                    value={gradient.end}
+                    options={[...BACKGROUND_GRADIENT_END_STOPS]}
+                    onValueChange={value => changeGradient({...gradient, end: String(value) as ControlledBackgroundGradient['end']})}
+                />
+            </label>
+        </div>}
+        {mode === 'image' && <Select
+            aria-label="项目背景图片"
+            disabled={imageField.disabled}
+            value={selectedAsset?.value ?? 'unselected'}
             options={[
-                {value: 'custom', label: raw ? '自定义源码 / 未接管' : '未设置'},
-                ...options,
+                {value: 'unselected', label: assets.length === 0 ? '项目内没有图片' : '选择项目图片'},
+                ...assetOptions,
             ]}
             onValueChange={value => {
-                if (value === 'custom') return
-                void onChange({kind: 'background-image', value: String(value)}, {immediate: true})
+                if (value === 'unselected') return
+                void onImageChange({kind: 'background-image', value: String(value)}, {immediate: true})
             }}
-        />
-    </PropertyShell>
+        />}
+        {customImage && <p className="page-document-property__message">
+            自定义背景源码会原样保留；选择纯色、渐变或项目图片后才由控件接管。
+        </p>}
+        {mode !== 'solid' && imageField.localValue !== null && <Button
+            aria-label="清除"
+            className="page-document-property__clear"
+            disabled={imageField.disabled}
+            size="sm"
+            title={imageField.clearTitle}
+            variant="ghost"
+            onClick={() => void onImageChange({kind: 'clear-override'}, {immediate: true})}
+        >清除</Button>}
+        {(mode === 'solid' ? colorField.reason : imageField.reason) && <p className="page-document-property__message">
+            {mode === 'solid' ? colorField.reason : imageField.reason}
+        </p>}
+    </section>
 }
 
 export function BoxShadowPropertyControl({field, onChange}: {field: VisualPropertyState; onChange: ChangeProperty}) {

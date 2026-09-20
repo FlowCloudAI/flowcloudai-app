@@ -33,7 +33,7 @@ import {BoxSpacingControls} from './BoxSpacingControls.tsx'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
 import {
-    BackgroundImagePropertyControl,
+    BackgroundPropertyControl,
     BoxShadowPropertyControl,
     DimensionPropertyControl,
     KeywordPropertyControl,
@@ -503,8 +503,13 @@ export function PageDocumentPropertiesPanel({
                                 applyKernelEntry={applyKernelEntry}
                             />
                             <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
-                            <ColorPropertyControl field={fieldFor(fields, 'background-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}/>
-                            <BackgroundImagePropertyControl assets={assets} field={fieldFor(fields, 'background-image')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}/>
+                            <BackgroundPropertyControl
+                                assets={assets}
+                                colorField={fieldFor(fields, 'background-color')}
+                                imageField={fieldFor(fields, 'background-image')}
+                                onColorChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}
+                                onImageChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}
+                            />
                             <NumericPropertyControl field={fieldFor(fields, 'border-width')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-width'), value, options)}/>
                             <KeywordPropertyControl field={fieldFor(fields, 'border-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-style'), value, options)}/>
                             <ColorPropertyControl field={fieldFor(fields, 'border-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-color'), value, options)}/>

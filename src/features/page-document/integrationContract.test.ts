@@ -167,6 +167,35 @@ describe('page document editor integration boundary', () => {
         assert.match(panel, /\(\) => \(\) => flushPendingChanges\(\)/u)
     })
 
+    it('颜色色块通过通用 portal 浮层展开且背景类型收在同一卡片', () => {
+        const color = readFileSync(
+            join(currentDirectory, 'components/properties/ColorPropertyControl.tsx'),
+            'utf8',
+        )
+        const overlay = readFileSync(
+            join(repositoryRoot, 'src/shared/ui/overlay/Overlay.tsx'),
+            'utf8',
+        )
+        const structured = readFileSync(
+            join(currentDirectory, 'components/properties/StructuredPropertyControls.tsx'),
+            'utf8',
+        )
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+
+        assert.match(color, /<FloatingPanel[\s\S]*passive[\s\S]*page-document-color-popover/u)
+        assert.match(overlay, /createPortal\([\s\S]*document\.body/u)
+        assert.doesNotMatch(color, /type="color"/u)
+        assert.match(color, /\{fallbackLabel\}<\/Button>[\s\S]*<strong>主题色<\/strong>/u)
+        assert.match(color, /色相[\s\S]*饱和度[\s\S]*十六进制[\s\S]*透明度/u)
+        assert.match(structured, /function BackgroundPropertyControl[\s\S]*\['solid', '纯色'\][\s\S]*\['gradient', '渐变'\][\s\S]*\['image', '图片'\]/u)
+        assert.match(structured, /serializeControlledBackgroundGradient/u)
+        assert.match(panel, /<BackgroundPropertyControl[\s\S]*colorField=.*background-color[\s\S]*imageField=.*background-image/u)
+        assert.doesNotMatch(panel, /<BackgroundImagePropertyControl/u)
+    })
+
     it('可视画布只由外层舞台滚动且未达页宽上限时不留内边距', () => {
         const editorCss = readFileSync(
             join(currentDirectory, 'components/PageDocumentEditor.css'),
