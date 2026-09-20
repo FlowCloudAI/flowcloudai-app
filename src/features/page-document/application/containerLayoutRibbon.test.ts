@@ -13,7 +13,7 @@ import {
 const NODE_ID = '11111111-1111-4111-8111-111111111111'
 
 test('容器间距功能区发出受管 gap intent', () => {
-    const request = createContainerGapRequest(NODE_ID, '1rem')
+    const request = createContainerGapRequest(NODE_ID, '1rem', 'mobile')
     const handle: ComponentHandle = {
         handleId: 'handle:container-layout' as ComponentHandle['handleId'],
         nodeId: NODE_ID as ComponentHandle['nodeId'],
@@ -39,10 +39,10 @@ test('容器布局功能区通过绑定入口发出有限布局属性 intents', 
     }
     const bindings = new Map([[NODE_ID, handle]])
     const cases = [
-        [createContainerLayoutRequest(NODE_ID, 'grid'), 'display', 'grid'],
-        [createContainerColumnsRequest(NODE_ID, 'two'), 'grid-template-columns', 'repeat(2, minmax(0, 1fr))'],
-        [createContainerAlignRequest(NODE_ID, 'center'), 'align-items', 'center'],
-        [createContainerJustifyRequest(NODE_ID, 'space-between'), 'justify-content', 'space-between'],
+        [createContainerLayoutRequest(NODE_ID, 'grid', 'desktop'), 'display', 'grid'],
+        [createContainerColumnsRequest(NODE_ID, 'two', 'desktop'), 'grid-template-columns', 'repeat(2, minmax(0, 1fr))'],
+        [createContainerAlignRequest(NODE_ID, 'center', 'desktop'), 'align-items', 'center'],
+        [createContainerJustifyRequest(NODE_ID, 'space-between', 'desktop'), 'justify-content', 'space-between'],
     ] as const
     for (const [request, property, value] of cases) {
         const intent = request.createIntents(bindings)[0]

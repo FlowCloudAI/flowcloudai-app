@@ -20,10 +20,14 @@ export const RESPONSIVE_EDIT_SCOPE_NOTES: Readonly<Record<ResponsiveViewportCont
     mobile: '基础声明，在所有宽度下生效。', desktop: '宽度 768 像素及以上；清除后继承移动设置。',
 }
 
-export function createPageLayoutPaddingRequest(nodeId: string, rem: number): KernelDraftEditRequest {
+export function createPageLayoutPaddingRequest(
+    nodeId: string,
+    rem: number,
+    context: ResponsiveViewportContext,
+): KernelDraftEditRequest {
     if (!Number.isFinite(rem) || rem < 0) throw new TypeError('页面内距必须是非负有限数。')
     const numberText = Number(rem.toFixed(4)).toString()
     return createRibbonPropertyRequest(nodeId, 'padding-block-start', {
         kind: 'numeric', value: rem, unit: 'rem', numberText,
-    })
+    }, context)
 }

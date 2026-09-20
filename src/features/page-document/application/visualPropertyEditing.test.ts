@@ -11,7 +11,10 @@ import {
     undoEntryDraft,
     type DocumentDraftModel,
 } from './documentDraftModel.ts'
-import {createDocumentKernelDraftRuntime} from './documentKernelDraftRuntime.ts'
+import {
+    createDocumentKernelDraftRuntime,
+    type KernelComponentInspectionRequest,
+} from './documentKernelDraftRuntime.ts'
 import {createLiveVisualCommitScheduler} from './liveVisualCommitScheduler.ts'
 import {
     createVisualPropertyEditRequest,
@@ -288,6 +291,27 @@ describe('visual property editing', () => {
             'opacity' as 'color',
             {kind: 'color', value: '#112233', opacity: 100},
         ), /只开放/u)
+    })
+
+    it('交互态属性检查只读取三项颜色且不执行视口回退检查', () => {
+        const source = snapshot()
+        const model = createDocumentDraft(source)
+        const runtime = createDocumentKernelDraftRuntime()
+        const requests: KernelComponentInspectionRequest[] = []
+        const states = inspectVisualProperties(
+            paragraph(model),
+            request => {
+                requests.push(request)
+                return runtime.inspectComponent(model, source, request)
+            },
+            source.styleCss,
+            'hover',
+            ['color', 'background-color', 'border-color'],
+        )
+
+        assert.equal(requests.length, 1)
+        assert.deepEqual(requests[0]?.properties, ['color', 'background-color', 'border-color'])
+        assert.deepEqual(states.map(state => state.property), ['color', 'background-color', 'border-color'])
     })
 
     it('结构化属性值只序列化白名单形式并拒绝伪造结构', () => {

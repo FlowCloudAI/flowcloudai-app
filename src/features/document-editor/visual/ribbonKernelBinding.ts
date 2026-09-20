@@ -51,7 +51,7 @@ export function createRibbonPropertyRequest(
     nodeId: string,
     property: VisualPropertyName,
     value: VisualPropertyEditValue,
-    styleContext: 'mobile' | 'desktop' = 'mobile',
+    styleContext: 'mobile' | 'desktop',
 ): KernelDraftEditRequest {
     return createVisualPropertyEditRequest(nodeId, [{property, value}], {styleContext})
 }

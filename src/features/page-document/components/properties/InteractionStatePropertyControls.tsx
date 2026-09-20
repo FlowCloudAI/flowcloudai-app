@@ -33,8 +33,7 @@ export function InteractionStatePropertyControls({
 }) {
     const [context, setContext] = useState<InteractionContext>('hover')
     const fields = useMemo(
-        () => inspectVisualProperties(node, inspectComponent, entryStyleCss, context)
-            .filter(field => COLOR_PROPERTIES.includes(field.property as typeof COLOR_PROPERTIES[number])),
+        () => inspectVisualProperties(node, inspectComponent, entryStyleCss, context, COLOR_PROPERTIES),
         [context, entryStyleCss, inspectComponent, node],
     )
     const applicable = fields.filter(field => !field.disabled)

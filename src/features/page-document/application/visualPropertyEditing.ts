@@ -267,24 +267,33 @@ export function inspectVisualProperties(
     inspect: InspectVisualComponent,
     entryStyleCss = '',
     styleContext: VisualStyleContext = 'mobile',
+    requestedProperties: readonly VisualPropertyName[] = VISUAL_PROPERTY_FIELDS.map(field => field.property),
 ): readonly VisualPropertyState[] {
-    const properties = [...new Set([...VISUAL_PROPERTY_FIELDS.map(field => field.property), 'display'])]
+    const fields = VISUAL_PROPERTY_FIELDS.filter(field => requestedProperties.includes(field.property))
+    const needsDisplay = fields.some(field => ['gap', 'row-gap', 'column-gap'].includes(field.property))
+    const properties = [...new Set([
+        ...fields.map(field => field.property),
+        ...(needsDisplay ? ['display' as const] : []),
+    ])]
     const result = inspect({nodeId: node.id, properties, context: readContextFor(styleContext)})
+    const needsViewportFallback = styleContext === 'mobile' || styleContext === 'desktop'
     const fallbackStyleContext = styleContext === 'desktop' ? 'mobile' : 'desktop'
-    const fallbackResult = inspect({
-        nodeId: node.id,
-        properties,
-        context: readContextFor(fallbackStyleContext),
-    })
+    const fallbackResult = needsViewportFallback
+        ? inspect({
+            nodeId: node.id,
+            properties,
+            context: readContextFor(fallbackStyleContext),
+        })
+        : null
     const inspections = result.status === 'ready' ? result.inspection.properties : {}
     const fallbackInspections =
-        fallbackResult.status === 'ready' ? fallbackResult.inspection.properties : {}
+        fallbackResult?.status === 'ready' ? fallbackResult.inspection.properties : {}
     const display = effectiveValue(inspections.display)
     const otherViewportProperties = ['mobile', 'desktop'].includes(styleContext)
         ? managedOtherViewportProperties(node, entryStyleCss, styleContext)
         : new Set<string>()
     return Object.freeze(
-        VISUAL_PROPERTY_FIELDS.map(field =>
+        fields.map(field =>
             fieldState(
                 node,
                 field,

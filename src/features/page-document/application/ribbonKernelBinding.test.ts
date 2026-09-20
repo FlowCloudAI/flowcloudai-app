@@ -31,7 +31,7 @@ test('工具栏字号绑定发出受管 font-size 属性 intent', () => {
         value: 20,
         unit: 'px',
         numberText: '20',
-    })
+    }, 'mobile')
     const intent = request.createIntents(new Map([[NODE_ID, handle()]]))
     assert.equal(request.nodeIds[0], NODE_ID)
     assert.equal(intent[0]?.kind, 'edit-property')
@@ -40,8 +40,8 @@ test('工具栏字号绑定发出受管 font-size 属性 intent', () => {
 })
 
 test('工具栏加粗与对齐分别绑定受限字重和 text-align intent', () => {
-    const weight = createRibbonPropertyRequest(NODE_ID, 'font-weight', {kind: 'font-weight', value: '700'})
-    const alignment = createRibbonPropertyRequest(NODE_ID, 'text-align', {kind: 'choice', value: 'center'})
+    const weight = createRibbonPropertyRequest(NODE_ID, 'font-weight', {kind: 'font-weight', value: '700'}, 'mobile')
+    const alignment = createRibbonPropertyRequest(NODE_ID, 'text-align', {kind: 'choice', value: 'center'}, 'mobile')
     const bindings = new Map([[NODE_ID, handle()]])
     const weightIntent = weight.createIntents(bindings)
     const alignmentIntent = alignment.createIntents(bindings)

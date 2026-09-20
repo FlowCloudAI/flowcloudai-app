@@ -1,5 +1,6 @@
 // 本测试从页面页签的真实请求构造入口检查布局写回内容。
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import test from 'node:test'
 import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
 import {createPageLayoutPaddingRequest} from '../../document-editor/visual/pageAndViewRibbonModel.ts'
@@ -7,7 +8,7 @@ import {createPageLayoutPaddingRequest} from '../../document-editor/visual/pageA
 const NODE_ID = '11111111-1111-4111-8111-111111111111'
 
 test('页面布局页签的内距命令发出受管 padding-block-start intent', () => {
-    const request = createPageLayoutPaddingRequest(NODE_ID, 1)
+    const request = createPageLayoutPaddingRequest(NODE_ID, 1, 'desktop')
     const handle: ComponentHandle = {
         handleId: 'handle:page-layout' as ComponentHandle['handleId'],
         nodeId: NODE_ID as ComponentHandle['nodeId'],
@@ -20,4 +21,10 @@ test('页面布局页签的内距命令发出受管 padding-block-start intent',
     assert.equal(intent?.kind, 'edit-property')
     assert.equal(intent?.property, 'padding-block-start')
     assert.deepEqual(intent?.action, {kind: 'set-value', value: '1rem'})
+    assert.deepEqual(intent?.destination, {scope: 'entry', channel: {kind: 'conditional-rule', context: 'desktop'}})
+})
+
+test('页面编辑器默认从移动基础档开始', () => {
+    const editor = readFileSync(new URL('../components/PageDocumentEditor.tsx', import.meta.url), 'utf8')
+    assert.match(editor, /useState<ResponsiveViewportContext>\('mobile'\)/u)
 })

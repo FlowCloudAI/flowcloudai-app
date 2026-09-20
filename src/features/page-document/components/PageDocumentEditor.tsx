@@ -184,7 +184,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [ribbonCollapsed, setRibbonCollapsed] = useState(false)
     const [pageScope, setPageScope] = useState<DocumentQuickScope>('entry')
     const [previewWidth, setPreviewWidth] = useState<LayoutPreviewViewportMode>('auto')
-    const [editContext, setEditContext] = useState<ResponsiveViewportContext>('desktop')
+    const [editContext, setEditContext] = useState<ResponsiveViewportContext>('mobile')
     const [outlineVisible, setOutlineVisible] = useState(true)
     const [layoutGuidesVisible, setLayoutGuidesVisible] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -831,6 +831,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                         ) : visibleRibbonTab === 'page' ? (
                             <PageRibbonControls
                                 scope={pageScope}
+                                editContext={editContext}
                                 onScopeChange={setPageScope}
                                 onOpenTheme={() => openPropertyDetails('appearance', 'appearance')}
                                 onOpenPageLayout={() => openPropertyDetails('layout', 'responsive-layout')}

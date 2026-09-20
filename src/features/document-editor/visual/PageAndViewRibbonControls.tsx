@@ -145,8 +145,9 @@ function ProjectThemeTaskPane({
     )
 }
 
-export function PageRibbonControls({scope, onScopeChange, onOpenTheme, onOpenPageLayout, nodeId, onApplyLayout, sourceVersion, inspectThemeTokens, applyThemeToken}: {
+export function PageRibbonControls({scope, editContext, onScopeChange, onOpenTheme, onOpenPageLayout, nodeId, onApplyLayout, sourceVersion, inspectThemeTokens, applyThemeToken}: {
     scope: DocumentQuickScope
+    editContext: ResponsiveViewportContext
     onScopeChange: (scope: DocumentQuickScope) => void
     onOpenTheme: (scope: DocumentQuickScope) => void
     onOpenPageLayout: () => void
@@ -188,7 +189,7 @@ export function PageRibbonControls({scope, onScopeChange, onOpenTheme, onOpenPag
                 label="页面内距"
                 onClick={() => {
                     if (nodeId && onApplyLayout) {
-                        onApplyLayout(createPageLayoutPaddingRequest(nodeId, 1), '设置页面上内距')
+                        onApplyLayout(createPageLayoutPaddingRequest(nodeId, 1, editContext), '设置页面上内距')
                     } else onOpenPageLayout()
                 }}
                 title="写入当前节点的页面上内距"

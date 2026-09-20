@@ -7,7 +7,7 @@ export type ContainerColumnPreset = 'unset' | 'one' | 'two' | 'three'
 export type ContainerAlignPreset = 'unset' | 'stretch' | 'start' | 'center' | 'end'
 export type ContainerJustifyPreset = 'unset' | 'start' | 'center' | 'end' | 'space-between'
 
-export function createContainerGapRequest(nodeId: string, value: 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem', context: 'mobile' | 'desktop' = 'mobile'): KernelDraftEditRequest {
+export function createContainerGapRequest(nodeId: string, value: 'unset' | '0px' | '0.5rem' | '1rem' | '1.5rem', context: 'mobile' | 'desktop'): KernelDraftEditRequest {
     if (value === 'unset') return createRibbonPropertyRequest(nodeId, 'gap', {kind: 'clear-override'}, context)
     const unit = value.endsWith('rem') ? 'rem' : 'px'
     return createRibbonPropertyRequest(nodeId, 'gap', {
@@ -18,7 +18,7 @@ export function createContainerGapRequest(nodeId: string, value: 'unset' | '0px'
 export function createContainerLayoutRequest(
     nodeId: string,
     value: ContainerLayoutMode,
-    context: 'mobile' | 'desktop' = 'mobile',
+    context: 'mobile' | 'desktop',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
@@ -31,7 +31,7 @@ export function createContainerLayoutRequest(
 export function createContainerColumnsRequest(
     nodeId: string,
     value: ContainerColumnPreset,
-    context: 'mobile' | 'desktop' = 'mobile',
+    context: 'mobile' | 'desktop',
 ): KernelDraftEditRequest {
     const columns =
         value === 'one'
@@ -52,7 +52,7 @@ export function createContainerColumnsRequest(
 export function createContainerAlignRequest(
     nodeId: string,
     value: ContainerAlignPreset,
-    context: 'mobile' | 'desktop' = 'mobile',
+    context: 'mobile' | 'desktop',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
@@ -65,7 +65,7 @@ export function createContainerAlignRequest(
 export function createContainerJustifyRequest(
     nodeId: string,
     value: ContainerJustifyPreset,
-    context: 'mobile' | 'desktop' = 'mobile',
+    context: 'mobile' | 'desktop',
 ): KernelDraftEditRequest {
     return createRibbonPropertyRequest(
         nodeId,
