@@ -46,3 +46,25 @@ test('页面编辑工作条挂入词条常驻顶栏且不再占用第二行', ()
     assert.match(viewControls, /label="预览草稿"/u)
     assert.doesNotMatch(projectEditor, /key: `entry-\$\{activeEntryId\}`/u)
 })
+
+test('页面功能区允许 Select 菜单浮在画布上方', () => {
+    const css = readFileSync(new URL('../document-editor/visual/DocumentOfficeRibbon.css', import.meta.url), 'utf8')
+    const stylesheet = postcss.parse(css)
+    const ribbon = stylesheet.nodes.find(node => node.type === 'rule'
+        && node.selector === '.document-office-ribbon')
+    const panel = stylesheet.nodes.find(node => node.type === 'rule'
+        && node.selector === '.document-ribbon-panel')
+
+    assert.ok(ribbon && ribbon.type === 'rule')
+    assert.ok(panel && panel.type === 'rule')
+    assert.ok(ribbon.nodes.some(node => node.type === 'decl'
+        && node.prop === 'position' && node.value === 'relative'))
+    assert.ok(ribbon.nodes.some(node => node.type === 'decl'
+        && node.prop === 'z-index' && node.value === 'var(--fc-z-dropdown)'))
+    assert.ok(ribbon.nodes.some(node => node.type === 'decl'
+        && node.prop === 'overflow' && node.value === 'visible'))
+    assert.ok(panel.nodes.some(node => node.type === 'decl'
+        && node.prop === 'overflow' && node.value === 'visible'))
+    assert.equal(panel.nodes.some(node => node.type === 'decl'
+        && node.prop === 'overflow-x' && node.value !== 'visible'), false)
+})

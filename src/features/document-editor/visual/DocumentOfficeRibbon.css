@@ -3,7 +3,10 @@
 .document-office-ribbon {
     --document-ribbon-control-height: var(--fc-control-height-xs);
     --document-ribbon-group-body-height: calc(var(--document-ribbon-control-height) * 2 + var(--fc-space-xs));
+    position: relative;
+    z-index: var(--fc-z-dropdown);
     min-width: 0;
+    overflow: visible;
     border-bottom: 1px solid var(--fc-color-border-light);
     background: var(--fc-color-bg-elevated);
     font-size: var(--fc-font-size-xs);
@@ -86,7 +89,8 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fc-space-xs) var(--fc-space-sm) 0;
-    overflow-x: auto;
+    /* Select 菜单属于浮层；横向裁切会连带把纵向溢出计算为 auto，导致菜单被功能区高度截断。 */
+    overflow: visible;
 }
 
 .document-ribbon-group {
