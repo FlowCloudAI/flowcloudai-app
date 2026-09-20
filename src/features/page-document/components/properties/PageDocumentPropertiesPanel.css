@@ -558,6 +558,12 @@
     gap: var(--fc-space-xs);
 }
 
+.page-document-property__modes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fc-space-xs);
+}
+
 .page-document-background-property__gradient {
     display: grid;
     gap: var(--fc-space-sm);

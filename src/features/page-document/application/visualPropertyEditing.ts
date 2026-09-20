@@ -40,6 +40,9 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'justify-content', label: '横向分布', group: 'layout'},
     {property: 'align-self', label: '子项纵向对齐', group: 'layout'},
     {property: 'justify-self', label: '子项横向对齐', group: 'layout'},
+    {property: 'flex-basis', label: '基准宽度', group: 'layout'},
+    {property: 'flex-grow', label: '剩余空间占比', group: 'layout'},
+    {property: 'flex-shrink', label: '空间不足收缩', group: 'layout'},
     {property: 'margin-block-start', label: '外距上', group: 'layout'},
     {property: 'margin-block-end', label: '外距下', group: 'layout'},
     {property: 'margin-inline-start', label: '外距左', group: 'layout'},
@@ -465,6 +468,7 @@ const VISUAL_KEYWORD_VALUES = Object.freeze({
     'list-style-position': ['inside', 'outside'],
     'align-self': ['auto', 'stretch', 'start', 'center', 'end'],
     'justify-self': ['auto', 'stretch', 'start', 'center', 'end'],
+    'flex-basis': ['auto', 'content', '0%', '25%', '33.333%', '50%', '66.667%', '75%', '100%'],
 } as const satisfies Partial<Record<VisualPropertyName, readonly string[]>>)
 
 export type VisualKeywordPropertyName = keyof typeof VISUAL_KEYWORD_VALUES
@@ -570,6 +574,7 @@ function serializeShadow(layers: readonly VisualShadowLayer[]): string {
 
 function allowedNumericUnits(property: VisualPropertyName): readonly VisualNumericUnit[] {
     if (property === 'line-height') return ['']
+    if (property === 'flex-grow' || property === 'flex-shrink') return ['']
     if (property === 'font-size') return ['px', 'rem', 'em', '%']
     if (
         property.startsWith('margin-') ||

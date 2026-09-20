@@ -50,4 +50,15 @@ describe('页面属性数值模型', () => {
         assert.equal(numericSliderDisplayValue(range, 144), 96)
         assert.equal(numericSliderDisplayValue(range, -4), 6)
     })
+
+    it('Flex 子项占比与收缩使用非负无单位数值', () => {
+        const grow = numericPropertyDefinition('flex-grow')
+        const shrink = numericPropertyDefinition('flex-shrink')
+        assert.ok(grow)
+        assert.ok(shrink)
+        assert.deepEqual(grow.defaultValue, {kind: 'numeric', value: 0, unit: '', numberText: '0'})
+        assert.deepEqual(shrink.defaultValue, {kind: 'numeric', value: 1, unit: '', numberText: '1'})
+        assert.equal(grow.minimum, 0)
+        assert.deepEqual(grow.units, [''])
+    })
 })

@@ -403,6 +403,9 @@ describe('visual property editing', () => {
             ['float', {kind: 'keyword', value: 'inline-start'}, 'inline-start'],
             ['list-style-type', {kind: 'keyword', value: 'decimal'}, 'decimal'],
             ['list-style-position', {kind: 'keyword', value: 'inside'}, 'inside'],
+            ['flex-basis', {kind: 'keyword', value: '50%'}, '50%'],
+            ['flex-grow', {kind: 'numeric', value: 2, unit: '', numberText: '2'}, '2'],
+            ['flex-shrink', {kind: 'numeric', value: 0.5, unit: '', numberText: '0.5'}, '0.5'],
         ] as const satisfies readonly [VisualPropertyName, VisualPropertyEditValue, string][]
         for (const [property, value, expected] of cases) {
             const request = createVisualPropertyEditRequest(
@@ -421,6 +424,7 @@ describe('visual property editing', () => {
         assert.throws(() => serializeVisualPropertyValue('border-radius', {kind: 'box-shadow', layers: []}), /阴影结构/u)
         assert.throws(() => serializeVisualPropertyValue('opacity', {kind: 'numeric', value: 2, unit: '', numberText: '2'}), /0–1/u)
         assert.throws(() => serializeVisualPropertyValue('rotate', {kind: 'numeric', value: 2, unit: 'px', numberText: '2'}), /单位/u)
+        assert.throws(() => serializeVisualPropertyValue('flex-grow', {kind: 'numeric', value: -1, unit: '', numberText: '-1'}), /负数/u)
     })
 
     it('半透明标准色与主题色写回后仍能由调节控件精确回读', () => {

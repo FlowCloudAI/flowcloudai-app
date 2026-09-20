@@ -217,7 +217,7 @@ describe('page document editor integration boundary', () => {
         )
         assert.match(panel, /<details className="page-document-image-details__description">\s*<summary>替代文本与图注<\/summary>/u)
         assert.doesNotMatch(panel, /<details[^>]*\sopen(?:=|\s|>)/u)
-        assert.match(panel, /\['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'\]/u)
+        assert.match(panel, /<WidthPropertyControl[\s\S]*\['height', 'min-width', 'max-width', 'min-height', 'max-height'\]/u)
         assert.match(panel, /node\.kind === 'asset'[\s\S]*\['object-fit', 'object-position'\]/u)
     })
 
@@ -290,5 +290,31 @@ describe('page document editor integration boundary', () => {
         assert.match(ribbonCss, /\.document-ribbon-command\.is-icon-only > span/u)
         assert.doesNotMatch(home, /document-ribbon-control-status/u)
         assert.match(panel, /!fixedRoot && <NumericPropertyControl field=\{fieldFor\(fields, 'rotate'\)\}/u)
+    })
+
+    it('Flex 子项、统一宽度模式与插入位置只在适用时呈现', () => {
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        const structured = readFileSync(
+            join(currentDirectory, 'components/properties/StructuredPropertyControls.tsx'),
+            'utf8',
+        )
+        const insertion = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/BuiltInStructureRibbonControls.tsx'),
+            'utf8',
+        )
+        const editor = readFileSync(
+            join(currentDirectory, 'components/PageDocumentEditor.tsx'),
+            'utf8',
+        )
+
+        assert.match(panel, /const flexParent = \/\^\(\?:inline-\)\?flex\$\/u\.test\(parentDisplay\)/u)
+        assert.match(panel, /\{flexParent && <PropertyDisclosure[\s\S]*Flex 子项[\s\S]*flex-basis[\s\S]*flex-grow[\s\S]*flex-shrink/u)
+        assert.match(structured, /aria-label="宽度模式"[\s\S]*>自动<[\s\S]*>设置宽度<[\s\S]*WIDTH_PRESETS/u)
+        assert.match(structured, /\[25, 50, 75, 100\]/u)
+        assert.match(insertion, /\{showInside && <DocumentRibbonCommand[\s\S]*label="容器内"/u)
+        assert.match(editor, /showInside=\{Boolean\(insertionTargets\?\.inside\)\}/u)
     })
 })

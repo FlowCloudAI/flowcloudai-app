@@ -855,6 +855,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                             <>
                                 <InsertionPlacementRibbonControls
                                     placement={effectiveInsertionPlacement}
+                                    showInside={Boolean(insertionTargets?.inside)}
                                     insideDisabledReason={insertionTargets?.inside
                                         ? null
                                         : '只有受管容器可以接收内部内容；普通节点请使用“容器后”。'}

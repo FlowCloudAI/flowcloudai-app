@@ -13,6 +13,7 @@ import {
 } from '../../application/visualPropertyEditing.ts'
 import type {PropertyChangeOptions} from './NumericPropertyControl.tsx'
 import {NumericPropertyControl} from './NumericPropertyControl.tsx'
+import {numericPropertyDefinition, readNumericPropertyEditorValue} from './numericPropertyModel.ts'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {
     BACKGROUND_GRADIENT_ANGLES,
@@ -114,6 +115,68 @@ export function DimensionPropertyControl({field, onChange}: {field: VisualProper
         <KeywordPropertyControl field={field} onChange={onChange}/>
         <NumericPropertyControl compact field={field} onChange={onChange}/>
     </div>
+}
+
+const WIDTH_PRESETS = [25, 50, 75, 100].map(value => ({
+    label: `${value}%`,
+    value,
+    unit: '%' as const,
+}))
+
+/** 宽度只呈现“自动 / 设置宽度”两种作者模式；复杂源码在作者主动接管前逐字保留。 */
+export function WidthPropertyControl({field, onChange}: {field: VisualPropertyState; onChange: ChangeProperty}) {
+    if (field.property !== 'width') throw new TypeError('宽度控件只能编辑 width。')
+    const definition = numericPropertyDefinition('width')
+    if (!definition) throw new TypeError('宽度缺少数值控件定义。')
+    const raw = (field.localValue ?? field.value).trim()
+    const parsed = readNumericPropertyEditorValue(raw, definition)
+    const mode = field.sourceState === 'mixed'
+        ? 'custom'
+        : raw === 'auto'
+          ? 'auto'
+          : parsed.kind === 'numeric'
+            ? 'numeric'
+            : 'custom'
+    const chooseNumeric = () => void onChange(
+        {kind: 'numeric', value: 100, unit: '%', numberText: '100'},
+        {immediate: true},
+    )
+    return <PropertyShell field={field} onChange={onChange}>
+        <div className="page-document-property__modes" role="group" aria-label="宽度模式">
+            <Button
+                aria-pressed={mode === 'auto'}
+                disabled={field.disabled}
+                size="sm"
+                variant={mode === 'auto' ? 'primary' : 'outline'}
+                onClick={() => void onChange({kind: 'keyword', value: 'auto'}, {immediate: true})}
+            >自动</Button>
+            <Button
+                aria-pressed={mode === 'numeric'}
+                disabled={field.disabled}
+                size="sm"
+                variant={mode === 'numeric' ? 'primary' : 'outline'}
+                onClick={chooseNumeric}
+            >设置宽度</Button>
+        </div>
+        {mode === 'custom' && raw && <div className="page-document-property__custom" role="status">
+            <strong>{field.sourceState === 'mixed' ? '当前范围包含多种宽度' : '复杂宽度源码'}</strong>
+            {field.sourceState !== 'mixed' && <code>{raw}</code>}
+            <span>当前源码会原样保留；选择模式后才由控件接管。</span>
+        </div>}
+        {mode === 'numeric' && <NumericPropertyControl
+            compact
+            embedded
+            field={field}
+            presets={WIDTH_PRESETS}
+            onChange={onChange}
+        />}
+        {mode === 'auto' && field.sourceState === 'other-viewport' && field.localValue === null && <Button
+            size="sm"
+            variant="outline"
+            disabled={field.disabled}
+            onClick={() => void onChange({kind: 'keyword', value: 'auto'}, {immediate: true})}
+        >在本档覆盖</Button>}
+    </PropertyShell>
 }
 
 type BackgroundMode = 'solid' | 'gradient' | 'image'

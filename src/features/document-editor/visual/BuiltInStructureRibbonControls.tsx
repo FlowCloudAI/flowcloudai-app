@@ -16,29 +16,31 @@ const COMMANDS = Object.freeze([
 
 export function InsertionPlacementRibbonControls({
     placement,
+    showInside,
     insideDisabledReason,
     afterDisabledReason,
     onChange,
 }: {
     readonly placement: PageDocumentInsertionPlacement
+    readonly showInside: boolean
     readonly insideDisabledReason: string | null
     readonly afterDisabledReason: string | null
     readonly onChange: (placement: PageDocumentInsertionPlacement) => void
 }) {
     return <DocumentRibbonGroup label="插入位置" priority="essential">
-        <DocumentRibbonCommand
+        {showInside && <DocumentRibbonCommand
             active={placement === 'inside'}
             disabled={Boolean(insideDisabledReason)}
             icon={Box}
             label="容器内"
             onClick={() => onChange('inside')}
             title={insideDisabledReason ?? '插入到所选容器末尾'}
-        />
+        />}
         <DocumentRibbonCommand
             active={placement === 'after'}
             disabled={Boolean(afterDisabledReason)}
             icon={ArrowDownToLine}
-            label="容器后"
+            label={showInside ? '容器后' : '之后'}
             onClick={() => onChange('after')}
             title={afterDisabledReason ?? '插入到所选节点之后'}
         />

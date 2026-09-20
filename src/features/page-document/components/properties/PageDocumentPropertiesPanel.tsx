@@ -37,6 +37,7 @@ import {
     BoxShadowPropertyControl,
     DimensionPropertyControl,
     KeywordPropertyControl,
+    WidthPropertyControl,
 } from './StructuredPropertyControls.tsx'
 import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
@@ -249,6 +250,7 @@ const LAYOUT_STRUCTURE_PROPERTIES = [
     'align-self',
     'justify-self',
 ] as const
+const FLEX_ITEM_PROPERTIES = ['flex-basis', 'flex-grow', 'flex-shrink'] as const
 const LAYOUT_SPACING_PROPERTIES = [
     'margin-block-start',
     'margin-block-end',
@@ -377,6 +379,16 @@ export function PageDocumentPropertiesPanel({
         () => node ? inspectVisualProperties(node, inspectComponent, entryStyleCss, styleContext) : [],
         [entryStyleCss, inspectComponent, node, styleContext],
     )
+    const parentDisplay = useMemo(() => gridParent
+        ? inspectVisualProperties(
+            gridParent,
+            inspectComponent,
+            entryStyleCss,
+            styleContext,
+            ['display'],
+        )[0]?.value.trim().toLowerCase() ?? ''
+        : '', [entryStyleCss, gridParent, inspectComponent, styleContext])
+    const flexParent = /^(?:inline-)?flex$/u.test(parentDisplay)
     const adoptKind = node ? inferOpaqueAdoptionKind(node) : null
     const image = useMemo(() => node?.managed && node.kind === 'asset'
         ? readManagedImageDescription(articleHtml, node.id, assets.map(asset => asset.id))
@@ -525,6 +537,20 @@ export function PageDocumentPropertiesPanel({
                                     onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
                                 /> : null)}
                             </PropertyDisclosure>
+                            {flexParent && <PropertyDisclosure key={`${node.id}:flex-item`} title="Flex 子项" fields={fields} properties={FLEX_ITEM_PROPERTIES}>
+                                <KeywordPropertyControl
+                                    field={fieldFor(fields, 'flex-basis')}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, 'flex-basis'), value, options)}
+                                />
+                                <NumericPropertyControl
+                                    field={fieldFor(fields, 'flex-grow')}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, 'flex-grow'), value, options)}
+                                />
+                                <NumericPropertyControl
+                                    field={fieldFor(fields, 'flex-shrink')}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, 'flex-shrink'), value, options)}
+                                />
+                            </PropertyDisclosure>}
                             <PropertyDisclosure key={`${node.id}:layout-spacing`} title="间距" fields={fields} properties={LAYOUT_SPACING_PROPERTIES}>
                                 <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
                                 <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
@@ -537,7 +563,11 @@ export function PageDocumentPropertiesPanel({
                                 </div>
                             </PropertyDisclosure>
                             <PropertyDisclosure key={`${node.id}:layout-size`} title="尺寸与环绕" fields={fields} properties={LAYOUT_SIZE_PROPERTIES}>
-                                {(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
+                                <WidthPropertyControl
+                                    field={fieldFor(fields, 'width')}
+                                    onChange={(value, options) => applyOne(fieldFor(fields, 'width'), value, options)}
+                                />
+                                {(['height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
                                     key={property}
                                     field={fieldFor(fields, property)}
                                     onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}

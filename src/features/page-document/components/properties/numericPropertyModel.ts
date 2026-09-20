@@ -122,6 +122,21 @@ export function numericPropertyDefinition(property: VisualPropertyName): Numeric
             sliderRange: () => ({minimum: 0.5, maximum: 8, step: 0.1}),
         }
     }
+    if (property === 'flex-grow' || property === 'flex-shrink') {
+        return {
+            property,
+            units: [''],
+            defaultValue: {
+                kind: 'numeric',
+                value: property === 'flex-grow' ? 0 : 1,
+                unit: '',
+                numberText: property === 'flex-grow' ? '0' : '1',
+            },
+            presets: [],
+            minimum: 0,
+            sliderRange: () => ({minimum: 0, maximum: 5, step: 0.1}),
+        }
+    }
     if (property === 'opacity') {
         return {
             property,
