@@ -131,6 +131,14 @@
     gap: var(--fc-space-xs);
 }
 
+.page-document-property-composite {
+    display: grid;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
+}
+
 .page-document-property + .page-document-property,
 .page-document-spacing-group + .page-document-spacing-group,
 .page-document-spacing-group + .page-document-property {

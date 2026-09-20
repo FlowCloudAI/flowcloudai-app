@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
 import type {EntrySourceSnapshot} from '../domain/contract.ts'
 import {createLayerProjection} from '../domain/layerProjection.ts'
+import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
 import {
     createDocumentDraft,
     redoEntryDraft,
@@ -18,6 +19,7 @@ import {
     parseSerializedVisualColor,
     serializeVisualPropertyValue,
     type VisualPropertyChange,
+    type VisualPropertyEditValue,
     type VisualPropertyName,
 } from './visualPropertyEditing.ts'
 
@@ -233,6 +235,63 @@ describe('visual property editing', () => {
         assert.throws(() => serializeVisualPropertyValue('grid-template-columns', {kind: 'grid-columns', value: 'repeat(9, 1fr)' as never}), /分栏/u)
         assert.throws(() => serializeVisualPropertyValue('align-items', {kind: 'align-items', value: 'space-around' as never}), /纵向/u)
         assert.throws(() => serializeVisualPropertyValue('justify-content', {kind: 'justify-content', value: 'unsafe' as never}), /横向/u)
+    })
+
+    it('扩展属性经属性面板绑定生成受管 intents，并拒绝值结构错配', () => {
+        const handle: ComponentHandle = {
+            handleId: 'handle:extended-properties' as ComponentHandle['handleId'],
+            nodeId: PARAGRAPH_ID as ComponentHandle['nodeId'],
+            instanceId: 'instance:extended-properties',
+            kind: 'paragraph',
+            origin: {kind: 'author', source: {scope: 'entry', file: 'article.html'}, range: utf16Range(0, 1)},
+            analysisStamp: 'analysis:extended-properties' as ComponentHandle['analysisStamp'],
+        }
+        const shadowLength = (value: number) => ({kind: 'numeric' as const, value, unit: 'px' as const, numberText: String(value)})
+        const cases = [
+            ['border-width', {kind: 'numeric', value: 2, unit: 'px', numberText: '2'}, '2px'],
+            ['border-style', {kind: 'keyword', value: 'dashed'}, 'dashed'],
+            ['border-color', {kind: 'color', value: '#112233', opacity: 100}, '#112233'],
+            ['border-radius', {kind: 'numeric', value: 8, unit: 'px', numberText: '8'}, '8px'],
+            ['background-image', {kind: 'background-image', value: 'linear-gradient(135deg, var(--fc-entry-accent), transparent)'}, 'linear-gradient(135deg, var(--fc-entry-accent), transparent)'],
+            ['box-shadow', {kind: 'box-shadow', layers: [{offsetX: shadowLength(0), offsetY: shadowLength(2), blur: shadowLength(8), spread: shadowLength(0), color: '#000000', inset: false}]}, '0px 2px 8px 0px #000000'],
+            ['opacity', {kind: 'numeric', value: 0.5, unit: '', numberText: '0.5'}, '0.5'],
+            ['rotate', {kind: 'numeric', value: 15, unit: 'deg', numberText: '15'}, '15deg'],
+            ['width', {kind: 'keyword', value: 'fit-content'}, 'fit-content'],
+            ['height', {kind: 'numeric', value: 12, unit: 'rem', numberText: '12'}, '12rem'],
+            ['min-width', {kind: 'keyword', value: 'min-content'}, 'min-content'],
+            ['max-width', {kind: 'keyword', value: 'none'}, 'none'],
+            ['min-height', {kind: 'numeric', value: 6, unit: 'rem', numberText: '6'}, '6rem'],
+            ['max-height', {kind: 'keyword', value: 'fit-content'}, 'fit-content'],
+            ['row-gap', {kind: 'numeric', value: 1, unit: 'rem', numberText: '1'}, '1rem'],
+            ['column-gap', {kind: 'numeric', value: 2, unit: 'rem', numberText: '2'}, '2rem'],
+            ['letter-spacing', {kind: 'numeric', value: 0.04, unit: 'em', numberText: '0.04'}, '0.04em'],
+            ['word-spacing', {kind: 'numeric', value: 0.2, unit: 'em', numberText: '0.2'}, '0.2em'],
+            ['text-decoration-line', {kind: 'keyword', value: 'underline'}, 'underline'],
+            ['text-decoration-color', {kind: 'color', value: '#334455', opacity: 100}, '#334455'],
+            ['text-decoration-style', {kind: 'keyword', value: 'wavy'}, 'wavy'],
+            ['object-fit', {kind: 'keyword', value: 'cover'}, 'cover'],
+            ['object-position', {kind: 'keyword', value: 'right bottom'}, 'right bottom'],
+            ['float', {kind: 'keyword', value: 'inline-start'}, 'inline-start'],
+            ['list-style-type', {kind: 'keyword', value: 'decimal'}, 'decimal'],
+            ['list-style-position', {kind: 'keyword', value: 'inside'}, 'inside'],
+        ] as const satisfies readonly [VisualPropertyName, VisualPropertyEditValue, string][]
+        for (const [property, value, expected] of cases) {
+            const request = createVisualPropertyEditRequest(
+                PARAGRAPH_ID,
+                [{property, value}],
+                {},
+                () => `extended-${property}`,
+            )
+            const intent = request.createIntents(new Map([[PARAGRAPH_ID, handle]]))[0]
+            assert.equal(intent?.kind, 'edit-property')
+            assert.equal(intent?.property, property)
+            assert.deepEqual(intent?.action, {kind: 'set-value', value: expected})
+        }
+        assert.throws(() => serializeVisualPropertyValue('color', {kind: 'keyword', value: 'cover'}), /关键字结构/u)
+        assert.throws(() => serializeVisualPropertyValue('opacity', {kind: 'background-image', value: 'linear-gradient(90deg, var(--fc-entry-surface), transparent)'}), /背景图结构/u)
+        assert.throws(() => serializeVisualPropertyValue('border-radius', {kind: 'box-shadow', layers: []}), /阴影结构/u)
+        assert.throws(() => serializeVisualPropertyValue('opacity', {kind: 'numeric', value: 2, unit: '', numberText: '2'}), /0–1/u)
+        assert.throws(() => serializeVisualPropertyValue('rotate', {kind: 'numeric', value: 2, unit: 'px', numberText: '2'}), /单位/u)
     })
 
     it('半透明标准色与主题色写回后仍能由调节控件精确回读', () => {

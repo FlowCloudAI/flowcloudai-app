@@ -32,6 +32,12 @@ import {
 import {BoxSpacingControls} from './BoxSpacingControls.tsx'
 import {ColorPropertyControl} from './ColorPropertyControl.tsx'
 import {NumericPropertyControl, type PropertyChangeOptions} from './NumericPropertyControl.tsx'
+import {
+    BackgroundImagePropertyControl,
+    BoxShadowPropertyControl,
+    DimensionPropertyControl,
+    KeywordPropertyControl,
+} from './StructuredPropertyControls.tsx'
 import './PageDocumentPropertiesPanel.css'
 import {createPublicComponentInstanceEditRequest} from '../../application/publicComponentEditing.ts'
 
@@ -384,6 +390,11 @@ export function PageDocumentPropertiesPanel({
                             <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
                             <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-weight'), value, options)}/>
                             <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'letter-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'letter-spacing'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'word-spacing')} onChange={(value, options) => applyOne(fieldFor(fields, 'word-spacing'), value, options)}/>
+                            <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-line')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-line'), value, options)}/>
+                            <ColorPropertyControl field={fieldFor(fields, 'text-decoration-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-color'), value, options)}/>
+                            <KeywordPropertyControl field={fieldFor(fields, 'text-decoration-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'text-decoration-style'), value, options)}/>
                         </>
                     )}
                     {tab === 'layout' && (
@@ -391,12 +402,32 @@ export function PageDocumentPropertiesPanel({
                             <BoxSpacingControls label="外距" fields={fields} onChange={applyChanges}/>
                             <BoxSpacingControls label="内距" fields={fields} onChange={applyChanges}/>
                             <NumericPropertyControl field={fieldFor(fields, 'gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'gap'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'row-gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'row-gap'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'column-gap')} onChange={(value, options) => applyOne(fieldFor(fields, 'column-gap'), value, options)}/>
+                            {(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'] as const).map(property => <DimensionPropertyControl
+                                key={property}
+                                field={fieldFor(fields, property)}
+                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                            />)}
+                            {(['float', 'object-fit', 'object-position', 'list-style-type', 'list-style-position'] as const).map(property => <KeywordPropertyControl
+                                key={property}
+                                field={fieldFor(fields, property)}
+                                onChange={(value, options) => applyOne(fieldFor(fields, property), value, options)}
+                            />)}
                         </>
                     )}
                     {tab === 'appearance' && (
                         <>
                             <ColorPropertyControl field={fieldFor(fields, 'color')} onChange={(value, options) => applyOne(fieldFor(fields, 'color'), value, options)}/>
                             <ColorPropertyControl field={fieldFor(fields, 'background-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-color'), value, options)}/>
+                            <BackgroundImagePropertyControl assets={assets} field={fieldFor(fields, 'background-image')} onChange={(value, options) => applyOne(fieldFor(fields, 'background-image'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'border-width')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-width'), value, options)}/>
+                            <KeywordPropertyControl field={fieldFor(fields, 'border-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-style'), value, options)}/>
+                            <ColorPropertyControl field={fieldFor(fields, 'border-color')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-color'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'border-radius')} onChange={(value, options) => applyOne(fieldFor(fields, 'border-radius'), value, options)}/>
+                            <BoxShadowPropertyControl field={fieldFor(fields, 'box-shadow')} onChange={(value, options) => applyOne(fieldFor(fields, 'box-shadow'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'opacity')} onChange={(value, options) => applyOne(fieldFor(fields, 'opacity'), value, options)}/>
+                            <NumericPropertyControl field={fieldFor(fields, 'rotate')} onChange={(value, options) => applyOne(fieldFor(fields, 'rotate'), value, options)}/>
                         </>
                     )}
                 </div>

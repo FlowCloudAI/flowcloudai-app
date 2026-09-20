@@ -27,6 +27,11 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'font-size', label: '字号', group: 'text'},
     {property: 'font-weight', label: '字重', group: 'text'},
     {property: 'line-height', label: '行高', group: 'text'},
+    {property: 'letter-spacing', label: '字距', group: 'text'},
+    {property: 'word-spacing', label: '词距', group: 'text'},
+    {property: 'text-decoration-line', label: '文字装饰', group: 'text'},
+    {property: 'text-decoration-color', label: '装饰颜色', group: 'text'},
+    {property: 'text-decoration-style', label: '装饰线型', group: 'text'},
     {property: 'display', label: '布局方式', group: 'layout'},
     {property: 'text-align', label: '对齐', group: 'layout'},
     {property: 'grid-template-columns', label: '分栏数', group: 'layout'},
@@ -41,8 +46,29 @@ export const VISUAL_PROPERTY_FIELDS = [
     {property: 'padding-inline-start', label: '内距左', group: 'layout'},
     {property: 'padding-inline-end', label: '内距右', group: 'layout'},
     {property: 'gap', label: '容器间距', group: 'layout'},
+    {property: 'row-gap', label: '行间距', group: 'layout'},
+    {property: 'column-gap', label: '列间距', group: 'layout'},
+    {property: 'width', label: '宽度', group: 'layout'},
+    {property: 'height', label: '高度', group: 'layout'},
+    {property: 'min-width', label: '最小宽度', group: 'layout'},
+    {property: 'max-width', label: '最大宽度', group: 'layout'},
+    {property: 'min-height', label: '最小高度', group: 'layout'},
+    {property: 'max-height', label: '最大高度', group: 'layout'},
+    {property: 'float', label: '图文环绕', group: 'layout'},
+    {property: 'object-fit', label: '图片填充', group: 'layout'},
+    {property: 'object-position', label: '图片位置', group: 'layout'},
+    {property: 'list-style-type', label: '列表标记', group: 'layout'},
+    {property: 'list-style-position', label: '标记位置', group: 'layout'},
     {property: 'color', label: '文字颜色', group: 'appearance'},
     {property: 'background-color', label: '背景色', group: 'appearance'},
+    {property: 'background-image', label: '背景图与渐变', group: 'appearance'},
+    {property: 'border-width', label: '边框宽度', group: 'appearance'},
+    {property: 'border-style', label: '边框线型', group: 'appearance'},
+    {property: 'border-color', label: '边框颜色', group: 'appearance'},
+    {property: 'border-radius', label: '圆角', group: 'appearance'},
+    {property: 'box-shadow', label: '阴影', group: 'appearance'},
+    {property: 'opacity', label: '透明度', group: 'appearance'},
+    {property: 'rotate', label: '旋转', group: 'appearance'},
 ] as const
 
 export type VisualPropertyName = (typeof VISUAL_PROPERTY_FIELDS)[number]['property']
@@ -51,6 +77,8 @@ export type VisualPropertySourceState =
     | 'local'
     | 'inherited'
     | 'other-viewport'
+    | 'mixed'
+    | 'custom-source'
     | 'not-applicable'
 
 export interface VisualPropertyState {
@@ -144,7 +172,7 @@ function fieldState(
             reason: '当前节点不是可编辑组件。',
         })
     }
-    if (field.property === 'gap' && !/^(?:inline-)?(?:grid|flex)$/iu.test(display.trim())) {
+    if (['gap', 'row-gap', 'column-gap'].includes(field.property) && !/^(?:inline-)?(?:grid|flex)$/iu.test(display.trim())) {
         return Object.freeze({
             ...base,
             value: effectiveValue(inspection),
@@ -286,7 +314,7 @@ export const VISUAL_FONT_WEIGHTS = ['400', '500', '600', '700', '800', '900'] as
 export type VisualFontWeight = (typeof VISUAL_FONT_WEIGHTS)[number]
 export type VisualLengthUnit = 'px' | 'rem' | 'em' | '%'
 export type VisualSpacingUnit = 'px' | 'rem' | 'em'
-export type VisualNumericUnit = VisualLengthUnit | VisualSpacingUnit | ''
+export type VisualNumericUnit = VisualLengthUnit | VisualSpacingUnit | 'deg' | ''
 
 export interface VisualNumericPropertyValue {
     readonly kind: 'numeric'
@@ -317,6 +345,38 @@ export interface VisualColorPropertyValue {
     readonly kind: 'color'
     readonly value: string
     readonly opacity: number
+}
+
+export interface VisualShadowLayer {
+    readonly offsetX: VisualNumericPropertyValue
+    readonly offsetY: VisualNumericPropertyValue
+    readonly blur: VisualNumericPropertyValue
+    readonly spread: VisualNumericPropertyValue
+    readonly color: string
+    readonly inset: boolean
+}
+
+const VISUAL_KEYWORD_VALUES = Object.freeze({
+    'width': ['auto', 'fit-content', '100%'],
+    'height': ['auto', 'fit-content', '100%'],
+    'min-width': ['auto', 'min-content', 'fit-content'],
+    'max-width': ['none', 'max-content', 'fit-content'],
+    'min-height': ['auto', 'min-content', 'fit-content'],
+    'max-height': ['none', 'max-content', 'fit-content'],
+    'border-style': ['none', 'solid', 'dashed', 'dotted', 'double'],
+    'text-decoration-line': ['none', 'underline', 'line-through', 'underline line-through'],
+    'text-decoration-style': ['solid', 'double', 'dotted', 'dashed', 'wavy'],
+    'object-fit': ['fill', 'contain', 'cover', 'none', 'scale-down'],
+    'object-position': ['center', 'left top', 'right top', 'left bottom', 'right bottom'],
+    'float': ['none', 'inline-start', 'inline-end', 'left', 'right'],
+    'list-style-type': ['disc', 'circle', 'square', 'decimal', 'lower-alpha', 'upper-roman', 'none'],
+    'list-style-position': ['inside', 'outside'],
+} as const satisfies Partial<Record<VisualPropertyName, readonly string[]>>)
+
+export type VisualKeywordPropertyName = keyof typeof VISUAL_KEYWORD_VALUES
+
+export function visualKeywordOptions(property: VisualPropertyName): readonly string[] {
+    return VISUAL_KEYWORD_VALUES[property as VisualKeywordPropertyName] ?? []
 }
 
 function byteHex(value: number): string {
@@ -355,6 +415,9 @@ export type VisualPropertyEditValue =
     | {readonly kind: 'align-items'; readonly value: VisualAlignItemsValue}
     | {readonly kind: 'justify-content'; readonly value: VisualJustifyContentValue}
     | VisualColorPropertyValue
+    | {readonly kind: 'keyword'; readonly value: string}
+    | {readonly kind: 'background-image'; readonly value: string}
+    | {readonly kind: 'box-shadow'; readonly layers: readonly VisualShadowLayer[]}
     | {readonly kind: 'clear-override'}
 
 export interface VisualPropertyChange {
@@ -385,14 +448,51 @@ function serializeColor(value: VisualColorPropertyValue): string {
     return `color-mix(in srgb, ${value.value} ${compactNumber(value.opacity)}%, transparent)`
 }
 
+function serializeShadowLength(value: VisualNumericPropertyValue, allowNegative: boolean): string {
+    if (!['px', 'rem', 'em'].includes(value.unit)) throw new TypeError('阴影长度单位不受支持。')
+    if (!Number.isFinite(value.value) || !CSS_NUMBER_PATTERN.test(value.numberText) || Number(value.numberText) !== value.value) {
+        throw new TypeError('阴影长度必须包含有限数字。')
+    }
+    if (!allowNegative && value.value < 0) throw new TypeError('阴影模糊与扩散不能为负数。')
+    return `${value.numberText}${value.unit}`
+}
+
+function serializeShadow(layers: readonly VisualShadowLayer[]): string {
+    if (layers.length < 1 || layers.length > 4) throw new TypeError('阴影必须包含 1–4 层。')
+    return layers.map(layer => {
+        if (!HEX_COLOR_PATTERN.test(layer.color) && !ENTRY_THEME_COLOR_PATTERN.test(layer.color)) {
+            throw new TypeError('阴影颜色只能使用完整十六进制值或页面主题色。')
+        }
+        return [
+            layer.inset ? 'inset' : '',
+            serializeShadowLength(layer.offsetX, true),
+            serializeShadowLength(layer.offsetY, true),
+            serializeShadowLength(layer.blur, false),
+            serializeShadowLength(layer.spread, true),
+            layer.color.toLowerCase(),
+        ].filter(Boolean).join(' ')
+    }).join(', ')
+}
+
 function allowedNumericUnits(property: VisualPropertyName): readonly VisualNumericUnit[] {
     if (property === 'line-height') return ['']
     if (property === 'font-size') return ['px', 'rem', 'em', '%']
     if (
         property.startsWith('margin-') ||
         property.startsWith('padding-') ||
-        property === 'gap'
+        property === 'gap' ||
+        property === 'row-gap' ||
+        property === 'column-gap' ||
+        property === 'border-width' ||
+        property === 'border-radius' ||
+        property === 'letter-spacing' ||
+        property === 'word-spacing'
     ) return ['px', 'rem', 'em']
+    if (['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'].includes(property)) {
+        return ['px', 'rem', 'em', '%']
+    }
+    if (property === 'opacity') return ['']
+    if (property === 'rotate') return ['deg']
     return []
 }
 
@@ -435,8 +535,24 @@ export function serializeVisualPropertyValue(
         }
         return value.value
     }
+    if (value.kind === 'keyword') {
+        const options = visualKeywordOptions(property)
+        if (!options.includes(value.value)) throw new TypeError('关键字结构与目标属性不匹配。')
+        return value.value
+    }
+    if (value.kind === 'background-image') {
+        if (property !== 'background-image') throw new TypeError('背景图结构与目标属性不匹配。')
+        const asset = /^url\("fcasset:\/\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"\)$/iu.test(value.value)
+        const gradient = /^linear-gradient\((?:0|45|90|135|180|225|270|315)deg, var\(--fc-entry-(?:surface|text|accent|muted)\), (?:transparent|var\(--fc-entry-(?:surface|text|accent|muted)\))\)$/u.test(value.value)
+        if (!asset && !gradient) throw new TypeError('背景图只接受受管资产或受控线性渐变。')
+        return value.value
+    }
+    if (value.kind === 'box-shadow') {
+        if (property !== 'box-shadow') throw new TypeError('阴影结构与目标属性不匹配。')
+        return serializeShadow(value.layers)
+    }
     if (value.kind === 'color') {
-        if (property !== 'color' && property !== 'background-color') {
+        if (!['color', 'background-color', 'border-color', 'text-decoration-color'].includes(property)) {
             throw new TypeError('颜色结构与目标属性不匹配。')
         }
         return serializeColor(value)
@@ -447,9 +563,10 @@ export function serializeVisualPropertyValue(
         throw new TypeError('数值结构必须包含有限数字。')
     }
     if (Number(value.numberText) !== value.value) throw new TypeError('数值文本与数值不一致。')
-    if (!property.startsWith('margin-') && value.value < 0) {
+    if (!property.startsWith('margin-') && !['letter-spacing', 'word-spacing', 'rotate'].includes(property) && value.value < 0) {
         throw new TypeError('该属性不接受负数。')
     }
+    if (property === 'opacity' && value.value > 1) throw new TypeError('透明度必须位于 0–1。')
     return `${value.numberText}${value.unit}`
 }
 

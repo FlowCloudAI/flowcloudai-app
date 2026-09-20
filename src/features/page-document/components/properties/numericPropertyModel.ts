@@ -55,6 +55,13 @@ const SPACING_PRESETS: readonly NumericPropertyPreset[] = [
     {label: '大', value: 1.5, unit: 'rem'},
 ]
 
+const SIZE_PRESETS: readonly NumericPropertyPreset[] = [
+    {label: '小', value: 12, unit: 'rem'},
+    {label: '中', value: 24, unit: 'rem'},
+    {label: '大', value: 48, unit: 'rem'},
+    {label: '填充', value: 100, unit: '%'},
+]
+
 function compactNumber(value: number): string {
     return Number(value.toFixed(6)).toString()
 }
@@ -89,17 +96,59 @@ export function numericPropertyDefinition(property: VisualPropertyName): Numeric
             sliderRange: () => ({minimum: 0.5, maximum: 8, step: 0.1}),
         }
     }
+    if (property === 'opacity') {
+        return {
+            property,
+            units: [''],
+            defaultValue: {kind: 'numeric', value: 1, unit: '', numberText: '1'},
+            presets: [
+                {label: '透明', value: 0, unit: ''},
+                {label: '半透明', value: 0.5, unit: ''},
+                {label: '不透明', value: 1, unit: ''},
+            ],
+            minimum: 0,
+            sliderRange: () => ({minimum: 0, maximum: 1, step: 0.05}),
+        }
+    }
+    if (property === 'rotate') {
+        return {
+            property,
+            units: ['deg'],
+            defaultValue: {kind: 'numeric', value: 0, unit: 'deg', numberText: '0'},
+            presets: [
+                {label: '无', value: 0, unit: 'deg'},
+                {label: '左转', value: -90, unit: 'deg'},
+                {label: '右转', value: 90, unit: 'deg'},
+                {label: '倒置', value: 180, unit: 'deg'},
+            ],
+            sliderRange: () => ({minimum: -180, maximum: 180, step: 1}),
+        }
+    }
+    if (['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height'].includes(property)) {
+        return {
+            property,
+            units: ['px', 'rem', 'em', '%'],
+            defaultValue: {kind: 'numeric', value: 100, unit: '%', numberText: '100'},
+            presets: SIZE_PRESETS,
+            minimum: 0,
+            sliderRange: unit => unit === '%'
+                ? {minimum: 0, maximum: 100, step: 1}
+                : unit === 'px'
+                  ? {minimum: 0, maximum: 1024, step: 1}
+                  : {minimum: 0, maximum: 64, step: 0.25},
+        }
+    }
     const spacing =
         property.startsWith('margin-') ||
         property.startsWith('padding-') ||
-        property === 'gap'
+        ['gap', 'row-gap', 'column-gap', 'border-width', 'border-radius', 'letter-spacing', 'word-spacing'].includes(property)
     if (!spacing) return null
-    const permitsNegative = property.startsWith('margin-')
+    const permitsNegative = property.startsWith('margin-') || property === 'letter-spacing' || property === 'word-spacing'
     return {
         property,
         units: ['px', 'rem', 'em'],
-        defaultValue: {kind: 'numeric', value: property === 'gap' ? 1 : 0, unit: 'rem', numberText: property === 'gap' ? '1' : '0'},
-        presets: property === 'gap' ? SPACING_PRESETS : [],
+        defaultValue: {kind: 'numeric', value: ['gap', 'row-gap', 'column-gap'].includes(property) ? 1 : 0, unit: 'rem', numberText: ['gap', 'row-gap', 'column-gap'].includes(property) ? '1' : '0'},
+        presets: ['gap', 'row-gap', 'column-gap', 'border-radius'].includes(property) ? SPACING_PRESETS : [],
         minimum: permitsNegative ? undefined : 0,
         sliderRange: unit => spacingRange(unit, permitsNegative),
     }
