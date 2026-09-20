@@ -79,6 +79,7 @@ export type VisualPropertyGroup = (typeof VISUAL_PROPERTY_FIELDS)[number]['group
 export type VisualPropertySourceState =
     | 'local'
     | 'inherited'
+    | 'default'
     | 'other-viewport'
     | 'mixed'
     | 'custom-source'
@@ -92,6 +93,7 @@ export interface VisualPropertyState {
     readonly localValue: string | null
     readonly sourceState: VisualPropertySourceState
     readonly statusText: string
+    readonly clearTitle: string
     readonly disabled: boolean
     readonly reason: string | null
 }
@@ -162,6 +164,39 @@ function effectiveValue(inspection: PropertyInspection | undefined): string {
     )
 }
 
+const INHERITED_VISUAL_PROPERTIES = new Set<VisualPropertyName>([
+    'color',
+    'font-size',
+    'font-weight',
+    'letter-spacing',
+    'line-height',
+    'list-style-position',
+    'list-style-type',
+    'text-align',
+    'word-spacing',
+])
+
+function fallbackPresentation(
+    property: VisualPropertyName,
+    inspection: PropertyInspection | undefined,
+    styleContext: VisualStyleContext,
+): {readonly text: '继承' | '默认'; readonly clearTitle: string} {
+    if (styleContext === 'desktop') {
+        return {text: '继承', clearTitle: '清除后继承移动基础设置。'}
+    }
+    if (styleContext === 'hover' || styleContext === 'focus-within') {
+        return {text: '继承', clearTitle: '清除后继承常态设置。'}
+    }
+    const inherited = inspection?.effectiveValue?.inherited === true
+        || INHERITED_VISUAL_PROPERTIES.has(property)
+        || inspection?.directDeclarations.some(declaration =>
+            declaration.condition === 'active' && declaration.origin.source?.scope === 'project',
+        ) === true
+    return inherited
+        ? {text: '继承', clearTitle: '清除后继承上层作者样式。'}
+        : {text: '默认', clearTitle: '清除后恢复浏览器默认值。'}
+}
+
 function fieldState(
     node: LayerProjectionNode,
     field: (typeof VISUAL_PROPERTY_FIELDS)[number],
@@ -176,6 +211,7 @@ function fieldState(
         label: field.label,
         group: field.group,
     } as const
+    const fallback = fallbackPresentation(field.property, inspection, styleContext)
     if (!node.managed || node.kind === 'source' || node.kind === 'operation' || !inspection) {
         return Object.freeze({
             ...base,
@@ -183,6 +219,7 @@ function fieldState(
             localValue: null,
             sourceState: 'not-applicable' as const,
             statusText: '不适用 · 当前节点不是可编辑组件',
+            clearTitle: fallback.clearTitle,
             disabled: true,
             reason: '当前节点不是可编辑组件。',
         })
@@ -194,6 +231,7 @@ function fieldState(
             localValue: null,
             sourceState: 'not-applicable' as const,
             statusText: '不适用 · 需要 Grid 或 Flex',
+            clearTitle: fallback.clearTitle,
             disabled: true,
             reason: '需要 Grid 或 Flex。',
         })
@@ -224,11 +262,17 @@ function fieldState(
             localValue: localDeclaration?.resolvedValue ?? localDeclaration?.rawValue ?? null,
             sourceState: 'not-applicable' as const,
             statusText: `不适用 · ${reason}`,
+            clearTitle: fallback.clearTitle,
             disabled: true,
             reason,
         })
     }
     const localValue = localDeclaration?.resolvedValue ?? localDeclaration?.rawValue ?? null
+    const localValues = new Set(localDeclarations.map(declaration =>
+        declaration.resolvedValue ?? declaration.rawValue,
+    ))
+    const mixed = localValues.size > 1
+    const customSource = Boolean(localValue) && inspection.valueCapability.kind === 'read-only'
     const otherViewport = ['mobile', 'desktop'].includes(styleContext) && (
         effectiveValue(inspection).trim() !== effectiveValue(fallbackInspection).trim() ||
         otherViewportProperties.has(field.property) ||
@@ -242,21 +286,29 @@ function fieldState(
             ),
         )
     )
-    const inherited = styleContext === 'desktop'
-        ? '本档未设置 · 继承移动设置'
-        : styleContext === 'mobile'
-          ? '本档未设置 · 继承词条样式'
-          : '当前状态未设置 · 使用常态值'
     return Object.freeze({
         ...base,
         value: localValue ?? effectiveValue(inspection),
         localValue,
-        sourceState: otherViewport ? 'other-viewport' : localValue ? 'local' : 'inherited',
-        statusText: otherViewport
-            ? `${localValue ? '本级已设置' : inherited} · 其他区间有覆盖`
-            : localValue
-              ? '本级已设置'
-              : inherited,
+        sourceState: mixed
+            ? 'mixed'
+            : customSource
+              ? 'custom-source'
+              : otherViewport
+                ? 'other-viewport'
+                : localValue
+                  ? 'local'
+                  : fallback.text === '继承' ? 'inherited' : 'default',
+        statusText: mixed
+            ? '多种值 · 调整后统一'
+            : customSource
+              ? '自定义源码'
+              : otherViewport
+                ? `${localValue ? '本级已设置' : fallback.text} · 其他区间有覆盖`
+                : localValue
+                  ? '本级已设置'
+                  : fallback.text,
+        clearTitle: fallback.clearTitle,
         disabled: false,
         reason: null,
     })

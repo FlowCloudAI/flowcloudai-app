@@ -70,6 +70,14 @@ function uniformValue(
     return state?.kind === 'uniform' ? state.value : null
 }
 
+function isMixedValue(
+    inspection: ReturnType<RibbonInspectTextRange>,
+    property: RibbonInlineProperty,
+): boolean {
+    if (inspection.status !== 'ready') return false
+    return inspection.inspection.properties[property]?.valueState.kind === 'mixed'
+}
+
 function toggledDecoration(value: string | null): string {
     const tokens = new Set((value ?? '').split(/\s+/u).filter(token => token && token !== 'none'))
     if (tokens.has('underline')) tokens.delete('underline')
@@ -87,10 +95,12 @@ export function InlineRibbonStyleControls({
     const enabled = Boolean(range && range.to > range.from && inspection?.status === 'ready')
     const reason = enabled ? null : range ? '选区已经漂移，请重新选择文字。' : '请先在画布中选择一段文字。'
     const size = inspection ? uniformValue(inspection, 'font-size') : null
+    const sizeMixed = inspection ? isMixedValue(inspection, 'font-size') : false
     const weight = inspection ? uniformValue(inspection, 'font-weight') : null
     const style = inspection ? uniformValue(inspection, 'font-style') : null
     const decoration = inspection ? uniformValue(inspection, 'text-decoration-line') : null
     const color = inspection ? uniformValue(inspection, 'color') : null
+    const colorMixed = inspection ? isMixedValue(inspection, 'color') : false
     const apply = (property: RibbonInlineProperty, value: string | null, label: string) => {
         if (!range || !enabled) return
         void applyKernelEntry(
@@ -106,10 +116,17 @@ export function InlineRibbonStyleControls({
                     <Select
                         aria-label="选区字号"
                         disabled={!enabled}
-                        onValueChange={value => apply('font-size', String(value), '修改选区字号')}
-                        options={[...FONT_SIZE_OPTIONS]}
+                        onValueChange={value => {
+                            if (value !== 'mixed') apply('font-size', String(value), '修改选区字号')
+                        }}
+                        options={[
+                            ...(sizeMixed ? [{value: 'mixed', label: '多种字号'}] : []),
+                            ...FONT_SIZE_OPTIONS,
+                        ]}
                         title={reason ?? '选区字号'}
-                        value={FONT_SIZE_OPTIONS.some(option => option.value === size) ? size ?? '16px' : '16px'}
+                        value={sizeMixed
+                            ? 'mixed'
+                            : FONT_SIZE_OPTIONS.some(option => option.value === size) ? size ?? '16px' : '16px'}
                     />
                     <DocumentRibbonCommand active={weight === '700'} disabled={!enabled} icon={Bold} label="加粗" onClick={() => apply('font-weight', weight === '700' ? '400' : '700', '切换选区加粗')} title={reason ?? '切换选区加粗'} />
                     <DocumentRibbonCommand active={style === 'italic'} disabled={!enabled} icon={Italic} label="斜体" onClick={() => apply('font-style', style === 'italic' ? 'normal' : 'italic', '切换选区斜体')} title={reason ?? '切换选区斜体'} />
@@ -119,14 +136,21 @@ export function InlineRibbonStyleControls({
                     <Select
                         aria-label="选区文字颜色"
                         disabled={!enabled}
-                        onValueChange={value => apply('color', String(value), '修改选区文字颜色')}
-                        options={[...COLOR_OPTIONS]}
+                        onValueChange={value => {
+                            if (value !== 'mixed') apply('color', String(value), '修改选区文字颜色')
+                        }}
+                        options={[
+                            ...(colorMixed ? [{value: 'mixed', label: '多种颜色'}] : []),
+                            ...COLOR_OPTIONS,
+                        ]}
                         title={reason ?? '选区文字颜色'}
-                        value={COLOR_OPTIONS.some(option => option.value === color) ? color ?? 'currentcolor' : 'currentcolor'}
+                        value={colorMixed
+                            ? 'mixed'
+                            : COLOR_OPTIONS.some(option => option.value === color) ? color ?? 'currentcolor' : 'currentcolor'}
                     />
                     <DocumentRibbonCommand disabled={!enabled} icon={Eraser} label="清除" onClick={() => {
                         for (const property of PROPERTIES) apply(property, null, `清除选区${property}`)
-                    }} title={reason ?? '清除选区常用格式'} />
+                    }} title={reason ?? '清除后继承整段文字样式'} />
                 </>}
             />
         </DocumentRibbonGroup>

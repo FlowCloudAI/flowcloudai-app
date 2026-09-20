@@ -3,6 +3,8 @@
 import assert from 'node:assert/strict'
 import {describe, it} from 'node:test'
 import {
+    authorNumericUnitLabel,
+    authorNumericUnitTitle,
     changeNumericPropertyUnit,
     matchingNumericPropertyPreset,
     numericPropertyDefinition,
@@ -11,6 +13,13 @@ import {
 } from './numericPropertyModel.ts'
 
 describe('页面属性数值模型', () => {
+    it('单位只向作者显示名称并保留 CSS 单位说明', () => {
+        assert.equal(authorNumericUnitLabel('px'), '像素')
+        assert.equal(authorNumericUnitLabel('em'), '字')
+        assert.equal(authorNumericUnitLabel('rem'), '标准字')
+        assert.equal(authorNumericUnitLabel(''), '倍数')
+        assert.match(authorNumericUnitTitle('px'), /px/u)
+    })
     it('按当前单位步进并守住非负语义边界', () => {
         const definition = numericPropertyDefinition('padding-block-start')
         assert.ok(definition)

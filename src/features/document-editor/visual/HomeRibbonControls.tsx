@@ -144,10 +144,10 @@ function FontControls({
                         </button>
                     </div>
                     <button
-                        aria-label="清除整段字号"
+                        aria-label="清除"
                         disabled={!canWrite || size?.localValue === null}
                         onClick={() => apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
-                        title="清除本级字号设置"
+                        title={size?.clearTitle ?? '清除后恢复默认字号。'}
                         type="button"
                     >
                         <Eraser size={14} />

@@ -127,6 +127,17 @@ describe('page document editor integration boundary', () => {
         assert.doesNotMatch(adapter, /export function validateVisualPropertyValue/u)
         assert.match(adapter, /changes:\s*readonly VisualPropertyChange\[\]/u)
         assert.match(adapter, /serializeVisualPropertyValue\(change\.property, change\.value\)/u)
+        assert.doesNotMatch(componentSources, /清除本级设置/u)
+        assert.match(componentSources, /aria-label="清除"/u)
+        assert.match(componentSources, /<code>\{customValue\.raw\}<\/code>/u)
+        assert.match(componentSources, /\(!guardedSource \|\| takeover\) && <div className="page-document-property__numeric">/u)
+
+        const inlineRibbon = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/InlineRibbonStyleControls.tsx'),
+            'utf8',
+        )
+        assert.match(inlineRibbon, /sizeMixed[\s\S]*多种字号/u)
+        assert.match(inlineRibbon, /colorMixed[\s\S]*多种颜色/u)
     })
 
     it('连续属性交互经会话调度且结束与切换节点都会冲刷尾帧', () => {

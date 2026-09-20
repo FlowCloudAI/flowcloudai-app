@@ -54,14 +54,19 @@ function PropertyShell({
             <span>{field.label}</span>
             <span data-source-state={field.sourceState}>{field.statusText}</span>
         </div>
+        {field.sourceState === 'mixed' && (
+            <p className="page-document-property__message">多种值会原样保留，选择新值后才会统一。</p>
+        )}
         {children}
         {field.localValue !== null && <Button
+            aria-label="清除"
             className="page-document-property__clear"
             size="sm"
             variant="ghost"
             disabled={field.disabled}
+            title={field.clearTitle}
             onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}
-        >清除本级设置</Button>}
+        >清除</Button>}
         {field.reason && <p className="page-document-property__message">{field.reason}</p>}
     </section>
 }
@@ -69,7 +74,7 @@ function PropertyShell({
 export function KeywordPropertyControl({field, onChange}: {field: VisualPropertyState; onChange: ChangeProperty}) {
     const values = visualKeywordOptions(field.property)
     const raw = (field.localValue ?? field.value).trim()
-    const known = values.includes(raw)
+    const known = field.sourceState !== 'mixed' && values.includes(raw)
     return <PropertyShell field={field} onChange={onChange}>
         {!known && raw && <p className="page-document-property__message">自定义源码值“{raw}”会原样保留，选择后才由控件接管。</p>}
         <Select
@@ -77,7 +82,7 @@ export function KeywordPropertyControl({field, onChange}: {field: VisualProperty
             disabled={field.disabled}
             value={known ? raw : 'custom'}
             options={[
-                ...(!known ? [{value: 'custom', label: raw ? '自定义源码' : '未设置'}] : []),
+                ...(!known ? [{value: 'custom', label: field.sourceState === 'mixed' ? '多种值' : raw ? '自定义源码' : '默认'}] : []),
                 ...values.map(value => ({value, label: value})),
             ]}
             onValueChange={value => {

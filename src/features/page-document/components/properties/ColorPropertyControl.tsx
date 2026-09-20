@@ -218,8 +218,16 @@ export function ColorPropertyControl({
                 }}>在本档覆盖</Button>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
-                    清除本级设置
+                <Button
+                    aria-label="清除"
+                    className="page-document-property__clear"
+                    size="sm"
+                    title={field.clearTitle}
+                    variant="ghost"
+                    disabled={field.disabled}
+                    onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}
+                >
+                    清除
                 </Button>
             )}
             {(error || field.reason) && <p className="page-document-property__message" role={error ? 'alert' : undefined}>{error ?? field.reason}</p>}

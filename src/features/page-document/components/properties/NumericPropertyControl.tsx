@@ -9,6 +9,8 @@ import type {
 } from '../../application/visualPropertyEditing.ts'
 import {PageDocumentStepIcon} from '../icons/PageDocumentPropertyIcons.tsx'
 import {
+    authorNumericUnitLabel,
+    authorNumericUnitTitle,
     changeNumericPropertyUnit,
     matchingNumericPropertyPreset,
     numericPropertyDefinition,
@@ -42,6 +44,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
     )
     const [draft, setDraft] = useState(candidate.numberText)
     const [error, setError] = useState<string | null>(null)
+    const [takeover, setTakeover] = useState(false)
     const interactionRef = useRef<string | null>(null)
     const candidateRef = useRef(candidate)
     const repeatDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -59,6 +62,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
             setDraft(next.candidate.numberText)
         }
         setError(null)
+        setTakeover(false)
     // 控件定义只由当前属性派生；字段挂载期间保持不变。
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentSource])
@@ -119,6 +123,7 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
     const range = definition.sliderRange(candidate.unit)
     const preset = matchingNumericPropertyPreset(definition.presets, candidate)
     const customValue = readNumericPropertyEditorValue(field.localValue ?? field.value, definition)
+    const guardedSource = customValue.kind === 'custom' || field.sourceState === 'mixed'
 
     return (
         <section className={`page-document-property${field.disabled ? ' is-disabled' : ''}${compact ? ' is-compact' : ''}`}>
@@ -126,18 +131,23 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                 <span>{field.label}</span>
                 <span data-source-state={field.sourceState}>{field.statusText}</span>
             </div>
-            {customValue.kind === 'custom' && (
+            {guardedSource && !takeover && (
                 <div className="page-document-property__custom" role="status">
-                    <span>复杂源码值会原样保留，请在代码模式调整。</span>
+                    <strong>{field.sourceState === 'mixed' ? '当前范围包含多种值' : '复杂源码值'}</strong>
+                    {customValue.kind === 'custom' && <code>{customValue.raw}</code>}
+                    <span>{field.sourceState === 'mixed'
+                        ? '只有主动选择后，才会把多个作者值统一为图形设置。'
+                        : '当前源码会原样保留。只有主动选择后，才会改为图形设置。'}</span>
                     <Button size="sm" variant="outline" disabled={field.disabled} onClick={() => {
+                        setTakeover(true)
                         publish(definition.defaultValue, true)
                         finish()
                     }}>
-                        改用调节控件
+                        改用图形设置
                     </Button>
                 </div>
             )}
-            <div className="page-document-property__numeric">
+            {(!guardedSource || takeover) && <div className="page-document-property__numeric">
                 <Slider
                     aria-label={`${field.label}滑杆`}
                     disabled={field.disabled}
@@ -211,16 +221,23 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') flush()
                         }}
                     />
-                    <Select
-                        aria-label={`${field.label}单位`}
-                        disabled={field.disabled || definition.units.length === 1}
-                        value={candidate.unit}
-                        options={definition.units.map(unit => ({value: unit, label: unit || '倍'}))}
-                        onValueChange={value => {
-                            publish(changeNumericPropertyUnit(candidate, String(value) as VisualNumericPropertyValue['unit'], definition), true)
-                            finish()
-                        }}
-                    />
+                    {definition.units.length === 1 ? (
+                        <span
+                            className="page-document-property__unit"
+                            title={authorNumericUnitTitle(definition.units[0])}
+                        >{authorNumericUnitLabel(definition.units[0])}</span>
+                    ) : (
+                        <Select
+                            aria-label={`${field.label}单位`}
+                            disabled={field.disabled}
+                            value={candidate.unit}
+                            options={definition.units.map(unit => ({value: unit, label: authorNumericUnitLabel(unit)}))}
+                            onValueChange={value => {
+                                publish(changeNumericPropertyUnit(candidate, String(value) as VisualNumericPropertyValue['unit'], definition), true)
+                                finish()
+                            }}
+                        />
+                    )}
                     <Button
                         aria-label={`${field.label}增大`}
                         iconOnly
@@ -247,8 +264,8 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                         }}
                     ><PageDocumentStepIcon direction={1}/></Button>
                 </div>
-            </div>
-            {definition.presets.length > 0 && (
+            </div>}
+            {(!guardedSource || takeover) && definition.presets.length > 0 && (
                 <div className="page-document-property__presets" role="group" aria-label={`${field.label}快捷值`}>
                     {definition.presets.map(item => (
                         <Button
@@ -274,8 +291,16 @@ export function NumericPropertyControl({field, compact = false, onChange}: Numer
                 </Button>
             )}
             {field.localValue !== null && (
-                <Button className="page-document-property__clear" size="sm" variant="ghost" disabled={field.disabled} onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}>
-                    清除本级设置
+                <Button
+                    aria-label="清除"
+                    className="page-document-property__clear"
+                    size="sm"
+                    title={field.clearTitle}
+                    variant="ghost"
+                    disabled={field.disabled}
+                    onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}
+                >
+                    清除
                 </Button>
             )}
             {(error || field.reason) && <p className="page-document-property__message" role={error ? 'alert' : undefined}>{error ?? field.reason}</p>}

@@ -31,6 +31,32 @@ export type NumericPropertyEditorValue =
     | {readonly kind: 'numeric'; readonly candidate: VisualNumericPropertyValue}
     | {readonly kind: 'custom'; readonly raw: string}
 
+const AUTHOR_UNIT_LABELS: Readonly<Record<VisualNumericUnit, string>> = {
+    '': '倍数',
+    px: '像素',
+    em: '字',
+    rem: '标准字',
+    '%': '%',
+    deg: '度',
+}
+
+const AUTHOR_UNIT_TITLES: Readonly<Record<VisualNumericUnit, string>> = {
+    '': '倍数（无 CSS 单位）',
+    px: '像素（px）',
+    em: '字（em，相对当前字号）',
+    rem: '标准字（rem，相对页面基础字号）',
+    '%': '%（CSS 百分比）',
+    deg: '度（deg）',
+}
+
+export function authorNumericUnitLabel(unit: VisualNumericUnit): string {
+    return AUTHOR_UNIT_LABELS[unit]
+}
+
+export function authorNumericUnitTitle(unit: VisualNumericUnit): string {
+    return AUTHOR_UNIT_TITLES[unit]
+}
+
 const CSS_DIMENSION_PATTERN = /^([+-]?(?:(?:\d+\.\d+)|(?:\d+)|(?:\.\d+))(?:[eE][+-]?\d+)?)([a-z%]*)$/iu
 const CSS_NUMBER_PATTERN = /^[+-]?(?:(?:\d+\.\d+)|(?:\d+)|(?:\.\d+))(?:[eE][+-]?\d+)?$/u
 

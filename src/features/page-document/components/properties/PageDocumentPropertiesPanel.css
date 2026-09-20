@@ -340,6 +340,13 @@
     gap: var(--fc-space-xs);
 }
 
+.page-document-property__unit {
+    min-width: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption);
+    text-align: center;
+}
+
 .page-document-property__number-row .fc-btn svg,
 .page-document-spacing-group__links .fc-btn svg,
 .page-document-color-trigger svg {
@@ -360,15 +367,22 @@
 }
 
 .page-document-property__custom {
-    display: flex;
-    align-items: center;
+    display: grid;
     gap: var(--fc-space-xs);
+    padding: var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border-light);
+    border-radius: var(--fc-radius-sm);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption);
 }
 
-.page-document-property__custom span {
-    flex: 1;
+.page-document-property__custom code {
+    overflow-wrap: anywhere;
+    color: var(--fc-color-text);
+}
+
+.page-document-property__custom .fc-btn {
+    justify-self: start;
 }
 
 .page-document-property__clear {

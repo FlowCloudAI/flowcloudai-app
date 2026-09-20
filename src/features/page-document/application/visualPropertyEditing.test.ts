@@ -220,6 +220,7 @@ describe('visual property editing', () => {
         assert.match(states.find(item => item.property === 'color')?.statusText ?? '', /其他区间有覆盖/u)
         assert.equal(states.find(item => item.property === 'gap')?.disabled, true)
         assert.match(states.find(item => item.property === 'gap')?.statusText ?? '', /需要 Grid 或 Flex/u)
+        assert.equal(states.some(item => /本(?:级|档|状态)未设置/u.test(item.statusText)), false)
     })
 
     it('桌面覆盖清除后经真实内核回落到移动基础值', () => {
@@ -257,7 +258,37 @@ describe('visual property editing', () => {
         assert.equal(desktop?.localValue, null)
         assert.equal(desktop?.value, '16px')
         assert.equal(desktop?.sourceState, 'other-viewport')
-        assert.match(desktop?.statusText ?? '', /继承移动设置/u)
+        assert.match(desktop?.statusText ?? '', /继承/u)
+        assert.equal(desktop?.clearTitle, '清除后继承移动基础设置。')
+    })
+
+    it('属性状态区分默认、继承、多值与复杂源码，清除说明给出真实回退结果', () => {
+        const style = baseStyle().replace(
+            'color: #334455; padding-block-start: 2px;',
+            'color: #334455; font-size: 16px; font-size: 18px; line-height: calc(1 + .2); padding-block-start: 2px;',
+        )
+        const source = snapshot(style)
+        const model = createDocumentDraft(source)
+        const runtime = createDocumentKernelDraftRuntime()
+        const states = inspectVisualProperties(
+            paragraph(model),
+            request => runtime.inspectComponent(model, source, request),
+            source.styleCss,
+            'mobile',
+        )
+        const fontSize = states.find(item => item.property === 'font-size')
+        const lineHeight = states.find(item => item.property === 'line-height')
+        const opacity = states.find(item => item.property === 'opacity')
+
+        assert.match(source.styleCss, /font-size: 16px; font-size: 18px/u)
+        assert.equal(fontSize?.sourceState, 'mixed')
+        assert.equal(fontSize?.statusText, '多种值 · 调整后统一')
+        assert.equal(lineHeight?.sourceState, 'local')
+        assert.equal(lineHeight?.value, 'calc(1 + .2)')
+        assert.equal(opacity?.sourceState, 'default')
+        assert.equal(opacity?.statusText, '默认')
+        assert.equal(opacity?.clearTitle, '清除后恢复浏览器默认值。')
+        assert.equal(states.some(item => /本(?:级|档|状态)未设置/u.test(item.statusText)), false)
     })
 
     it('交互态颜色绑定写入独立 hover 与 focus-within 通道且不携带断点', () => {
