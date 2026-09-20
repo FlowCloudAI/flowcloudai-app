@@ -21,7 +21,10 @@ import {
     type KernelComponentInspectionResult,
     type KernelDraftEditRequest,
 } from './documentKernelDraftRuntime.ts'
-import {createVisualPropertyEditRequest} from './visualPropertyEditing.ts'
+import {
+    createVisualPropertyEditRequest,
+    type VisualStyleContext,
+} from './visualPropertyEditing.ts'
 
 export interface TableDimensions {
     readonly rowCount: number
@@ -198,46 +201,46 @@ export function createListItemInsertionRequest(
 export function createDividerLineStyleRequest(
     dividerId: string,
     style: DividerLineStyle,
+    styleContext: Extract<VisualStyleContext, 'mobile' | 'desktop'>,
     requestId: string = crypto.randomUUID(),
 ): KernelDraftEditRequest {
-    return Object.freeze({
-        nodeIds: Object.freeze([dividerId.toLowerCase()]),
-        idempotencyKey: idempotencyKey(`ribbon-divider-line:${requestId}`),
-        interactionId: interactionId(`ribbon-divider-line:${documentFingerprint(requestId)}`),
-        authorizedScopes: Object.freeze(['entry'] as const),
-        createIntents(handles: KernelComponentBindings) {
-            const divider = requireKernelComponentHandle(handles, dividerId)
-            return Object.freeze([Object.freeze({
-                kind: 'edit-property' as const,
-                target: Object.freeze({kind: 'component-root' as const, component: divider}),
-                property: 'border-style',
-                action: style === 'unset'
-                    ? Object.freeze({kind: 'clear-override' as const})
-                    : Object.freeze({kind: 'set-value' as const, value: style}),
-                readContext: ALL_WIDTHS_CONTEXT,
-                destination: Object.freeze({scope: 'entry' as const, channel: Object.freeze({kind: 'base-rule' as const})}),
-            } satisfies EditIntent)])
-        },
-    })
+    return createVisualPropertyEditRequest(
+        dividerId,
+        [{
+            property: 'border-style',
+            value: style === 'unset'
+                ? {kind: 'clear-override'}
+                : {kind: 'keyword', value: style},
+        }],
+        {styleContext},
+        () => requestId,
+    )
 }
 
 export function createDividerSpacingRequest(
     dividerId: string,
     spacing: DividerSpacing,
+    styleContext: Extract<VisualStyleContext, 'mobile' | 'desktop'>,
+    requestId: string = crypto.randomUUID(),
 ): KernelDraftEditRequest {
     const value = spacing === 'compact' ? 0.5 : spacing === 'normal' ? 1 : spacing === 'wide' ? 2 : null
-    return createVisualPropertyEditRequest(dividerId, [
-        {
-            property: 'margin-block-start',
-            value: value === null
-                ? {kind: 'clear-override'}
-                : {kind: 'numeric', value, unit: 'rem', numberText: String(value)},
-        },
-        {
-            property: 'margin-block-end',
-            value: value === null
-                ? {kind: 'clear-override'}
-                : {kind: 'numeric', value, unit: 'rem', numberText: String(value)},
-        },
-    ])
+    return createVisualPropertyEditRequest(
+        dividerId,
+        [
+            {
+                property: 'margin-block-start',
+                value: value === null
+                    ? {kind: 'clear-override'}
+                    : {kind: 'numeric', value, unit: 'rem', numberText: String(value)},
+            },
+            {
+                property: 'margin-block-end',
+                value: value === null
+                    ? {kind: 'clear-override'}
+                    : {kind: 'numeric', value, unit: 'rem', numberText: String(value)},
+            },
+        ],
+        {styleContext},
+        () => requestId,
+    )
 }

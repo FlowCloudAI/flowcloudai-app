@@ -615,7 +615,7 @@ export function serializeVisualPropertyValue(
 export function createVisualPropertyEditRequest(
     nodeId: string,
     changes: readonly VisualPropertyChange[],
-    history: DocumentHistoryOptions & {readonly styleContext?: VisualStyleContext} = {},
+    history: DocumentHistoryOptions & {readonly styleContext: VisualStyleContext},
     allocateRequestId: () => string = () => crypto.randomUUID(),
 ): KernelDraftEditRequest {
     if (changes.length === 0) throw new TypeError('属性修改不能为空。')
@@ -628,9 +628,8 @@ export function createVisualPropertyEditRequest(
     }
     const requestId = allocateRequestId()
     const interactionSeed = history.historyGroupId ?? requestId
-    const styleContext = history.styleContext ?? 'mobile'
-    const readContext = readContextFor(styleContext)
-    const destination = destinationFor(styleContext)
+    const readContext = readContextFor(history.styleContext)
+    const destination = destinationFor(history.styleContext)
     return Object.freeze({
         nodeIds: Object.freeze([nodeId.toLowerCase()]),
         idempotencyKey: idempotencyKey(`page-property:${requestId}`),

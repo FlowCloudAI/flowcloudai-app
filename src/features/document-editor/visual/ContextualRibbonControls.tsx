@@ -111,17 +111,19 @@ function ListStructureControls({
 
 function DividerStructureControls({
     node,
+    context,
     inspectComponent,
     applyKernelEntry,
 }: {
     node: LayerProjectionNode
+    context: ContainerLayoutContext
     inspectComponent: InspectComponent
     applyKernelEntry: ApplyKernelEntry
 }) {
     const result = inspectComponent({
         nodeId: node.id,
         properties: ['border-style', 'margin-block-start', 'margin-block-end'],
-        context: {viewport: 'desktop', interactions: {hover: false, focusWithin: false}, direction: 'ltr', writingMode: 'horizontal-tb'},
+        context: {viewport: context, interactions: {hover: false, focusWithin: false}, direction: 'ltr', writingMode: 'horizontal-tb'},
     })
     const line = inspectedValue(result, 'border-style')
     const start = inspectedValue(result, 'margin-block-start')
@@ -129,13 +131,13 @@ function DividerStructureControls({
     return <>
         <Select
             aria-label="分隔线样式"
-            onValueChange={value => void applyKernelEntry(createDividerLineStyleRequest(node.id, String(value) as 'unset' | 'solid' | 'dashed' | 'dotted'), '修改分隔线样式')}
+            onValueChange={value => void applyKernelEntry(createDividerLineStyleRequest(node.id, String(value) as 'unset' | 'solid' | 'dashed' | 'dotted', context), '修改分隔线样式')}
             options={[{value: 'unset', label: '继承'}, {value: 'solid', label: '实线'}, {value: 'dashed', label: '虚线'}, {value: 'dotted', label: '点线'}]}
             value={line === 'solid' || line === 'dashed' || line === 'dotted' ? line : 'unset'}
         />
         <Select
             aria-label="分隔线上下留白"
-            onValueChange={value => void applyKernelEntry(createDividerSpacingRequest(node.id, String(value) as 'unset' | 'compact' | 'normal' | 'wide'), '修改分隔线上下留白')}
+            onValueChange={value => void applyKernelEntry(createDividerSpacingRequest(node.id, String(value) as 'unset' | 'compact' | 'normal' | 'wide', context), '修改分隔线上下留白')}
             options={[{value: 'unset', label: '继承'}, {value: 'compact', label: '紧凑'}, {value: 'normal', label: '标准'}, {value: 'wide', label: '宽松'}]}
             value={spacing}
         />
@@ -229,7 +231,7 @@ export function ContextualRibbonControls({
     if (selected.kind === 'divider') {
         return <>
             <DocumentRibbonGroup label="分隔线" priority="essential" wide>
-                <DividerStructureControls applyKernelEntry={applyKernelEntry} inspectComponent={inspectComponent} node={selected} />
+                <DividerStructureControls applyKernelEntry={applyKernelEntry} context={context} inspectComponent={inspectComponent} node={selected} />
             </DocumentRibbonGroup>
         </>
     }

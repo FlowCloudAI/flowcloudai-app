@@ -96,7 +96,7 @@ function apply(
     const request = createVisualPropertyEditRequest(
         PARAGRAPH_ID,
         [{property, value}],
-        {historyGroupId},
+        {historyGroupId, styleContext: 'mobile'},
         () => `${property}:${value.kind}`,
     )
     const prepared = runtime.prepare(model, source, request)
@@ -189,7 +189,7 @@ describe('visual property editing', () => {
         const request = createVisualPropertyEditRequest(
             PARAGRAPH_ID,
             [{property: 'color', value: {kind: 'color', value: '#112233', opacity: 100}}],
-            {},
+            {styleContext: 'mobile'},
             () => 'color-with-breakpoint',
         )
         const prepared = runtime.prepare(model, source, request)
@@ -376,7 +376,7 @@ describe('visual property editing', () => {
             const request = createVisualPropertyEditRequest(
                 PARAGRAPH_ID,
                 [{property, value}],
-                {},
+                {styleContext: 'mobile'},
                 () => `extended-${property}`,
             )
             const intent = request.createIntents(new Map([[PARAGRAPH_ID, handle]]))[0]
@@ -416,7 +416,7 @@ describe('visual property editing', () => {
         const request = createVisualPropertyEditRequest(PARAGRAPH_ID, [
             {property: 'padding-block-start', value: {kind: 'numeric', value: 3, unit: 'px', numberText: '3'}},
             {property: 'padding-block-end', value: {kind: 'numeric', value: 3, unit: 'px', numberText: '3'}},
-        ], {}, () => 'linked-padding')
+        ], {styleContext: 'mobile'}, () => 'linked-padding')
         const prepared = runtime.prepare(initial, source, request)
 
         assert.equal(prepared.status, 'ready', JSON.stringify(prepared))

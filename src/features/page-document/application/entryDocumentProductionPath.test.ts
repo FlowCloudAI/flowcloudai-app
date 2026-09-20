@@ -97,7 +97,7 @@ describe('页面编辑生产项目基线', () => {
                 property: 'font-size',
                 value: {kind: 'numeric', value: 18, unit: 'px', numberText: '18'},
             }],
-            {},
+            {styleContext: 'mobile'},
             () => 'production-property-edit',
         )
         const propertyPrepared = runtime.prepare(state.model, state.snapshot, propertyRequest)

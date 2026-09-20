@@ -1,4 +1,4 @@
-// 本测试固定图片上下文页签最终使用既有图片替换内核请求，不创建第二套写回路径。
+// 本测试从上下文功能区实际使用的请求构造入口固定图片、结构与档位写回，不创建第二套路径。
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
@@ -6,6 +6,7 @@ import {createImageReplacementRequest} from './imageAssetEditing.ts'
 import type {ManagedImageDescription} from './imageSemanticEditing.ts'
 import {
     createDividerLineStyleRequest,
+    createDividerSpacingRequest,
     createListItemInsertionRequest,
     createListTypeRequest,
     createTableResizeRequest,
@@ -80,10 +81,30 @@ test('列表上下文命令发出列表标签与新增列表项 intent', () => {
     assert.equal(insertIntent?.newNodeId, itemId)
 })
 
-test('分隔线上下文命令发出受管 border-style intent', () => {
-    const request = createDividerLineStyleRequest(NODE_ID, 'dashed')
-    const intent = request.createIntents(new Map([[NODE_ID, componentHandle(NODE_ID, 'divider')]]))[0]
-    assert.equal(intent?.kind, 'edit-property')
-    assert.equal(intent?.property, 'border-style')
-    assert.deepEqual(intent?.action, {kind: 'set-value', value: 'dashed'})
+test('分隔线功能区的线型与留白跟随当前移动或桌面档位', () => {
+    const bindings = new Map([[NODE_ID, componentHandle(NODE_ID, 'divider')]])
+    for (const [context, channel] of [
+        ['mobile', {kind: 'base-rule'}],
+        ['desktop', {kind: 'conditional-rule', context: 'desktop'}],
+    ] as const) {
+        const lineIntent = createDividerLineStyleRequest(NODE_ID, 'dashed', context).createIntents(bindings)[0]
+        assert.equal(lineIntent?.kind, 'edit-property')
+        assert.equal(lineIntent?.property, 'border-style')
+        assert.deepEqual(lineIntent?.action, {kind: 'set-value', value: 'dashed'})
+        assert.deepEqual(lineIntent?.readContext, {
+            viewport: context,
+            interactions: {hover: false, focusWithin: false},
+            direction: 'ltr',
+            writingMode: 'horizontal-tb',
+        })
+        assert.deepEqual(lineIntent?.destination, {scope: 'entry', channel})
+
+        const spacingIntents = createDividerSpacingRequest(NODE_ID, 'wide', context).createIntents(bindings)
+        assert.deepEqual(spacingIntents.map(intent => intent.kind === 'edit-property'
+            ? [intent.property, intent.action, intent.readContext, intent.destination]
+            : null), [
+            ['margin-block-start', {kind: 'set-value', value: '2rem'}, lineIntent?.readContext, {scope: 'entry', channel}],
+            ['margin-block-end', {kind: 'set-value', value: '2rem'}, lineIntent?.readContext, {scope: 'entry', channel}],
+        ])
+    }
 })
