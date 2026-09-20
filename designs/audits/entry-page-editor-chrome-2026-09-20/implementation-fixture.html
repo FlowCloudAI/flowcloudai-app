@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>页面编辑器紧凑密度实现夹具</title>
+<link rel="stylesheet" href="../../../node_modules/flowcloudai-ui/src/style/index.css">
+<link rel="stylesheet" href="../../../node_modules/flowcloudai-ui/src/components/Button/Button.css">
+<link rel="stylesheet" href="../../../node_modules/flowcloudai-ui/src/components/Input/Input.css">
+<link rel="stylesheet" href="../../../node_modules/flowcloudai-ui/src/components/Select/Select.css">
+<link rel="stylesheet" href="../../../src/features/document-editor/visual/DocumentOfficeRibbon.css">
+<link rel="stylesheet" href="../../../src/features/page-document/components/properties/PageDocumentPropertiesPanel.css">
+<link rel="stylesheet" href="../../../src/features/page-document/editor/workspace/PageDocumentPropertiesDockHost.css">
+<style>
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+body { margin: 0; overflow: hidden; background: var(--fc-color-bg-secondary); color: var(--fc-color-text); font-family: var(--fc-font-family); }
+.qa-note { height: 2.5rem; padding: var(--fc-space-sm) var(--fc-space-md); border-bottom: 1px solid var(--fc-color-border); background: var(--fc-color-bg-elevated); font-size: var(--fc-font-size-caption); }
+.qa-shell { display: grid; grid-template-rows: 2.75rem auto minmax(0, 1fr) 1.75rem; width: calc(100% - 2rem); height: calc(100% - 3.5rem); margin: 1rem; overflow: hidden; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); background: var(--fc-color-bg); box-shadow: var(--fc-shadow-sm); }
+.qa-topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--fc-space-md); padding: 0 var(--fc-space-md); border-bottom: 1px solid var(--fc-color-border-light); background: var(--fc-color-bg-elevated); }
+.qa-topbar__center, .qa-topbar__right { display: flex; align-items: center; gap: var(--fc-space-sm); }
+.qa-topbar__center { justify-content: center; }
+.qa-topbar__right { justify-content: flex-end; color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-caption); }
+.qa-chip { height: var(--fc-control-height-xs); padding: 0 var(--fc-space-sm); border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-full); background: var(--fc-color-bg); color: var(--fc-color-text-secondary); }
+.qa-chip.is-active { background: var(--fc-color-primary); color: var(--fc-color-text-on-primary); border-color: var(--fc-color-primary); }
+.qa-body { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; min-width: 0; min-height: 0; }
+.qa-canvas { min-width: 0; min-height: 0; overflow: auto; padding: var(--fc-space-xl); background: var(--fc-color-bg-secondary); }
+.qa-page { width: min(48rem, 100%); min-height: 35rem; margin: 0 auto; padding: 3rem; border: 1px solid var(--fc-color-border); border-radius: var(--fc-radius-lg); background: var(--fc-color-bg-elevated); box-shadow: var(--fc-shadow-xs); }
+.qa-selected { margin-top: var(--fc-space-xl); padding: var(--fc-space-sm); border: 2px solid var(--fc-color-primary); border-radius: var(--fc-radius-sm); }
+.qa-dock { min-width: 0; min-height: 0; border-left: 1px solid var(--fc-color-border-light); background: var(--fc-color-bg); }
+.qa-status { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--fc-space-md); border-top: 1px solid var(--fc-color-border-light); color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-caption); }
+.qa-slider { width: 100%; accent-color: var(--fc-color-primary); }
+.qa-ribbon .document-ribbon-panel { overflow: hidden; }
+@media (max-width: 70rem) {
+  .qa-shell { width: 100%; height: calc(100% - 2.5rem); margin: 0; border-inline: 0; border-radius: 0; }
+  .qa-body { grid-template-columns: minmax(0, 1fr) 18rem; }
+  .qa-topbar__right span:first-child { display: none; }
+  .document-ribbon-group[data-ribbon-priority="low"] { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="qa-note">生产样式静态夹具 · 只验证工具栏与属性 Dock 密度，不替代 Tauri 原生交互验收</header>
+<main class="qa-shell">
+  <header class="qa-topbar">
+    <strong>返回　未命名词条</strong>
+    <div class="qa-topbar__center"><button class="qa-chip">浏览</button><button class="qa-chip is-active">编辑</button><button class="qa-chip is-active">可视</button><button class="qa-chip">代码</button></div>
+    <div class="qa-topbar__right"><span>已保存</span><button class="qa-chip">词条信息</button><button class="qa-chip">更多</button></div>
+  </header>
+  <section class="document-office-ribbon qa-ribbon" aria-label="文档功能区">
+    <div class="document-ribbon-tab-row">
+      <div class="document-ribbon-tabs" role="tablist"><button aria-selected="true">开始</button><button>插入</button><button>页面</button><button>视图</button></div>
+      <button class="document-ribbon-collapse">收起</button>
+    </div>
+    <div class="document-ribbon-panel is-icons">
+      <div class="document-ribbon-group is-wide" data-ribbon-priority="essential">
+        <div class="document-ribbon-group-content"><div class="document-ribbon-two-rows"><div>
+          <div class="fc-select fc-select--radius-sm"><div class="fc-select__trigger"><span class="fc-select__value">16</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div>
+          <div class="document-ribbon-font-weight"><button aria-pressed="true"><b>B</b></button></div><button>清除</button>
+        </div><div><span class="document-ribbon-control-status">整段文字 · 移动基础</span></div></div></div>
+        <div class="document-ribbon-group-footer">字体</div>
+      </div>
+      <div class="document-ribbon-group is-wide" data-ribbon-priority="high">
+        <div class="document-ribbon-group-content"><div class="document-ribbon-alignment"><button aria-pressed="true">左</button><button>中</button><button>右</button><button>散</button></div></div>
+        <div class="document-ribbon-group-footer">段落</div>
+      </div>
+      <div class="document-ribbon-group is-disabled" data-ribbon-priority="low"><div class="document-ribbon-group-content"><button class="document-ribbon-unavailable" disabled>语义样式</button></div><div class="document-ribbon-group-footer">样式</div></div>
+      <div class="document-ribbon-group" data-ribbon-priority="normal"><div class="document-ribbon-group-content"><button class="document-ribbon-command">查找</button></div><div class="document-ribbon-group-footer">编辑</div></div>
+      <div class="document-ribbon-group" data-ribbon-priority="low"><div class="document-ribbon-group-content"><button class="document-ribbon-unavailable" disabled>块操作</button></div><div class="document-ribbon-group-footer">块操作</div></div>
+      <div class="document-ribbon-group is-wide is-disabled" data-ribbon-priority="essential"><div class="document-ribbon-group-content"><div class="document-ribbon-two-rows"><div><div class="fc-select fc-select--disabled"><div class="fc-select__trigger"><span class="fc-select__value">16</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div><button disabled><b>B</b></button><button disabled><i>I</i></button></div><div><button disabled><u>U</u></button><div class="fc-select fc-select--disabled"><div class="fc-select__trigger"><span class="fc-select__value">继承</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div><button disabled>清除</button></div></div></div><div class="document-ribbon-group-footer">所选文字</div></div>
+    </div>
+  </section>
+  <div class="qa-body">
+    <section class="qa-canvas"><article class="qa-page"><h1>未命名词条</h1><p>新段落</p><p class="qa-selected">这是用于核对功能区密度与属性编辑反馈的正文。</p><p>属性调整仍进入同一草稿和撤销历史。</p></article></section>
+    <aside class="qa-dock page-document-properties-dock-host">
+      <div class="page-document-properties-dock-host__tabs"><button class="is-active">属性</button><button>关系</button></div>
+      <section class="page-document-properties-dock-host__panel">
+        <div class="page-document-properties-panel">
+          <header><strong>属性 · 段落</strong><span>修改范围 · 移动基础</span></header>
+          <div class="page-document-properties-panel__tabs"><button class="is-active">文字</button><button>布局</button><button>颜色与效果</button></div>
+          <div class="page-document-properties-panel__fields">
+            <button class="fc-btn fc-btn--outline fc-btn--sm">保存选中内容为公共组件</button>
+            <section class="page-document-property"><div class="page-document-property__heading"><span>字号</span><span>本档未设置 · 继承词条样式</span></div><div class="page-document-property__numeric"><input class="qa-slider" type="range" value="16"><div class="page-document-property__number-row"><button class="fc-btn fc-btn--outline fc-btn--sm fc-btn--icon-only">减</button><div class="fc-input fc-input--sm"><div class="fc-input__wrapper"><input class="fc-input__field" value="16"></div></div><div class="fc-select"><div class="fc-select__trigger"><span class="fc-select__value">px</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div><button class="fc-btn fc-btn--outline fc-btn--sm fc-btn--icon-only">加</button></div></div><div class="page-document-property__presets"><button class="fc-btn fc-btn--ghost fc-btn--sm">小字</button><button class="fc-btn fc-btn--secondary fc-btn--sm">正文</button><button class="fc-btn fc-btn--ghost fc-btn--sm">小标题</button><button class="fc-btn fc-btn--ghost fc-btn--sm">大标题</button></div></section>
+            <section class="page-document-property"><div class="page-document-property__heading"><span>字重</span><span>本档未设置 · 继承词条样式</span></div><div class="fc-select"><div class="fc-select__trigger"><span class="fc-select__value">400 · 常规</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div></section>
+            <section class="page-document-property"><div class="page-document-property__heading"><span>行高</span><span>本档未设置 · 继承词条样式</span></div><div class="page-document-property__numeric"><input class="qa-slider" type="range" value="15"><div class="page-document-property__number-row"><button class="fc-btn fc-btn--outline fc-btn--sm fc-btn--icon-only">减</button><div class="fc-input fc-input--sm"><div class="fc-input__wrapper"><input class="fc-input__field" value="1.5"></div></div><div class="fc-select"><div class="fc-select__trigger"><span class="fc-select__value">倍</span><span class="fc-select__arrow" aria-hidden="true"></span></div></div><button class="fc-btn fc-btn--outline fc-btn--sm fc-btn--icon-only">加</button></div></div></section>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <footer class="qa-status"><span>校验通过 · 0 条诊断　草稿已同步　修改生效范围：移动基础</span><span>选中：段落　revision · r1</span></footer>
+</main>
+</body>
+</html>

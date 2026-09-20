@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>页面编辑器生产样式聚焦对比</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #202228; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+main { display: grid; gap: 16px; padding: 16px; }
+.toolbar-grid, .dock-grid { display: grid; grid-template-columns: repeat(2, max-content); gap: 16px; }
+figure { margin: 0; }
+figcaption { height: 28px; padding: 5px 8px; font-size: 12px; }
+.crop { position: relative; overflow: hidden; background: #fff; }
+.toolbar { width: 720px; height: 120px; }
+.toolbar img { width: 720px; height: 500px; object-fit: cover; object-position: top left; }
+.dock { width: 320px; height: 700px; }
+.dock img { position: absolute; top: 0; right: 0; width: 1440px; height: 1000px; max-width: none; }
+</style>
+</head>
+<body><main>
+<section class="toolbar-grid">
+  <figure><figcaption>设计稿 · 工具栏</figcaption><div class="crop toolbar"><img src="design-wide-light.png" alt="设计稿工具栏"></div></figure>
+  <figure><figcaption>生产样式 · 工具栏</figcaption><div class="crop toolbar"><img src="implementation-wide-light.png" alt="生产样式工具栏"></div></figure>
+</section>
+<section class="dock-grid">
+  <figure><figcaption>设计稿 · 属性 Dock</figcaption><div class="crop dock"><img src="design-wide-light.png" alt="设计稿属性 Dock"></div></figure>
+  <figure><figcaption>生产样式 · 属性 Dock</figcaption><div class="crop dock"><img src="implementation-wide-light.png" alt="生产样式属性 Dock"></div></figure>
+</section>
+</main></body>
+</html>

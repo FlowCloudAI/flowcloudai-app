@@ -16,12 +16,14 @@
 }
 
 .page-document-properties-dock-host__tabs button {
-    min-height: 2.5rem;
+    min-height: var(--fc-control-height-sm);
+    padding: 0 var(--fc-space-sm);
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
+    font-size: var(--fc-font-size-sm);
 }
 
 .page-document-properties-dock-host__tabs button.is-active {

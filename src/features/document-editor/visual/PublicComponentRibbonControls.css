@@ -1,14 +1,14 @@
 .public-component-ribbon {
     display: flex;
     min-width: 0;
-    gap: var(--fc-space-sm);
+    gap: var(--fc-space-xs);
 }
 
 .public-component-ribbon__toolbar {
     display: grid;
     align-content: start;
-    gap: var(--fc-space-xs);
-    min-width: 10rem;
+    gap: calc(var(--fc-space-xs) / 2);
+    min-width: 8rem;
 }
 
 .public-component-ribbon__error {
@@ -21,14 +21,14 @@
 .public-component-ribbon__hint,
 .public-component-ribbon-empty {
     margin: 0;
-    padding: var(--fc-space-sm);
+    padding: var(--fc-space-xs) var(--fc-space-sm);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption);
 }
 
 .public-component-ribbon__list {
     display: flex;
-    gap: var(--fc-space-sm);
+    gap: var(--fc-space-xs);
     min-width: 0;
     overflow-x: auto;
 }
@@ -37,7 +37,7 @@
     display: grid;
     justify-items: center;
     gap: var(--fc-space-xs);
-    min-width: 7rem;
+    min-width: 5rem;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-caption);
 }
@@ -52,8 +52,8 @@
 .public-component-ribbon__item .page-document-asset-picker__thumbnail,
 .public-component-ribbon__placeholder {
     display: grid;
-    width: 3.5rem;
-    height: 2.5rem;
+    width: 2.5rem;
+    height: var(--fc-control-height-xs);
     place-items: center;
     overflow: hidden;
     border: 1px solid var(--fc-color-border-light);
