@@ -35,27 +35,41 @@ export function createComponentInsertionPatches(
     }
     const input = creationInput(componentKind, newChildNodeIds, assetId)
     if (input.status === 'rejected') return input
-    let markup: string | null
-    try {
-        markup = createComponentMarkup(componentKind, newNodeId, input.input)
-    } catch {
-        return rejected('component-creation-input-invalid', '组件创建身份或参数无效。')
-    }
-    if (!markup) {
-        return rejected('component-creation-unsupported', `${componentKind} 不能独立创建。`)
-    }
     const parentInner = elementInnerRange(sourceContainer)
     const afterRange = after ? elementRange(after) : null
     if (!parentInner || (after && !afterRange)) {
         return rejected('source-location-missing', '无法定位组件插入位置。')
     }
     const insertionOffset = afterRange?.to ?? parentInner.from
+    const containerIndent = inferredElementIndent(article.content, sourceContainer)
+    const markupIndent = insertionIndent(
+        article.content,
+        sourceContainer,
+        afterRange?.from ?? null,
+        parentInner,
+    )
+    let markup: string | null
+    try {
+        markup = createComponentMarkup(componentKind, newNodeId, input.input, markupIndent)
+    } catch {
+        return rejected('component-creation-input-invalid', '组件创建身份或参数无效。')
+    }
+    if (!markup) {
+        return rejected('component-creation-unsupported', `${componentKind} 不能独立创建。`)
+    }
     const patches: SourcePatch[] = [
         Object.freeze({
             source: article.key,
             range: utf16Range(insertionOffset, insertionOffset),
             expected: '',
-            insert: markup,
+            insert: renderMarkupInsertion(
+                article.content,
+                insertionOffset,
+                parentInner.to,
+                markup,
+                markupIndent,
+                containerIndent,
+            ),
         }),
     ]
     if (componentKind === 'container') {
@@ -75,6 +89,63 @@ export function createComponentInsertionPatches(
         )
     }
     return Object.freeze({status: 'ready', patches: Object.freeze(patches)})
+}
+
+function insertionIndent(
+    source: string,
+    container: HtmlCompositionElement,
+    afterStart: number | null,
+    inner: {readonly from: number; readonly to: number},
+): string {
+    if (afterStart !== null) {
+        const existing = exactLineIndent(source, afterStart)
+        if (existing !== null) return existing
+    } else {
+        const innerSource = source.slice(inner.from, inner.to)
+        const firstContentOffset = innerSource.search(/\S/u)
+        if (firstContentOffset >= 0) {
+            const existing = exactLineIndent(source, inner.from + firstContentOffset)
+            if (existing !== null) return existing
+        }
+    }
+    // 单行墙没有可复用的同级缩进，只局部拆开新边界，并以父级行缩进加两格作为直接子级。
+    return `${inferredElementIndent(source, container)}  `
+}
+
+function inferredElementIndent(source: string, element: HtmlCompositionElement): string {
+    const range = elementRange(element)
+    if (!range) return ''
+    return exactLineIndent(source, range.from) ?? lineLeadingWhitespace(source, range.from)
+}
+
+function exactLineIndent(source: string, offset: number): string | null {
+    const start = lineStart(source, offset)
+    const before = source.slice(start, offset)
+    return /^[\t ]*$/u.test(before) ? before : null
+}
+
+function lineLeadingWhitespace(source: string, offset: number): string {
+    return source.slice(lineStart(source, offset)).match(/^[\t ]*/u)?.[0] ?? ''
+}
+
+function lineStart(source: string, offset: number): number {
+    const lf = source.lastIndexOf('\n', offset - 1)
+    const cr = source.lastIndexOf('\r', offset - 1)
+    return Math.max(lf, cr) + 1
+}
+
+function renderMarkupInsertion(
+    source: string,
+    insertionOffset: number,
+    parentEnd: number,
+    markup: string,
+    markupIndent: string,
+    containerIndent: string,
+): string {
+    const remaining = source.slice(insertionOffset, parentEnd)
+    if (/^[\t ]*(?:\r\n|\r|\n)/u.test(remaining)) return `\n${markup}`
+    const followingIndent = remaining.trim().length === 0 ? containerIndent : markupIndent
+    return `\n${markup}\n${followingIndent}`
 }
 
 type CreationInputResult =

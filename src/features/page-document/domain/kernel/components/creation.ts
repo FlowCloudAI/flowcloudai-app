@@ -14,10 +14,12 @@ export interface ComponentCreationInput {
     readonly tableCellIds?: readonly string[]
 }
 
+/** 缩进只作用于结构边界；文字叶子内部不得出现格式空白，否则会改变语义偏移。 */
 export function createComponentMarkup(
     kind: DocumentNodeKind,
     rawNodeId: string,
-    input: ComponentCreationInput = {},
+    input: ComponentCreationInput,
+    indent: string,
 ): string | null {
     const id = nodeId(rawNodeId)
     const definition = componentDefinition(kind)
@@ -28,37 +30,37 @@ export function createComponentMarkup(
 
     switch (kind) {
         case 'container':
-            return `<${tag} ${identity}></${tag}>`
+            return `${indent}<${tag} ${identity}>\n${indent}</${tag}>`
         case 'paragraph':
-            return `<${tag} ${identity}>新段落</${tag}>`
+            return `${indent}<${tag} ${identity}>新段落</${tag}>`
         case 'heading':
-            return `<${tag} ${identity}>新标题</${tag}>`
+            return `${indent}<${tag} ${identity}>新标题</${tag}>`
         case 'list': {
             const itemId = input.listItemId ? nodeId(input.listItemId) : null
             return itemId
-                ? `<${tag} ${identity}><li data-fc-node-id="${itemId}" data-fc-node-kind="list-item">新列表项</li></${tag}>`
+                ? `${indent}<${tag} ${identity}>\n${indent}  <li data-fc-node-id="${itemId}" data-fc-node-kind="list-item">新列表项</li>\n${indent}</${tag}>`
                 : null
         }
         case 'list-item':
-            return `<${tag} ${identity}>新列表项</${tag}>`
+            return `${indent}<${tag} ${identity}>新列表项</${tag}>`
         case 'table':
-            return createTableMarkup(tag, identity, input.tableCellIds)
+            return createTableMarkup(tag, identity, input.tableCellIds, indent)
         case 'table-cell':
             return null
         case 'asset': {
             const assetId = input.assetId ? nodeId(input.assetId) : null
             return assetId
-                ? `<${tag} ${identity}><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" alt="词条资产"></${tag}>`
+                ? `${indent}<${tag} ${identity}><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" alt="词条资产"></${tag}>`
                 : null
         }
         case 'gallery': {
             const assetId = input.assetId ? nodeId(input.assetId) : null
             return assetId
-                ? `<${tag} ${identity}><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" alt="图库资产"></${tag}>`
-                : `<${tag} ${identity}></${tag}>`
+                ? `${indent}<${tag} ${identity}><img src="fcasset://${assetId}" data-fc-asset-id="${assetId}" alt="图库资产"></${tag}>`
+                : `${indent}<${tag} ${identity}></${tag}>`
         }
         case 'divider':
-            return `<${tag} ${identity}>`
+            return `${indent}<${tag} ${identity}>`
         case 'component':
             return null
     }
@@ -68,6 +70,7 @@ function createTableMarkup(
     tag: string,
     identity: string,
     rawCellIds: readonly string[] | undefined,
+    indent: string,
 ): string | null {
     if (rawCellIds?.length !== DEFAULT_TABLE_CELL_COUNT) return null
     const cells = rawCellIds.map(id => nodeId(id))
@@ -75,9 +78,9 @@ function createTableMarkup(
         .slice(0, DEFAULT_TABLE_COLUMN_COUNT)
         .map(
             (cellId, index) =>
-                `<th data-fc-node-id="${cellId}" data-fc-node-kind="table-cell">列 ${index + 1}</th>`,
+                `${indent}      <th data-fc-node-id="${cellId}" data-fc-node-kind="table-cell">列 ${index + 1}</th>`,
         )
-        .join('')
+        .join('\n')
     const body = Array.from({length: DEFAULT_TABLE_ROW_COUNT - 1}, (_, row) => row)
         .map(row => {
             const offset = DEFAULT_TABLE_COLUMN_COUNT * (row + 1)
@@ -85,11 +88,20 @@ function createTableMarkup(
                 .slice(offset, offset + DEFAULT_TABLE_COLUMN_COUNT)
                 .map(
                     cellId =>
-                        `<td data-fc-node-id="${cellId}" data-fc-node-kind="table-cell">单元格</td>`,
+                        `${indent}      <td data-fc-node-id="${cellId}" data-fc-node-kind="table-cell">单元格</td>`,
                 )
-                .join('')
-            return `<tr>${rowCells}</tr>`
+                .join('\n')
+            return `${indent}    <tr>\n${rowCells}\n${indent}    </tr>`
         })
-        .join('')
-    return `<${tag} ${identity}><thead><tr>${header}</tr></thead><tbody>${body}</tbody></${tag}>`
+        .join('\n')
+    return `${indent}<${tag} ${identity}>
+${indent}  <thead>
+${indent}    <tr>
+${header}
+${indent}    </tr>
+${indent}  </thead>
+${indent}  <tbody>
+${body}
+${indent}  </tbody>
+${indent}</${tag}>`
 }
