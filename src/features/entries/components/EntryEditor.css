@@ -536,11 +536,27 @@
 }
 
 .entry-editor-workspace__header-left,
+.entry-editor-workspace__header-center,
 .entry-editor-workspace__toolbar-actions {
     display: flex;
     align-items: center;
     gap: var(--fc-space-sm);
     min-width: 0;
+}
+
+.entry-editor-workspace__header-center {
+    justify-content: center;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.entry-editor-workspace__header-center::-webkit-scrollbar {
+    display: none;
+}
+
+.entry-editor-workspace__page-workbar-host {
+    display: flex;
+    min-width: max-content;
 }
 
 .entry-editor-workspace__toolbar-actions {

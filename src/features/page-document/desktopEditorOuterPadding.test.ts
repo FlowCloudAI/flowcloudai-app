@@ -30,3 +30,12 @@ test('桌面词条页使用满高网格且页面编辑器不再是带外边距�
     assert.equal(editor.nodes.some(node => node.type === 'decl'
         && (node.prop === 'border' || node.prop === 'border-radius')), false)
 })
+
+test('页面编辑工作条挂入词条常驻顶栏且不再占用第二行', () => {
+    const workspace = readFileSync(new URL('../entries/components/EntryEditorWorkspace.tsx', import.meta.url), 'utf8')
+    const editor = readFileSync(new URL('components/PageDocumentEditor.tsx', import.meta.url), 'utf8')
+
+    assert.match(workspace, /entry-editor-workspace__header-center[\s\S]*setPageDocumentWorkbarHost/u)
+    assert.match(editor, /workbarPortalHost && createPortal\(workbarControls, workbarPortalHost\)/u)
+    assert.match(editor, /!workbarPortalHost && <header className="page-document-editor__workbar"/u)
+})

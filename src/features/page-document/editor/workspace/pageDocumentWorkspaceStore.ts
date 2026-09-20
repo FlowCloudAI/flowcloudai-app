@@ -15,6 +15,7 @@ export interface PageDocumentWorkspaceSnapshot {
     sidebarHost: HTMLElement | null
     dockHost: HTMLElement | null
     relationsDockHost: HTMLElement | null
+    workbarHost: HTMLElement | null
 }
 
 const EMPTY_SNAPSHOT: PageDocumentWorkspaceSnapshot = Object.freeze({
@@ -22,6 +23,7 @@ const EMPTY_SNAPSHOT: PageDocumentWorkspaceSnapshot = Object.freeze({
     sidebarHost: null,
     dockHost: null,
     relationsDockHost: null,
+    workbarHost: null,
 })
 
 let snapshot = EMPTY_SNAPSHOT
@@ -36,7 +38,8 @@ function publish(next: PageDocumentWorkspaceSnapshot): void {
         next.active?.requestLeave === snapshot.active?.requestLeave &&
         next.sidebarHost === snapshot.sidebarHost &&
         next.dockHost === snapshot.dockHost &&
-        next.relationsDockHost === snapshot.relationsDockHost
+        next.relationsDockHost === snapshot.relationsDockHost &&
+        next.workbarHost === snapshot.workbarHost
     ) return
     snapshot = Object.freeze(next)
     listeners.forEach(listener => listener())
@@ -71,4 +74,8 @@ export function setPageDocumentDockHost(dockHost: HTMLElement | null): void {
 
 export function setPageDocumentRelationsDockHost(relationsDockHost: HTMLElement | null): void {
     publish({...snapshot, relationsDockHost})
+}
+
+export function setPageDocumentWorkbarHost(workbarHost: HTMLElement | null): void {
+    publish({...snapshot, workbarHost})
 }

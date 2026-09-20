@@ -216,6 +216,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         active: activeWorkspace,
         sidebarHost,
         dockHost,
+        workbarHost,
     } = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
     const handleSave = useCallback(async () => {
@@ -595,11 +596,62 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         workspace: activeWorkspace,
         host: dockHost,
     }) ? dockHost : null
+    const workbarPortalHost = shouldOccupyPageDocumentSharedHost({
+        active,
+        editor: editorIdentity,
+        workspace: activeWorkspace,
+        host: workbarHost,
+    }) ? workbarHost : null
     const forwardsNavigation = shouldForwardPageDocumentNavigation(mode)
     const visibleCandidate = active && mode === 'visual' ? linkCandidateIntent : null
     const linkCandidates = visibleCandidate?.query !== null && visibleCandidate
         ? pageDocumentLinkCandidates(projectEntries, entryId, visibleCandidate.query)
         : []
+    const workbarControls = <div className={`page-document-editor__workbar-content${workbarPortalHost ? ' is-merged' : ''}`}>
+        {!workbarPortalHost && <>
+            <strong>页面编辑</strong>
+            <span className="page-document-editor__separator" aria-hidden="true" />
+        </>}
+        <div className="page-document-editor__modes" role="group" aria-label="页面编辑模式">
+            <button
+                type="button"
+                className={mode === 'visual' ? 'is-active' : ''}
+                aria-pressed={mode === 'visual'}
+                onClick={() => changeMode('visual')}
+            >可视</button>
+            <button
+                type="button"
+                className={mode === 'display' ? 'is-active' : ''}
+                aria-pressed={mode === 'display'}
+                onClick={() => changeMode('display')}
+            >展示</button>
+            <button
+                type="button"
+                className={mode === 'code' ? 'is-active' : ''}
+                aria-pressed={mode === 'code'}
+                onClick={() => changeMode('code')}
+            >代码</button>
+        </div>
+        {mode === 'visual' && <Button type="button" size="sm" variant="outline" onClick={() => openAssetPicker('insert')}>插入图片</Button>}
+        <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={!canUndo}
+            onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.undo() : session.undo()}
+        >撤销</Button>
+        <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={!canRedo}
+            onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
+        >重做</Button>
+        <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
+        <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void handleSave()}>
+            {scope.phase === 'saving' ? '保存中…' : '保存'}
+        </Button>
+    </div>
 
     return (
         <>
@@ -636,7 +688,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 />,
                 dockPortalHost,
             )}
-            <section className="page-document-editor">
+            {workbarPortalHost && createPortal(workbarControls, workbarPortalHost)}
+            <section className={`page-document-editor${workbarPortalHost ? ' has-external-workbar' : ''}`}>
             {componentEditor && <PublicComponentDefinitionCreator
                 open
                 projectId={projectId}
@@ -726,53 +779,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     {linkCandidates.length === 0 && <p>没有匹配的词条</p>}
                 </div>
             </FloatingPanel>}
-            <header className="page-document-editor__workbar">
-                <strong>页面编辑</strong>
-                <span className="page-document-editor__separator" aria-hidden="true" />
-                <div className="page-document-editor__modes" role="group" aria-label="页面编辑模式">
-                    <button
-                        type="button"
-                        className={mode === 'visual' ? 'is-active' : ''}
-                        aria-pressed={mode === 'visual'}
-                        onClick={() => changeMode('visual')}
-                    >可视</button>
-                    <button
-                        type="button"
-                        className={mode === 'display' ? 'is-active' : ''}
-                        aria-pressed={mode === 'display'}
-                        onClick={() => changeMode('display')}
-                    >
-                        展示
-                    </button>
-                    <button
-                        type="button"
-                        className={mode === 'code' ? 'is-active' : ''}
-                        aria-pressed={mode === 'code'}
-                        onClick={() => changeMode('code')}
-                    >
-                        代码
-                    </button>
-                </div>
-                {mode === 'visual' && <Button type="button" size="sm" variant="outline" onClick={() => openAssetPicker('insert')}>插入图片</Button>}
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={!canUndo}
-                    onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.undo() : session.undo()}
-                >撤销</Button>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={!canRedo}
-                    onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
-                >重做</Button>
-                <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
-                <Button type="button" size="sm" radius="full" disabled={!canSave} onClick={() => void handleSave()}>
-                    {scope.phase === 'saving' ? '保存中…' : '保存'}
-                </Button>
-            </header>
+            {!workbarPortalHost && <header className="page-document-editor__workbar">{workbarControls}</header>}
 
             {conflict && (
                 <section className="page-document-editor__conflict" role="alert">

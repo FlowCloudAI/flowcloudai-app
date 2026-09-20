@@ -4,7 +4,10 @@ import {type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {ActionMenu, FloatingPanel} from '../../../shared/ui/overlay'
-import {usePageDocumentWorkspace} from '../../page-document/editor/workspace/pageDocumentWorkspaceStore.ts'
+import {
+    setPageDocumentWorkbarHost,
+    usePageDocumentWorkspace,
+} from '../../page-document/editor/workspace/pageDocumentWorkspaceStore.ts'
 import type {EntryEditorMode} from '../lib/entryEditorShortcutModel.ts'
 
 interface EntryEditorWorkspaceProps {
@@ -147,7 +150,13 @@ export default function EntryEditorWorkspace({
                 />
             </div>
 
-            {modeSwitch}
+            <div className="entry-editor-workspace__header-center">
+                {modeSwitch}
+                {active && editorMode === 'edit' && <div
+                    className="entry-editor-workspace__page-workbar-host"
+                    ref={setPageDocumentWorkbarHost}
+                />}
+            </div>
 
             <div className="entry-editor-workspace__toolbar-actions">
                 {toolbarExtras}
