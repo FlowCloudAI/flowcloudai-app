@@ -1,11 +1,18 @@
-// 本组件封装 CodeMirror 的源码输入与诊断标记；保存、冲突和预览仍由页面文档会话管理。
+// 本组件封装 CodeMirror 的源码输入与诊断标记；按文件缓存 EditorState，避免页签重建清空各自历史。
+// 保存、冲突和预览仍由页面文档会话管理，外部同步不进入用户撤销栈。
 
 import {forwardRef, useEffect, useImperativeHandle, useRef} from 'react'
-import {redo, redoDepth, undo, undoDepth} from '@codemirror/commands'
-import {Compartment, type Extension} from '@codemirror/state'
+import {redo, undo} from '@codemirror/commands'
+import {Compartment, EditorState, type Extension} from '@codemirror/state'
 import {lintGutter, setDiagnostics, type Diagnostic} from '@codemirror/lint'
 import {EditorView, basicSetup} from 'codemirror'
 import type {DocumentDiagnostic, SourceFileName} from '../../domain/contract.ts'
+import {
+    type CodeSourceEditorHistory,
+    type CodeSourceEditorStateCache,
+    sourceEditorHistory,
+    synchronizeExternalEditorState,
+} from './codeSourceEditorState.ts'
 
 interface CodeSourceEditorProps {
     file: SourceFileName
@@ -15,10 +22,7 @@ interface CodeSourceEditorProps {
     onHistoryChange: (history: CodeSourceEditorHistory) => void
 }
 
-export interface CodeSourceEditorHistory {
-    canUndo: boolean
-    canRedo: boolean
-}
+export type {CodeSourceEditorHistory} from './codeSourceEditorState.ts'
 
 export interface CodeSourceEditorHandle {
     undo: () => boolean
@@ -86,6 +90,7 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
     const valueRef = useRef(value)
     const diagnosticsRef = useRef(diagnostics)
     const editableCompartmentRef = useRef(new Compartment())
+    const stateCacheRef = useRef<CodeSourceEditorStateCache>(new Map())
 
     useEffect(() => {
         onChangeRef.current = onChange
@@ -105,43 +110,55 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
         if (!host) return
         let cancelled = false
         let view: EditorView | null = null
-        void loadLanguage(file).then(language => {
+        const stateCache = stateCacheRef.current
+        const cachedState = stateCache.get(file)
+        onHistoryChangeRef.current(sourceEditorHistory(cachedState))
+
+        const mount = (state: EditorState) => {
             if (cancelled) return
+            const synchronizedState = synchronizeExternalEditorState(state, valueRef.current)
             view = new EditorView({
-                doc: valueRef.current,
+                state: synchronizedState,
                 parent: host,
-                extensions: [
-                    basicSetup,
-                    language,
-                    lintGutter(),
-                    EditorView.lineWrapping,
-                    editorTheme,
-                    editableCompartmentRef.current.of(EditorView.editable.of(true)),
-                    EditorView.updateListener.of(update => {
-                        if (update.docChanged && !externalUpdateRef.current) {
-                            onChangeRef.current(update.state.doc.toString())
-                        }
-                        if (update.transactions.length > 0) {
-                            onHistoryChangeRef.current({
-                                canUndo: undoDepth(update.state) > 0,
-                                canRedo: redoDepth(update.state) > 0,
-                            })
-                        }
-                    }),
-                ],
             })
             viewRef.current = view
-            onHistoryChangeRef.current({canUndo: false, canRedo: false})
+            onHistoryChangeRef.current(sourceEditorHistory(view.state))
             view.dispatch(setDiagnostics(
                 view.state,
                 codeMirrorDiagnostics(diagnosticsRef.current, file, view.state.doc.length),
             ))
-        })
+        }
+
+        if (cachedState) {
+            mount(cachedState)
+        } else {
+            void loadLanguage(file).then(language => {
+                mount(EditorState.create({
+                    doc: valueRef.current,
+                    extensions: [
+                        basicSetup,
+                        language,
+                        lintGutter(),
+                        EditorView.lineWrapping,
+                        editorTheme,
+                        editableCompartmentRef.current.of(EditorView.editable.of(true)),
+                        EditorView.updateListener.of(update => {
+                            if (update.docChanged && !externalUpdateRef.current) {
+                                onChangeRef.current(update.state.doc.toString())
+                            }
+                            if (update.transactions.length > 0) {
+                                onHistoryChangeRef.current(sourceEditorHistory(update.state))
+                            }
+                        }),
+                    ],
+                }))
+            })
+        }
         return () => {
             cancelled = true
+            if (view) stateCache.set(file, view.state)
             if (viewRef.current === view) viewRef.current = null
             view?.destroy()
-            onHistoryChangeRef.current({canUndo: false, canRedo: false})
         }
     }, [file])
 
@@ -154,8 +171,13 @@ function CodeSourceEditor({file, value, diagnostics, onChange, onHistoryChange},
         const view = viewRef.current
         if (!view || view.state.doc.toString() === value) return
         externalUpdateRef.current = true
-        view.dispatch({changes: {from: 0, to: view.state.doc.length, insert: value}})
-        externalUpdateRef.current = false
+        try {
+            const synchronizedState = synchronizeExternalEditorState(view.state, value)
+            view.setState(synchronizedState)
+            onHistoryChangeRef.current(sourceEditorHistory(synchronizedState))
+        } finally {
+            externalUpdateRef.current = false
+        }
     }, [value])
 
     useEffect(() => {
