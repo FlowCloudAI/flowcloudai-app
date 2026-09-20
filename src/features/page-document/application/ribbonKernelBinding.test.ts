@@ -74,22 +74,32 @@ test('断点切换经功能区绑定写入移动基础与桌面条件通道', ()
     assert.deepEqual(desktop.destination, {scope: 'entry', channel: {kind: 'conditional-rule', context: 'desktop'}})
 })
 
-test('可信文字选区通过功能区绑定发出 text-range 样式 intent', () => {
-    const request = createRibbonTextRangePropertyRequest({
+test('行内样式功能区按当前档位读取且始终写入 inline 通道', () => {
+    const range = {
         nodeId: NODE_ID,
         from: 1,
         to: 3,
         expected: '文字',
-    }, 'font-weight', '700', () => 'inline-request')
-    const intent = request.createIntents(new Map([[NODE_ID, handle()]]))[0]
-    assert.equal(intent?.kind, 'edit-property')
-    if (intent?.kind !== 'edit-property') return
-    assert.deepEqual(intent.target, {
-        kind: 'text-range',
-        component: handle(),
-        range: utf16Range(1, 3),
-        expected: '文字',
-    })
-    assert.deepEqual(intent.action, {kind: 'set-value', value: '700'})
-    assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
+    } as const
+    for (const styleContext of ['mobile', 'desktop'] as const) {
+        const request = createRibbonTextRangePropertyRequest(
+            range,
+            'font-weight',
+            '700',
+            styleContext,
+            () => `inline-request-${styleContext}`,
+        )
+        const intent = request.createIntents(new Map([[NODE_ID, handle()]]))[0]
+        assert.equal(intent?.kind, 'edit-property')
+        if (intent?.kind !== 'edit-property') continue
+        assert.deepEqual(intent.target, {
+            kind: 'text-range',
+            component: handle(),
+            range: utf16Range(1, 3),
+            expected: '文字',
+        })
+        assert.deepEqual(intent.action, {kind: 'set-value', value: '700'})
+        assert.equal(intent.readContext.viewport, styleContext)
+        assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
+    }
 })

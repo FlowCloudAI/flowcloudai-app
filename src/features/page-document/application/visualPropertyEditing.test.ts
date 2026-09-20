@@ -213,6 +213,7 @@ describe('visual property editing', () => {
             paragraph(model),
             request => runtime.inspectComponent(model, source, request),
             source.styleCss,
+            'mobile',
         )
 
         assert.equal(states.find(item => item.property === 'color')?.sourceState, 'other-viewport', JSON.stringify(states.find(item => item.property === 'color')))

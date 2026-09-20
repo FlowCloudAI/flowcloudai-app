@@ -279,6 +279,7 @@ export function HomeRibbonControls({
                 range={activeTextRange}
                 applyKernelEntry={applyKernelEntry}
                 inspectTextRange={inspectTextRange}
+                styleContext={styleContext}
             />
         </>
     )

@@ -32,12 +32,15 @@ export type RibbonInlineProperty =
     | 'text-decoration-line'
     | 'color'
 
-const INLINE_CONTEXT: ReadContext = Object.freeze({
-    viewport: 'desktop',
-    interactions: Object.freeze({hover: false, focusWithin: false}),
-    direction: 'ltr',
-    writingMode: 'horizontal-tb',
-})
+function inlineReadContext(styleContext: 'mobile' | 'desktop'): ReadContext {
+    // 行内目的地不分档；viewport 只描述作者当前所见区间，供回读和影响分析使用。
+    return Object.freeze({
+        viewport: styleContext,
+        interactions: Object.freeze({hover: false, focusWithin: false}),
+        direction: 'ltr',
+        writingMode: 'horizontal-tb',
+    })
+}
 
 const INLINE_VALUE_PATTERNS: Readonly<Record<RibbonInlineProperty, RegExp>> = Object.freeze({
     'font-size': /^(?:\d+(?:\.\d+)?)(?:px|rem|em|%)$/u,
@@ -60,6 +63,7 @@ export function createRibbonTextRangePropertyRequest(
     range: RibbonTextRange,
     property: RibbonInlineProperty,
     value: string | null,
+    styleContext: 'mobile' | 'desktop',
     allocateRequestId: () => string = () => crypto.randomUUID(),
 ): KernelDraftEditRequest {
     if (range.from < 0 || range.to <= range.from || range.expected.length !== range.to - range.from) {
@@ -88,7 +92,7 @@ export function createRibbonTextRangePropertyRequest(
                 action: value === null
                     ? Object.freeze({kind: 'clear-override' as const})
                     : Object.freeze({kind: 'set-value' as const, value}),
-                readContext: INLINE_CONTEXT,
+                readContext: inlineReadContext(styleContext),
                 destination: Object.freeze({scope: 'entry' as const, channel: Object.freeze({kind: 'inline' as const})}),
             })])
         },

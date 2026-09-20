@@ -15,14 +15,8 @@ export interface InlineRibbonStyleControlsProps {
     readonly range: RibbonTextRange | null
     readonly applyKernelEntry: RibbonApplyKernelEntry
     readonly inspectTextRange: RibbonInspectTextRange
+    readonly styleContext: 'mobile' | 'desktop'
 }
-
-const READ_CONTEXT = Object.freeze({
-    viewport: 'desktop' as const,
-    interactions: Object.freeze({hover: false, focusWithin: false}),
-    direction: 'ltr' as const,
-    writingMode: 'horizontal-tb' as const,
-})
 
 const PROPERTIES = Object.freeze([
     'font-size',
@@ -49,11 +43,20 @@ const COLOR_OPTIONS = Object.freeze([
     {value: 'var(--fc-entry-muted)', label: '弱化'},
 ])
 
-function inspect(range: RibbonTextRange, inspectTextRange: RibbonInspectTextRange) {
+function inspect(
+    range: RibbonTextRange,
+    inspectTextRange: RibbonInspectTextRange,
+    styleContext: 'mobile' | 'desktop',
+) {
     const request: KernelTextRangeInspectionRequest = {
         ...range,
         properties: PROPERTIES,
-        context: READ_CONTEXT,
+        context: {
+            viewport: styleContext,
+            interactions: {hover: false, focusWithin: false},
+            direction: 'ltr',
+            writingMode: 'horizontal-tb',
+        },
     }
     return inspectTextRange(request)
 }
@@ -78,8 +81,9 @@ export function InlineRibbonStyleControls({
     range,
     applyKernelEntry,
     inspectTextRange,
+    styleContext,
 }: InlineRibbonStyleControlsProps) {
-    const inspection = range ? inspect(range, inspectTextRange) : null
+    const inspection = range ? inspect(range, inspectTextRange, styleContext) : null
     const enabled = Boolean(range && range.to > range.from && inspection?.status === 'ready')
     const reason = enabled ? null : range ? '选区已经漂移，请重新选择文字。' : '请先在画布中选择一段文字。'
     const size = inspection ? uniformValue(inspection, 'font-size') : null
@@ -90,7 +94,7 @@ export function InlineRibbonStyleControls({
     const apply = (property: RibbonInlineProperty, value: string | null, label: string) => {
         if (!range || !enabled) return
         void applyKernelEntry(
-            createRibbonTextRangePropertyRequest(range, property, value),
+            createRibbonTextRangePropertyRequest(range, property, value, styleContext),
             label,
             {immediate: true},
         )

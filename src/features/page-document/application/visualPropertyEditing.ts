@@ -266,7 +266,7 @@ export function inspectVisualProperties(
     node: LayerProjectionNode,
     inspect: InspectVisualComponent,
     entryStyleCss = '',
-    styleContext: VisualStyleContext = 'mobile',
+    styleContext: VisualStyleContext,
     requestedProperties: readonly VisualPropertyName[] = VISUAL_PROPERTY_FIELDS.map(field => field.property),
 ): readonly VisualPropertyState[] {
     const fields = VISUAL_PROPERTY_FIELDS.filter(field => requestedProperties.includes(field.property))

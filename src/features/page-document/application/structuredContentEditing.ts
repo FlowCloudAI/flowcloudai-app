@@ -39,13 +39,6 @@ export interface StructuredSelectionContext {
 export type DividerLineStyle = 'unset' | 'solid' | 'dashed' | 'dotted'
 export type DividerSpacing = 'unset' | 'compact' | 'normal' | 'wide'
 
-const ALL_WIDTHS_CONTEXT: ReadContext = Object.freeze({
-    viewport: 'mobile',
-    interactions: Object.freeze({hover: false, focusWithin: false}),
-    direction: 'ltr',
-    writingMode: 'horizontal-tb',
-})
-
 export function resolveStructuredSelectionContext(
     nodes: readonly LayerProjectionNode[],
     selectedNodeId: string | null,
@@ -78,7 +71,17 @@ export function readTableDimensions(
         readonly context: ReadContext
     }) => KernelComponentInspectionResult,
 ): TableDimensions | null {
-    const result = inspect({nodeId: tableId, properties: [], context: ALL_WIDTHS_CONTEXT})
+    // 此次检查只读取表格结构句柄，空属性列表使读取上下文不参与样式判定。
+    const result = inspect({
+        nodeId: tableId,
+        properties: [],
+        context: {
+            viewport: 'mobile',
+            interactions: {hover: false, focusWithin: false},
+            direction: 'ltr',
+            writingMode: 'horizontal-tb',
+        },
+    })
     if (result.status !== 'ready' || result.inspection.handle.kind !== 'table') return null
     const table = result.inspection.structure.table
     return table?.status === 'rectangular'
