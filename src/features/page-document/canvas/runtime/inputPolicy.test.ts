@@ -43,6 +43,12 @@ test('未收到开启命令时不处理输入，开启后只提交受控 beforei
         'deleteContentForward',
         'deleteWordBackward',
         'deleteWordForward',
+        'deleteSoftLineBackward',
+        'deleteSoftLineForward',
+        'deleteHardLineBackward',
+        'deleteHardLineForward',
+        'deleteByCut',
+        'deleteContent',
     ]) {
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: false, inputType}), 'submit')
         assert.equal(canvasBeforeInputDecision({editingEnabled: true, isComposing: true, inputType}), 'block')
@@ -281,4 +287,43 @@ test('折叠删除不会把 UTF-16 代理对拆开', () => {
         'deleteContentForward',
     )
     assert.deepEqual(forward, {nodeId: snapshot.nodeId, from: 1, to: 3, expected: '😀', collapsed: false})
+})
+
+test('剪切与整行删除进入受控替换，缺失 target range 时按正确行边界扩展', () => {
+    const selected = {...snapshot, from: 4, to: 7, expected: 'def', collapsed: false}
+    assert.deepEqual(expandCollapsedCanvasDeletion('abc\ndef\nghi', selected, 'deleteByCut'), selected)
+
+    const caret = {...snapshot, from: 6, to: 6}
+    assert.deepEqual(expandCollapsedCanvasDeletion('abc\ndef\nghi', caret, 'deleteHardLineBackward'), {
+        ...caret,
+        from: 4,
+        expected: 'de',
+        collapsed: false,
+    })
+    assert.deepEqual(expandCollapsedCanvasDeletion('abc\ndef\nghi', {...snapshot, from: 5, to: 5}, 'deleteHardLineForward'), {
+        ...snapshot,
+        from: 5,
+        to: 7,
+        expected: 'ef',
+        collapsed: false,
+    })
+
+    const visualLine = {...snapshot, from: 5, to: 6, expected: 'e', collapsed: false}
+    assert.deepEqual(
+        expandCollapsedCanvasDeletion('abc\ndef\nghi', caret, 'deleteSoftLineBackward', visualLine),
+        visualLine,
+    )
+})
+
+test('未白名单的输入类型仍拒绝并保留原因', () => {
+    assert.equal(canvasBeforeInputDecision({
+        editingEnabled: true,
+        isComposing: false,
+        inputType: 'deleteEntireDocument',
+    }), 'block')
+    assert.deepEqual(canvasBlockedInputDetail('deleteEntireDocument', 'unsupported-input-type', snapshot.nodeId), {
+        inputType: 'deleteEntireDocument',
+        reason: 'unsupported-input-type',
+        nodeId: snapshot.nodeId,
+    })
 })

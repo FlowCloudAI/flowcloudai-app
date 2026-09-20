@@ -33,6 +33,12 @@ export const CANVAS_INPUT_TYPES = [
     'deleteContentForward',
     'deleteWordBackward',
     'deleteWordForward',
+    'deleteSoftLineBackward',
+    'deleteSoftLineForward',
+    'deleteHardLineBackward',
+    'deleteHardLineForward',
+    'deleteByCut',
+    'deleteContent',
 ] as const
 
 export const CANVAS_INPUT_BLOCKED_REASONS = [

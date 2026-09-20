@@ -332,6 +332,28 @@ function captureInputRange(event: InputEvent): CanvasTextSelectionSnapshot | nul
         : captureSelection()
 }
 
+/** WebKit 未给 target range 时，用原生视觉行边界补齐软行删除；随后恢复原光标，避免污染乐观写回。 */
+function captureSoftLineDeletionRange(
+    snapshot: CanvasTextSelectionSnapshot,
+    inputType: CanvasInputType,
+): CanvasTextSelectionSnapshot | null {
+    if (!snapshot.collapsed || (inputType !== 'deleteSoftLineBackward' && inputType !== 'deleteSoftLineForward')) {
+        return null
+    }
+    const selection = getSelection()
+    if (!selection || selection.rangeCount !== 1 || typeof selection.modify !== 'function') return null
+    const original = selection.getRangeAt(0).cloneRange()
+    selection.modify(
+        'extend',
+        inputType === 'deleteSoftLineBackward' ? 'backward' : 'forward',
+        'lineboundary',
+    )
+    const expanded = captureSelection()
+    selection.removeAllRanges()
+    selection.addRange(original)
+    return expanded?.nodeId === snapshot.nodeId ? expanded : null
+}
+
 function locateTextOffset(rootNode: Node, offset: number): {node: Node; offset: number} | null {
     if (!Number.isInteger(offset) || offset < 0 || offset > semanticLength(rootNode)) return null
     let remaining = offset
@@ -546,7 +568,10 @@ function installInputListeners(): void {
         }
         let text = ''
         if (inputType.startsWith('delete')) {
-            snapshot = expandCollapsedCanvasDeletion(semanticText(node), snapshot, inputType as CanvasInputType)
+            const typedInput = inputType as CanvasInputType
+            const hasTargetRange = (event.getTargetRanges?.().length ?? 0) > 0
+            const softLineRange = hasTargetRange ? null : captureSoftLineDeletionRange(snapshot, typedInput)
+            snapshot = expandCollapsedCanvasDeletion(semanticText(node), snapshot, typedInput, softLineRange)
         } else if (inputType === 'insertParagraph') {
             if (!isCanvasSplittableKind(node.getAttribute('data-fc-node-kind'))) {
                 event.preventDefault()

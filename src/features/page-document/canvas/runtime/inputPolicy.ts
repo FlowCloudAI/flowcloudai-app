@@ -29,6 +29,12 @@ const beforeInputTypes = new Set<string>([
     'deleteContentForward',
     'deleteWordBackward',
     'deleteWordForward',
+    'deleteSoftLineBackward',
+    'deleteSoftLineForward',
+    'deleteHardLineBackward',
+    'deleteHardLineForward',
+    'deleteByCut',
+    'deleteContent',
 ] satisfies readonly CanvasInputType[])
 
 const nativeCompositionInputTypes = new Set([
@@ -155,8 +161,30 @@ export function expandCollapsedCanvasDeletion(
     text: string,
     snapshot: CanvasTextSelectionSnapshot,
     inputType: CanvasInputType,
+    softLineRange: CanvasTextSelectionSnapshot | null = null,
 ): CanvasTextSelectionSnapshot {
     if (!snapshot.collapsed) return snapshot
+    if (inputType === 'deleteSoftLineBackward' || inputType === 'deleteSoftLineForward') {
+        if (softLineRange && softLineRange.nodeId === snapshot.nodeId) return softLineRange
+        const boundary = inputType.endsWith('Backward')
+            ? text.lastIndexOf('\n', Math.max(0, snapshot.from - 1)) + 1
+            : (() => {
+                const nextLineBreak = text.indexOf('\n', snapshot.to)
+                return nextLineBreak < 0 ? text.length : nextLineBreak
+            })()
+        return inputType.endsWith('Backward')
+            ? {...snapshot, from: boundary, expected: text.slice(boundary, snapshot.to), collapsed: boundary === snapshot.to}
+            : {...snapshot, to: boundary, expected: text.slice(snapshot.from, boundary), collapsed: snapshot.from === boundary}
+    }
+    if (inputType === 'deleteHardLineBackward') {
+        const from = text.lastIndexOf('\n', Math.max(0, snapshot.from - 1)) + 1
+        return {...snapshot, from, expected: text.slice(from, snapshot.to), collapsed: from === snapshot.to}
+    }
+    if (inputType === 'deleteHardLineForward') {
+        const nextLineBreak = text.indexOf('\n', snapshot.to)
+        const to = nextLineBreak < 0 ? text.length : nextLineBreak
+        return {...snapshot, to, expected: text.slice(snapshot.from, to), collapsed: snapshot.from === to}
+    }
     if (inputType.endsWith('Backward')) {
         const from = previousCodePointOffset(text, snapshot.from)
         return {...snapshot, from, expected: text.slice(from, snapshot.to), collapsed: from === snapshot.to}
