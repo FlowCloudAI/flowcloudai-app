@@ -99,8 +99,19 @@ function findManagedNode(nodeId: string | null): HTMLElement | null {
 }
 
 function setSelection(nodeId: string | null): void {
+    const normalizedNodeId = nodeId?.toLowerCase() ?? null
+    if (selectedNodeId !== normalizedNodeId) {
+        const textSelection = captureSelection()
+        if (textSelection && textSelection.nodeId !== normalizedNodeId) getSelection()?.removeAllRanges()
+        const focusedNode = managedNode(document.activeElement)
+        const focusedNodeId = managedNodeId(focusedNode)
+        if (focusedNodeId && focusedNodeId !== normalizedNodeId && focusedNode instanceof HTMLElement) {
+            focusedNode.blur()
+        }
+        activeTextSelection = null
+    }
     findManagedNode(selectedNodeId)?.removeAttribute('data-fc-canvas-selected')
-    selectedNodeId = nodeId?.toLowerCase() ?? null
+    selectedNodeId = normalizedNodeId
     findManagedNode(selectedNodeId)?.setAttribute('data-fc-canvas-selected', '')
 }
 

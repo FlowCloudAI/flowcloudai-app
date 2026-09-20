@@ -230,6 +230,7 @@ test('运行时把快捷键、Enter、指针结束与写回重采集接进真实
     assert.match(source, /addEventListener\('pointercancel', reportSettledTextSelection\)/u)
     assert.match(source, /reportTextSelection\(restoredSelection, true\)/u)
     assert.match(source, /selectionchange[\s\S]*?reportTextSelection\(activeTextSelection\)/u)
+    assert.match(source, /selectedNodeId !== normalizedNodeId[\s\S]*?getSelection\(\)\?\.removeAllRanges\(\)[\s\S]*?focusedNode\.blur\(\)/u)
     const blurHandler = source.slice(source.indexOf("window.addEventListener('blur'"), source.indexOf("installInputListeners()"))
     assert.doesNotMatch(blurHandler, /clearTextSelection\(\)/u)
 })
