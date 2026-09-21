@@ -272,6 +272,19 @@
     background: var(--fc-color-bg-secondary);
 }
 
+.document-ribbon-node-color {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-2xs);
+    white-space: nowrap;
+}
+
+.document-ribbon-node-color .page-document-property {
+    margin: 0;
+}
+
 .document-ribbon-alignment button,
 .document-ribbon-font-weight button {
     display: grid;

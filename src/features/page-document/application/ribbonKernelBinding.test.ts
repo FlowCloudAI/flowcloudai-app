@@ -51,6 +51,35 @@ test('工具栏加粗与对齐分别绑定受限字重和 text-align intent', ()
     assert.deepEqual(alignmentIntent[0]?.action, {kind: 'set-value', value: 'center'})
 })
 
+test('字体组的节点文字与节点底色写入当前节点的受管规则', () => {
+    const bindings = new Map([[NODE_ID, handle()]])
+    const color = createRibbonPropertyRequest(
+        NODE_ID,
+        'color',
+        {kind: 'color', value: '#334455', opacity: 100},
+        'mobile',
+    ).createIntents(bindings)[0]
+    const background = createRibbonPropertyRequest(
+        NODE_ID,
+        'background-color',
+        {kind: 'color', value: 'var(--fc-entry-surface)', opacity: 100},
+        'desktop',
+    ).createIntents(bindings)[0]
+
+    assert.equal(color?.kind, 'edit-property')
+    assert.equal(background?.kind, 'edit-property')
+    if (color?.kind !== 'edit-property' || background?.kind !== 'edit-property') return
+    assert.equal(color.property, 'color')
+    assert.deepEqual(color.action, {kind: 'set-value', value: '#334455'})
+    assert.deepEqual(color.destination, {scope: 'entry', channel: {kind: 'base-rule'}})
+    assert.equal(background.property, 'background-color')
+    assert.deepEqual(background.action, {kind: 'set-value', value: 'var(--fc-entry-surface)'})
+    assert.deepEqual(background.destination, {
+        scope: 'entry',
+        channel: {kind: 'conditional-rule', context: 'desktop'},
+    })
+})
+
 test('断点切换经功能区绑定写入移动基础与桌面条件通道', () => {
     const bindings = new Map([[NODE_ID, handle()]])
     const mobile = createRibbonPropertyRequest(

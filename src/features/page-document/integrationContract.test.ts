@@ -294,6 +294,7 @@ describe('page document editor integration boundary', () => {
         assert.doesNotMatch(home, /document-ribbon-control-status/u)
         assert.doesNotMatch(home, /label="样式"/u)
         assert.match(home, /label="块操作"[\s\S]*label="删除"/u)
+        assert.match(home, /ColorPropertyControl[\s\S]*节点文字[\s\S]*'color'[\s\S]*节点底色[\s\S]*'background-color'/u)
         assert.match(panel, /!fixedRoot && <NumericPropertyControl field=\{fieldFor\(fields, 'rotate'\)\}/u)
     })
 

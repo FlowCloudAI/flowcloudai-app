@@ -29,6 +29,7 @@ import {
 import {createRibbonPropertyRequest} from './ribbonKernelBinding.ts'
 import type {RibbonTextRange} from './ribbonKernelBinding.ts'
 import {InlineRibbonStyleControls} from './InlineRibbonStyleControls.tsx'
+import {ColorPropertyControl} from '../../page-document/components/properties/ColorPropertyControl.tsx'
 
 export type RibbonApplyKernelEntry = (
     request: KernelDraftEditRequest,
@@ -96,6 +97,8 @@ function FontControls({
 }) {
     const size = stateFor(states, 'font-size')
     const weight = stateFor(states, 'font-weight')
+    const color = stateFor(states, 'color')
+    const backgroundColor = stateFor(states, 'background-color')
     const sizeValue = propertyValue(size)
     const selectedSize = FONT_SIZE_OPTIONS.includes(sizeValue as (typeof FONT_SIZE_OPTIONS)[number])
         ? sizeValue
@@ -104,7 +107,7 @@ function FontControls({
     const canWrite = Boolean(size && !size.disabled)
     const canWeight = Boolean(weight && !weight.disabled)
     const apply = (property: VisualPropertyName, value: VisualPropertyEditValue, label: string) => {
-        void applyKernelEntry(createRibbonPropertyRequest(node.id, property, value, styleContext), label, {immediate: true})
+        return applyKernelEntry(createRibbonPropertyRequest(node.id, property, value, styleContext), label, {immediate: true})
     }
     return (
         <DocumentRibbonRows
@@ -116,7 +119,7 @@ function FontControls({
                         onValueChange={value => {
                             const next = String(value)
                             if (next === 'current') return
-                            apply(
+                            void apply(
                                 'font-size',
                                 next === 'unset'
                                     ? {kind: 'clear-override'}
@@ -137,7 +140,7 @@ function FontControls({
                             aria-label="加粗"
                             aria-pressed={weightValue === '700'}
                             disabled={!canWeight}
-                            onClick={() => apply('font-weight', {kind: 'font-weight', value: weightValue === '700' ? '400' : '700'}, '切换整段加粗')}
+                            onClick={() => void apply('font-weight', {kind: 'font-weight', value: weightValue === '700' ? '400' : '700'}, '切换整段加粗')}
                             title={weight?.reason ?? '切换整段加粗'}
                             type="button"
                         >
@@ -147,7 +150,7 @@ function FontControls({
                     <button
                         aria-label="清除"
                         disabled={!canWrite || size?.localValue === null}
-                        onClick={() => apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
+                        onClick={() => void apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
                         title={size?.clearTitle ?? '清除后恢复默认字号。'}
                         type="button"
                     >
@@ -155,7 +158,32 @@ function FontControls({
                     </button>
                 </>
             }
-            second={null}
+            second={<>
+                {color && <div className="document-ribbon-node-color">
+                    <span>节点文字</span>
+                    <ColorPropertyControl
+                        embedded
+                        field={color}
+                        onChange={(value, options) => applyKernelEntry(
+                            createRibbonPropertyRequest(node.id, 'color', value, styleContext),
+                            '修改节点文字颜色',
+                            options,
+                        )}
+                    />
+                </div>}
+                {backgroundColor && <div className="document-ribbon-node-color">
+                    <span>节点底色</span>
+                    <ColorPropertyControl
+                        embedded
+                        field={backgroundColor}
+                        onChange={(value, options) => applyKernelEntry(
+                            createRibbonPropertyRequest(node.id, 'background-color', value, styleContext),
+                            '修改节点背景颜色',
+                            options,
+                        )}
+                    />
+                </div>}
+            </>}
         />
     )
 }
