@@ -386,7 +386,8 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
         async (message: string): Promise<false> => {
             debugLog('visual-failure', message)
             setVisualError(message)
-            await showAlert(message, 'warning', 'nonInvasive', 2200)
+            // 提示不阻塞失败回执：等待提示结束期间画布队列里的后续输入会被整批连带拒绝并回滚。
+            void showAlert(message, 'warning', 'nonInvasive', 2200)
             return false
         },
         [showAlert],
