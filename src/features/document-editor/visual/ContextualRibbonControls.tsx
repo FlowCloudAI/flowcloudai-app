@@ -1,5 +1,5 @@
 // 本组件按当前选中节点呈现上下文工具；结构化命令统一经 DocumentKernelDraftRuntime 写回。
-import {Captions, ImagePlus, LayoutGrid, ListChecks, ListPlus, Palette, SlidersHorizontal} from 'lucide-react'
+import {AlignLeft, AlignRight, Ban, Captions, ImagePlus, LayoutGrid, ListChecks, ListPlus, Palette, SlidersHorizontal} from 'lucide-react'
 import {Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../page-document/domain/layerProjection.ts'
 import type {KernelComponentInspectionResult} from '../../page-document/application/documentKernelDraftRuntime.ts'
@@ -11,8 +11,13 @@ import {
     createTableResizeRequest,
     readTableDimensions,
 } from '../../page-document/application/structuredContentEditing.ts'
+import {
+    inspectVisualProperties,
+    type VisualPropertyState,
+} from '../../page-document/application/visualPropertyEditing.ts'
 import {ContainerLayoutRibbonControls, type ApplyKernelEntry, type ContainerLayoutContext, type InspectComponent} from './ContainerLayoutRibbonControls.tsx'
-import {DocumentRibbonCommand, DocumentRibbonGroup} from './DocumentOfficeRibbon.tsx'
+import {DocumentRibbonCommand, DocumentRibbonGroup, DocumentRibbonRows} from './DocumentOfficeRibbon.tsx'
+import {createRibbonPropertyRequest} from './ribbonKernelBinding.ts'
 
 export type LocalAssetFeedback = string | null
 export type VisualInspectorTab = 'content' | 'layout' | 'appearance'
@@ -23,6 +28,13 @@ function inspectedValue(result: KernelComponentInspectionResult, property: strin
     if (result.status !== 'ready') return ''
     const inspection = result.inspection.properties[property]
     return inspection?.effectiveValue?.resolvedValue ?? inspection?.effectiveValue?.rawValue ?? ''
+}
+
+function visualStateFor(
+    states: readonly VisualPropertyState[],
+    property: VisualPropertyState['property'],
+): VisualPropertyState | undefined {
+    return states.find(state => state.property === property)
 }
 
 function TableStructureControls({
@@ -176,9 +188,82 @@ export function ContextualRibbonControls({
 }) {
     void assetFeedback
     if (selected.kind === 'asset') {
+        const states = inspectVisualProperties(
+            selected,
+            inspectComponent,
+            '',
+            context,
+            ['float', 'object-fit'],
+        )
+        const floatState = visualStateFor(states, 'float')
+        const objectFitState = visualStateFor(states, 'object-fit')
+        const floatValue = floatState?.value === 'inline-start' || floatState?.value === 'left'
+            ? 'inline-start'
+            : floatState?.value === 'inline-end' || floatState?.value === 'right'
+              ? 'inline-end'
+              : 'none'
+        const objectFitOptions = [
+            {value: 'contain', label: '完整显示'},
+            {value: 'cover', label: '填满裁切'},
+            {value: 'fill', label: '拉伸填满'},
+            {value: 'scale-down', label: '只缩小'},
+        ] as const
+        const objectFitValue = objectFitOptions.some(option => option.value === objectFitState?.value)
+            ? objectFitState?.value ?? 'contain'
+            : 'contain'
+        const applyAssetProperty = (
+            property: 'float' | 'object-fit',
+            value: string,
+            label: string,
+        ) => applyKernelEntry(
+            createRibbonPropertyRequest(selected.id, property, {kind: 'keyword', value}, context),
+            label,
+            {immediate: true},
+        )
         return <>
             <DocumentRibbonGroup label="图片" priority="essential" wide>
                 <DocumentRibbonCommand icon={ImagePlus} label="替换图片" onClick={onChooseLocalAsset} title="从项目资产库选择替换图片" />
+            </DocumentRibbonGroup>
+            <DocumentRibbonGroup label="环绕与填充" priority="high" wide>
+                <DocumentRibbonRows
+                    first={<div className="document-ribbon-choice-row" role="group" aria-label="图片图文环绕">
+                        <DocumentRibbonCommand
+                            active={floatValue === 'none'}
+                            disabled={floatState?.disabled}
+                            icon={Ban}
+                            label="无环绕"
+                            onClick={() => void applyAssetProperty('float', 'none', '取消图片图文环绕')}
+                            title={floatState?.reason ?? '不使用图文环绕'}
+                        />
+                        <DocumentRibbonCommand
+                            active={floatValue === 'inline-start'}
+                            disabled={floatState?.disabled}
+                            icon={AlignLeft}
+                            label="左环绕"
+                            onClick={() => void applyAssetProperty('float', 'inline-start', '设置图片左侧环绕')}
+                            title={floatState?.reason ?? '图片靠左，文字从右侧环绕'}
+                        />
+                        <DocumentRibbonCommand
+                            active={floatValue === 'inline-end'}
+                            disabled={floatState?.disabled}
+                            icon={AlignRight}
+                            label="右环绕"
+                            onClick={() => void applyAssetProperty('float', 'inline-end', '设置图片右侧环绕')}
+                            title={floatState?.reason ?? '图片靠右，文字从左侧环绕'}
+                        />
+                    </div>}
+                    second={<label className="document-ribbon-layout-choice">
+                        <span>填充方式</span>
+                        <Select
+                            aria-label="图片填充方式"
+                            disabled={objectFitState?.disabled}
+                            onValueChange={value => void applyAssetProperty('object-fit', String(value), '修改图片填充方式')}
+                            options={[...objectFitOptions]}
+                            title={objectFitState?.reason ?? '图片填充方式'}
+                            value={objectFitValue}
+                        />
+                    </label>}
+                />
             </DocumentRibbonGroup>
             <DocumentRibbonGroup label="辅助信息" priority="high">
                 <DocumentRibbonCommand icon={Captions} label="替代文字" onClick={() => onOpenDetails('content', 'content')} />

@@ -4,6 +4,7 @@ import test from 'node:test'
 import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
 import {createImageReplacementRequest} from './imageAssetEditing.ts'
 import type {ManagedImageDescription} from './imageSemanticEditing.ts'
+import {createRibbonPropertyRequest} from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {
     createDividerLineStyleRequest,
     createDividerSpacingRequest,
@@ -39,6 +40,39 @@ test('图片上下文页签的替换动作发出受管资产引用 intent', () =
     const intent = request.createIntents(new Map([[NODE_ID, handle]]))[0]
     assert.equal(intent?.kind, 'set-asset-reference')
     assert.equal(intent?.assetId, '33333333-3333-4333-8333-333333333333')
+})
+
+test('图片上下文页签的环绕与填充命令写入当前断点的受管规则', () => {
+    const bindings = new Map([[NODE_ID, componentHandle(NODE_ID, 'asset')]])
+    for (const [context, channel] of [
+        ['mobile', {kind: 'base-rule'}],
+        ['desktop', {kind: 'conditional-rule', context: 'desktop'}],
+    ] as const) {
+        for (const value of ['none', 'inline-start', 'inline-end']) {
+            const intent = createRibbonPropertyRequest(
+                NODE_ID,
+                'float',
+                {kind: 'keyword', value},
+                context,
+            ).createIntents(bindings)[0]
+            assert.equal(intent?.kind, 'edit-property')
+            assert.equal(intent?.property, 'float')
+            assert.deepEqual(intent?.action, {kind: 'set-value', value})
+            assert.deepEqual(intent?.destination, {scope: 'entry', channel})
+        }
+        for (const value of ['contain', 'cover', 'fill', 'scale-down']) {
+            const intent = createRibbonPropertyRequest(
+                NODE_ID,
+                'object-fit',
+                {kind: 'keyword', value},
+                context,
+            ).createIntents(bindings)[0]
+            assert.equal(intent?.kind, 'edit-property')
+            assert.equal(intent?.property, 'object-fit')
+            assert.deepEqual(intent?.action, {kind: 'set-value', value})
+            assert.deepEqual(intent?.destination, {scope: 'entry', channel})
+        }
+    }
 })
 
 function componentHandle(nodeId: string, kind: ComponentHandle['kind']): ComponentHandle {
