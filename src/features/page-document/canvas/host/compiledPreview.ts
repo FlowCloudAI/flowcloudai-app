@@ -25,6 +25,8 @@ export const CANVAS_BASE_PROJECT_CSS = `@layer fc-canvas-defaults, fc-renderer, 
     --fc-entry-surface: Canvas;
     --fc-entry-text: CanvasText;
     --fc-entry-accent: Highlight;
+    --fc-entry-accent-contrast: HighlightText;
+    --fc-entry-muted: GrayText;
   }
   .fc-entry { color: var(--fc-entry-text); background: var(--fc-entry-surface); }
 }`

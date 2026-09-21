@@ -448,6 +448,77 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
     })
 
+    it('主题色连续输入并入同一个行内格式，不逐字嵌套 span', () => {
+        const runtime = createDocumentKernelDraftRuntime()
+        const initial = createEntryDocumentSessionState(identity, document())
+        const typed = (index: number, text: string): CanvasInputIntentMessage => ({
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: index + 1,
+            type: 'input-intent',
+            intentId: `8a000000-0000-7000-8000-00000000000${index}`,
+            nodeId: PARAGRAPH_ID,
+            inputType: 'insertText',
+            from: 4 + index,
+            to: 4 + index,
+            expected: '',
+            text,
+            storedMarks: {styleContext: 'mobile', values: {color: 'var(--fc-entry-text)'}},
+        })
+        const operation = createCanvasInputKernelOperation(
+            [typed(0, 'a'), typed(1, 'b'), typed(2, 'c')],
+            'canvas-input-history:theme-run',
+            'paragraph',
+            () => crypto.randomUUID(),
+        )
+        const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const html = runtime.applyPrepared(initial.model, initial.snapshot, prepared.edit).model.entry.sources['article.html']
+        assert.match(html, /受管正文<span data-fc-inline-format="color" style="color: var\(--fc-entry-text\);">abc<\/span><\/p>/u)
+        assert.equal(html.match(/data-fc-inline-format="color"/gu)?.length, 1)
+    })
+
+    it('色板提供的每个主题色都能在块末换行之后作为待输入格式通过内核验收', () => {
+        const runtime = createDocumentKernelDraftRuntime()
+        for (const [index, color] of [
+            'var(--fc-entry-surface)',
+            'var(--fc-entry-text)',
+            'var(--fc-entry-accent)',
+            'var(--fc-entry-muted)',
+        ].entries()) {
+            const withBreak = {
+                ...document(),
+                html: articleHtml().replace('受管正文</p>', '受管正文<br></p>'),
+            }
+            const initial = createEntryDocumentSessionState(identity, withBreak)
+            const message: CanvasInputIntentMessage = {
+                channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+                version: PAGE_DOCUMENT_CANVAS_VERSION,
+                sessionToken: 'a'.repeat(64),
+                sequence: 1,
+                type: 'input-intent',
+                intentId: `8b000000-0000-7000-8000-00000000000${index}`,
+                nodeId: PARAGRAPH_ID,
+                inputType: 'insertText',
+                from: 5,
+                to: 5,
+                expected: '',
+                text: 'r',
+                storedMarks: {styleContext: 'mobile', values: {color}},
+            }
+            const operation = createCanvasInputKernelOperation(
+                [message],
+                `canvas-input-history:palette-${index}`,
+                'paragraph',
+                () => crypto.randomUUID(),
+            )
+            const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
+            assert.equal(prepared.status, 'ready', `${color}: ${JSON.stringify(prepared)}`)
+        }
+    })
+
     it('CSS 变量颜色可经待输入格式与已有选区两条产品路径通过候选验收', () => {
         const runtime = createDocumentKernelDraftRuntime()
         const initial = createEntryDocumentSessionState(identity, document())

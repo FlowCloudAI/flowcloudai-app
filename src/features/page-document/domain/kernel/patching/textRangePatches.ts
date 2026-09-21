@@ -96,7 +96,9 @@ export function createTextRangeStylePatches(
         const selectedFrom = Math.max(from, unit.from)
         const selectedTo = Math.min(to, unit.to)
         if (selectedFrom >= selectedTo || unit.kind === 'break') continue
-        if (normalizeValue(unit.propertyValue) === normalizeValue(value)) continue
+        // 与候选验收共用同一判定：变量值读回的是解析结果，只比字符串会把已带同一变量的文字再包一层，
+        // 连续输入时逐字嵌套 span。
+        if (textUnitHasRequestedStyle(unit, property, value, resolveProperty)) continue
         const owner = unit.writeOwner
         if (owner && owner.from >= from && owner.to <= to && !patchedOwners.has(owner.element)) {
             const ownerPatch = createInlineStylePropertyPatch(
