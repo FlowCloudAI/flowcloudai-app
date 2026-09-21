@@ -11,7 +11,7 @@
  */
 
 export const CARET_ANCHOR_ATTRIBUTE = 'data-fc-canvas-caret-anchor'
-export const CARET_ANCHOR_FILLER = '​'
+export const CARET_ANCHOR_FILLER = '\u200B'
 
 const ELEMENT_NODE = 1
 const TEXT_NODE = 3

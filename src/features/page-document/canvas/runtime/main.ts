@@ -47,6 +47,7 @@ import {
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
 import {createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
+import {createCanvasDebugTrace, describeDomPosition} from './debugTrace.ts'
 import {
     absorbableEchoElement,
     buildOptimisticTextFragment,
@@ -77,6 +78,10 @@ const composition = createCanvasCompositionTracker()
 const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
 const linkCandidate = createCanvasLinkCandidateTracker()
 const linkHover = createCanvasLinkHoverTracker()
+const debugTrace = createCanvasDebugTrace(entries => send({type: 'debug-log', entries}))
+let debugFocusNodeId: string | null = null
+let debugLastNodeHtml = ''
+let debugObserver: MutationObserver | null = null
 
 type RuntimePayload = CanvasRuntimeMessage extends infer Message
     ? Message extends CanvasRuntimeMessage
@@ -150,6 +155,84 @@ function clearRenderedDocument(): void {
     reportSize()
 }
 
+function debugSelectionSummary(): Record<string, unknown> {
+    const selection = getSelection()
+    if (!selection || selection.rangeCount === 0) return {dom: '无选区'}
+    const range = selection.getRangeAt(0)
+    const scope = managedNode(range.startContainer)
+    return {
+        start: describeDomPosition(scope, range.startContainer, range.startOffset),
+        end: range.collapsed ? '同起点' : describeDomPosition(scope, range.endContainer, range.endOffset),
+        semantic: captureSelection(),
+        activeElement: managedNodeId(managedNode(document.activeElement)),
+    }
+}
+
+function debugState(): Record<string, unknown> {
+    return {
+        storedMarks: caretState.storedMarks,
+        caret: caretState.selection,
+        composing: composition.isComposing,
+        pendingInputs: pendingInputIds.size,
+        pendingRender: pendingRender?.requestId ?? null,
+        pendingResolvedSelection,
+        gateSuppressed: selectionReportGate.suppressed,
+    }
+}
+
+function debugSnapshotFocusedNode(reason: string): void {
+    if (!debugTrace.enabled || !debugFocusNodeId) return
+    const node = findManagedNode(debugFocusNodeId)
+    const html = node ? node.outerHTML : '(节点不在画布中)'
+    if (html === debugLastNodeHtml) return
+    debugLastNodeHtml = html
+    debugTrace.trace('dom', {reason, nodeId: debugFocusNodeId, text: node ? semanticText(node) : null, html})
+}
+
+function debugFocus(value: EventTarget | Node | null): void {
+    if (!debugTrace.enabled) return
+    const nodeId = managedNodeId(managedNode(value))
+    if (!nodeId || nodeId === debugFocusNodeId) return
+    debugFocusNodeId = nodeId
+    debugLastNodeHtml = ''
+    debugTrace.trace('focus-node', {nodeId})
+    debugSnapshotFocusedNode('开始监听')
+}
+
+function setDebug(enabled: boolean): void {
+    debugObserver?.disconnect()
+    debugObserver = null
+    debugFocusNodeId = null
+    debugLastNodeHtml = ''
+    debugTrace.setEnabled(enabled)
+    if (!enabled) return
+    debugTrace.trace('debug-on', {editingEnabled, selectedNodeId, userAgent: navigator.userAgent, ...debugState()})
+    debugObserver = new MutationObserver(records => {
+        if (!debugFocusNodeId) return
+        const node = findManagedNode(debugFocusNodeId)
+        const relevant = records.filter(record => record.target === root || (node?.contains(record.target) ?? false))
+        if (relevant.length === 0) return
+        debugTrace.trace('mutations', relevant.slice(0, 24).map(record => ({
+            type: record.type,
+            target: describeDomPosition(node, record.target, 0),
+            attribute: record.attributeName,
+            old: record.oldValue,
+            added: record.addedNodes.length,
+            removed: record.removedNodes.length,
+        })))
+        debugSnapshotFocusedNode('DOM 变化')
+    })
+    debugObserver.observe(root, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        characterDataOldValue: true,
+        attributes: true,
+        attributeOldValue: true,
+    })
+    debugFocus(getSelection()?.anchorNode ?? document.activeElement)
+}
+
 function applyRender(
     command: CanvasRenderCommand,
     resolvedSelection: CanvasResolvedSelection | null = null,
@@ -172,6 +255,7 @@ function applyRender(
         })
         return
     }
+    debugTrace.trace('applyRender', {requestId: command.requestId, resolvedSelection, textSelection, ...debugState()})
     selectionReportGate.beginRender()
     try {
         const template = document.createElement('template')
@@ -197,6 +281,7 @@ function applyRender(
             restoredSelection = textSelection
         }
         const shouldReportSelection = pendingResolvedSelection === null
+        debugTrace.trace('applyRender:done', {requestId: command.requestId, restoredSelection, pendingResolvedSelection, selection: debugSelectionSummary()})
         selectionReportGate.finishRender(() => {
             if (shouldReportSelection) reportTextSelection(restoredSelection, true, true)
         })
@@ -220,6 +305,7 @@ function applyRender(
 
 function render(command: CanvasRenderCommand): void {
     if (shouldDeferCanvasRender(composition.isComposing, pendingInputIds.size)) {
+        debugTrace.trace('render:deferred', {requestId: command.requestId, replaced: pendingRender?.requestId ?? null, ...debugState()})
         pendingRender = command
         return
     }
@@ -279,8 +365,12 @@ function reportTextSelection(
 ): void {
     if (!editingEnabled || composition.isComposing) return
     const selection = refreshedTextSelection(captureSelection() ?? fallback)
+    const marksBefore = caretState.storedMarks
     if (selection && restoredByRuntime) caretState.restoreSelection(selection)
     else caretState.observeSelection(selection)
+    if (marksBefore && !caretState.storedMarks) {
+        debugTrace.trace('marks-cleared', {by: '选区观察', selection, restoredByRuntime})
+    }
     syncCaretAnchor(selection)
     const storedMarks = selection ? caretState.storedMarks : null
     const key = selection
@@ -293,6 +383,7 @@ function reportTextSelection(
         return
     }
     // 折叠光标同样是字体工具的可信上下文；切到宿主工具栏时必须保留，供后续输入格式继续使用。
+    debugTrace.trace('send:text-selection', {selection, storedMarks, restoredByRuntime})
     send({
         type: 'text-selection',
         nodeId: selection.nodeId,
@@ -358,16 +449,17 @@ function restoreTextSelection(snapshot: CanvasTextSelectionSnapshot): boolean {
     return true
 }
 
-function placeCaretInAnchor(anchor: Element): void {
+function placeCaretInAnchor(anchor: Element): boolean {
     const filler = anchor.firstChild
     const selection = getSelection()
-    if (!filler || !selection) return
+    if (!filler || !selection) return false
     const end = filler.textContent?.length ?? 0
     if (selection.rangeCount === 1) {
         const current = selection.getRangeAt(0)
-        if (current.collapsed && current.startContainer === filler && current.startOffset === end) return
+        if (current.collapsed && current.startContainer === filler && current.startOffset === end) return false
     }
     selection.collapse(filler, end)
+    return true
 }
 
 /**
@@ -387,9 +479,10 @@ function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState
         && current.getAttribute('style') === style
         && semanticOffset(editable, current, 0) === target.from
     ) {
-        placeCaretInAnchor(current)
+        if (placeCaretInAnchor(current)) debugTrace.trace('anchor:recaret', {target})
         return
     }
+    if (anchors.length > 0) debugTrace.trace('anchor:remove', {count: anchors.length, target, style})
     for (const anchor of anchors) {
         const parent = anchor.parentNode
         removeCaretAnchor(anchor)
@@ -404,6 +497,7 @@ function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState
     range.collapse(true)
     range.insertNode(anchor)
     placeCaretInAnchor(anchor)
+    debugTrace.trace('anchor:insert', {target, style, at: describeDomPosition(editable, position.node, position.offset)})
 }
 
 function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: string): boolean {
@@ -424,6 +518,7 @@ function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: st
         const insertion = echoInsertionPoint(range.startContainer, range.startOffset)
         const absorbed = insertion && absorbableEchoElement(insertion.parentNode, insertion.index, style)
         const fragment = buildOptimisticTextFragment(document, text, absorbed ? null : style)
+        debugTrace.trace('echo', {snapshot, text, style, absorbed: Boolean(absorbed), at: describeDomPosition(node, range.startContainer, range.startOffset)})
         if (absorbed) {
             while (fragment.firstChild) absorbed.appendChild(fragment.firstChild)
         } else {
@@ -466,11 +561,13 @@ function submitInputIntent(
         return false
     }
     if (!applyOptimisticTextEdit(snapshot, text)) {
+        debugTrace.trace('echo:rejected', {inputType, snapshot, text, selection: debugSelectionSummary()})
         reportBlockedInput(inputType, 'invalid-selection', snapshot.nodeId)
         return false
     }
     const intentId = crypto.randomUUID()
     pendingInputIds.add(intentId)
+    debugTrace.trace('send:input-intent', {intentId, inputType, snapshot, text, storedMarks: caretState.storedMarks})
     send({
         type: 'input-intent',
         intentId,
@@ -545,6 +642,7 @@ function resolveInput(
     }
     if (!accepted) rejectedInputPending = true
     if (accepted && selection) pendingResolvedSelection = selection
+    debugTrace.trace('resolve-input', {intentId, accepted, selection, ...debugState(), rejectedInputPending})
     if (pendingInputIds.size > 0 || composition.isComposing) return
     const next = pendingRender
     pendingRender = null
@@ -559,6 +657,47 @@ function resolveInput(
     rejectedInputPending = false
 }
 
+/** 仅供调试浮层的原生事件记录；捕获阶段注册，先于业务处理器看到事件原貌。 */
+function installDebugListeners(): void {
+    const keyDetail = (event: KeyboardEvent) => ({
+        key: event.key,
+        code: event.code,
+        keyCode: event.keyCode,
+        repeat: event.repeat,
+        eventComposing: event.isComposing,
+        modifiers: [event.metaKey && 'meta', event.ctrlKey && 'ctrl', event.altKey && 'alt', event.shiftKey && 'shift']
+            .filter(Boolean),
+        target: managedNodeId(managedNode(event.target)),
+    })
+    document.addEventListener('keydown', event => {
+        if (debugTrace.enabled) debugTrace.trace('keydown', keyDetail(event))
+    }, true)
+    document.addEventListener('keyup', event => {
+        if (debugTrace.enabled) debugTrace.trace('keyup', keyDetail(event))
+    }, true)
+    document.addEventListener('input', event => {
+        if (!debugTrace.enabled) return
+        const input = event as InputEvent
+        debugTrace.trace('input', {inputType: input.inputType, data: input.data, eventComposing: input.isComposing})
+    }, true)
+    document.addEventListener('compositionupdate', event => {
+        if (debugTrace.enabled) debugTrace.trace('compositionupdate', {data: event.data, selection: debugSelectionSummary()})
+    }, true)
+    document.addEventListener('focusin', event => {
+        if (!debugTrace.enabled) return
+        debugTrace.trace('focusin', {target: managedNodeId(managedNode(event.target))})
+        debugFocus(event.target)
+    }, true)
+    document.addEventListener('focusout', event => {
+        if (debugTrace.enabled) debugTrace.trace('focusout', {target: managedNodeId(managedNode(event.target))})
+    }, true)
+    document.addEventListener('pointerdown', event => {
+        if (!debugTrace.enabled) return
+        debugTrace.trace('pointerdown', {target: managedNodeId(managedNode(event.target)), x: event.clientX, y: event.clientY})
+        debugFocus(event.target)
+    }, true)
+}
+
 function installInputListeners(): void {
     document.addEventListener('beforeinput', event => {
         const node = managedNode(event.target)
@@ -569,6 +708,14 @@ function installInputListeners(): void {
             editingEnabled,
             isComposing: composition.isComposing,
             inputType,
+        })
+        debugTrace.trace('beforeinput', {
+            inputType,
+            data: event.data,
+            decision,
+            eventComposing: event.isComposing,
+            cancelable: event.cancelable,
+            selection: debugTrace.enabled ? debugSelectionSummary() : null,
         })
         if (decision === 'ignore' || decision === 'native-composition') return
         if (decision === 'paste-owned') {
@@ -621,6 +768,10 @@ function installInputListeners(): void {
     })
 
     document.addEventListener('selectionchange', () => {
+        if (debugTrace.enabled) {
+            debugFocus(getSelection()?.anchorNode ?? null)
+            debugTrace.trace('selectionchange', {...debugSelectionSummary(), gateSuppressed: selectionReportGate.suppressed, composing: composition.isComposing})
+        }
         if (editingEnabled && !composition.isComposing && !selectionReportGate.suppressed) {
             // WebKit 在焦点移向宿主工具栏的瞬间可能暂时读不到 Range；保留上一次
             // 已认证选区，直到明确采集到新选区或会话主动清除。
@@ -639,6 +790,7 @@ function installInputListeners(): void {
     document.addEventListener('pointercancel', reportSettledTextSelection)
     document.addEventListener('pointerdown', event => {
         if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) {
+            if (caretState.storedMarks) debugTrace.trace('marks-cleared', {by: '指针'})
             caretState.authorPointer()
             syncCaretAnchor(null)
         }
@@ -660,6 +812,7 @@ function installInputListeners(): void {
             return
         }
         caretState.beginComposition(nodeId)
+        debugTrace.trace('compositionstart', {data: event.data, snapshot, selection: debugTrace.enabled ? debugSelectionSummary() : null, ...debugState()})
         if (!composition.begin(snapshot)) return
         compositionOriginalNode = node.cloneNode(true) as HTMLElement
         compositionNodeId = nodeId
@@ -667,6 +820,7 @@ function installInputListeners(): void {
 
     document.addEventListener('compositionend', event => {
         if (!composition.isComposing) return
+        debugTrace.trace('compositionend', {data: event.data, selection: debugSelectionSummary()})
         const result = composition.finish(event.data ?? '')
         restoreCompositionStart()
         const submitted = result
@@ -726,6 +880,7 @@ function installInputListeners(): void {
         }
         if (event.defaultPrevented || event.isComposing || composition.isComposing || !editingEnabled) return
         if (event.key.startsWith('Arrow')) {
+            if (caretState.storedMarks) debugTrace.trace('marks-cleared', {by: `方向键 ${event.key}`})
             caretState.authorDirection()
             // 必须在默认动作之前移除，否则方向键会先在零宽填充字符上空走一步。
             syncCaretAnchor(null)
@@ -773,6 +928,12 @@ function start(): void {
         const command = parseCanvasHostCommand(event.data, token)
         if (!command || command.sequence <= incomingSequence) return
         incomingSequence = command.sequence
+        if (command.type === 'set-debug') setDebug(command.enabled)
+        if (debugTrace.enabled && command.type !== 'asset-frame') {
+            debugTrace.trace(`recv:${command.type}`, command.type === 'render'
+                ? {requestId: command.requestId, htmlLength: command.html.length}
+                : {...command, channel: undefined, version: undefined, sessionToken: undefined})
+        }
         if (command.type === 'render') render(command)
         if (command.type === 'asset-frame' && command.requestId === latestRequestId) {
             applyCanvasAssetFrame(assetDisplays, assetCache, command)
@@ -781,7 +942,9 @@ function start(): void {
         if (command.type === 'set-selection') setSelection(command.nodeId)
         if (command.type === 'set-editing') setEditing(command.enabled)
         if (command.type === 'update-stored-marks') {
-            if (caretState.updateStoredMarks(command.mode, command.storedMarks)) {
+            const updated = caretState.updateStoredMarks(command.mode, command.storedMarks)
+            debugTrace.trace('marks-updated', {updated, storedMarks: caretState.storedMarks, caret: caretState.selection})
+            if (updated) {
                 reportTextSelection(caretState.selection, true, true)
             }
         }
@@ -840,6 +1003,7 @@ function start(): void {
         if (leave) send(leave)
     })
 
+    installDebugListeners()
     installInputListeners()
     new ResizeObserver(reportSize).observe(root)
     window.addEventListener('error', event => {

@@ -5,6 +5,9 @@ import {
     CANVAS_ASSET_FRAME_MAX_EDGE,
     CANVAS_ASSET_ORIGINAL_MAX_PIXELS,
     CANVAS_ASSET_REQUEST_MAX_COUNT,
+    CANVAS_DEBUG_BATCH_MAX_ENTRIES,
+    CANVAS_DEBUG_DETAIL_MAX_CODE_UNITS,
+    CANVAS_DEBUG_KIND_MAX_CODE_UNITS,
     CANVAS_DIMENSION_MAX,
     CANVAS_ERROR_MAX_CODE_UNITS,
     CANVAS_HREF_MAX_CODE_UNITS,
@@ -93,6 +96,12 @@ function parseStoredMarks(value: unknown): CanvasStoredMarks | null | undefined 
 
 export function parseCanvasHostCommand(value: unknown, token: string): CanvasHostCommand | null {
     if (!isRecord(value) || !isEnvelope(value, token) || !isWithinMessageBudget(value)) return null
+    if (value.type === 'set-debug') {
+        return hasOnlyKeys(value, [...envelopeKeys, 'enabled'])
+            && typeof value.enabled === 'boolean'
+            ? value as unknown as CanvasHostCommand
+            : null
+    }
     if (value.type === 'render') {
         const keys = [...envelopeKeys, 'requestId', 'html', 'css']
         return hasOnlyKeys(value, keys)
@@ -224,8 +233,27 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
         : null
 }
 
+function isDebugLogEntry(value: unknown): boolean {
+    return isRecord(value)
+        && hasOnlyKeys(value, ['at', 'kind', 'detail'])
+        && typeof value.at === 'number'
+        && Number.isFinite(value.at)
+        && isBoundedString(value.kind, CANVAS_DEBUG_KIND_MAX_CODE_UNITS, false)
+        && isBoundedString(value.detail, CANVAS_DEBUG_DETAIL_MAX_CODE_UNITS)
+}
+
 export function parseCanvasRuntimeMessage(value: unknown, token: string): CanvasRuntimeMessage | null {
     if (!isRecord(value) || !isEnvelope(value, token) || !isWithinMessageBudget(value)) return null
+    if (value.type === 'debug-log') {
+        const entries = value.entries
+        return hasOnlyKeys(value, [...envelopeKeys, 'entries'])
+            && Array.isArray(entries)
+            && entries.length > 0
+            && entries.length <= CANVAS_DEBUG_BATCH_MAX_ENTRIES
+            && entries.every(isDebugLogEntry)
+            ? value as unknown as CanvasRuntimeMessage
+            : null
+    }
     if (value.type === 'rendered') {
         return hasOnlyKeys(value, [...envelopeKeys, 'requestId', 'managedNodeCount', 'missingAssetIds'])
             && isUuid(value.requestId)

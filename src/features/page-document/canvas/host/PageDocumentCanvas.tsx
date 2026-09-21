@@ -1,7 +1,7 @@
 // 本组件拥有 iframe 与 bridge 会话；业务页面只接收已鉴权的选择、错误和导航意图。
 
 import classNames from 'classnames'
-import {useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref} from 'react'
+import {useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore, type Ref} from 'react'
 import {pageDocumentAssetErrorStatus, pageDocumentReadAssetFrame} from '../../../../api/pageDocument.ts'
 import {
     createCanvasHostCommandFactory,
@@ -23,6 +23,13 @@ import {CanvasAssetFrameCache} from './assetFrameCache.ts'
 import {requestedCanvasAssetIds, sourceForRenderedAssetRequest, type CanvasAssetRenderSource} from './assetRenderSource.ts'
 import {canForwardCanvasNavigationIntent} from './navigationIntent.ts'
 import {canvasRectToHostViewport} from './linkHoverGeometry.ts'
+import {
+    appendCanvasDebugEntries,
+    debugLog,
+    isPageDocumentDebugEnabled,
+    setDebugFocusedNode,
+    subscribePageDocumentDebug,
+} from '../../debug/pageDocumentDebugLog.ts'
 import './PageDocumentCanvas.css'
 
 export interface PageDocumentCanvasProps {
@@ -131,8 +138,19 @@ export function PageDocumentCanvas({
     }, [css, html, onFindIntent, onHistoryIntent, onInputBlocked, onInputFlush, onInputIntent, onLinkCandidateIntent, onLinkHover, onNavigationIntent, onRenderError, onRendered, onSelectionChange, onTextSelectionChange])
 
     const send = useCallback((payload: CanvasHostCommandPayload) => {
+        if (payload.type !== 'asset-frame' && payload.type !== 'set-debug') {
+            debugLog(`send:${payload.type}`, payload.type === 'render'
+                ? {requestId: payload.requestId, htmlLength: payload.html.length}
+                : payload)
+        }
         frameRef.current?.contentWindow?.postMessage(session.createCommand(payload), '*')
     }, [session])
+    const debugEnabled = useSyncExternalStore(subscribePageDocumentDebug, isPageDocumentDebugEnabled)
+
+    useEffect(() => {
+        // 画布每次重建都从关闭态开始；加载完成后与开关变化时都要重新告知。
+        if (status === 'ready' && loadedRef.current) send({type: 'set-debug', enabled: debugEnabled})
+    }, [debugEnabled, send, status])
 
     useImperativeHandle(ref, () => ({
         focusEditor() {
@@ -227,6 +245,14 @@ export function PageDocumentCanvas({
         const handleMessage = (event: MessageEvent) => {
             const message = gate.accept(event)
             if (!message) return
+            if (message.type === 'debug-log') {
+                appendCanvasDebugEntries(message.entries)
+                return
+            }
+            if (message.type !== 'size' && message.type !== 'link-hover') {
+                debugLog(`recv:${message.type}`, {...message, channel: undefined, version: undefined, sessionToken: undefined})
+            }
+            if (message.type === 'text-selection') setDebugFocusedNode(message.nodeId)
             if (message.type === 'size') setHeight(resolveCanvasHeight(message.height, minimumHeight))
             if (message.type === 'selection') latest.current.onSelectionChange?.(message.nodeId)
             if (message.type === 'text-selection') latest.current.onTextSelectionChange?.(message)

@@ -1,6 +1,7 @@
 // 本 Hook 管理词条页面文档的读取、前端防抖校验与独立保存；不接触词条 Markdown 持久化。
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {debugLog} from '../debug/pageDocumentDebugLog.ts'
 import {useAlert} from 'flowcloudai-ui'
 import {
     pageDocumentCheckAsset,
@@ -369,13 +370,21 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                     ]),
                 })
             }
-            return kernelRuntimeRef.current.prepare(current.model, current.snapshot, request)
+            const result = kernelRuntimeRef.current.prepare(current.model, current.snapshot, request)
+            debugLog('kernel:prepare', {
+                nodeIds: request.nodeIds,
+                interactionId: request.interactionId,
+                status: result.status,
+                diagnostics: 'diagnostics' in result ? result.diagnostics : undefined,
+            })
+            return result
         },
         [],
     )
 
     const reportVisualFailure = useCallback(
         async (message: string): Promise<false> => {
+            debugLog('visual-failure', message)
             setVisualError(message)
             await showAlert(message, 'warning', 'nonInvasive', 2200)
             return false
@@ -513,11 +522,26 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                     target.kind,
                     () => crypto.randomUUID(),
                 )
+                debugLog('input:commit', {
+                    historyGroupId,
+                    targetKind: target.kind,
+                    messages: messages.map(message => ({
+                        intentId: message.intentId,
+                        inputType: message.inputType,
+                        from: message.from,
+                        to: message.to,
+                        expected: message.expected,
+                        text: message.text,
+                        storedMarks: message.storedMarks,
+                    })),
+                    resolution: operation.resolution,
+                })
                 return applyKernelEntry(
                     operation.request,
                     canvasInputHistoryLabel(last.inputType),
                     metadata,
                 ).then(accepted => {
+                    debugLog('input:commit-result', {intentId: last.intentId, accepted})
                     if (accepted && active) {
                         resolutionByIntent.set(last.intentId, operation.resolution)
                     }
@@ -568,6 +592,7 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             }
             const resolution = canvasInputResolutionRef.current.get(message.intentId)
             canvasInputResolutionRef.current.delete(message.intentId)
+            debugLog('input:resolved', {intentId: message.intentId, accepted, resolution: resolution ?? null})
             return accepted
                 ? resolution ?? {accepted: true, selection: null}
                 : {accepted: false, selection: null}

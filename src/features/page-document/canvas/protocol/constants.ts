@@ -55,3 +55,8 @@ export const CANVAS_STORED_MARK_PROPERTIES = [
     'font-weight',
     'text-decoration-line',
 ] as const
+
+/** 调试日志只在宿主显式开启后回传；批量与单条上限保证一次消息远低于总预算。 */
+export const CANVAS_DEBUG_BATCH_MAX_ENTRIES = 100
+export const CANVAS_DEBUG_KIND_MAX_CODE_UNITS = 64
+export const CANVAS_DEBUG_DETAIL_MAX_CODE_UNITS = 8_000

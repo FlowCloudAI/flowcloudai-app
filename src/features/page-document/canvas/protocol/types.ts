@@ -76,7 +76,14 @@ export interface CanvasAssetFrameCommand extends CanvasEnvelope {
     rgbaBase64: string
 }
 
+/** 调试浮层开启时要求画布回传内部日志；关闭后画布丢弃缓冲并停止采集。 */
+export interface CanvasSetDebugCommand extends CanvasEnvelope {
+    type: 'set-debug'
+    enabled: boolean
+}
+
 export type CanvasHostCommand =
+    | CanvasSetDebugCommand
     | CanvasRenderCommand
     | CanvasSetSelectionCommand
     | CanvasViewportCommand
@@ -193,7 +200,21 @@ export interface CanvasLinkCandidateIntentMessage extends CanvasEnvelope {
     to: number
 }
 
+export interface CanvasDebugLogEntry {
+    /** 以 performance.timeOrigin 为基准的绝对毫秒数，宿主据此与自身日志合并排序。 */
+    at: number
+    kind: string
+    detail: string
+}
+
+/** 仅在宿主开启调试后发送，只用于调试浮层展示与复制，不驱动任何编辑行为。 */
+export interface CanvasDebugLogMessage extends CanvasEnvelope {
+    type: 'debug-log'
+    entries: CanvasDebugLogEntry[]
+}
+
 export type CanvasRuntimeMessage =
+    | CanvasDebugLogMessage
     | CanvasRenderedMessage
     | CanvasRenderErrorMessage
     | CanvasSizeMessage

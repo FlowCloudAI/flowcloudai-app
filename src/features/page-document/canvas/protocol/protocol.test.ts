@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+    CANVAS_DEBUG_BATCH_MAX_ENTRIES,
     CANVAS_MESSAGE_MAX_BYTES,
     createCanvasHostCommandFactory,
     createCanvasRuntimeMessageGate,
@@ -379,4 +380,20 @@ test('切换文档后旧 token 即使沿用同一 Window 也失效', () => {
     assert.equal(nextGate.accept({source, data: message('selection', {nodeId: NODE_ID}, 1)}), null)
     const current = {...message('selection', {nodeId: NODE_ID}, 1), sessionToken: OTHER_TOKEN}
     assert.equal(nextGate.accept({source, data: current})?.type, 'selection')
+})
+
+test('调试日志消息只接受有界的条目批次', () => {
+    const entry = {at: 1_700_000_000_000.5, kind: 'keydown', detail: '{"key":"a"}'}
+    assert.equal(parseCanvasRuntimeMessage(message('debug-log', {entries: [entry]}), TOKEN)?.type, 'debug-log')
+    assert.equal(parseCanvasRuntimeMessage(message('debug-log', {entries: []}), TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('debug-log', {entries: [{...entry, extra: 1}]}), TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('debug-log', {entries: [{...entry, kind: ''}]}), TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage(message('debug-log', {
+        entries: Array.from({length: CANVAS_DEBUG_BATCH_MAX_ENTRIES + 1}, () => entry),
+    }), TOKEN), null)
+})
+
+test('调试开关命令只接受布尔值', () => {
+    assert.equal(parseCanvasHostCommand(message('set-debug', {enabled: true}), TOKEN)?.type, 'set-debug')
+    assert.equal(parseCanvasHostCommand(message('set-debug', {enabled: 'yes'}), TOKEN), null)
 })

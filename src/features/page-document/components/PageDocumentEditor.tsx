@@ -1,6 +1,8 @@
 // 本组件提供页面文档第一批编辑壳层；只编辑独立 HTML/CSS，并把保存交给页面文档会话。
 
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {PageDocumentDebugOverlay} from '../debug/PageDocumentDebugOverlay.tsx'
+import {pageDocumentDebugToolsAvailable} from '../debug/pageDocumentDebugLog.ts'
 import {createPortal} from 'react-dom'
 import {Button} from 'flowcloudai-ui'
 import {Eye, FilePlus2, Home, Image, LayoutPanelTop, Redo2, Table2, Undo2, type LucideIcon} from 'lucide-react'
@@ -229,6 +231,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [componentAction, setComponentAction] = useState<ComponentActionState | null>(null)
     const [propertyDockNavigation, setPropertyDockNavigation] = useState<ReturnType<typeof createPropertyDockNavigationRequest> | null>(null)
     const canvasRef = useRef<PageDocumentCanvasHandle>(null)
+    const [debugOpen, setDebugOpen] = useState(false)
     const committingCandidateRef = useRef<string | null>(null)
     const sourceWorkspaceRef = useRef<SourceWorkspaceHandle>(null)
     const interactionKeyRef = useRef('')
@@ -1141,7 +1144,29 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 <ResponsiveEditContextControl compact onChange={changeEditContext} value={editContext} />
                 <span>选中：{selectedNode ? pageDocumentLayerLabel(selectedNode) : '—'}</span>
                 <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
+                {pageDocumentDebugToolsAvailable() && (
+                    <button
+                        aria-pressed={debugOpen}
+                        className="page-document-debug-toggle"
+                        onClick={() => setDebugOpen(current => !current)}
+                        type="button"
+                    >调试日志</button>
+                )}
             </footer>
+            {debugOpen && (
+                <PageDocumentDebugOverlay
+                    source={state.model.entry.sources['article.html']}
+                    context={() => ({
+                        entryId,
+                        mode,
+                        editContext,
+                        selectedNodeId,
+                        activeTextRange,
+                        dirty,
+                    })}
+                    onClose={() => setDebugOpen(false)}
+                />
+            )}
             </section>
         </>
     )
