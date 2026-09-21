@@ -46,6 +46,7 @@ import {
 } from './resolvedSelection.ts'
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
+import {createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
 import {
     absorbableEchoElement,
     buildOptimisticTextFragment,
@@ -280,6 +281,7 @@ function reportTextSelection(
     const selection = refreshedTextSelection(captureSelection() ?? fallback)
     if (selection && restoredByRuntime) caretState.restoreSelection(selection)
     else caretState.observeSelection(selection)
+    syncCaretAnchor(selection)
     const storedMarks = selection ? caretState.storedMarks : null
     const key = selection
         ? `${selection.nodeId}:${selection.from}:${selection.to}:${selection.expected}:${JSON.stringify(storedMarks)}`
@@ -304,6 +306,7 @@ function reportTextSelection(
 function clearTextSelection(): void {
     selectionReportGate.cancelRender()
     caretState.exitEditing()
+    syncCaretAnchor(null)
     if (lastTextSelectionKey === null) return
     lastTextSelectionKey = null
     send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: '', storedMarks: null})
@@ -351,7 +354,56 @@ function restoreTextSelection(snapshot: CanvasTextSelectionSnapshot): boolean {
     range.setEnd(end.node, end.offset)
     selection.removeAllRanges()
     selection.addRange(range)
+    syncCaretAnchor(snapshot)
     return true
+}
+
+function placeCaretInAnchor(anchor: Element): void {
+    const filler = anchor.firstChild
+    const selection = getSelection()
+    if (!filler || !selection) return
+    const end = filler.textContent?.length ?? 0
+    if (selection.rangeCount === 1) {
+        const current = selection.getRangeAt(0)
+        if (current.collapsed && current.startContainer === filler && current.startOffset === end) return
+    }
+    selection.collapse(filler, end)
+}
+
+/**
+ * 让 DOM 光标与待输入标记一致：有标记且光标折叠时，光标停在带同一声明的锚点里，
+ * 使原生绘制的光标与输入法候选文字直接呈现所设格式；否则移除全部锚点。
+ * 已经一致时不改动 DOM，selectionchange 因此不会反复触发。组合期间锚点由输入法占用，不动它。
+ */
+function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState.selection): void {
+    if (composition.isComposing) return
+    const style = editingEnabled && target?.collapsed ? storedMarkStyle(caretState.storedMarks) : null
+    const node = style && target ? findManagedNode(target.nodeId) : null
+    const editable = isCanvasEditableElement(node) ? node : null
+    const anchors = findCaretAnchors(root)
+    const current = anchors.length === 1 ? anchors[0] : null
+    if (
+        style && target && editable && current && editable.contains(current)
+        && current.getAttribute('style') === style
+        && semanticOffset(editable, current, 0) === target.from
+    ) {
+        placeCaretInAnchor(current)
+        return
+    }
+    for (const anchor of anchors) {
+        const parent = anchor.parentNode
+        removeCaretAnchor(anchor)
+        parent?.normalize()
+    }
+    if (!style || !target || !editable) return
+    const position = locateTextOffset(editable, target.from)
+    if (!position) return
+    const {anchor} = createCaretAnchor(document, style)
+    const range = document.createRange()
+    range.setStart(position.node, position.offset)
+    range.collapse(true)
+    range.insertNode(anchor)
+    placeCaretInAnchor(anchor)
 }
 
 function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: string): boolean {
@@ -586,7 +638,10 @@ function installInputListeners(): void {
     document.addEventListener('pointerup', reportSettledTextSelection)
     document.addEventListener('pointercancel', reportSettledTextSelection)
     document.addEventListener('pointerdown', event => {
-        if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) caretState.authorPointer()
+        if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) {
+            caretState.authorPointer()
+            syncCaretAnchor(null)
+        }
     })
 
     document.addEventListener('compositionstart', event => {
@@ -672,6 +727,8 @@ function installInputListeners(): void {
         if (event.defaultPrevented || event.isComposing || composition.isComposing || !editingEnabled) return
         if (event.key.startsWith('Arrow')) {
             caretState.authorDirection()
+            // 必须在默认动作之前移除，否则方向键会先在零宽填充字符上空走一步。
+            syncCaretAnchor(null)
             return
         }
         if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey) return

@@ -4,7 +4,12 @@
  * 子节点的语义区间按半开区间处理：位置恰好落在子元素首尾时，归属最近的共同父级，
  * 不进入相邻的行内元素。这样在已有格式片段的紧邻位置输入时，不会因遍历顺序意外
  * 继承左侧或右侧 span；只有严格位于元素语义区间内部的位置才归属该元素。
+ *
+ * 画布本地的插入点锚点（caretAnchor）语义长度为零：锚点内任何 DOM 位置都映射到锚点起点，
+ * 语义偏移也永远不会被定位进锚点内部。
  */
+
+import {isCaretAnchor} from './caretAnchor.ts'
 
 const ELEMENT_NODE = 1
 const TEXT_NODE = 3
@@ -14,15 +19,24 @@ function isLineBreak(value: Node): boolean {
 }
 
 export function semanticLength(value: Node): number {
+    if (isCaretAnchor(value)) return 0
     if (value.nodeType === TEXT_NODE) return value.textContent?.length ?? 0
     if (isLineBreak(value)) return 1
     return Array.from(value.childNodes).reduce((total, child) => total + semanticLength(child), 0)
 }
 
 export function semanticText(value: Node): string {
+    if (isCaretAnchor(value)) return ''
     if (value.nodeType === TEXT_NODE) return value.textContent ?? ''
     if (isLineBreak(value)) return '\n'
     return Array.from(value.childNodes).map(semanticText).join('')
+}
+
+function isSameOrDescendant(ancestor: Node, value: Node): boolean {
+    for (let current: Node | null = value; current; current = current.parentNode) {
+        if (current === ancestor) return true
+    }
+    return false
 }
 
 export function semanticOffset(rootNode: Node, container: Node, offset: number): number | null {
@@ -31,6 +45,13 @@ export function semanticOffset(rootNode: Node, container: Node, offset: number):
     let found = false
     const visit = (value: Node): void => {
         if (found) return
+        if (isCaretAnchor(value)) {
+            if (isSameOrDescendant(value, container)) {
+                found = true
+                resolved = total
+            }
+            return
+        }
         if (value === container) {
             found = true
             if (value.nodeType === TEXT_NODE) {
