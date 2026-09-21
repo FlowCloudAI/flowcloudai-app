@@ -1,6 +1,6 @@
 // 本组件把主仓已有的页面文档属性适配器接到 Office 功能区；不读取模型或直接改写源码。
 
-import {AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eraser, Search} from 'lucide-react'
+import {AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eraser, Search, Trash2} from 'lucide-react'
 import {Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../page-document/domain/layerProjection.ts'
 import type {
@@ -53,6 +53,7 @@ export interface HomeRibbonControlsProps {
     styleContext: 'mobile' | 'desktop'
     onFind?: () => void
     onOpenDetails?: () => void
+    onRemove?: () => void
 }
 
 const FONT_SIZE_OPTIONS = ['12px', '14px', '16px', '18px', '20px', '24px', '32px'] as const
@@ -208,6 +209,7 @@ export function HomeRibbonControls({
     styleContext,
     onFind,
     onOpenDetails,
+    onRemove,
 }: HomeRibbonControlsProps) {
     const availability = homeRibbonGroupAvailability(selected)
     const states = selected?.managed
@@ -263,14 +265,20 @@ export function HomeRibbonControls({
                     title="查找功能将在后续工具栏批次接入"
                 />
             </DocumentRibbonGroup>
-            <DocumentRibbonGroup
-                disabledReason={availability.block}
+            {selected?.managed && selected.attributes['data-fc-editor-root'] === undefined && <DocumentRibbonGroup
                 label="块操作"
                 priority={DOCUMENT_HOME_RIBBON_PRIORITIES.block}
                 slot="block"
             >
-                <RibbonUnavailable label="块操作" reason={availability.block ?? '块移动与删除将在后续工具栏批次接入'} />
-            </DocumentRibbonGroup>
+                <DocumentRibbonCommand
+                    danger
+                    disabled={!onRemove}
+                    icon={Trash2}
+                    label="删除"
+                    onClick={onRemove ?? (() => undefined)}
+                    title={onRemove ? '删除选中的页面节点' : (availability.block ?? '当前节点不可删除')}
+                />
+            </DocumentRibbonGroup>}
             <InlineRibbonStyleControls
                 range={activeTextRange}
                 applyKernelEntry={applyKernelEntry}

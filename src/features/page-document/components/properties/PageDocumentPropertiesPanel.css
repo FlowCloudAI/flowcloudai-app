@@ -57,6 +57,13 @@
     font-size: var(--fc-font-size-caption);
 }
 
+.page-document-properties-panel__node-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border-bottom: 1px solid var(--fc-color-border-light);
+}
+
 .page-document-image-details {
     display: grid;
     gap: var(--fc-space-sm);

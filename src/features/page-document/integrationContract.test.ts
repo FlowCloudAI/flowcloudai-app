@@ -317,4 +317,24 @@ describe('page document editor integration boundary', () => {
         assert.match(insertion, /\{showInside && <DocumentRibbonCommand[\s\S]*label="容器内"/u)
         assert.match(editor, /showInside=\{Boolean\(insertionTargets\?\.inside\)\}/u)
     })
+
+    it('页面节点删除同时接入功能区与属性 Dock，固定根不渲染命令', () => {
+        const home = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/HomeRibbonControls.tsx'),
+            'utf8',
+        )
+        const panel = readFileSync(
+            join(currentDirectory, 'components/properties/PageDocumentPropertiesPanel.tsx'),
+            'utf8',
+        )
+        const editor = readFileSync(
+            join(currentDirectory, 'components/PageDocumentEditor.tsx'),
+            'utf8',
+        )
+
+        assert.match(home, /selected\?\.managed && selected\.attributes\['data-fc-editor-root'\] === undefined/u)
+        assert.match(home, /label="删除"[\s\S]*onClick=\{onRemove/u)
+        assert.match(panel, /node\?\.managed && !fixedRoot[\s\S]*删除选中节点/u)
+        assert.match(editor, /createPageNodeRemoval\(layerProjection\.nodes, node\.id\)[\s\S]*setSelectedNodeId\(removal\.selectionAfterRemoval\)/u)
+    })
 })

@@ -80,6 +80,7 @@ import {
     createBuiltInStructureInsertion,
     type BuiltInStructureKind,
 } from '../application/builtInStructureInsertion.ts'
+import {createPageNodeRemoval} from '../application/pageNodeRemoval.ts'
 import {PublicComponentDefinitionCreator} from './public-components/PublicComponentDefinitionCreator.tsx'
 import {
     publicComponentDefinitionFormValue,
@@ -428,6 +429,21 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             if (accepted) setSelectedNodeId(insertion.newNodeId)
         })
     }
+    const removePageNode = (node: LayerProjectionNode) => {
+        const removal = createPageNodeRemoval(layerProjection.nodes, node.id)
+        if (!removal) {
+            void session.reportVisualFailure('当前页面节点不能删除。')
+            return
+        }
+        setActiveTextRange(null)
+        void session.applyVisualPropertyEntry(
+            removal.request,
+            '删除页面节点',
+            {immediate: true},
+        ).then(accepted => {
+            if (accepted) setSelectedNodeId(removal.selectionAfterRemoval)
+        })
+    }
 
     const openComponentEditor = (definition?: PublicComponentDefinitionContract) => {
         setComponentAction(null)
@@ -717,6 +733,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                     onReplaceImage={() => openAssetPicker('replace')}
                     onManagePublicComponent={openSelectedComponentActions}
                     onSaveAsPublicComponent={openCapturedComponentEditor}
+                    onRemovePageNode={removePageNode}
                     visualError={session.visualError}
                     styleContext={editContext}
                     navigationRequest={propertyDockNavigation}
@@ -850,6 +867,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 activeTextRange={activeTextRange}
                                 styleContext={editContext}
                                 onOpenDetails={() => openPropertyDetails('content', 'text')}
+                                onRemove={selectedNode ? () => removePageNode(selectedNode) : undefined}
                             />
                         ) : visibleRibbonTab === 'insert' ? (
                             <>

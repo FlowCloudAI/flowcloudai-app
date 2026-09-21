@@ -67,6 +67,7 @@ interface PageDocumentPropertiesPanelProps {
     onReplaceImage: () => void
     onManagePublicComponent: (node: LayerProjectionNode) => void
     onSaveAsPublicComponent: (node: LayerProjectionNode) => void
+    onRemovePageNode: (node: LayerProjectionNode) => void
     visualError: string | null
     styleContext: 'mobile' | 'desktop'
     navigationRequest: PropertyDockNavigationRequest | null
@@ -369,6 +370,7 @@ export function PageDocumentPropertiesPanel({
     onReplaceImage,
     onManagePublicComponent,
     onSaveAsPublicComponent,
+    onRemovePageNode,
     visualError,
     styleContext,
     navigationRequest,
@@ -441,6 +443,13 @@ export function PageDocumentPropertiesPanel({
                 <strong>属性 · {node ? (PAGE_DOCUMENT_NODE_KIND_LABELS[node.kind] ?? (node.managed ? '页面元素' : '源码元素')) : '未选择'}</strong>
                 <span>修改范围 · {styleContext === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
             </header>
+            {node?.managed && !fixedRoot && (
+                <div className="page-document-properties-panel__node-actions">
+                    <Button type="button" size="sm" variant="outline" onClick={() => onRemovePageNode(node)}>
+                        删除选中节点
+                    </Button>
+                </div>
+            )}
             {image && <div data-property-section="content"><ImageDescriptionControls
                     key={`${image.nodeId}:${image.reference.assetId ?? image.reference.status}:${image.alt}:${image.caption ?? ''}`}
                     image={image}
