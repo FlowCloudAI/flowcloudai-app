@@ -1,6 +1,6 @@
 // 本组件把主仓已有的页面文档属性适配器接到 Office 功能区；不读取模型或直接改写源码。
 
-import {AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eraser, Search, Trash2} from 'lucide-react'
+import {AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eraser, IndentDecrease, IndentIncrease, Search, Trash2} from 'lucide-react'
 import {Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../page-document/domain/layerProjection.ts'
 import type {
@@ -26,7 +26,11 @@ import {
     DocumentRibbonGroup,
     DocumentRibbonRows,
 } from './DocumentOfficeRibbon.tsx'
-import {createRibbonPropertyRequest} from './ribbonKernelBinding.ts'
+import {
+    createRibbonPropertyRequest,
+    ribbonParagraphIndentLevel,
+    ribbonParagraphIndentStep,
+} from './ribbonKernelBinding.ts'
 import type {RibbonTextRange} from './ribbonKernelBinding.ts'
 import {InlineRibbonStyleControls} from './InlineRibbonStyleControls.tsx'
 import {ColorPropertyControl} from '../../page-document/components/properties/ColorPropertyControl.tsx'
@@ -200,31 +204,65 @@ function ParagraphControls({
     styleContext: 'mobile' | 'desktop'
 }) {
     const alignment = stateFor(states, 'text-align')
+    const indent = stateFor(states, 'margin-inline-start')
     const current = propertyValue(alignment) || 'left'
     const canWrite = Boolean(alignment && !alignment.disabled)
+    const indentValue = propertyValue(indent) || '0'
+    const indentLevel = ribbonParagraphIndentLevel(indentValue)
+    const indentReason = indent?.reason
+        ?? (indentLevel === null ? '当前缩进是自定义值，请在详细设置中调整。' : null)
+    const changeIndent = (direction: 'decrease' | 'increase') => {
+        const next = ribbonParagraphIndentStep(indentValue, direction)
+        if (!next) return
+        void applyKernelEntry(
+            createRibbonPropertyRequest(node.id, 'margin-inline-start', next, styleContext),
+            direction === 'increase' ? '增加段落缩进' : '减少段落缩进',
+            {immediate: true},
+        )
+    }
     return (
-        <div className="document-ribbon-alignment" role="group" aria-label="段落对齐">
-            {ALIGNMENT_OPTIONS.map(option => {
-                const Icon = option.icon
-                return (
-                    <button
-                        aria-label={option.label}
-                        aria-pressed={current === option.value}
-                        disabled={!canWrite}
-                        key={option.value}
-                        onClick={() => void applyKernelEntry(
-                            createRibbonPropertyRequest(node.id, 'text-align', {kind: 'choice', value: option.value}, styleContext),
-                            `修改${option.label}`,
-                            {immediate: true},
-                        )}
-                        title={alignment?.reason ?? option.label}
-                        type="button"
-                    >
-                        <Icon size={14} />
-                    </button>
-                )
-            })}
-        </div>
+        <DocumentRibbonRows
+            first={<div className="document-ribbon-alignment" role="group" aria-label="段落对齐">
+                {ALIGNMENT_OPTIONS.map(option => {
+                    const Icon = option.icon
+                    return (
+                        <button
+                            aria-label={option.label}
+                            aria-pressed={current === option.value}
+                            disabled={!canWrite}
+                            key={option.value}
+                            onClick={() => void applyKernelEntry(
+                                createRibbonPropertyRequest(node.id, 'text-align', {kind: 'choice', value: option.value}, styleContext),
+                                `修改${option.label}`,
+                                {immediate: true},
+                            )}
+                            title={alignment?.reason ?? option.label}
+                            type="button"
+                        >
+                            <Icon size={14} />
+                        </button>
+                    )
+                })}
+            </div>}
+            second={<>
+                <DocumentRibbonCommand
+                    ariaLabel={indentReason || indentLevel === 0 ? `减少缩进：${indentReason ?? '已到最小缩进'}` : '减少缩进'}
+                    disabled={Boolean(indentReason) || indentLevel === 0}
+                    icon={IndentDecrease}
+                    label="减少缩进"
+                    onClick={() => changeIndent('decrease')}
+                    title={indentReason ?? (indentLevel === 0 ? '已到最小缩进' : '减少缩进')}
+                />
+                <DocumentRibbonCommand
+                    ariaLabel={indentReason || indentLevel === 3 ? `增加缩进：${indentReason ?? '已到最大缩进'}` : '增加缩进'}
+                    disabled={Boolean(indentReason) || indentLevel === 3}
+                    icon={IndentIncrease}
+                    label="增加缩进"
+                    onClick={() => changeIndent('increase')}
+                    title={indentReason ?? (indentLevel === 3 ? '已到最大缩进' : '增加缩进')}
+                />
+            </>}
+        />
     )
 }
 

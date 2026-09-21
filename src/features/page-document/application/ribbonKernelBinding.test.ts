@@ -6,6 +6,9 @@ import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
 import {
     createRibbonPropertyRequest,
     createRibbonTextRangePropertyRequest,
+    RIBBON_PARAGRAPH_INDENT_LEVELS,
+    ribbonParagraphIndentLevel,
+    ribbonParagraphIndentStep,
     toggleRibbonTextDecoration,
 } from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {refreshCanvasTextSelection} from '../canvas/runtime/inputPolicy.ts'
@@ -76,6 +79,37 @@ test('字体组的节点文字与节点底色写入当前节点的受管规则',
     assert.equal(background.property, 'background-color')
     assert.deepEqual(background.action, {kind: 'set-value', value: 'var(--fc-entry-surface)'})
     assert.deepEqual(background.destination, {
+        scope: 'entry',
+        channel: {kind: 'conditional-rule', context: 'desktop'},
+    })
+})
+
+test('段落缩进只沿固定档位增减并写入当前断点', () => {
+    assert.deepEqual(RIBBON_PARAGRAPH_INDENT_LEVELS, [0, 1, 2, 3])
+    assert.deepEqual(['0', '1rem', '2rem', '3rem'].map(ribbonParagraphIndentLevel), [0, 1, 2, 3])
+    assert.equal(ribbonParagraphIndentLevel('1.5rem'), null)
+    assert.equal(ribbonParagraphIndentStep('0', 'decrease'), null)
+    assert.equal(ribbonParagraphIndentStep('3rem', 'increase'), null)
+    assert.deepEqual(ribbonParagraphIndentStep('1rem', 'increase'), {
+        kind: 'numeric', value: 2, unit: 'rem', numberText: '2',
+    })
+    assert.deepEqual(ribbonParagraphIndentStep('2rem', 'decrease'), {
+        kind: 'numeric', value: 1, unit: 'rem', numberText: '1',
+    })
+
+    const next = ribbonParagraphIndentStep('1rem', 'increase')
+    assert.ok(next)
+    const intent = createRibbonPropertyRequest(
+        NODE_ID,
+        'margin-inline-start',
+        next,
+        'desktop',
+    ).createIntents(new Map([[NODE_ID, handle()]]))[0]
+    assert.equal(intent?.kind, 'edit-property')
+    if (intent?.kind !== 'edit-property') return
+    assert.equal(intent.property, 'margin-inline-start')
+    assert.deepEqual(intent.action, {kind: 'set-value', value: '2rem'})
+    assert.deepEqual(intent.destination, {
         scope: 'entry',
         channel: {kind: 'conditional-rule', context: 'desktop'},
     })

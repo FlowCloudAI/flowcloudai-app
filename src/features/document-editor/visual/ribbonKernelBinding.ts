@@ -34,6 +34,35 @@ export type RibbonInlineProperty =
 
 export type RibbonTextDecoration = 'underline' | 'line-through'
 
+export const RIBBON_PARAGRAPH_INDENT_LEVELS = Object.freeze([0, 1, 2, 3] as const)
+export type RibbonParagraphIndentDirection = 'decrease' | 'increase'
+
+export function ribbonParagraphIndentLevel(value: string): number | null {
+    const normalized = value.trim().toLowerCase()
+    if (/^0(?:\.0+)?(?:px|rem)?$/u.test(normalized)) return 0
+    const matched = /^(\d+(?:\.\d+)?)rem$/u.exec(normalized)
+    if (!matched) return null
+    const level = Number(matched[1])
+    return RIBBON_PARAGRAPH_INDENT_LEVELS.includes(level as (typeof RIBBON_PARAGRAPH_INDENT_LEVELS)[number])
+        ? level
+        : null
+}
+
+export function ribbonParagraphIndentStep(
+    value: string,
+    direction: RibbonParagraphIndentDirection,
+): VisualPropertyEditValue | null {
+    const current = ribbonParagraphIndentLevel(value)
+    if (current === null) return null
+    const currentIndex = RIBBON_PARAGRAPH_INDENT_LEVELS.indexOf(
+        current as (typeof RIBBON_PARAGRAPH_INDENT_LEVELS)[number],
+    )
+    const next = RIBBON_PARAGRAPH_INDENT_LEVELS[currentIndex + (direction === 'increase' ? 1 : -1)]
+    return next === undefined
+        ? null
+        : {kind: 'numeric', value: next, unit: 'rem', numberText: String(next)}
+}
+
 export function toggleRibbonTextDecoration(
     value: string | null,
     decoration: RibbonTextDecoration,
