@@ -218,10 +218,28 @@ export default function Overlay({
             if (!passive || !shouldDismissOverlay(dismissibleRef.current, isAlertModalOpenRef.current)) return
             if (event.target instanceof Node && !panelRef.current?.contains(event.target)) onCloseRef.current?.()
         }
-        if (passive) document.addEventListener('pointerdown', onOutsidePointerDown, true)
+        let iframeBlurFrame = 0
+        const onWindowBlur = () => {
+            if (!passive) return
+            // iframe 拥有独立文档，内部 pointerdown 不会冒泡到宿主；焦点落入画布后补做点外关闭。
+            iframeBlurFrame = requestAnimationFrame(() => {
+                if (
+                    document.activeElement instanceof HTMLIFrameElement &&
+                    shouldDismissOverlay(dismissibleRef.current, isAlertModalOpenRef.current)
+                ) onCloseRef.current?.()
+            })
+        }
+        if (passive) {
+            document.addEventListener('pointerdown', onOutsidePointerDown, true)
+            window.addEventListener('blur', onWindowBlur)
+        }
 
         return () => {
-            if (passive) document.removeEventListener('pointerdown', onOutsidePointerDown, true)
+            if (passive) {
+                document.removeEventListener('pointerdown', onOutsidePointerDown, true)
+                window.removeEventListener('blur', onWindowBlur)
+            }
+            cancelAnimationFrame(iframeBlurFrame)
             removeOverlay(id)
             if (!passive) document.body.style.overflow = bodyOverflow
             cancelAnimationFrame(focusRaf)

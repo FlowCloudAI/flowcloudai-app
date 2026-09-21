@@ -188,6 +188,7 @@ describe('page document editor integration boundary', () => {
         assert.match(color, /<FloatingPanel[\s\S]*passive[\s\S]*page-document-color-popover/u)
         assert.match(color, /<FloatingPanel[\s\S]*anchorRef=\{triggerAnchorRef\}/u)
         assert.match(overlay, /variant !== 'anchored'[\s\S]*resolveAnchoredOverlayPosition/u)
+        assert.match(overlay, /HTMLIFrameElement[\s\S]*window\.addEventListener\('blur', onWindowBlur\)/u)
         assert.match(overlay, /createPortal\([\s\S]*document\.body/u)
         assert.doesNotMatch(color, /type="color"/u)
         assert.match(color, /\{fallbackLabel\}<\/Button>[\s\S]*<strong>主题色<\/strong>/u)
