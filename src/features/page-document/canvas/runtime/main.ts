@@ -46,6 +46,12 @@ import {
 } from './resolvedSelection.ts'
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
+import {
+    absorbableEchoElement,
+    buildOptimisticTextFragment,
+    echoInsertionPoint,
+    storedMarkStyle,
+} from './storedMarkEcho.ts'
 import runtimeCss from './runtime.css?inline'
 
 let token: string
@@ -361,12 +367,16 @@ function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: st
     range.setEnd(end.node, end.offset)
     range.deleteContents()
     if (text.length > 0) {
-        const fragment = document.createDocumentFragment()
-        for (const [index, part] of text.split('\n').entries()) {
-            if (index > 0) fragment.append(document.createElement('br'))
-            if (part.length > 0) fragment.append(document.createTextNode(part))
+        // 标记集必须在本地先画出来：否则第一帧是文本块默认格式，等权威渲染回来才变，肉眼可见跳变。
+        const style = storedMarkStyle(caretState.storedMarks)
+        const insertion = echoInsertionPoint(range.startContainer, range.startOffset)
+        const absorbed = insertion && absorbableEchoElement(insertion.parentNode, insertion.index, style)
+        const fragment = buildOptimisticTextFragment(document, text, absorbed ? null : style)
+        if (absorbed) {
+            while (fragment.firstChild) absorbed.appendChild(fragment.firstChild)
+        } else {
+            range.insertNode(fragment)
         }
-        range.insertNode(fragment)
     }
     node.normalize()
     const caret = snapshot.from + text.length
