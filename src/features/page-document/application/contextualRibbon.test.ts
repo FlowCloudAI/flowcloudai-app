@@ -115,6 +115,27 @@ test('列表上下文命令发出列表标签与新增列表项 intent', () => {
     assert.equal(insertIntent?.newNodeId, itemId)
 })
 
+test('列表上下文页签的标记菜单写入当前断点的受管规则', () => {
+    const bindings = new Map([[NODE_ID, componentHandle(NODE_ID, 'list')]])
+    for (const [context, channel] of [
+        ['mobile', {kind: 'base-rule'}],
+        ['desktop', {kind: 'conditional-rule', context: 'desktop'}],
+    ] as const) {
+        for (const value of ['disc', 'circle', 'square', 'decimal', 'lower-alpha', 'upper-roman', 'none']) {
+            const intent = createRibbonPropertyRequest(
+                NODE_ID,
+                'list-style-type',
+                {kind: 'keyword', value},
+                context,
+            ).createIntents(bindings)[0]
+            assert.equal(intent?.kind, 'edit-property')
+            assert.equal(intent?.property, 'list-style-type')
+            assert.deepEqual(intent?.action, {kind: 'set-value', value})
+            assert.deepEqual(intent?.destination, {scope: 'entry', channel})
+        }
+    }
+})
+
 test('分隔线功能区的线型与留白跟随当前移动或桌面档位', () => {
     const bindings = new Map([[NODE_ID, componentHandle(NODE_ID, 'divider')]])
     for (const [context, channel] of [

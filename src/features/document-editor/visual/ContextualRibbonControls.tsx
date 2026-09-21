@@ -92,12 +92,16 @@ function ListStructureControls({
     parentListId,
     canAddListItem,
     applyKernelEntry,
+    context,
+    inspectComponent,
     onAddListItem,
 }: {
     node: LayerProjectionNode
     parentListId: string | null
     canAddListItem: boolean
     applyKernelEntry: ApplyKernelEntry
+    context: ContainerLayoutContext
+    inspectComponent: InspectComponent
     onAddListItem?: (listId: string, afterNodeId: string | null) => void
 }) {
     const list = node.kind === 'list' ? node : null
@@ -112,13 +116,52 @@ function ListStructureControls({
         if (!listId || !onAddListItem) return
         onAddListItem(listId, node.kind === 'list-item' ? node.id : lastItem)
     }
-    return <>
-        {list && <>
-            <DocumentRibbonCommand active={currentTag === 'ul'} icon={ListChecks} label="项目符号" onClick={() => setTag('ul')} />
-            <DocumentRibbonCommand active={currentTag === 'ol'} icon={ListChecks} label="编号" onClick={() => setTag('ol')} />
+    const styleState = visualStateFor(
+        inspectVisualProperties(node, inspectComponent, '', context, ['list-style-type']),
+        'list-style-type',
+    )
+    const markerOptions = [
+        {value: 'disc', label: '实心圆点'},
+        {value: 'circle', label: '空心圆点'},
+        {value: 'square', label: '方块'},
+        {value: 'decimal', label: '数字'},
+        {value: 'lower-alpha', label: '小写字母'},
+        {value: 'upper-roman', label: '大写罗马数字'},
+        {value: 'none', label: '无标记'},
+    ] as const
+    const markerValue = markerOptions.some(option => option.value === styleState?.value)
+        ? styleState?.value ?? 'disc'
+        : 'current'
+    return <DocumentRibbonRows
+        first={<>
+            {list && <>
+                <DocumentRibbonCommand active={currentTag === 'ul'} icon={ListChecks} label="项目符号" onClick={() => setTag('ul')} />
+                <DocumentRibbonCommand active={currentTag === 'ol'} icon={ListChecks} label="编号" onClick={() => setTag('ol')} />
+            </>}
+            <DocumentRibbonCommand disabled={!canAddListItem || !onAddListItem} icon={ListPlus} label="添加列表项" onClick={add} title="在列表末尾添加一项" />
         </>}
-        <DocumentRibbonCommand disabled={!canAddListItem || !onAddListItem} icon={ListPlus} label="添加列表项" onClick={add} title="在列表末尾添加一项" />
-    </>
+        second={<label className="document-ribbon-layout-choice">
+            <span>列表标记</span>
+            <Select
+                aria-label="列表标记样式"
+                disabled={styleState?.disabled}
+                onValueChange={value => {
+                    if (value === 'current') return
+                    void applyKernelEntry(
+                        createRibbonPropertyRequest(node.id, 'list-style-type', {kind: 'keyword', value: String(value)}, context),
+                        '修改列表标记',
+                        {immediate: true},
+                    )
+                }}
+                options={[
+                    ...(markerValue === 'current' ? [{value: 'current', label: '当前样式', disabled: true}] : []),
+                    ...markerOptions,
+                ]}
+                title={styleState?.reason ?? '列表标记样式'}
+                value={markerValue}
+            />
+        </label>}
+    />
 }
 
 function DividerStructureControls({
@@ -306,7 +349,15 @@ export function ContextualRibbonControls({
     if (selected.kind === 'list' || selected.kind === 'list-item') {
         return <>
             <DocumentRibbonGroup label="列表" priority="essential" wide>
-                <ListStructureControls applyKernelEntry={applyKernelEntry} canAddListItem={canAddListItem} node={selected} onAddListItem={onAddListItem} parentListId={parentListId} />
+                <ListStructureControls
+                    applyKernelEntry={applyKernelEntry}
+                    canAddListItem={canAddListItem}
+                    context={context}
+                    inspectComponent={inspectComponent}
+                    node={selected}
+                    onAddListItem={onAddListItem}
+                    parentListId={parentListId}
+                />
             </DocumentRibbonGroup>
             <DocumentRibbonGroup label="列表外观" priority="normal">
                 <DocumentRibbonCommand icon={Palette} label="颜色" onClick={() => onOpenDetails('appearance', 'appearance')} />
