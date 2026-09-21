@@ -5,6 +5,8 @@ import {
     type CanvasInputResolution,
     type CanvasInputIntentMessage,
     type CanvasInputType,
+    type CanvasStoredMarkProperty,
+    type CanvasStoredMarks,
 } from '../canvas/protocol/index.ts'
 import {createLayerProjection} from '../domain/layerProjection.ts'
 import {
@@ -47,18 +49,16 @@ export function canvasInputCaretSelection(
     })
 }
 
-export type CanvasTypingStyleProperty =
-    | 'background-color'
-    | 'color'
-    | 'font-size'
-    | 'font-style'
-    | 'font-weight'
-    | 'text-decoration-line'
+export type CanvasTypingStyleProperty = CanvasStoredMarkProperty
 
-export interface CanvasTypingStyleSnapshot {
+export interface CanvasTypingStyleSnapshot extends CanvasStoredMarks {
     readonly nodeId: string
-    readonly styleContext: 'mobile' | 'desktop'
-    readonly values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
+}
+
+export function canvasInputTypingStyleSnapshot(
+    message: CanvasInputIntentMessage,
+): CanvasTypingStyleSnapshot | null {
+    return message.storedMarks ? Object.freeze({nodeId: message.nodeId, ...message.storedMarks}) : null
 }
 
 const editableKinds = new Set<string>(CANVAS_EDITABLE_KINDS)
@@ -165,7 +165,6 @@ export function createCanvasInputKernelOperation(
     historyGroupId: string,
     targetKind: string,
     allocateNodeId: () => string = () => crypto.randomUUID(),
-    typingStyles: ReadonlyMap<string, CanvasTypingStyleSnapshot | null> = new Map(),
 ): CanvasInputKernelOperation {
     const first = messages[0]
     if (!first || messages.some(message => message.nodeId.toLowerCase() !== first.nodeId.toLowerCase())) {
@@ -180,7 +179,7 @@ export function createCanvasInputKernelOperation(
     }
     const allocatedNodeIds = structural.map(() => nodeId(allocateNodeId()))
     const last = messages.at(-1)
-    const hasTypingStyle = messages.some(message => typingStyles.get(message.intentId) != null)
+    const hasTypingStyle = messages.some(message => message.storedMarks !== null)
     const selection = structural.length > 0
         ? Object.freeze({
               nodeId: allocatedNodeIds.at(-1) as string,
@@ -211,7 +210,7 @@ export function createCanvasInputKernelOperation(
             }
             return Object.freeze(messages.flatMap(message => [
                 replacementIntent(message, handle),
-                ...typingStyleIntents(message, handle, typingStyles.get(message.intentId) ?? null),
+                ...typingStyleIntents(message, handle, canvasInputTypingStyleSnapshot(message)),
             ]))
         },
     })

@@ -14,6 +14,7 @@ import {
     type CanvasInputResolution,
     type CanvasLinkCandidateIntentMessage,
     type CanvasLinkHoverRect,
+    type CanvasStoredMarks,
     type CanvasTextSelectionMessage,
 } from '../protocol/index.ts'
 import {validateAuthorHref} from '../../domain/kernel/policy/hrefPolicy.ts'
@@ -54,6 +55,7 @@ export interface PageDocumentCanvasProps {
 export interface PageDocumentCanvasHandle {
     resolveLinkCandidate(intentId: string, resolution: CanvasInputResolution): void
     focusEditor(): void
+    updateStoredMarks(mode: 'merge' | 'replace', storedMarks: CanvasStoredMarks | null): void
 }
 
 export function PageDocumentCanvas({
@@ -135,6 +137,10 @@ export function PageDocumentCanvas({
     useImperativeHandle(ref, () => ({
         focusEditor() {
             frameRef.current?.contentWindow?.focus()
+        },
+        updateStoredMarks(mode, storedMarks) {
+            if (!loadedRef.current) return
+            send({type: 'update-stored-marks', mode, storedMarks})
         },
         resolveLinkCandidate(intentId, resolution) {
             if (!loadedRef.current) return

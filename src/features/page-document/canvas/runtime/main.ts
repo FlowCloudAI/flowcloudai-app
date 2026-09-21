@@ -45,6 +45,7 @@ import {
     type CanvasResolvedSelection,
 } from './resolvedSelection.ts'
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
+import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
 import runtimeCss from './runtime.css?inline'
 
 let token: string
@@ -63,8 +64,8 @@ let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
 let pendingResolvedSelection: CanvasResolvedSelection | null = null
 let lastTextSelectionKey: string | null = null
-let activeTextSelection: CanvasTextSelectionSnapshot | null = null
 const pendingInputIds = new Set<string>()
+const caretState = createCanvasCaretStoredMarksState()
 const composition = createCanvasCompositionTracker()
 const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
 const linkCandidate = createCanvasLinkCandidateTracker()
@@ -106,7 +107,7 @@ function findManagedNode(nodeId: string | null): HTMLElement | null {
         .find(node => managedNodeId(node) === nodeId.toLowerCase()) ?? null
 }
 
-function setSelection(nodeId: string | null): void {
+function setSelection(nodeId: string | null, restoredByRuntime = false): void {
     const normalizedNodeId = nodeId?.toLowerCase() ?? null
     if (selectedNodeId !== normalizedNodeId) {
         const textSelection = captureSelection()
@@ -116,7 +117,7 @@ function setSelection(nodeId: string | null): void {
         if (focusedNodeId && focusedNodeId !== normalizedNodeId && focusedNode instanceof HTMLElement) {
             focusedNode.blur()
         }
-        activeTextSelection = null
+        if (!restoredByRuntime) caretState.observeSelection(null)
     }
     findManagedNode(selectedNodeId)?.removeAttribute('data-fc-canvas-selected')
     selectedNodeId = normalizedNodeId
@@ -151,7 +152,7 @@ function applyRender(
     latestRequestId = command.requestId
     // 晚于输入回执到达的规范化预览仍需挂载；先记住纯文本选区，避免全量安全挂载打断连续输入。
     const textSelection = editingEnabled && !resolvedSelection
-        ? captureSelection() ?? activeTextSelection
+        ? captureSelection() ?? caretState.selection
         : null
     const result = isolatePageDocument(command.html, command.css)
     if (!result.artifact) {
@@ -174,7 +175,7 @@ function applyRender(
         const missingAssetIds = missingCanvasAssetIds(assetDisplays, assetCache)
         if (missingAssetIds.length > CANVAS_ASSET_REQUEST_MAX_COUNT) throw new Error('画布图片引用超过上限。')
         applyCanvasEditingState(root, editingEnabled)
-        setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
+        setSelection(resolvedSelection?.nodeId ?? selectedNodeId, resolvedSelection !== null)
         let restoredSelection: CanvasTextSelectionSnapshot | null = null
         if (resolvedSelection) {
             // 延迟队列可能先挂上一帧不含新块的预览；目标出现前不消耗宿主落点。
@@ -190,7 +191,7 @@ function applyRender(
         }
         const shouldReportSelection = pendingResolvedSelection === null
         selectionReportGate.finishRender(() => {
-            if (shouldReportSelection) reportTextSelection(restoredSelection, true)
+            if (shouldReportSelection) reportTextSelection(restoredSelection, true, true)
         })
         send({
             type: 'rendered',
@@ -267,36 +268,39 @@ function refreshedTextSelection(snapshot: CanvasTextSelectionSnapshot | null): C
 function reportTextSelection(
     fallback: CanvasTextSelectionSnapshot | null = null,
     force = false,
+    restoredByRuntime = false,
 ): void {
     if (!editingEnabled || composition.isComposing) return
     const selection = refreshedTextSelection(captureSelection() ?? fallback)
+    if (selection && restoredByRuntime) caretState.restoreSelection(selection)
+    else caretState.observeSelection(selection)
+    const storedMarks = selection ? caretState.storedMarks : null
     const key = selection
-        ? `${selection.nodeId}:${selection.from}:${selection.to}:${selection.expected}`
+        ? `${selection.nodeId}:${selection.from}:${selection.to}:${selection.expected}:${JSON.stringify(storedMarks)}`
         : null
     if (!force && key === lastTextSelectionKey) return
     lastTextSelectionKey = key
     if (!selection) {
-        activeTextSelection = null
-        send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
+        send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: '', storedMarks: null})
         return
     }
     // 折叠光标同样是字体工具的可信上下文；切到宿主工具栏时必须保留，供后续输入格式继续使用。
-    activeTextSelection = selection
     send({
         type: 'text-selection',
         nodeId: selection.nodeId,
         from: selection.from,
         to: selection.to,
         expected: selection.expected,
+        storedMarks,
     })
 }
 
 function clearTextSelection(): void {
     selectionReportGate.cancelRender()
-    activeTextSelection = null
+    caretState.exitEditing()
     if (lastTextSelectionKey === null) return
     lastTextSelectionKey = null
-    send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
+    send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: '', storedMarks: null})
 }
 
 function captureInputRange(event: InputEvent): CanvasTextSelectionSnapshot | null {
@@ -366,13 +370,15 @@ function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: st
     }
     node.normalize()
     const caret = snapshot.from + text.length
-    restoreTextSelection({
+    const restoredCaret = {
         nodeId: snapshot.nodeId,
         from: caret,
         to: caret,
         expected: '',
         collapsed: true,
-    })
+    }
+    restoreTextSelection(restoredCaret)
+    caretState.restoreSelection(restoredCaret)
     reportSize()
     return true
 }
@@ -412,6 +418,7 @@ function submitInputIntent(
         to: snapshot.to,
         expected: snapshot.expected,
         text,
+        storedMarks: caretState.storedMarks,
     } satisfies Omit<CanvasInputIntentMessage, 'channel' | 'version' | 'sessionToken' | 'sequence'>)
     // beforeinput 已拦截原生写入；手动更新 DOM 后不会再有对应的 input 事件。
     if (inputType === 'insertParagraph') {
@@ -555,19 +562,22 @@ function installInputListeners(): void {
         if (editingEnabled && !composition.isComposing && !selectionReportGate.suppressed) {
             // WebKit 在焦点移向宿主工具栏的瞬间可能暂时读不到 Range；保留上一次
             // 已认证选区，直到明确采集到新选区或会话主动清除。
-            reportTextSelection(activeTextSelection)
+            reportTextSelection(caretState.selection)
             reportLinkCandidate()
         }
     })
 
     const reportSettledTextSelection = () => {
-        const fallback = activeTextSelection
+        const fallback = caretState.selection
         requestAnimationFrame(() => {
             if (!selectionReportGate.suppressed) reportTextSelection(fallback, true)
         })
     }
     document.addEventListener('pointerup', reportSettledTextSelection)
     document.addEventListener('pointercancel', reportSettledTextSelection)
+    document.addEventListener('pointerdown', event => {
+        if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) caretState.authorPointer()
+    })
 
     document.addEventListener('compositionstart', event => {
         const candidateLeave = linkCandidate.clear()
@@ -584,6 +594,7 @@ function installInputListeners(): void {
             reportBlockedInput('insertCompositionText', 'invalid-selection', nodeId)
             return
         }
+        caretState.beginComposition(nodeId)
         if (!composition.begin(snapshot)) return
         compositionOriginalNode = node.cloneNode(true) as HTMLElement
         compositionNodeId = nodeId
@@ -649,6 +660,10 @@ function installInputListeners(): void {
             return
         }
         if (event.defaultPrevented || event.isComposing || composition.isComposing || !editingEnabled) return
+        if (event.key.startsWith('Arrow')) {
+            caretState.authorDirection()
+            return
+        }
         if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey) return
         const node = managedNode(event.target)
         const nodeId = managedNodeId(node)
@@ -698,6 +713,11 @@ function start(): void {
         }
         if (command.type === 'set-selection') setSelection(command.nodeId)
         if (command.type === 'set-editing') setEditing(command.enabled)
+        if (command.type === 'update-stored-marks') {
+            if (caretState.updateStoredMarks(command.mode, command.storedMarks)) {
+                reportTextSelection(caretState.selection, true, true)
+            }
+        }
         if (command.type === 'resolve-input') {
             resolveInput(command.intentId, command.accepted, command.selection)
         }

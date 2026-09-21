@@ -15,7 +15,6 @@ import {
     createCanvasInputKernelOperation,
     createCanvasInputKernelRequest,
     readCanvasInputTarget,
-    type CanvasTypingStyleSnapshot,
 } from './canvasInputOperation.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
@@ -164,6 +163,7 @@ describe('页面编辑生产项目基线', () => {
             sequence: 1,
             type: 'input-intent' as const,
             nodeId: PARAGRAPH_ID,
+            storedMarks: null,
         }
         const messages: CanvasInputIntentMessage[] = [
             {
@@ -258,6 +258,7 @@ describe('页面编辑生产项目基线', () => {
             to: 2,
             expected: '',
             text: '',
+            storedMarks: null,
         }
         const splitOperation = createCanvasInputKernelOperation(
             [splitMessage],
@@ -347,6 +348,7 @@ describe('页面编辑生产项目基线', () => {
             to: 4,
             expected: '',
             text: '首行\n软换行\n\n第二段\n\n末段',
+            storedMarks: null,
         }
         const operation = createCanvasInputKernelOperation(
             [message],
@@ -391,17 +393,16 @@ describe('页面编辑生产项目基线', () => {
             to: 4,
             expected: '',
             text: '新',
+            storedMarks: {
+                styleContext: 'mobile',
+                values: {'font-size': '18px', color: '#556677'},
+            },
         }
         const operation = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:typing-style',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[message.intentId, {
-                nodeId: PARAGRAPH_ID,
-                styleContext: 'mobile',
-                values: {'font-size': '18px', color: '#556677'},
-            }]]),
         )
         const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
         assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
@@ -463,17 +464,16 @@ describe('页面编辑生产项目基线', () => {
             to: 4,
             expected: '',
             text: '新',
+            storedMarks: {
+                styleContext: 'mobile',
+                values: {color: 'var(--fc-entry-text)'},
+            },
         }
         const typing = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:typing-variable',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[message.intentId, {
-                nodeId: PARAGRAPH_ID,
-                styleContext: 'mobile',
-                values: {color: 'var(--fc-entry-text)'},
-            }]]),
         )
         const typingPrepared = runtime.prepare(initial.model, initial.snapshot, typing.request)
         assert.equal(typingPrepared.status, 'ready', JSON.stringify(typingPrepared))
@@ -508,6 +508,10 @@ describe('页面编辑生产项目基线', () => {
                 to: 4,
                 expected: '',
                 text: '甲',
+                storedMarks: {
+                    styleContext: 'mobile',
+                    values: {color: '#c43c35'},
+                },
             },
             {
                 channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
@@ -522,19 +526,17 @@ describe('页面编辑生产项目基线', () => {
                 to: 5,
                 expected: '',
                 text: '乙',
+                storedMarks: {
+                    styleContext: 'mobile',
+                    values: {color: '#c43c35'},
+                },
             },
         ]
-        const typingStyle: CanvasTypingStyleSnapshot = {
-            nodeId: PARAGRAPH_ID,
-            styleContext: 'mobile',
-            values: {color: '#c43c35'},
-        }
         const operation = createCanvasInputKernelOperation(
             messages,
             'canvas-input-history:continuous-typing-style',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map(messages.map(message => [message.intentId, typingStyle])),
         )
         const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
         assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
@@ -590,17 +592,16 @@ describe('页面编辑生产项目基线', () => {
             to: 4,
             expected: '',
             text: '中文',
+            storedMarks: {
+                styleContext: 'mobile',
+                values: {color: '#c43c35'},
+            },
         }
         const operation = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:composition-style',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[message.intentId, {
-                nodeId: PARAGRAPH_ID,
-                styleContext: 'mobile',
-                values: {color: '#c43c35'},
-            }]]),
         )
         const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
         assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
@@ -664,6 +665,7 @@ describe('页面编辑生产项目基线', () => {
             to: 2,
             expected: '',
             text: '',
+            storedMarks: null,
         }
         assert.deepEqual(readCanvasInputTarget(before, cellId), {kind: 'table-cell', text: '单元格'})
         assert.throws(

@@ -6,7 +6,7 @@ import test from 'node:test'
 
 const source = readFileSync(new URL('./PageDocumentEditor.tsx', import.meta.url), 'utf8')
 
-test('待输入格式只跨同一文字落点的连续输入存活，真实上下文切换仍会清理', () => {
+test('宿主只展示并转发画布标记集，不再按偏移猜测存活状态', () => {
     const selectionHandler = source.slice(
         source.indexOf('const handleSelection ='),
         source.indexOf('const handleTextSelection ='),
@@ -29,8 +29,12 @@ test('待输入格式只跨同一文字落点的连续输入存活，真实上�
     )
 
     assert.match(selectionHandler, /activeTextRange\?\.nodeId !== next[\s\S]*?clearTypingContext\(\)/u)
-    assert.match(textSelectionHandler, /message\.nodeId === null[\s\S]*?clearTypingContext\(\)/u)
-    assert.match(textSelectionHandler, /current\.nodeId !== message\.nodeId\) return null/u)
+    assert.match(textSelectionHandler, /message\.nodeId === null[\s\S]*?clearTypingDisplay\(\)/u)
+    assert.doesNotMatch(textSelectionHandler, /message\.nodeId === null[\s\S]*?updateStoredMarks/u)
+    assert.match(textSelectionHandler, /setTypingStyle\(message\.storedMarks/u)
+    assert.doesNotMatch(source, /expectedTypingCaretRef|typingStyleRef|current\.caret === message\.from/u)
+    assert.match(source, /updateStoredMarks\('merge',/u)
+    assert.match(source, /updateStoredMarks\('replace',/u)
     assert.match(undoHandler, /clearTypingContext\(\)[\s\S]*?session\.undo\(\)/u)
     assert.match(redoHandler, /clearTypingContext\(\)[\s\S]*?session\.redo\(\)/u)
     assert.match(contextHandler, /nextContext === editContext[\s\S]*?clearTypingContext\(\)[\s\S]*?setEditContext\(nextContext\)/u)

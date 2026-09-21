@@ -10,6 +10,7 @@ import {
     CANVAS_HREF_MAX_CODE_UNITS,
     CANVAS_INPUT_BLOCKED_REASONS,
     CANVAS_INPUT_TYPES,
+    CANVAS_STORED_MARK_PROPERTIES,
     CANVAS_MESSAGE_MAX_BYTES,
     CANVAS_PIXEL_RATIO_MAX,
     CANVAS_SOURCE_MAX_CODE_UNITS,
@@ -17,7 +18,7 @@ import {
     PAGE_DOCUMENT_CANVAS_CHANNEL,
     PAGE_DOCUMENT_CANVAS_VERSION,
 } from './constants.ts'
-import type {CanvasHostCommand, CanvasLinkHoverRect, CanvasRuntimeMessage} from './types.ts'
+import type {CanvasHostCommand, CanvasLinkHoverRect, CanvasRuntimeMessage, CanvasStoredMarks} from './types.ts'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -78,6 +79,18 @@ function isWithinMessageBudget(value: unknown): boolean {
 
 const envelopeKeys = ['channel', 'version', 'sessionToken', 'sequence', 'type'] as const
 
+function parseStoredMarks(value: unknown): CanvasStoredMarks | null | undefined {
+    if (value === null) return null
+    if (!isRecord(value) || !hasOnlyKeys(value, ['styleContext', 'values'])) return undefined
+    if (value.styleContext !== 'mobile' && value.styleContext !== 'desktop') return undefined
+    if (!isRecord(value.values)) return undefined
+    const properties = Object.keys(value.values)
+    if (properties.length === 0 || properties.length > CANVAS_STORED_MARK_PROPERTIES.length) return undefined
+    if (!properties.every(property => CANVAS_STORED_MARK_PROPERTIES.includes(property as never))) return undefined
+    if (!Object.values(value.values).every(item => isBoundedString(item, 1_024, false))) return undefined
+    return value as unknown as CanvasStoredMarks
+}
+
 export function parseCanvasHostCommand(value: unknown, token: string): CanvasHostCommand | null {
     if (!isRecord(value) || !isEnvelope(value, token) || !isWithinMessageBudget(value)) return null
     if (value.type === 'render') {
@@ -110,6 +123,15 @@ export function parseCanvasHostCommand(value: unknown, token: string): CanvasHos
     if (value.type === 'set-editing') {
         return hasOnlyKeys(value, [...envelopeKeys, 'enabled'])
             && typeof value.enabled === 'boolean'
+            ? value as unknown as CanvasHostCommand
+            : null
+    }
+    if (value.type === 'update-stored-marks') {
+        const storedMarks = parseStoredMarks(value.storedMarks)
+        return hasOnlyKeys(value, [...envelopeKeys, 'mode', 'storedMarks'])
+            && (value.mode === 'merge' || value.mode === 'replace')
+            && storedMarks !== undefined
+            && (value.mode === 'replace' || storedMarks !== null)
             ? value as unknown as CanvasHostCommand
             : null
     }
@@ -174,6 +196,7 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
         'to',
         'expected',
         'text',
+        'storedMarks',
     ]
     const from = value.from
     const to = value.to
@@ -182,6 +205,7 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
         : value.inputType === 'insertLineBreak'
           ? value.text === '\n'
           : true
+    const storedMarks = parseStoredMarks(value.storedMarks)
     return hasOnlyKeys(value, keys)
         && isUuid(value.intentId)
         && isUuid(value.nodeId)
@@ -194,6 +218,7 @@ function parseInputIntent(value: Record<string, unknown>): CanvasRuntimeMessage 
         && (to as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
         && isBoundedString(value.expected, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
         && isBoundedString(value.text, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
+        && storedMarks !== undefined
         && validTypePayload
         ? value as unknown as CanvasRuntimeMessage
         : null
@@ -238,7 +263,8 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
         const nodeId = value.nodeId
         const from = value.from
         const to = value.to
-        const empty = nodeId === null && from === 0 && to === 0 && value.expected === ''
+        const storedMarks = parseStoredMarks(value.storedMarks)
+        const empty = nodeId === null && from === 0 && to === 0 && value.expected === '' && storedMarks === null
         const selected = isUuid(nodeId)
             && Number.isInteger(from)
             && Number.isInteger(to)
@@ -246,7 +272,9 @@ export function parseCanvasRuntimeMessage(value: unknown, token: string): Canvas
             && (to as number) >= (from as number)
             && (to as number) <= CANVAS_TEXT_FIELD_MAX_CODE_UNITS
             && isBoundedString(value.expected, CANVAS_TEXT_FIELD_MAX_CODE_UNITS)
-        return hasOnlyKeys(value, [...envelopeKeys, 'nodeId', 'from', 'to', 'expected'])
+            && storedMarks !== undefined
+            && ((from as number) === (to as number) || storedMarks === null)
+        return hasOnlyKeys(value, [...envelopeKeys, 'nodeId', 'from', 'to', 'expected', 'storedMarks'])
             && (empty || selected)
             ? value as unknown as CanvasRuntimeMessage
             : null

@@ -38,7 +38,6 @@ import {
     createCanvasInputKernelOperation,
     readCanvasInputTarget,
     readCanvasInputTargetText,
-    type CanvasTypingStyleSnapshot,
 } from '../application/canvasInputOperation.ts'
 import {
     createLiveVisualCommitScheduler,
@@ -119,7 +118,6 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     const liveVisualSchedulerRef = useRef<LiveVisualCommitScheduler<ScheduledKernelEntry> | null>(null)
     const canvasInputSchedulerRef = useRef<CanvasInputCommitScheduler | null>(null)
     const canvasInputResolutionRef = useRef(new Map<string, CanvasInputResolution>())
-    const canvasTypingStylesRef = useRef(new Map<string, CanvasTypingStyleSnapshot | null>())
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -486,7 +484,6 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
     useEffect(() => {
         let active = true
         const resolutionByIntent = canvasInputResolutionRef.current
-        const typingStylesByIntent = canvasTypingStylesRef.current
         const scheduler = createCanvasInputCommitScheduler({
             delayMs: LIVE_VISUAL_COMMIT_DELAY_MS,
             readNodeText: nodeId => {
@@ -515,10 +512,6 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                     historyGroupId,
                     target.kind,
                     () => crypto.randomUUID(),
-                    new Map(messages.map(message => [
-                        message.intentId,
-                        typingStylesByIntent.get(message.intentId) ?? null,
-                    ])),
                 )
                 return applyKernelEntry(
                     operation.request,
@@ -539,14 +532,12 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             void scheduler.endInteraction()
             canvasInputSchedulerRef.current = null
             resolutionByIntent.clear()
-            typingStylesByIntent.clear()
         }
     }, [applyKernelEntry])
 
     const applyCanvasInputIntent = useCallback(
         async (
             message: CanvasInputIntentMessage,
-            typingStyle: CanvasTypingStyleSnapshot | null = null,
         ): Promise<CanvasInputResolution> => {
             const current = stateRef.current
             const reject = async (feedback: string): Promise<CanvasInputResolution> => {
@@ -567,13 +558,11 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
             }
             const scheduler = canvasInputSchedulerRef.current
             if (!scheduler) return reject('画布输入调度尚未就绪。')
-            canvasTypingStylesRef.current.set(message.intentId, typingStyle)
             const separateInteraction = message.inputType === 'insertParagraph' || message.inputType === 'insertFromPaste'
             const accepted = await scheduler.schedule(message, {
                 immediate: message.inputType === 'insertCompositionText' || separateInteraction,
                 separate: separateInteraction,
             })
-                .finally(() => canvasTypingStylesRef.current.delete(message.intentId))
             if (!accepted && stateRef.current?.identity.entryId === current.identity.entryId) {
                 setVisualError('画布文本范围已经变化，本次输入未写入页面草稿。')
             }

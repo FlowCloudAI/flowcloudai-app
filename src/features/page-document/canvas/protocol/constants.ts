@@ -46,3 +46,12 @@ export const CANVAS_INPUT_BLOCKED_REASONS = [
     'unsupported-input-type',
     'input-too-large',
 ] as const
+
+export const CANVAS_STORED_MARK_PROPERTIES = [
+    'background-color',
+    'color',
+    'font-size',
+    'font-style',
+    'font-weight',
+    'text-decoration-line',
+] as const

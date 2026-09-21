@@ -3,12 +3,19 @@
 import type {
     CANVAS_INPUT_BLOCKED_REASONS,
     CANVAS_INPUT_TYPES,
+    CANVAS_STORED_MARK_PROPERTIES,
     PAGE_DOCUMENT_CANVAS_CHANNEL,
     PAGE_DOCUMENT_CANVAS_VERSION,
 } from './constants.ts'
 
 export type CanvasInputType = (typeof CANVAS_INPUT_TYPES)[number]
 export type CanvasInputBlockedReason = (typeof CANVAS_INPUT_BLOCKED_REASONS)[number]
+export type CanvasStoredMarkProperty = (typeof CANVAS_STORED_MARK_PROPERTIES)[number]
+
+export interface CanvasStoredMarks {
+    readonly styleContext: 'mobile' | 'desktop'
+    readonly values: Readonly<Partial<Record<CanvasStoredMarkProperty, string>>>
+}
 
 export interface CanvasEnvelope {
     channel: typeof PAGE_DOCUMENT_CANVAS_CHANNEL
@@ -41,6 +48,13 @@ export interface CanvasSetEditingCommand extends CanvasEnvelope {
     enabled: boolean
 }
 
+/** 功能区只发送标记变更；合并、替换与存活判定都由画布内的权威光标状态完成。 */
+export interface CanvasUpdateStoredMarksCommand extends CanvasEnvelope {
+    type: 'update-stored-marks'
+    mode: 'merge' | 'replace'
+    storedMarks: CanvasStoredMarks | null
+}
+
 export interface CanvasResolveInputCommand extends CanvasEnvelope {
     type: 'resolve-input'
     intentId: string
@@ -67,6 +81,7 @@ export type CanvasHostCommand =
     | CanvasSetSelectionCommand
     | CanvasViewportCommand
     | CanvasSetEditingCommand
+    | CanvasUpdateStoredMarksCommand
     | CanvasResolveInputCommand
     | CanvasAssetFrameCommand
 
@@ -102,6 +117,7 @@ export interface CanvasTextSelectionMessage extends CanvasEnvelope {
     from: number
     to: number
     expected: string
+    storedMarks: CanvasStoredMarks | null
 }
 
 export interface CanvasNavigationIntentMessage extends CanvasEnvelope {
@@ -134,6 +150,7 @@ export interface CanvasInputIntentMessage extends CanvasEnvelope {
     to: number
     expected: string
     text: string
+    storedMarks: CanvasStoredMarks | null
 }
 
 export interface CanvasInputResolution {

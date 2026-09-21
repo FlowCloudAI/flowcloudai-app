@@ -24,6 +24,7 @@ import {
     CANVAS_EDITABLE_KINDS,
     type CanvasInputIntentMessage,
     type CanvasLinkCandidateIntentMessage,
+    type CanvasStoredMarks,
     type CanvasTextSelectionMessage,
 } from '../canvas/protocol/index.ts'
 import {pageDocumentLinkCandidates} from '../application/linkCandidateSelection.ts'
@@ -95,9 +96,7 @@ import {
 } from '../application/structuredContentEditing.ts'
 import type {RibbonTextRange} from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {
-    canvasInputCaretSelection,
     type CanvasTypingStyleProperty,
-    type CanvasTypingStyleSnapshot,
 } from '../application/canvasInputOperation.ts'
 import {
     resolveRibbonTab,
@@ -184,8 +183,7 @@ interface ComponentActionState {
 
 interface PendingTypingStyle {
     readonly nodeId: string
-    readonly caret: number
-    readonly values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
+    readonly storedMarks: CanvasStoredMarks
 }
 
 export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
@@ -236,8 +234,6 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const interactionKeyRef = useRef('')
     const appliedSelectionRequestRef = useRef('')
     const activeAssetPickerIdRef = useRef<string | null>(null)
-    const typingStyleRef = useRef<PendingTypingStyle | null>(null)
-    const expectedTypingCaretRef = useRef<{readonly nodeId: string; readonly offset: number} | null>(null)
     const session = useEntryPageDocumentSession({
         entryId,
         projectId,
@@ -254,21 +250,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         workbarHost,
     } = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
-    const updateTypingStyle = useCallback((
-        update: (current: PendingTypingStyle | null) => PendingTypingStyle | null,
-    ) => {
-        setTypingStyle(current => {
-            const next = update(current)
-            typingStyleRef.current = next
-            return next
-        })
-    }, [])
-    const clearTypingContext = useCallback(() => {
+    const clearTypingDisplay = useCallback(() => {
         setActiveTextRange(null)
         setTypingStyle(null)
-        typingStyleRef.current = null
-        expectedTypingCaretRef.current = null
     }, [])
+    const clearTypingContext = useCallback(() => {
+        clearTypingDisplay()
+        canvasRef.current?.updateStoredMarks('replace', null)
+    }, [clearTypingDisplay])
     const handleSave = useCallback(async () => {
         const result = await save()
         if (result) onSavedDerivedText?.(result.document.derivedText)
@@ -389,7 +378,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
 
     const handleTextSelection = (message: CanvasTextSelectionMessage) => {
         if (message.nodeId === null) {
-            clearTypingContext()
+            // 空消息已是画布确认的真实取消选择；宿主只同步展示，不把同一状态再写回画布。
+            clearTypingDisplay()
             return
         }
         const target = findLayerNode(layerProjection.nodes, message.nodeId)
@@ -405,31 +395,17 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             expected: message.expected,
         }
         setActiveTextRange(nextRange)
-        const expectedCaret = expectedTypingCaretRef.current
-        const expectedInputCaret = message.from === message.to
-            && expectedCaret?.nodeId === message.nodeId
-            && expectedCaret.offset === message.from
-        if (expectedCaret) expectedTypingCaretRef.current = null
-        updateTypingStyle(current => {
-            if (!current || message.from !== message.to || current.nodeId !== message.nodeId) return null
-            return current.caret === message.from || expectedInputCaret
-                ? {...current, caret: message.from}
-                : null
-        })
+        setTypingStyle(message.storedMarks
+            ? {nodeId: message.nodeId, storedMarks: message.storedMarks}
+            : null)
     }
 
     const setTypingStyleProperty = (property: CanvasTypingStyleProperty, value: string) => {
         if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
-        updateTypingStyle(current => ({
-            nodeId: activeTextRange.nodeId,
-            caret: activeTextRange.from,
-            values: Object.freeze({
-                ...(current?.nodeId === activeTextRange.nodeId && current.caret === activeTextRange.from
-                    ? current.values
-                    : {}),
-                [property]: value,
-            }),
-        }))
+        canvasRef.current?.updateStoredMarks('merge', {
+            styleContext: editContext,
+            values: {[property]: value},
+        })
         requestAnimationFrame(() => canvasRef.current?.focusEditor())
     }
 
@@ -437,36 +413,15 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>,
     ) => {
         if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
-        updateTypingStyle(() => ({
-            nodeId: activeTextRange.nodeId,
-            caret: activeTextRange.from,
+        canvasRef.current?.updateStoredMarks('replace', {
+            styleContext: editContext,
             values: Object.freeze({...values}),
-        }))
+        })
         requestAnimationFrame(() => canvasRef.current?.focusEditor())
     }
 
     const handleCanvasInputIntent = async (message: CanvasInputIntentMessage) => {
-        const pending = typingStyleRef.current
-        const expectedCaret = expectedTypingCaretRef.current
-        const continuesPendingTyping = message.from === message.to
-            && pending?.nodeId === message.nodeId
-            && (
-                pending.caret === message.from
-                || (expectedCaret?.nodeId === message.nodeId && expectedCaret.offset === message.from)
-            )
-        const typingSnapshot: CanvasTypingStyleSnapshot | null = continuesPendingTyping
-            ? Object.freeze({
-                nodeId: pending.nodeId,
-                styleContext: editContext,
-                values: pending.values,
-            })
-            : null
-        if (typingSnapshot && message.inputType !== 'insertParagraph') {
-            expectedTypingCaretRef.current = canvasInputCaretSelection(message)
-        }
-        const result = await session.applyCanvasInputIntent(message, typingSnapshot)
-        if (!result.accepted) expectedTypingCaretRef.current = null
-        return result
+        return session.applyCanvasInputIntent(message)
     }
 
     const handleLinkCandidateIntent = (message: CanvasLinkCandidateIntentMessage) => {
@@ -981,7 +936,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectTextRange={session.inspectTextRange}
                                 activeTextRange={activeTextRange}
                                 typingStyles={typingStyle && typingStyle.nodeId === activeTextRange?.nodeId
-                                    ? typingStyle.values
+                                    ? typingStyle.storedMarks.values
                                     : {}}
                                 styleContext={editContext}
                                 onOpenDetails={() => openPropertyDetails('content', 'text')}

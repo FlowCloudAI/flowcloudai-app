@@ -67,6 +67,16 @@ test('宿主命令严格校验渲染、选择、编辑权限、输入回执与�
         'set-editing',
     )
     assert.equal(parseCanvasHostCommand(message('set-editing', {enabled: 'yes'}), TOKEN), null)
+    assert.equal(parseCanvasHostCommand(message('update-stored-marks', {
+        mode: 'merge',
+        storedMarks: {styleContext: 'mobile', values: {color: '#c43c35'}},
+    }), TOKEN)?.type, 'update-stored-marks')
+    assert.equal(parseCanvasHostCommand(message('update-stored-marks', {
+        mode: 'replace', storedMarks: null,
+    }), TOKEN)?.type, 'update-stored-marks')
+    assert.equal(parseCanvasHostCommand(message('update-stored-marks', {
+        mode: 'merge', storedMarks: null,
+    }), TOKEN), null)
     assert.equal(
         parseCanvasHostCommand(message('resolve-input', {
             intentId: REQUEST_ID,
@@ -149,10 +159,11 @@ test('文字选区消息固定纯文本 UTF-16 区间与空选区形状', () => 
         from: 1,
         to: 3,
         expected: '😀',
+        storedMarks: null,
     })
     assert.equal(parseCanvasRuntimeMessage(selection, TOKEN)?.type, 'text-selection')
     assert.equal(parseCanvasRuntimeMessage(message('text-selection', {
-        nodeId: null, from: 0, to: 0, expected: '',
+        nodeId: null, from: 0, to: 0, expected: '', storedMarks: null,
     }), TOKEN)?.type, 'text-selection')
     assert.equal(parseCanvasRuntimeMessage({...selection, nodeId: 'invalid'} , TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage({...selection, from: -1}, TOKEN), null)
@@ -160,15 +171,26 @@ test('文字选区消息固定纯文本 UTF-16 区间与空选区形状', () => 
     assert.equal(parseCanvasRuntimeMessage({...selection, expected: '字'.repeat(65_537)}, TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage({...selection, html: '<b>禁止</b>'}, TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage(message('text-selection', {
-        nodeId: null, from: 1, to: 1, expected: '',
+        nodeId: null, from: 1, to: 1, expected: '', storedMarks: null,
     }), TOKEN), null)
+    const caretWithMarks = message('text-selection', {
+        nodeId: NODE_ID,
+        from: 1,
+        to: 1,
+        expected: '',
+        storedMarks: {styleContext: 'desktop', values: {color: '#c43c35', 'font-size': '18px'}},
+    })
+    assert.deepEqual(parseCanvasRuntimeMessage(caretWithMarks, TOKEN), caretWithMarks)
+    assert.equal(parseCanvasRuntimeMessage({...caretWithMarks, storedMarks: {styleContext: 'desktop', values: {unknown: 'x'}}}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...caretWithMarks, storedMarks: undefined}, TOKEN), null)
+    assert.equal(parseCanvasRuntimeMessage({...caretWithMarks, to: 2, expected: '文'}, TOKEN), null)
 })
 
 test('文字选区消息拒绝伪造来源、错误 token、过期序号与超长载荷', () => {
     const source = {}
     const gate = createCanvasRuntimeMessageGate(source, TOKEN)
     const selection = message('text-selection', {
-        nodeId: NODE_ID, from: 0, to: 2, expected: '文字',
+        nodeId: NODE_ID, from: 0, to: 2, expected: '文字', storedMarks: null,
     }, 3)
     assert.equal(gate.accept({source: {}, data: selection}), null)
     assert.equal(gate.accept({source, data: {...selection, sessionToken: OTHER_TOKEN}}), null)
@@ -218,6 +240,7 @@ test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单'
         to: 3,
         expected: '😀',
         text: '中文',
+        storedMarks: {styleContext: 'mobile', values: {color: '#c43c35'}},
     })
     assert.equal(parseCanvasRuntimeMessage(intent, TOKEN)?.type, 'input-intent')
     assert.equal(parseCanvasRuntimeMessage({...intent, inputType: 'formatBold'}, TOKEN), null)
@@ -236,6 +259,10 @@ test('输入消息沿用纯文本、UUID、UTF-16 区间与 inputType 白名单'
         'input-intent',
     )
     assert.equal(parseCanvasRuntimeMessage({...intent, newNodeId: NODE_ID}, TOKEN), null)
+    const withoutStoredMarks = Object.fromEntries(
+        Object.entries(intent).filter(([key]) => key !== 'storedMarks'),
+    )
+    assert.equal(parseCanvasRuntimeMessage(withoutStoredMarks, TOKEN), null)
     assert.equal(parseCanvasRuntimeMessage({...intent, inputType: 'insertParagraph', text: '\n'}, TOKEN), null)
     assert.equal(
         parseCanvasRuntimeMessage(message('input-blocked', {
@@ -305,6 +332,7 @@ test('输入意图同样受来源 Window、token、序号与统一大小上限�
         to: 0,
         expected: '',
         text: '中',
+        storedMarks: null,
     }, 4)
 
     assert.equal(gate.accept({source: {}, data: intent}), null)

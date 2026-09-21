@@ -7,12 +7,12 @@ import {
     PAGE_DOCUMENT_CANVAS_VERSION,
     type CanvasInputIntentMessage,
     type CanvasInputType,
+    type CanvasStoredMarks,
 } from '../canvas/protocol/index.ts'
 import type {ComponentHandle} from '../domain/kernel/index.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
     applyCanvasInputToText,
-    type CanvasTypingStyleSnapshot,
     canvasInputHistoryLabel,
     createCanvasInputKernelOperation,
     createCanvasInputKernelRequest,
@@ -29,6 +29,7 @@ function intent(
     to: number,
     expected: string,
     text: string,
+    storedMarks: CanvasStoredMarks | null = null,
 ): CanvasInputIntentMessage {
     return {
         channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
@@ -43,6 +44,7 @@ function intent(
         to,
         expected,
         text,
+        storedMarks,
     }
 }
 
@@ -69,17 +71,15 @@ describe('canvas input operation', () => {
     })
 
     it('折叠光标的待输入格式与文字替换在同一内核批次写入', () => {
-        const message = intent('10111111-1111-7111-8111-111111111111', 'insertText', 2, 2, '', '新')
+        const message = intent('10111111-1111-7111-8111-111111111111', 'insertText', 2, 2, '', '新', {
+            styleContext: 'desktop',
+            values: {'font-weight': '700', color: '#334455'},
+        })
         const operation = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:typing-style',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[message.intentId, {
-                nodeId: NODE_ID,
-                styleContext: 'desktop',
-                values: {'font-weight': '700', color: '#334455'},
-            }]]),
         )
         const handle = {nodeId: NODE_ID} as ComponentHandle
         const intents = operation.request.createIntents(new Map([[NODE_ID, handle]]))
@@ -113,17 +113,15 @@ describe('canvas input operation', () => {
     })
 
     it('中文组合提交把完整候选文字与待输入格式放进同一内核批次', () => {
-        const message = intent('10222222-2222-7222-8222-222222222222', 'insertCompositionText', 2, 2, '', '中文')
+        const message = intent('10222222-2222-7222-8222-222222222222', 'insertCompositionText', 2, 2, '', '中文', {
+            styleContext: 'mobile',
+            values: {color: '#c43c35'},
+        })
         const operation = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:composition-style',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[message.intentId, {
-                nodeId: NODE_ID,
-                styleContext: 'mobile',
-                values: {color: '#c43c35'},
-            }]]),
         )
         const handle = {nodeId: NODE_ID} as ComponentHandle
         const intents = operation.request.createIntents(new Map([[NODE_ID, handle]]))
@@ -155,23 +153,70 @@ describe('canvas input operation', () => {
         })
     })
 
-    it('连续输入批次按最后一条 current-candidate 消息返回格式重挂落点，无格式批次不返回', () => {
-        const first = intent('10555555-5555-7555-8555-555555555555', 'insertText', 2, 2, '', '甲')
-        const last = intent('10666666-6666-7666-8666-666666666666', 'insertText', 3, 3, '', '乙')
-        const style: CanvasTypingStyleSnapshot = {
-            nodeId: NODE_ID,
-            styleContext: 'mobile',
-            values: {color: '#334455'},
+    it('中文组合提交后的下一个字继续从画布标记集生成行内格式', () => {
+        const storedMarks = {
+            styleContext: 'mobile' as const,
+            values: {color: '#c43c35'},
         }
+        const composition = intent(
+            '10222222-2222-7222-8222-222222222222',
+            'insertCompositionText',
+            2,
+            2,
+            '',
+            '中文',
+            storedMarks,
+        )
+        const following = intent(
+            '10222222-2222-7222-8222-333333333333',
+            'insertText',
+            4,
+            4,
+            '',
+            '字',
+            storedMarks,
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const compositionIntents = createCanvasInputKernelOperation(
+            [composition],
+            'canvas-input-history:composition-following',
+            'paragraph',
+        ).request.createIntents(new Map([[NODE_ID, handle]]))
+        const followingIntents = createCanvasInputKernelOperation(
+            [following],
+            'canvas-input-history:composition-following',
+            'paragraph',
+        ).request.createIntents(new Map([[NODE_ID, handle]]))
+
+        for (const [intents, expected, from, to] of [
+            [compositionIntents, '中文', 2, 4],
+            [followingIntents, '字', 4, 5],
+        ] as const) {
+            const styleIntent = intents.at(1)
+            assert.equal(styleIntent?.kind, 'edit-property')
+            if (styleIntent?.kind !== 'edit-property' || styleIntent.target.kind !== 'text-range') continue
+            assert.equal(styleIntent.property, 'color')
+            assert.deepEqual(styleIntent.action, {kind: 'set-value', value: '#c43c35'})
+            assert.deepEqual(styleIntent.target.range, {unit: 'utf16-code-unit', from, to})
+            assert.equal(styleIntent.target.expected, expected)
+        }
+    })
+
+    it('连续输入批次按最后一条 current-candidate 消息返回格式重挂落点，无格式批次不返回', () => {
+        const first = intent('10555555-5555-7555-8555-555555555555', 'insertText', 2, 2, '', '甲', {
+            styleContext: 'mobile', values: {color: '#334455'},
+        })
+        const last = intent('10666666-6666-7666-8666-666666666666', 'insertText', 3, 3, '', '乙', {
+            styleContext: 'mobile', values: {color: '#334455'},
+        })
         const styled = createCanvasInputKernelOperation(
             [first, last],
             'canvas-input-history:styled-caret',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[first.intentId, style], [last.intentId, style]]),
         )
         const plain = createCanvasInputKernelOperation(
-            [first, last],
+            [{...first, storedMarks: null}, {...last, storedMarks: null}],
             'canvas-input-history:plain-caret',
             'paragraph',
         )
@@ -184,7 +229,9 @@ describe('canvas input operation', () => {
     })
 
     it('画布输入模块生成的所有顺序文本意图都显式使用当前候选坐标', () => {
-        const typed = intent('10333333-3333-7333-8333-333333333333', 'insertText', 2, 2, '', '新')
+        const typed = intent('10333333-3333-7333-8333-333333333333', 'insertText', 2, 2, '', '新', {
+            styleContext: 'mobile', values: {color: '#c43c35', 'font-size': '18px'},
+        })
         const split = intent('10444444-4444-7444-8444-444444444444', 'insertParagraph', 2, 2, '', '')
         const handle = {nodeId: NODE_ID} as ComponentHandle
         const typedIntents = createCanvasInputKernelOperation(
@@ -192,11 +239,6 @@ describe('canvas input operation', () => {
             'canvas-input-history:coordinate-regression',
             'paragraph',
             () => crypto.randomUUID(),
-            new Map([[typed.intentId, {
-                nodeId: NODE_ID,
-                styleContext: 'mobile',
-                values: {color: '#c43c35', 'font-size': '18px'},
-            }]]),
         ).request.createIntents(new Map([[NODE_ID, handle]]))
         const splitIntents = createCanvasInputKernelOperation(
             [split],

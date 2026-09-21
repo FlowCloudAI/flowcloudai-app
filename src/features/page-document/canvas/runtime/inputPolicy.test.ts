@@ -141,6 +141,7 @@ test('非折叠选区粘贴含空行文本只提交一次替换且不分段', ()
         to: 3,
         expected: '旧文',
         text: '第一行\n\n第二行',
+        storedMarks: null,
     }))
     const handle = {nodeId: snapshot.nodeId} as ComponentHandle
     const intents = createCanvasInputKernelOperation(
@@ -184,6 +185,7 @@ test('非折叠选区按 Enter 用块内换行替换选中文字', () => {
         to: 3,
         expected: '旧文',
         text: enter.text,
+        storedMarks: null,
     }
     const handle = {nodeId: snapshot.nodeId} as ComponentHandle
     const intents = createCanvasInputKernelOperation(
@@ -263,7 +265,7 @@ test('重渲染期的瞬时空选区不能清掉待输入格式或使字体组�
 
     const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
     assert.match(source, /selectionReportGate\.beginRender\(\)[\s\S]*?root\.replaceChildren/u)
-    assert.match(source, /selectionReportGate\.suppressed[\s\S]*?reportTextSelection\(activeTextSelection\)/u)
+    assert.match(source, /selectionReportGate\.suppressed[\s\S]*?reportTextSelection\(caretState\.selection\)/u)
     assert.match(source, /function clearTextSelection\(\)[\s\S]*?selectionReportGate\.cancelRender\(\)[\s\S]*?nodeId: null/u)
     assert.match(source, /function clearRenderedDocument\(\)[\s\S]*?clearTextSelection\(\)/u)
     assert.match(source, /function setEditing\(enabled: boolean\)[\s\S]*?editingEnabled !== enabled[\s\S]*?clearTextSelection\(\)/u)
@@ -277,9 +279,9 @@ test('运行时把快捷键、Enter、指针结束与写回重采集接进真实
     assert.match(source, /intent\.inputType === 'insertParagraph' && !snapshot\.collapsed/u)
     assert.match(source, /addEventListener\('pointerup', reportSettledTextSelection\)/u)
     assert.match(source, /addEventListener\('pointercancel', reportSettledTextSelection\)/u)
-    assert.match(source, /reportTextSelection\(restoredSelection, true\)/u)
+    assert.match(source, /reportTextSelection\(restoredSelection, true, true\)/u)
     assert.match(source, /pendingResolvedSelection = restoration\.pendingSelection/u)
-    assert.match(source, /selectionchange[\s\S]*?reportTextSelection\(activeTextSelection\)/u)
+    assert.match(source, /selectionchange[\s\S]*?reportTextSelection\(caretState\.selection\)/u)
     assert.match(source, /selectedNodeId !== normalizedNodeId[\s\S]*?getSelection\(\)\?\.removeAllRanges\(\)[\s\S]*?focusedNode\.blur\(\)/u)
     const blurHandler = source.slice(source.indexOf("window.addEventListener('blur'"), source.indexOf("installInputListeners()"))
     assert.doesNotMatch(blurHandler, /clearTextSelection\(\)/u)
