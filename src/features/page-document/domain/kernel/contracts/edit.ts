@@ -29,6 +29,8 @@ export type PropertyEditAction =
 export interface PropertyEditIntent {
     readonly kind: 'edit-property'
     readonly target: EditTarget
+    /** 同批次内跟随文本修改的选区格式意图，须按当前候选文本解释坐标。 */
+    readonly coordinateSpace?: 'current-candidate'
     readonly property: string
     readonly action: PropertyEditAction
     readonly readContext: ReadContext

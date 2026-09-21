@@ -399,7 +399,7 @@ describe('页面编辑生产项目基线', () => {
             new Map([[message.intentId, {
                 nodeId: PARAGRAPH_ID,
                 styleContext: 'mobile',
-                values: {'font-weight': '700', color: '#556677'},
+                values: {'font-size': '18px', color: '#556677'},
             }]]),
         )
         const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
@@ -415,9 +415,33 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
         const state = acceptEntryDocumentVisualUpdate(initial, update)
         const html = state.model.entry.sources['article.html']
-        assert.match(html, /font-weight:\s*700/u)
+        assert.match(html, /font-size:\s*18px/u)
         assert.match(html, /color:\s*#556677/u)
         assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文新')
+        const inspection = runtime.inspectTextRange(state.model, state.snapshot, {
+            nodeId: PARAGRAPH_ID,
+            from: 4,
+            to: 5,
+            expected: '新',
+            properties: ['font-size', 'color'],
+            context: {
+                viewport: 'mobile',
+                interactions: {hover: false, focusWithin: false},
+                direction: 'ltr',
+                writingMode: 'horizontal-tb',
+            },
+        })
+        assert.equal(inspection.status, 'ready', JSON.stringify(inspection))
+        if (inspection.status === 'ready') {
+            assert.deepEqual(inspection.inspection.properties['font-size']?.valueState, {
+                kind: 'uniform',
+                value: '18px',
+            })
+            assert.deepEqual(inspection.inspection.properties.color?.valueState, {
+                kind: 'uniform',
+                value: '#556677',
+            })
+        }
         assert.equal(state.model.entry.undo.length, 1)
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
     })
@@ -482,6 +506,26 @@ describe('页面编辑生产项目基线', () => {
         const html = state.model.entry.sources['article.html']
         assert.match(html, /color:\s*#c43c35/u)
         assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文甲乙')
+        const inspection = runtime.inspectTextRange(state.model, state.snapshot, {
+            nodeId: PARAGRAPH_ID,
+            from: 4,
+            to: 6,
+            expected: '甲乙',
+            properties: ['color'],
+            context: {
+                viewport: 'mobile',
+                interactions: {hover: false, focusWithin: false},
+                direction: 'ltr',
+                writingMode: 'horizontal-tb',
+            },
+        })
+        assert.equal(inspection.status, 'ready', JSON.stringify(inspection))
+        if (inspection.status === 'ready') {
+            assert.deepEqual(inspection.inspection.properties.color?.valueState, {
+                kind: 'uniform',
+                value: '#c43c35',
+            })
+        }
         assert.equal(state.model.entry.undo.length, 1)
     })
 
@@ -528,6 +572,26 @@ describe('页面编辑生产项目基线', () => {
         const html = state.model.entry.sources['article.html']
         assert.match(html, /color:\s*#c43c35/u)
         assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文中文')
+        const inspection = runtime.inspectTextRange(state.model, state.snapshot, {
+            nodeId: PARAGRAPH_ID,
+            from: 4,
+            to: 6,
+            expected: '中文',
+            properties: ['color'],
+            context: {
+                viewport: 'mobile',
+                interactions: {hover: false, focusWithin: false},
+                direction: 'ltr',
+                writingMode: 'horizontal-tb',
+            },
+        })
+        assert.equal(inspection.status, 'ready', JSON.stringify(inspection))
+        if (inspection.status === 'ready') {
+            assert.deepEqual(inspection.inspection.properties.color?.valueState, {
+                kind: 'uniform',
+                value: '#c43c35',
+            })
+        }
         assert.equal(state.model.entry.undo.length, 1)
     })
 

@@ -765,7 +765,7 @@ function parsePropertyEditIntent(value: unknown): PropertyEditIntent {
     const record = exactRecord(
         value,
         ['kind', 'target', 'property', 'action', 'readContext', 'destination'],
-        ['takeover'],
+        ['takeover', 'coordinateSpace'],
     )
     if (record.kind !== 'edit-property') throw new TypeError('EditIntent.kind 不受支持。')
     if (typeof record.property !== 'string' || !PROPERTY_PATTERN.test(record.property)) {
@@ -774,9 +774,19 @@ function parsePropertyEditIntent(value: unknown): PropertyEditIntent {
     if (record.takeover !== undefined && record.takeover !== 'preserve-inline-effect') {
         throw new TypeError('PropertyEditIntent.takeover 不受支持。')
     }
+    if (record.coordinateSpace !== undefined && record.coordinateSpace !== 'current-candidate') {
+        throw new TypeError('PropertyEditIntent.coordinateSpace 不受支持。')
+    }
+    const target = parseEditTarget(record.target)
+    if (record.coordinateSpace !== undefined && target.kind !== 'text-range') {
+        throw new TypeError('PropertyEditIntent.coordinateSpace 只能用于文本选区。')
+    }
     return Object.freeze({
         kind: 'edit-property',
-        target: parseEditTarget(record.target),
+        target,
+        ...(record.coordinateSpace === undefined
+            ? {}
+            : {coordinateSpace: 'current-candidate' as const}),
         property: record.property,
         action: parsePropertyEditAction(record.action),
         readContext: parseReadContext(record.readContext),

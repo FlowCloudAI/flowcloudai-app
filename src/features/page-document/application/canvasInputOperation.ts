@@ -138,6 +138,7 @@ function typingStyleIntents(
                 range: utf16Range(message.from, message.from + message.text.length),
                 expected: message.text,
             }),
+            coordinateSpace: 'current-candidate' as const,
             property,
             action: Object.freeze({kind: 'set-value' as const, value}),
             readContext,

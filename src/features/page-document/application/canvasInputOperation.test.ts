@@ -88,6 +88,7 @@ describe('canvas input operation', () => {
         for (const styled of intents.slice(1)) {
             assert.equal(styled.kind, 'edit-property')
             if (styled.kind !== 'edit-property') continue
+            assert.equal(styled.coordinateSpace, 'current-candidate')
             assert.deepEqual(styled.target, {
                 kind: 'text-range',
                 component: handle,
@@ -132,6 +133,7 @@ describe('canvas input operation', () => {
                 range: {unit: 'utf16-code-unit', from: 2, to: 4},
                 expected: '中文',
             },
+            coordinateSpace: 'current-candidate',
             property: 'color',
             action: {kind: 'set-value', value: '#c43c35'},
             readContext: {
@@ -142,6 +144,37 @@ describe('canvas input operation', () => {
             },
             destination: {scope: 'entry', channel: {kind: 'inline'}},
         })
+    })
+
+    it('画布输入模块生成的所有顺序文本意图都显式使用当前候选坐标', () => {
+        const typed = intent('10333333-3333-7333-8333-333333333333', 'insertText', 2, 2, '', '新')
+        const split = intent('10444444-4444-7444-8444-444444444444', 'insertParagraph', 2, 2, '', '')
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const typedIntents = createCanvasInputKernelOperation(
+            [typed],
+            'canvas-input-history:coordinate-regression',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[typed.intentId, {
+                nodeId: NODE_ID,
+                styleContext: 'mobile',
+                values: {color: '#c43c35', 'font-size': '18px'},
+            }]]),
+        ).request.createIntents(new Map([[NODE_ID, handle]]))
+        const splitIntents = createCanvasInputKernelOperation(
+            [split],
+            'canvas-input-history:coordinate-split',
+            'paragraph',
+            () => '77777777-7777-7777-8777-777777777777',
+        ).request.createIntents(new Map([[NODE_ID, handle]]))
+
+        const sequentialTextIntents = [...typedIntents, ...splitIntents].filter(
+            item => 'target' in item && item.target.kind === 'text-range',
+        )
+        assert.equal(sequentialTextIntents.length, 4)
+        for (const sequential of sequentialTextIntents) {
+            assert.equal(sequential.coordinateSpace, 'current-candidate')
+        }
     })
 
     it('insertParagraph 映射为宿主分配身份的 split-text-block，insertLineBreak 映射为换行替换', () => {
