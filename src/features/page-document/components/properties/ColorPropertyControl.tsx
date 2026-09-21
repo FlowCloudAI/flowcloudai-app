@@ -203,6 +203,8 @@ export function ColorPropertyControl({
         ><span/></Button>
     )
     const fallbackLabel = field.clearTitle.includes('继承') ? '继承' : '默认'
+    const hasCustomColor = !sourceColor && Boolean(field.localValue ?? field.value)
+    const customColorGuidance = `当前${field.label}会保持不变；选择新颜色后才会替换。`
 
     return (
         <section className={`page-document-property page-document-color-property${embedded ? ' is-embedded' : ''}${field.disabled ? ' is-disabled' : ''}`}>
@@ -210,8 +212,8 @@ export function ColorPropertyControl({
                 <span>{field.label}</span>
                 <span data-source-state={field.sourceState}>{field.statusText}</span>
             </div>}
-            {!sourceColor && (field.localValue ?? field.value) && (
-                <p className="page-document-property__message">复杂源码值会原样保留，请在代码模式调整。</p>
+            {!embedded && hasCustomColor && (
+                <p className="page-document-property__message">{customColorGuidance}</p>
             )}
             <span className="page-document-color-trigger-anchor" ref={triggerAnchorRef}>
                 <Button
@@ -221,7 +223,7 @@ export function ColorPropertyControl({
                     disabled={field.disabled}
                     iconOnly
                     size="sm"
-                    title={`设置${field.label}`}
+                    title={hasCustomColor ? customColorGuidance : `设置${field.label}`}
                     variant="outline"
                     onClick={() => {
                         if (open) close()
