@@ -253,6 +253,21 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         workbarHost,
     } = usePageDocumentWorkspace()
     const appliedResetVersionRef = useRef(resetVersion)
+    const updateTypingStyle = useCallback((
+        update: (current: PendingTypingStyle | null) => PendingTypingStyle | null,
+    ) => {
+        setTypingStyle(current => {
+            const next = update(current)
+            typingStyleRef.current = next
+            return next
+        })
+    }, [])
+    const clearTypingContext = useCallback(() => {
+        setActiveTextRange(null)
+        setTypingStyle(null)
+        typingStyleRef.current = null
+        expectedTypingCaretRef.current = null
+    }, [])
     const handleSave = useCallback(async () => {
         const result = await save()
         if (result) onSavedDerivedText?.(result.document.derivedText)
@@ -285,11 +300,20 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         setComponentEditor(null)
         setComponentAction(null)
         setPropertyDockNavigation(null)
-        setActiveTextRange(null)
-        setTypingStyle(null)
-        typingStyleRef.current = null
-        expectedTypingCaretRef.current = null
-    }, [entryId, projectId])
+        clearTypingContext()
+    }, [clearTypingContext, entryId, projectId])
+
+    const handleUndo = useCallback(() => {
+        clearTypingContext()
+        if (mode === 'code') sourceWorkspaceRef.current?.undo()
+        else session.undo()
+    }, [clearTypingContext, mode, session])
+
+    const handleRedo = useCallback(() => {
+        clearTypingContext()
+        if (mode === 'code') sourceWorkspaceRef.current?.redo()
+        else session.redo()
+    }, [clearTypingContext, mode, session])
 
     useEffect(() => {
         if (!active) return
@@ -302,17 +326,15 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                 if (canSave) void handleSave()
             } else if (key === 'z' && !event.shiftKey) {
                 event.preventDefault()
-                if (mode === 'code') sourceWorkspaceRef.current?.undo()
-                else session.undo()
+                handleUndo()
             } else if ((key === 'z' && event.shiftKey) || (key === 'y' && !event.shiftKey)) {
                 event.preventDefault()
-                if (mode === 'code') sourceWorkspaceRef.current?.redo()
-                else session.redo()
+                handleRedo()
             }
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [active, canSave, handleSave, mode, session])
+    }, [active, canSave, handleRedo, handleSave, handleUndo])
 
     const saveStatus = useMemo(() => {
         if (!state) return '正在读取页面文档…'
@@ -360,31 +382,18 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         const next = resolveVisualSelection(layerProjection.nodes, nodeId, source)
         setSelectedNodeId(next)
         if (activeTextRange?.nodeId !== next) {
-            setActiveTextRange(null)
-            updateTypingStyle(() => null)
+            clearTypingContext()
         }
-    }
-
-    const updateTypingStyle = (
-        update: (current: PendingTypingStyle | null) => PendingTypingStyle | null,
-    ) => {
-        setTypingStyle(current => {
-            const next = update(current)
-            typingStyleRef.current = next
-            return next
-        })
     }
 
     const handleTextSelection = (message: CanvasTextSelectionMessage) => {
         if (message.nodeId === null) {
-            setActiveTextRange(null)
-            updateTypingStyle(() => null)
+            clearTypingContext()
             return
         }
         const target = findLayerNode(layerProjection.nodes, message.nodeId)
         if (!active || mode !== 'visual' || !target || !CANVAS_EDITABLE_KINDS.includes(target.kind as never)) {
-            setActiveTextRange(null)
-            updateTypingStyle(() => null)
+            clearTypingContext()
             return
         }
         setSelectedNodeId(message.nodeId)
@@ -399,7 +408,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         const expectedInputCaret = message.from === message.to
             && expectedCaret?.nodeId === message.nodeId
             && expectedCaret.offset === message.from
-        if (expectedInputCaret) expectedTypingCaretRef.current = null
+        if (expectedCaret) expectedTypingCaretRef.current = null
         updateTypingStyle(current => {
             if (!current || message.from !== message.to || current.nodeId !== message.nodeId) return null
             return current.caret === message.from || expectedInputCaret
@@ -476,12 +485,16 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
 
     const changeMode = (nextMode: PageDocumentWorkspaceMode) => {
         setLinkCandidateIntent(null)
-        setActiveTextRange(null)
-        updateTypingStyle(() => null)
-        expectedTypingCaretRef.current = null
+        clearTypingContext()
         activeAssetPickerIdRef.current = null
         setAssetPicker(null)
         setMode(nextMode)
+    }
+
+    const changeEditContext = (nextContext: ResponsiveViewportContext) => {
+        if (nextContext === editContext) return
+        clearTypingContext()
+        setEditContext(nextContext)
     }
 
     const commitLinkCandidate = async (entry: EntryBrief) => {
@@ -785,7 +798,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             aria-label="撤销"
             title="撤销"
             disabled={!canUndo}
-            onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.undo() : session.undo()}
+            onClick={handleUndo}
         ><Undo2 size={16} /></Button>
         <Button
             type="button"
@@ -794,7 +807,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             aria-label="重做"
             title="重做"
             disabled={!canRedo}
-            onClick={() => mode === 'code' ? sourceWorkspaceRef.current?.redo() : session.redo()}
+            onClick={handleRedo}
         ><Redo2 size={16} /></Button>
         <span className={`page-document-editor__save-state is-${scope.phase}`} role="status">{saveStatus}</span>
         {(canSave || scope.phase === 'saving') && <Button
@@ -1040,7 +1053,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 outlineVisible={outlineVisible}
                                 layoutGuidesVisible={layoutGuidesVisible}
                                 onPreviewModeChange={setPreviewWidth}
-                                onEditContextChange={setEditContext}
+                                onEditContextChange={changeEditContext}
                                 onOutlineVisibleChange={setOutlineVisible}
                                 onLayoutGuidesVisibleChange={setLayoutGuidesVisible}
                                 onOpenDisplay={() => changeMode('display')}
@@ -1132,8 +1145,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                         ? action => {
                                             if (action === 'save') {
                                                 if (canSave) void handleSave()
-                                            } else if (action === 'undo') session.undo()
-                                            else session.redo()
+                                            } else if (action === 'undo') handleUndo()
+                                            else handleRedo()
                                         }
                                         : undefined}
                                     onFindIntent={undefined /* TODO：页面文档尚无查找面板，后续在此消费画布请求。 */}
@@ -1167,7 +1180,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             <footer className="page-document-editor__statusbar">
                 <span>{validationLabel(scope.validationPhase)} · {diagnosticCount} 条诊断</span>
                 <span>{dirty ? '草稿未保存' : state.persistedRevision ? '草稿已同步' : '新页面尚未保存'}</span>
-                <ResponsiveEditContextControl compact onChange={setEditContext} value={editContext} />
+                <ResponsiveEditContextControl compact onChange={changeEditContext} value={editContext} />
                 <span>选中：{selectedNode ? pageDocumentLayerLabel(selectedNode) : '—'}</span>
                 <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
             </footer>

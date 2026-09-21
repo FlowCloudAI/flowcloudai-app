@@ -375,8 +375,9 @@ describe('page document editor integration boundary', () => {
             viewControls.indexOf('export function ViewRibbonControls'),
         )
 
-        assert.match(editor, /<ViewRibbonControls[\s\S]*editContext=\{editContext\}[\s\S]*onEditContextChange=\{setEditContext\}/u)
-        assert.match(editor, /<ResponsiveEditContextControl compact onChange=\{setEditContext\} value=\{editContext\} \/>/u)
+        assert.match(editor, /<ViewRibbonControls[\s\S]*editContext=\{editContext\}[\s\S]*onEditContextChange=\{changeEditContext\}/u)
+        assert.match(editor, /<ResponsiveEditContextControl compact onChange=\{changeEditContext\} value=\{editContext\} \/>/u)
+        assert.match(editor, /const changeEditContext =[\s\S]*clearTypingContext\(\)[\s\S]*setEditContext\(nextContext\)/u)
         assert.match(viewControls, /<ResponsiveEditContextControl onChange=\{onEditContextChange\} value=\{editContext\} \/>/u)
         assert.match(sharedControl, /onClick=\{\(\) => onChange\(context\)\}/u)
         assert.doesNotMatch(sharedControl, /preview|Preview/u)

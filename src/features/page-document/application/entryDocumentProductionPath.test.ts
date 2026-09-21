@@ -15,6 +15,7 @@ import {
     createCanvasInputKernelOperation,
     createCanvasInputKernelRequest,
     readCanvasInputTarget,
+    type CanvasTypingStyleSnapshot,
 } from './canvasInputOperation.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
@@ -419,6 +420,69 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文新')
         assert.equal(state.model.entry.undo.length, 1)
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
+    })
+
+    it('真实会话连续输入多个字符时每个字符都保留待输入格式', () => {
+        const initial = createEntryDocumentSessionState(identity, document())
+        const runtime = createDocumentKernelDraftRuntime()
+        const messages: readonly CanvasInputIntentMessage[] = [
+            {
+                channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+                version: PAGE_DOCUMENT_CANVAS_VERSION,
+                sessionToken: 'a'.repeat(64),
+                sequence: 1,
+                type: 'input-intent',
+                intentId: '87111111-1111-7111-8111-111111111111',
+                nodeId: PARAGRAPH_ID,
+                inputType: 'insertText',
+                from: 4,
+                to: 4,
+                expected: '',
+                text: '甲',
+            },
+            {
+                channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+                version: PAGE_DOCUMENT_CANVAS_VERSION,
+                sessionToken: 'a'.repeat(64),
+                sequence: 2,
+                type: 'input-intent',
+                intentId: '87222222-2222-7222-8222-222222222222',
+                nodeId: PARAGRAPH_ID,
+                inputType: 'insertText',
+                from: 5,
+                to: 5,
+                expected: '',
+                text: '乙',
+            },
+        ]
+        const typingStyle: CanvasTypingStyleSnapshot = {
+            nodeId: PARAGRAPH_ID,
+            styleContext: 'mobile',
+            values: {color: '#c43c35'},
+        }
+        const operation = createCanvasInputKernelOperation(
+            messages,
+            'canvas-input-history:continuous-typing-style',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map(messages.map(message => [message.intentId, typingStyle])),
+        )
+        const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const update = runtime.applyPrepared(
+            initial.model,
+            initial.snapshot,
+            prepared.edit,
+            '连续输入带格式文字',
+            {historyGroupId: 'canvas-input-history:continuous-typing-style'},
+        )
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        const state = acceptEntryDocumentVisualUpdate(initial, update)
+        const html = state.model.entry.sources['article.html']
+        assert.match(html, /color:\s*#c43c35/u)
+        assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文甲乙')
+        assert.equal(state.model.entry.undo.length, 1)
     })
 
     it('真实会话给中文组合提交的完整候选文字保留光标待输入颜色', () => {

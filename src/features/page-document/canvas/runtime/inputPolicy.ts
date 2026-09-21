@@ -99,6 +99,42 @@ export function refreshCanvasTextSelection(
     }
 }
 
+export interface CanvasSelectionReportGate {
+    readonly suppressed: boolean
+    beginRender(): void
+    finishRender(report: () => void): void
+    cancelRender(): void
+}
+
+/** DOM 重挂引发的 selectionchange 不代表作者取消选择；只在下一绘制帧回报稳定落点。 */
+export function createCanvasSelectionReportGate(
+    schedule: (callback: () => void) => void,
+): CanvasSelectionReportGate {
+    let generation = 0
+    let suppressed = false
+    return {
+        get suppressed() {
+            return suppressed
+        },
+        beginRender() {
+            generation += 1
+            suppressed = true
+        },
+        finishRender(report) {
+            const expectedGeneration = generation
+            schedule(() => {
+                if (!suppressed || generation !== expectedGeneration) return
+                suppressed = false
+                report()
+            })
+        },
+        cancelRender() {
+            generation += 1
+            suppressed = false
+        },
+    }
+}
+
 export type CanvasPasteDecision =
     | {readonly kind: 'ignore'}
     | {readonly kind: 'block'; readonly reason: CanvasInputBlockedReason}

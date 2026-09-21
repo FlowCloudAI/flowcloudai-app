@@ -20,6 +20,7 @@ import {
     canvasKeyboardIntent,
     canvasPasteDecision,
     createCanvasCompositionTracker,
+    createCanvasSelectionReportGate,
     expandCollapsedCanvasDeletion,
     isCanvasSplittableKind,
     refreshCanvasTextSelection,
@@ -60,6 +61,7 @@ let lastTextSelectionKey: string | null = null
 let activeTextSelection: CanvasTextSelectionSnapshot | null = null
 const pendingInputIds = new Set<string>()
 const composition = createCanvasCompositionTracker()
+const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
 const linkCandidate = createCanvasLinkCandidateTracker()
 const linkHover = createCanvasLinkHoverTracker()
 
@@ -157,6 +159,7 @@ function applyRender(
         })
         return
     }
+    selectionReportGate.beginRender()
     try {
         const template = document.createElement('template')
         template.innerHTML = result.artifact.html
@@ -180,7 +183,10 @@ function applyRender(
         } else if (textSelection && restoreTextSelection(textSelection)) {
             restoredSelection = textSelection
         }
-        reportTextSelection(restoredSelection, true)
+        const shouldReportSelection = pendingResolvedSelection === null
+        selectionReportGate.finishRender(() => {
+            if (shouldReportSelection) reportTextSelection(restoredSelection, true)
+        })
         send({
             type: 'rendered',
             requestId: command.requestId,
@@ -320,6 +326,7 @@ function reportTextSelection(
 }
 
 function clearTextSelection(): void {
+    selectionReportGate.cancelRender()
     activeTextSelection = null
     if (lastTextSelectionKey === null) return
     lastTextSelectionKey = null
@@ -603,7 +610,7 @@ function installInputListeners(): void {
     })
 
     document.addEventListener('selectionchange', () => {
-        if (editingEnabled && !composition.isComposing) {
+        if (editingEnabled && !composition.isComposing && !selectionReportGate.suppressed) {
             // WebKit 在焦点移向宿主工具栏的瞬间可能暂时读不到 Range；保留上一次
             // 已认证选区，直到明确采集到新选区或会话主动清除。
             reportTextSelection(activeTextSelection)
@@ -613,7 +620,9 @@ function installInputListeners(): void {
 
     const reportSettledTextSelection = () => {
         const fallback = activeTextSelection
-        requestAnimationFrame(() => reportTextSelection(fallback, true))
+        requestAnimationFrame(() => {
+            if (!selectionReportGate.suppressed) reportTextSelection(fallback, true)
+        })
     }
     document.addEventListener('pointerup', reportSettledTextSelection)
     document.addEventListener('pointercancel', reportSettledTextSelection)

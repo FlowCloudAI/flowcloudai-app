@@ -25,6 +25,13 @@ export interface RibbonTextRange {
     readonly expected: string
 }
 
+export type RibbonFontScope = 'selection' | 'typing' | 'inactive'
+
+export function resolveRibbonFontScope(range: RibbonTextRange | null): RibbonFontScope {
+    if (!range) return 'inactive'
+    return range.to > range.from ? 'selection' : 'typing'
+}
+
 export type RibbonInlineProperty =
     | 'background-color'
     | 'font-size'

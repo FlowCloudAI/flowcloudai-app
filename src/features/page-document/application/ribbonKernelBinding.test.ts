@@ -7,6 +7,7 @@ import {
     createRibbonPropertyRequest,
     createRibbonTextRangePropertyRequest,
     RIBBON_PARAGRAPH_INDENT_LEVELS,
+    resolveRibbonFontScope,
     ribbonCaretInspectionRange,
     ribbonParagraphIndentLevel,
     ribbonParagraphIndentStep,
@@ -182,6 +183,12 @@ test('行内样式功能区按当前档位读取且始终写入 inline 通道', 
         assert.equal(intent.readContext.viewport, styleContext)
         assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
     }
+})
+
+test('字体组在折叠光标下使用待输入作用域，只在没有文本落点时停用', () => {
+    assert.equal(resolveRibbonFontScope({nodeId: NODE_ID, from: 2, to: 2, expected: ''}), 'typing')
+    assert.equal(resolveRibbonFontScope({nodeId: NODE_ID, from: 1, to: 3, expected: '文字'}), 'selection')
+    assert.equal(resolveRibbonFontScope(null), 'inactive')
 })
 
 test('折叠光标优先用前一个完整字符回读文字格式并兼容代理对', () => {

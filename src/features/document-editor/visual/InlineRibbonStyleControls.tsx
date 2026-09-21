@@ -15,8 +15,10 @@ import type {RibbonApplyKernelEntry, RibbonInspectTextRange} from './HomeRibbonC
 import {DocumentRibbonCommand, DocumentRibbonGroup, DocumentRibbonRows} from './DocumentOfficeRibbon.tsx'
 import {
     createRibbonTextRangePropertyRequest,
+    resolveRibbonFontScope,
     ribbonCaretInspectionRange,
     toggleRibbonTextDecoration,
+    type RibbonFontScope,
     type RibbonInlineProperty,
     type RibbonTextRange,
 } from './ribbonKernelBinding.ts'
@@ -52,8 +54,6 @@ const FONT_SIZE_OPTIONS = Object.freeze([
     {value: '24px', label: '24'},
     {value: '32px', label: '32'},
 ])
-
-type FontScope = 'selection' | 'typing' | 'inactive'
 
 function stateFor(
     states: readonly VisualPropertyState[],
@@ -116,7 +116,7 @@ function colorField(
     inspection: ReturnType<RibbonInspectTextRange> | null,
     typingStyles: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>,
     property: 'color' | 'background-color',
-    scope: FontScope,
+    scope: RibbonFontScope,
 ): VisualPropertyState {
     const block = stateFor(states, property)
     if (scope === 'inactive' && block) {
@@ -147,7 +147,7 @@ function colorField(
     })
 }
 
-function scopeLabel(scope: FontScope): string {
+function scopeLabel(scope: RibbonFontScope): string {
     if (scope === 'selection') return '字体 · 选区'
     if (scope === 'typing') return '字体 · 后续输入'
     return '字体'
@@ -165,9 +165,7 @@ export function InlineRibbonStyleControls({
     onTypingStyleChange,
     onTypingStylesReset,
 }: InlineRibbonStyleControlsProps) {
-    const scope: FontScope = range
-        ? range.to > range.from ? 'selection' : 'typing'
-        : 'inactive'
+    const scope = resolveRibbonFontScope(range)
     const inspectionRange = range
         ? range.to > range.from ? range : ribbonCaretInspectionRange(range, node.textContent)
         : null

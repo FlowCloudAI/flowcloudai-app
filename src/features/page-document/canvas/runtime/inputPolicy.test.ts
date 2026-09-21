@@ -9,6 +9,7 @@ import {
     canvasEnterIntent,
     canvasKeyboardIntent,
     canvasPasteDecision,
+    createCanvasSelectionReportGate,
     createCanvasCompositionTracker,
     expandCollapsedCanvasDeletion,
     isCanvasSplittableKind,
@@ -225,6 +226,47 @@ test('写回后按当前语义文本刷新选区 expected，瞬时采集失败�
     })
     assert.equal(refreshCanvasTextSelection(selected, null), null)
     assert.equal(refreshCanvasTextSelection({...selected, to: 8}, 'A文字B'), null)
+})
+
+test('重渲染期的瞬时空选区不能清掉待输入格式或使字体组闪烁', () => {
+    const scheduled: Array<() => void> = []
+    const gate = createCanvasSelectionReportGate(callback => scheduled.push(callback))
+    const reports: Array<CanvasTextSelectionSnapshot | null> = []
+    let typingColor: string | null = '#c43c35'
+    let toolbarEnabled = true
+    const hostReceives = (selection: CanvasTextSelectionSnapshot | null) => {
+        reports.push(selection)
+        toolbarEnabled = selection !== null
+        if (!selection) typingColor = null
+    }
+
+    gate.beginRender()
+    if (!gate.suppressed) hostReceives(null)
+    gate.finishRender(() => hostReceives({...snapshot, from: 3, to: 3}))
+
+    assert.equal(toolbarEnabled, true)
+    assert.equal(typingColor, '#c43c35')
+    assert.deepEqual(reports, [])
+    scheduled.shift()?.()
+    assert.equal(toolbarEnabled, true)
+    assert.equal(typingColor, '#c43c35')
+    assert.deepEqual(reports, [{...snapshot, from: 3, to: 3}])
+
+    gate.beginRender()
+    gate.finishRender(() => hostReceives({...snapshot, from: 4, to: 4}))
+    gate.cancelRender()
+    hostReceives(null)
+    scheduled.shift()?.()
+    assert.equal(toolbarEnabled, false)
+    assert.equal(typingColor, null)
+    assert.deepEqual(reports, [{...snapshot, from: 3, to: 3}, null])
+
+    const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
+    assert.match(source, /selectionReportGate\.beginRender\(\)[\s\S]*?root\.replaceChildren/u)
+    assert.match(source, /selectionReportGate\.suppressed[\s\S]*?reportTextSelection\(activeTextSelection\)/u)
+    assert.match(source, /function clearTextSelection\(\)[\s\S]*?selectionReportGate\.cancelRender\(\)[\s\S]*?nodeId: null/u)
+    assert.match(source, /function clearRenderedDocument\(\)[\s\S]*?clearTextSelection\(\)/u)
+    assert.match(source, /function setEditing\(enabled: boolean\)[\s\S]*?editingEnabled !== enabled[\s\S]*?clearTextSelection\(\)/u)
 })
 
 test('运行时把快捷键、Enter、指针结束与写回重采集接进真实监听链路', () => {
