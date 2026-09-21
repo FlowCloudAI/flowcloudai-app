@@ -38,6 +38,7 @@ import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
 import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import {mountCanvasStyles} from './styleMount.ts'
+import {restoreCanvasResolvedSelection, type CanvasResolvedSelection} from './resolvedSelection.ts'
 import runtimeCss from './runtime.css?inline'
 
 let token: string
@@ -54,7 +55,7 @@ let pendingRender: CanvasRenderCommand | null = null
 let rejectedInputPending = false
 let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
-let pendingResolvedSelection: {nodeId: string; offset: number} | null = null
+let pendingResolvedSelection: CanvasResolvedSelection | null = null
 let lastTextSelectionKey: string | null = null
 let activeTextSelection: CanvasTextSelectionSnapshot | null = null
 const pendingInputIds = new Set<string>()
@@ -130,12 +131,13 @@ function clearRenderedDocument(): void {
     root.replaceChildren()
     assetDisplays = new Map()
     selectedNodeId = null
+    pendingResolvedSelection = null
     reportSize()
 }
 
 function applyRender(
     command: CanvasRenderCommand,
-    resolvedSelection: {nodeId: string; offset: number} | null = null,
+    resolvedSelection: CanvasResolvedSelection | null = null,
 ): void {
     const leave = linkHover.clear()
     if (leave) send(leave)
@@ -167,16 +169,14 @@ function applyRender(
         setSelection(resolvedSelection?.nodeId ?? selectedNodeId)
         let restoredSelection: CanvasTextSelectionSnapshot | null = null
         if (resolvedSelection) {
-            // 结构提交会替换原 contenteditable；重新聚焦宿主指定的新块，下一次输入才不会落回旧节点。
-            findManagedNode(resolvedSelection.nodeId)?.focus({preventScroll: true})
-            const nextSelection = {
-                nodeId: resolvedSelection.nodeId,
-                from: resolvedSelection.offset,
-                to: resolvedSelection.offset,
-                expected: '',
-                collapsed: true,
-            }
-            if (restoreTextSelection(nextSelection)) restoredSelection = nextSelection
+            // 延迟队列可能先挂上一帧不含新块的预览；目标出现前不消耗宿主落点。
+            const restoration = restoreCanvasResolvedSelection(
+                resolvedSelection,
+                findManagedNode,
+                restoreTextSelection,
+            )
+            restoredSelection = restoration.restoredSelection
+            pendingResolvedSelection = restoration.pendingSelection
         } else if (textSelection && restoreTextSelection(textSelection)) {
             restoredSelection = textSelection
         }
@@ -504,6 +504,7 @@ function setEditing(enabled: boolean): void {
         restoreCompositionStart()
         releasePendingRenderAfterComposition(false)
     }
+    if (!enabled) pendingResolvedSelection = null
     applyCanvasEditingState(root, editingEnabled)
 }
 
