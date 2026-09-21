@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-    applyPendingCanvasInputRender,
+    settleCanvasInputRender,
     restoreCanvasResolvedSelection,
     type CanvasResolvedSelection,
 } from './resolvedSelection.ts'
@@ -45,7 +45,7 @@ test('新节点已挂载但偏移尚不可恢复时仍保留落点', () => {
     assert.deepEqual(result, {restoredSelection: null, pendingSelection: selection})
 })
 
-test('带可信落点的接受回执重挂一次待渲染预览，无落点的普通输入保留乐观 DOM', () => {
+test('成功回执丢弃暂存预览：它早于这次提交，挂载会撤回刚输入的文字并让落点越界', () => {
     const render = {type: 'render', requestId: 'render:1'} as CanvasRenderCommand
     const applied: Array<{render: CanvasRenderCommand; selection: CanvasResolvedSelection | null}> = []
     const applyRender = (
@@ -53,10 +53,21 @@ test('带可信落点的接受回执重挂一次待渲染预览，无落点的�
         nextSelection: CanvasResolvedSelection | null,
     ) => applied.push({render: nextRender, selection: nextSelection})
 
-    assert.equal(applyPendingCanvasInputRender(render, false, selection, applyRender), true)
-    assert.deepEqual(applied, [{render, selection}])
-
-    applied.length = 0
-    assert.equal(applyPendingCanvasInputRender(render, false, null, applyRender), false)
+    assert.equal(settleCanvasInputRender(render, false, null, applyRender), 'discarded')
     assert.deepEqual(applied, [])
+    assert.equal(settleCanvasInputRender(null, false, null, applyRender), 'none')
+    assert.deepEqual(applied, [])
+})
+
+test('拒绝回执挂载宿主补发的回滚预览，并把光标放回最早被拒输入的起点', () => {
+    const render = {type: 'render', requestId: 'render:rollback'} as CanvasRenderCommand
+    const rollback: CanvasResolvedSelection = {nodeId: selection.nodeId, offset: 99}
+    const applied: Array<{render: CanvasRenderCommand; selection: CanvasResolvedSelection | null}> = []
+    const applyRender = (
+        nextRender: CanvasRenderCommand,
+        nextSelection: CanvasResolvedSelection | null,
+    ) => applied.push({render: nextRender, selection: nextSelection})
+
+    assert.equal(settleCanvasInputRender(render, true, rollback, applyRender), 'applied')
+    assert.deepEqual(applied, [{render, selection: rollback}])
 })

@@ -4,6 +4,7 @@ import {DOMParser} from '@xmldom/xmldom'
 import {
     CARET_ANCHOR_ATTRIBUTE,
     CARET_ANCHOR_FILLER,
+    caretAfterTrailingBreak,
     createCaretAnchor,
     findCaretAnchors,
     isCaretAnchor,
@@ -75,4 +76,13 @@ test('锚点意外含有文字时移除后保留文字，只去掉填充字符',
     const {root} = parse(`<span ${CARET_ANCHOR_ATTRIBUTE}="" style="color: red">${CARET_ANCHOR_FILLER}你好</span>`)
     removeCaretAnchor(findCaretAnchors(root)[0])
     assert.equal(root.textContent, '你好')
+})
+
+test('只有块末换行之后的位置需要占位锚点', () => {
+    assert.equal(caretAfterTrailingBreak('上\n', 2), true)
+    assert.equal(caretAfterTrailingBreak('上\n\n', 3), true)
+    // 两个换行之间是一条真实的空行，浏览器能正常放置光标。
+    assert.equal(caretAfterTrailingBreak('上\n\n', 2), false)
+    assert.equal(caretAfterTrailingBreak('上', 1), false)
+    assert.equal(caretAfterTrailingBreak('', 0), false)
 })

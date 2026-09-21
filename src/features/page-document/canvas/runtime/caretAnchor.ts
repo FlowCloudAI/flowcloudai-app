@@ -16,6 +16,14 @@ export const CARET_ANCHOR_FILLER = '\u200B'
 const ELEMENT_NODE = 1
 const TEXT_NODE = 3
 
+/**
+ * 块末尾的换行之后没有可渲染的行：WebKit 会把「末尾 <br> 之后」规范化到 <br> 之前，
+ * 光标与输入法候选文字都会落回上一行。这个位置同样需要锚点撑出真实的一行。
+ */
+export function caretAfterTrailingBreak(text: string, offset: number): boolean {
+    return offset === text.length && text.endsWith('\n')
+}
+
 export function isCaretAnchor(value: Node): boolean {
     return value.nodeType === ELEMENT_NODE && (value as Element).hasAttribute(CARET_ANCHOR_ATTRIBUTE)
 }

@@ -40,13 +40,13 @@ import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import {mountCanvasStyles} from './styleMount.ts'
 import {
-    applyPendingCanvasInputRender,
+    settleCanvasInputRender,
     restoreCanvasResolvedSelection,
     type CanvasResolvedSelection,
 } from './resolvedSelection.ts'
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
-import {createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
+import {caretAfterTrailingBreak, createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
 import {createCanvasDebugTrace, describeDomPosition} from './debugTrace.ts'
 import {
     absorbableEchoElement,
@@ -72,7 +72,9 @@ let compositionOriginalNode: HTMLElement | null = null
 let compositionNodeId: string | null = null
 let pendingResolvedSelection: CanvasResolvedSelection | null = null
 let lastTextSelectionKey: string | null = null
-const pendingInputIds = new Set<string>()
+/** 待决输入及其起点；拒绝回滚后光标回到最早被拒输入的起点。 */
+const pendingInputIds = new Map<string, CanvasResolvedSelection>()
+let rollbackSelection: CanvasResolvedSelection | null = null
 const caretState = createCanvasCaretStoredMarksState()
 const composition = createCanvasCompositionTracker()
 const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
@@ -469,14 +471,17 @@ function placeCaretInAnchor(anchor: Element): boolean {
  */
 function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState.selection): void {
     if (composition.isComposing) return
-    const style = editingEnabled && target?.collapsed ? storedMarkStyle(caretState.storedMarks) : null
-    const node = style && target ? findManagedNode(target.nodeId) : null
+    const node = editingEnabled && target?.collapsed ? findManagedNode(target.nodeId) : null
     const editable = isCanvasEditableElement(node) ? node : null
+    const marksStyle = editable ? storedMarkStyle(caretState.storedMarks) : null
+    // 没有待输入标记时，块末换行之后仍需要一个无样式锚点撑出真实的一行。
+    const style = marksStyle
+        ?? (editable && target && caretAfterTrailingBreak(semanticText(editable), target.from) ? '' : null)
     const anchors = findCaretAnchors(root)
     const current = anchors.length === 1 ? anchors[0] : null
     if (
-        style && target && editable && current && editable.contains(current)
-        && current.getAttribute('style') === style
+        style !== null && target && editable && current && editable.contains(current)
+        && (current.getAttribute('style') ?? '') === style
         && semanticOffset(editable, current, 0) === target.from
     ) {
         if (placeCaretInAnchor(current)) debugTrace.trace('anchor:recaret', {target})
@@ -488,7 +493,7 @@ function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState
         removeCaretAnchor(anchor)
         parent?.normalize()
     }
-    if (!style || !target || !editable) return
+    if (style === null || !target || !editable) return
     const position = locateTextOffset(editable, target.from)
     if (!position) return
     const {anchor} = createCaretAnchor(document, style)
@@ -566,7 +571,7 @@ function submitInputIntent(
         return false
     }
     const intentId = crypto.randomUUID()
-    pendingInputIds.add(intentId)
+    pendingInputIds.set(intentId, {nodeId: snapshot.nodeId, offset: snapshot.from})
     debugTrace.trace('send:input-intent', {intentId, inputType, snapshot, text, storedMarks: caretState.storedMarks})
     send({
         type: 'input-intent',
@@ -626,6 +631,7 @@ function resolveInput(
     accepted: boolean,
     selection: {nodeId: string; offset: number} | null,
 ): void {
+    const origin = pendingInputIds.get(intentId.toLowerCase()) ?? null
     if (!pendingInputIds.delete(intentId.toLowerCase())) {
         const candidate = linkCandidate.accept(intentId)
         if (!candidate) return
@@ -640,21 +646,24 @@ function resolveInput(
         }
         return
     }
-    if (!accepted) rejectedInputPending = true
+    if (!accepted) {
+        rejectedInputPending = true
+        if (origin && (!rollbackSelection || origin.offset < rollbackSelection.offset)) rollbackSelection = origin
+    }
     if (accepted && selection) pendingResolvedSelection = selection
-    debugTrace.trace('resolve-input', {intentId, accepted, selection, ...debugState(), rejectedInputPending})
+    debugTrace.trace('resolve-input', {intentId, accepted, selection, ...debugState(), rejectedInputPending, rollbackSelection})
     if (pendingInputIds.size > 0 || composition.isComposing) return
     const next = pendingRender
     pendingRender = null
-    if (applyPendingCanvasInputRender(
-        next,
-        rejectedInputPending,
-        pendingResolvedSelection,
-        applyRender,
-    )) {
-        pendingResolvedSelection = null
+    const rollback = rejectedInputPending ? rollbackSelection : null
+    if (rejectedInputPending) {
+        // 回滚取代此前成功输入留下的落点；回滚预览尚未到达时由下一次预览使用。
+        pendingResolvedSelection = next ? null : rollback
     }
+    const settled = settleCanvasInputRender(next, rejectedInputPending, rollback, applyRender)
+    if (settled === 'discarded') debugTrace.trace('render:discard-stale', {requestId: next?.requestId ?? null, pendingResolvedSelection})
     rejectedInputPending = false
+    rollbackSelection = null
 }
 
 /** 仅供调试浮层的原生事件记录；捕获阶段注册，先于业务处理器看到事件原貌。 */
@@ -698,6 +707,32 @@ function installDebugListeners(): void {
     }, true)
 }
 
+/**
+ * 输入法组合开始时记下组合前的可信光标并克隆节点，compositionend 据此还原再走乐观插入。
+ * WebKit 在焦点经由宿主工具栏返回画布时可能不派发 compositionstart，因此首个
+ * insertCompositionText 的 beforeinput（早于 DOM 变化）也会补做这一步；否则组合文字
+ * 只留在 DOM 里，既不提交草稿，也会在下一次预览时消失。
+ */
+function beginCanvasComposition(target: EventTarget | null, data: string | null, source: string): void {
+    const candidateLeave = linkCandidate.clear()
+    if (candidateLeave) send(candidateLeave)
+    const leave = linkHover.clear()
+    if (leave) send(leave)
+    if (!editingEnabled || composition.isComposing) return
+    const node = managedNode(target)
+    const nodeId = managedNodeId(node)
+    const snapshot = captureSelection()
+    if (!isCanvasEditableElement(node) || !nodeId || !snapshot || snapshot.nodeId !== nodeId) {
+        reportBlockedInput('insertCompositionText', 'invalid-selection', nodeId)
+        return
+    }
+    caretState.beginComposition(nodeId)
+    debugTrace.trace('compositionstart', {source, data, snapshot, selection: debugTrace.enabled ? debugSelectionSummary() : null, ...debugState()})
+    if (!composition.begin(snapshot)) return
+    compositionOriginalNode = node.cloneNode(true) as HTMLElement
+    compositionNodeId = nodeId
+}
+
 function installInputListeners(): void {
     document.addEventListener('beforeinput', event => {
         const node = managedNode(event.target)
@@ -717,6 +752,9 @@ function installInputListeners(): void {
             cancelable: event.cancelable,
             selection: debugTrace.enabled ? debugSelectionSummary() : null,
         })
+        if (decision === 'native-composition' && inputType === 'insertCompositionText' && !composition.isComposing) {
+            beginCanvasComposition(event.target, event.data, 'beforeinput')
+        }
         if (decision === 'ignore' || decision === 'native-composition') return
         if (decision === 'paste-owned') {
             event.preventDefault()
@@ -792,30 +830,13 @@ function installInputListeners(): void {
         if (editingEnabled && isCanvasEditableElement(managedNode(event.target))) {
             if (caretState.storedMarks) debugTrace.trace('marks-cleared', {by: '指针'})
             caretState.authorPointer()
+            pendingResolvedSelection = null
             syncCaretAnchor(null)
         }
     })
 
     document.addEventListener('compositionstart', event => {
-        const candidateLeave = linkCandidate.clear()
-        if (candidateLeave) send(candidateLeave)
-        const leave = linkHover.clear()
-        if (leave) send(leave)
-        // 输入法候选文字尚未进入作者源码，组合期间也不会上报其临时 DOM 选区。
-        // 保留组合开始前的可信光标，宿主才能把待输入格式应用到 compositionend 的最终文字。
-        if (!editingEnabled || composition.isComposing) return
-        const node = managedNode(event.target)
-        const nodeId = managedNodeId(node)
-        const snapshot = captureSelection()
-        if (!isCanvasEditableElement(node) || !nodeId || !snapshot || snapshot.nodeId !== nodeId) {
-            reportBlockedInput('insertCompositionText', 'invalid-selection', nodeId)
-            return
-        }
-        caretState.beginComposition(nodeId)
-        debugTrace.trace('compositionstart', {data: event.data, snapshot, selection: debugTrace.enabled ? debugSelectionSummary() : null, ...debugState()})
-        if (!composition.begin(snapshot)) return
-        compositionOriginalNode = node.cloneNode(true) as HTMLElement
-        compositionNodeId = nodeId
+        beginCanvasComposition(event.target, event.data, 'compositionstart')
     })
 
     document.addEventListener('compositionend', event => {
@@ -882,6 +903,7 @@ function installInputListeners(): void {
         if (event.key.startsWith('Arrow')) {
             if (caretState.storedMarks) debugTrace.trace('marks-cleared', {by: `方向键 ${event.key}`})
             caretState.authorDirection()
+            pendingResolvedSelection = null
             // 必须在默认动作之前移除，否则方向键会先在零宽填充字符上空走一步。
             syncCaretAnchor(null)
             return
@@ -1005,6 +1027,16 @@ function start(): void {
 
     installDebugListeners()
     installInputListeners()
+    // 宿主工具栏把焦点还给 iframe 时只聚焦了窗口；可编辑节点未聚焦时输入法会绕过画布的组合跟踪。
+    window.addEventListener('focus', () => {
+        const selection = caretState.selection
+        if (!editingEnabled || composition.isComposing || !selection) return
+        const node = findManagedNode(selection.nodeId)
+        if (!isCanvasEditableElement(node) || document.activeElement === node) return
+        debugTrace.trace('focus-restore', {selection})
+        node.focus({preventScroll: true})
+        restoreTextSelection(selection)
+    })
     new ResizeObserver(reportSize).observe(root)
     window.addEventListener('error', event => {
         if (!latestRequestId) return
