@@ -308,7 +308,8 @@ function reportTextSelection(
         send({type: 'text-selection', nodeId: null, from: 0, to: 0, expected: ''})
         return
     }
-    activeTextSelection = selection.collapsed ? null : selection
+    // 折叠光标同样是字体工具的可信上下文；切到宿主工具栏时必须保留，供后续输入格式继续使用。
+    activeTextSelection = selection
     send({
         type: 'text-selection',
         nodeId: selection.nodeId,

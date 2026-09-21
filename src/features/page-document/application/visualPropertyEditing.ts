@@ -27,6 +27,7 @@ import type {DocumentHistoryOptions} from './documentDraftModel.ts'
 export const VISUAL_PROPERTY_FIELDS = [
     {property: 'font-size', label: '字号', group: 'text'},
     {property: 'font-weight', label: '字重', group: 'text'},
+    {property: 'font-style', label: '字形', group: 'text'},
     {property: 'line-height', label: '行高', group: 'text'},
     {property: 'letter-spacing', label: '字距', group: 'text'},
     {property: 'word-spacing', label: '词距', group: 'text'},
@@ -450,6 +451,7 @@ export interface VisualShadowLayer {
 }
 
 const VISUAL_KEYWORD_VALUES = Object.freeze({
+    'font-style': ['normal', 'italic'],
     'align-items': ['stretch', 'start', 'center', 'end'],
     'justify-content': ['start', 'center', 'end', 'space-between'],
     'width': ['auto', 'fit-content', '100%'],

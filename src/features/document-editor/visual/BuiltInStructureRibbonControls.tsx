@@ -6,7 +6,7 @@ import type {PageDocumentInsertionPlacement} from '../../page-document/applicati
 import {DocumentRibbonCommand, DocumentRibbonGroup} from './DocumentOfficeRibbon.tsx'
 
 const COMMANDS = Object.freeze([
-    {kind: 'paragraph', label: '段落', icon: Pilcrow},
+    {kind: 'paragraph', label: '文本块', icon: Pilcrow},
     {kind: 'heading', label: '标题', icon: Heading2},
     {kind: 'list', label: '列表', icon: List},
     {kind: 'table', label: '表格', icon: Rows3},

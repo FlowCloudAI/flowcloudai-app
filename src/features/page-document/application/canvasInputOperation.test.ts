@@ -67,6 +67,45 @@ describe('canvas input operation', () => {
         assert.equal('html' in message, false)
     })
 
+    it('折叠光标的待输入格式与文字替换在同一内核批次写入', () => {
+        const message = intent('10111111-1111-7111-8111-111111111111', 'insertText', 2, 2, '', '新')
+        const operation = createCanvasInputKernelOperation(
+            [message],
+            'canvas-input-history:typing-style',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[message.intentId, {
+                nodeId: NODE_ID,
+                styleContext: 'desktop',
+                values: {'font-weight': '700', color: '#334455'},
+            }]]),
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const intents = operation.request.createIntents(new Map([[NODE_ID, handle]]))
+
+        assert.equal(intents.length, 3)
+        assert.equal(intents[0]?.kind, 'replace-text')
+        for (const styled of intents.slice(1)) {
+            assert.equal(styled.kind, 'edit-property')
+            if (styled.kind !== 'edit-property') continue
+            assert.deepEqual(styled.target, {
+                kind: 'text-range',
+                component: handle,
+                range: {unit: 'utf16-code-unit', from: 2, to: 3},
+                expected: '新',
+            })
+            assert.deepEqual(styled.destination, {scope: 'entry', channel: {kind: 'inline'}})
+            assert.equal(styled.readContext.viewport, 'desktop')
+        }
+        assert.deepEqual(
+            intents.slice(1).map(item => item.kind === 'edit-property' ? [item.property, item.action] : null),
+            [
+                ['font-weight', {kind: 'set-value', value: '700'}],
+                ['color', {kind: 'set-value', value: '#334455'}],
+            ],
+        )
+    })
+
     it('insertParagraph 映射为宿主分配身份的 split-text-block，insertLineBreak 映射为换行替换', () => {
         const createdId = '77777777-7777-7777-8777-777777777777'
         const split = intent('12111111-1111-7111-8111-111111111111', 'insertParagraph', 2, 2, '', '')

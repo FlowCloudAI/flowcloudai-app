@@ -13,6 +13,7 @@ import {
     nodeId,
     utf16Range,
     type EditIntent,
+    type ReadContext,
 } from '../domain/kernel/index.ts'
 import {
     requireKernelComponentHandle,
@@ -35,6 +36,20 @@ export interface CanvasInputTarget {
 export interface CanvasInputKernelOperation {
     readonly request: KernelDraftEditRequest
     readonly resolution: CanvasInputResolution
+}
+
+export type CanvasTypingStyleProperty =
+    | 'background-color'
+    | 'color'
+    | 'font-size'
+    | 'font-style'
+    | 'font-weight'
+    | 'text-decoration-line'
+
+export interface CanvasTypingStyleSnapshot {
+    readonly nodeId: string
+    readonly styleContext: 'mobile' | 'desktop'
+    readonly values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
 }
 
 const editableKinds = new Set<string>(CANVAS_EDITABLE_KINDS)
@@ -100,12 +115,47 @@ function replacementIntent(
     })
 }
 
+function typingStyleIntents(
+    message: CanvasInputIntentMessage,
+    handle: ReturnType<typeof requireKernelComponentHandle>,
+    snapshot: CanvasTypingStyleSnapshot | null,
+): readonly EditIntent[] {
+    if (!snapshot || snapshot.nodeId.toLowerCase() !== message.nodeId.toLowerCase() || message.text.length === 0) {
+        return []
+    }
+    const readContext: ReadContext = Object.freeze({
+        viewport: snapshot.styleContext,
+        interactions: Object.freeze({hover: false, focusWithin: false}),
+        direction: 'ltr',
+        writingMode: 'horizontal-tb',
+    })
+    return Object.freeze(
+        Object.entries(snapshot.values).map(([property, value]) => Object.freeze({
+            kind: 'edit-property' as const,
+            target: Object.freeze({
+                kind: 'text-range' as const,
+                component: handle,
+                range: utf16Range(message.from, message.from + message.text.length),
+                expected: message.text,
+            }),
+            property,
+            action: Object.freeze({kind: 'set-value' as const, value}),
+            readContext,
+            destination: Object.freeze({
+                scope: 'entry' as const,
+                channel: Object.freeze({kind: 'inline' as const}),
+            }),
+        } satisfies EditIntent)),
+    )
+}
+
 /** 同一调度窗口的顺序意图在 current-candidate 坐标中批量执行；结构身份只在宿主中分配。 */
 export function createCanvasInputKernelOperation(
     messages: readonly CanvasInputIntentMessage[],
     historyGroupId: string,
     targetKind: string,
     allocateNodeId: () => string = () => crypto.randomUUID(),
+    typingStyles: ReadonlyMap<string, CanvasTypingStyleSnapshot | null> = new Map(),
 ): CanvasInputKernelOperation {
     const first = messages[0]
     if (!first || messages.some(message => message.nodeId.toLowerCase() !== first.nodeId.toLowerCase())) {
@@ -145,7 +195,10 @@ export function createCanvasInputKernelOperation(
                     newNodeId: allocatedNodeIds[0],
                 } satisfies EditIntent)])
             }
-            return Object.freeze(messages.map(message => replacementIntent(message, handle)))
+            return Object.freeze(messages.flatMap(message => [
+                replacementIntent(message, handle),
+                ...typingStyleIntents(message, handle, typingStyles.get(message.intentId) ?? null),
+            ]))
         },
     })
     return Object.freeze({

@@ -26,6 +26,7 @@ export interface RibbonTextRange {
 }
 
 export type RibbonInlineProperty =
+    | 'background-color'
     | 'font-size'
     | 'font-weight'
     | 'font-style'
@@ -84,12 +85,40 @@ function inlineReadContext(styleContext: 'mobile' | 'desktop'): ReadContext {
 }
 
 const INLINE_VALUE_PATTERNS: Readonly<Record<RibbonInlineProperty, RegExp>> = Object.freeze({
+    'background-color': /^(?:#[\da-f]{6}|transparent|var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\)|rgb\(\d{1,3} \d{1,3} \d{1,3} \/ \d+(?:\.\d+)?%\)|color-mix\(in srgb, var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\) \d+(?:\.\d+)?%, transparent\))$/iu,
     'font-size': /^(?:\d+(?:\.\d+)?)(?:px|rem|em|%)$/u,
     'font-weight': /^(?:400|500|600|700|800|900)$/u,
     'font-style': /^(?:normal|italic)$/u,
     'text-decoration-line': /^(?:none|underline|line-through|underline line-through)$/u,
-    color: /^(?:var\(--fc-entry-(?:text|accent|muted)\)|currentcolor)$/u,
+    color: /^(?:#[\da-f]{6}|currentcolor|var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\)|rgb\(\d{1,3} \d{1,3} \d{1,3} \/ \d+(?:\.\d+)?%\)|color-mix\(in srgb, var\(--fc-entry-(?:surface|text|accent|accent-contrast|muted)\) \d+(?:\.\d+)?%, transparent\))$/iu,
 })
+
+/** 折叠光标借相邻字符读取有效格式；优先取前一个完整 Unicode 字符，与连续输入的继承方向一致。 */
+export function ribbonCaretInspectionRange(
+    range: RibbonTextRange,
+    text: string,
+): RibbonTextRange | null {
+    if (range.from !== range.to || range.from < 0 || range.from > text.length) return null
+    if (text.length === 0) return null
+    if (range.from > 0) {
+        const lastUnit = text.charCodeAt(range.from - 1)
+        const previousUnit = range.from >= 2 ? text.charCodeAt(range.from - 2) : 0
+        const width = lastUnit >= 0xdc00 && lastUnit <= 0xdfff && previousUnit >= 0xd800 && previousUnit <= 0xdbff
+            ? 2
+            : 1
+        const from = range.from - width
+        return Object.freeze({
+            nodeId: range.nodeId,
+            from,
+            to: range.from,
+            expected: text.slice(from, range.from),
+        })
+    }
+    const next = text.codePointAt(0)
+    if (next === undefined) return null
+    const to = next > 0xffff ? 2 : 1
+    return Object.freeze({nodeId: range.nodeId, from: 0, to, expected: text.slice(0, to)})
+}
 
 export function createRibbonPropertyRequest(
     nodeId: string,

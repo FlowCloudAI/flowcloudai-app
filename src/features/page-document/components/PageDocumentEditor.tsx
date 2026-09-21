@@ -22,6 +22,7 @@ import {
 import {PageDocumentCanvas, type PageDocumentCanvasHandle} from '../canvas/host/PageDocumentCanvas.tsx'
 import {
     CANVAS_EDITABLE_KINDS,
+    type CanvasInputIntentMessage,
     type CanvasLinkCandidateIntentMessage,
     type CanvasTextSelectionMessage,
 } from '../canvas/protocol/index.ts'
@@ -93,6 +94,10 @@ import {
     resolveStructuredSelectionContext,
 } from '../application/structuredContentEditing.ts'
 import type {RibbonTextRange} from '../../document-editor/visual/ribbonKernelBinding.ts'
+import type {
+    CanvasTypingStyleProperty,
+    CanvasTypingStyleSnapshot,
+} from '../application/canvasInputOperation.ts'
 import {
     resolveRibbonTab,
     ribbonTabsForNode,
@@ -176,6 +181,12 @@ interface ComponentActionState {
     readonly error: string | null
 }
 
+interface PendingTypingStyle {
+    readonly nodeId: string
+    readonly caret: number
+    readonly values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
+}
+
 export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const {
         entryId,
@@ -204,6 +215,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const [layoutGuidesVisible, setLayoutGuidesVisible] = useState(false)
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
     const [activeTextRange, setActiveTextRange] = useState<RibbonTextRange | null>(null)
+    const [typingStyle, setTypingStyle] = useState<PendingTypingStyle | null>(null)
     const [sourceHistory, setSourceHistory] = useState({canUndo: false, canRedo: false})
     const [linkCandidateIntent, setLinkCandidateIntent] = useState<CanvasLinkCandidateIntentMessage | null>(null)
     const [assetPicker, setAssetPicker] = useState<{
@@ -223,6 +235,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const interactionKeyRef = useRef('')
     const appliedSelectionRequestRef = useRef('')
     const activeAssetPickerIdRef = useRef<string | null>(null)
+    const typingStyleRef = useRef<PendingTypingStyle | null>(null)
+    const expectedTypingCaretRef = useRef<{readonly nodeId: string; readonly offset: number} | null>(null)
     const session = useEntryPageDocumentSession({
         entryId,
         projectId,
@@ -271,6 +285,10 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         setComponentEditor(null)
         setComponentAction(null)
         setPropertyDockNavigation(null)
+        setActiveTextRange(null)
+        setTypingStyle(null)
+        typingStyleRef.current = null
+        expectedTypingCaretRef.current = null
     }, [entryId, projectId])
 
     useEffect(() => {
@@ -339,26 +357,109 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     )
 
     const handleSelection = (nodeId: string, source: VisualSelectionSource) => {
-        setSelectedNodeId(resolveVisualSelection(layerProjection.nodes, nodeId, source))
+        const next = resolveVisualSelection(layerProjection.nodes, nodeId, source)
+        setSelectedNodeId(next)
+        if (activeTextRange?.nodeId !== next) {
+            setActiveTextRange(null)
+            updateTypingStyle(() => null)
+        }
+    }
+
+    const updateTypingStyle = (
+        update: (current: PendingTypingStyle | null) => PendingTypingStyle | null,
+    ) => {
+        setTypingStyle(current => {
+            const next = update(current)
+            typingStyleRef.current = next
+            return next
+        })
     }
 
     const handleTextSelection = (message: CanvasTextSelectionMessage) => {
-        if (message.nodeId === null || message.from === message.to) {
+        if (message.nodeId === null) {
             setActiveTextRange(null)
+            updateTypingStyle(() => null)
             return
         }
         const target = findLayerNode(layerProjection.nodes, message.nodeId)
         if (!active || mode !== 'visual' || !target || !CANVAS_EDITABLE_KINDS.includes(target.kind as never)) {
             setActiveTextRange(null)
+            updateTypingStyle(() => null)
             return
         }
         setSelectedNodeId(message.nodeId)
-        setActiveTextRange({
+        const nextRange = {
             nodeId: message.nodeId,
             from: message.from,
             to: message.to,
             expected: message.expected,
+        }
+        setActiveTextRange(nextRange)
+        const expectedCaret = expectedTypingCaretRef.current
+        const expectedInputCaret = message.from === message.to
+            && expectedCaret?.nodeId === message.nodeId
+            && expectedCaret.offset === message.from
+        if (expectedInputCaret) expectedTypingCaretRef.current = null
+        updateTypingStyle(current => {
+            if (!current || message.from !== message.to || current.nodeId !== message.nodeId) return null
+            return current.caret === message.from || expectedInputCaret
+                ? {...current, caret: message.from}
+                : null
         })
+    }
+
+    const setTypingStyleProperty = (property: CanvasTypingStyleProperty, value: string) => {
+        if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
+        updateTypingStyle(current => ({
+            nodeId: activeTextRange.nodeId,
+            caret: activeTextRange.from,
+            values: Object.freeze({
+                ...(current?.nodeId === activeTextRange.nodeId && current.caret === activeTextRange.from
+                    ? current.values
+                    : {}),
+                [property]: value,
+            }),
+        }))
+        requestAnimationFrame(() => canvasRef.current?.focusEditor())
+    }
+
+    const resetTypingStyles = (
+        values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>,
+    ) => {
+        if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
+        updateTypingStyle(() => ({
+            nodeId: activeTextRange.nodeId,
+            caret: activeTextRange.from,
+            values: Object.freeze({...values}),
+        }))
+        requestAnimationFrame(() => canvasRef.current?.focusEditor())
+    }
+
+    const handleCanvasInputIntent = async (message: CanvasInputIntentMessage) => {
+        const pending = typingStyleRef.current
+        const expectedCaret = expectedTypingCaretRef.current
+        const continuesPendingTyping = message.from === message.to
+            && pending?.nodeId === message.nodeId
+            && (
+                pending.caret === message.from
+                || (expectedCaret?.nodeId === message.nodeId && expectedCaret.offset === message.from)
+            )
+        const typingSnapshot: CanvasTypingStyleSnapshot | null = continuesPendingTyping
+            ? Object.freeze({
+                nodeId: pending.nodeId,
+                styleContext: editContext,
+                values: pending.values,
+            })
+            : null
+        if (typingSnapshot && message.inputType !== 'insertParagraph') {
+            expectedTypingCaretRef.current = {
+                nodeId: message.nodeId,
+                offset: message.from + message.text.length,
+            }
+        }
+        const result = await session.applyCanvasInputIntent(message, typingSnapshot)
+        if (!result.accepted) expectedTypingCaretRef.current = null
+        return result
     }
 
     const handleLinkCandidateIntent = (message: CanvasLinkCandidateIntentMessage) => {
@@ -376,6 +477,8 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
     const changeMode = (nextMode: PageDocumentWorkspaceMode) => {
         setLinkCandidateIntent(null)
         setActiveTextRange(null)
+        updateTypingStyle(() => null)
+        expectedTypingCaretRef.current = null
         activeAssetPickerIdRef.current = null
         setAssetPicker(null)
         setMode(nextMode)
@@ -424,7 +527,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
         const insertion = createBuiltInStructureInsertion(builtInInsertionTarget, kind)
         void session.applyVisualPropertyEntry(
             insertion.request,
-            `插入${({paragraph: '段落', heading: '标题', list: '列表', table: '表格', divider: '分隔线', container: '容器'} as const)[kind]}`,
+            `插入${({paragraph: '文本块', heading: '标题', list: '列表', table: '表格', divider: '分隔线', container: '容器'} as const)[kind]}`,
             {immediate: true},
         ).then(accepted => {
             if (accepted) setSelectedNodeId(insertion.newNodeId)
@@ -866,9 +969,14 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                 inspectComponent={session.inspectComponent}
                                 inspectTextRange={session.inspectTextRange}
                                 activeTextRange={activeTextRange}
+                                typingStyles={typingStyle && typingStyle.nodeId === activeTextRange?.nodeId
+                                    ? typingStyle.values
+                                    : {}}
                                 styleContext={editContext}
                                 onOpenDetails={() => openPropertyDetails('content', 'text')}
                                 onRemove={selectedNode ? () => removePageNode(selectedNode) : undefined}
+                                onTypingStyleChange={setTypingStyleProperty}
+                                onTypingStylesReset={resetTypingStyles}
                             />
                         ) : visibleRibbonTab === 'insert' ? (
                             <>
@@ -1012,7 +1120,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
                                         : undefined}
                                     onNavigationIntent={forwardsNavigation ? onNavigationIntent : undefined}
                                     onInputIntent={mode === 'visual'
-                                        ? session.applyCanvasInputIntent
+                                        ? handleCanvasInputIntent
                                         : undefined}
                                     onInputBlocked={mode === 'visual'
                                         ? session.reportCanvasInputBlocked

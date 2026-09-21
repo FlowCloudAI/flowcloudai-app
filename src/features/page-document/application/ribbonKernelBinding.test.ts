@@ -7,6 +7,7 @@ import {
     createRibbonPropertyRequest,
     createRibbonTextRangePropertyRequest,
     RIBBON_PARAGRAPH_INDENT_LEVELS,
+    ribbonCaretInspectionRange,
     ribbonParagraphIndentLevel,
     ribbonParagraphIndentStep,
     toggleRibbonTextDecoration,
@@ -84,7 +85,7 @@ test('字体组的节点文字与节点底色写入当前节点的受管规则',
     })
 })
 
-test('段落缩进只沿固定档位增减并写入当前断点', () => {
+test('文本块缩进只沿固定档位增减并写入当前断点', () => {
     assert.deepEqual(RIBBON_PARAGRAPH_INDENT_LEVELS, [0, 1, 2, 3])
     assert.deepEqual(['0', '1rem', '2rem', '3rem'].map(ribbonParagraphIndentLevel), [0, 1, 2, 3])
     assert.equal(ribbonParagraphIndentLevel('1.5rem'), null)
@@ -181,6 +182,21 @@ test('行内样式功能区按当前档位读取且始终写入 inline 通道', 
         assert.equal(intent.readContext.viewport, styleContext)
         assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
     }
+})
+
+test('折叠光标优先用前一个完整字符回读文字格式并兼容代理对', () => {
+    assert.deepEqual(
+        ribbonCaretInspectionRange({nodeId: NODE_ID, from: 3, to: 3, expected: ''}, 'A😀B'),
+        {nodeId: NODE_ID, from: 1, to: 3, expected: '😀'},
+    )
+    assert.deepEqual(
+        ribbonCaretInspectionRange({nodeId: NODE_ID, from: 0, to: 0, expected: ''}, '😀B'),
+        {nodeId: NODE_ID, from: 0, to: 2, expected: '😀'},
+    )
+    assert.equal(
+        ribbonCaretInspectionRange({nodeId: NODE_ID, from: 0, to: 0, expected: ''}, ''),
+        null,
+    )
 })
 
 test('所选文字删除线与下划线独立切换并写入同一 inline 装饰声明', () => {

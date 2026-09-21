@@ -136,8 +136,8 @@ describe('page document editor integration boundary', () => {
             join(repositoryRoot, 'src/features/document-editor/visual/InlineRibbonStyleControls.tsx'),
             'utf8',
         )
-        assert.match(inlineRibbon, /sizeMixed[\s\S]*多种字号/u)
-        assert.match(inlineRibbon, /colorMixed[\s\S]*多种颜色/u)
+        assert.match(inlineRibbon, /sizeMixed[\s\S]*label: '混合'/u)
+        assert.match(inlineRibbon, /isMixedValue\(inspection, property\)/u)
     })
 
     it('连续属性交互经会话调度且结束与切换节点都会冲刷尾帧', () => {
@@ -249,7 +249,7 @@ describe('page document editor integration boundary', () => {
             'utf8',
         )
 
-        assert.match(panel, /PropertyDisclosure[\s\S]*基础文字[\s\S]*字距与装饰[\s\S]*布局结构[\s\S]*间距[\s\S]*尺寸与环绕[\s\S]*颜色与交互[\s\S]*边框与圆角[\s\S]*阴影与效果/u)
+        assert.match(panel, /PropertyDisclosure[\s\S]*文本块基础格式[\s\S]*字距与装饰[\s\S]*布局结构[\s\S]*间距[\s\S]*尺寸与环绕[\s\S]*颜色与交互[\s\S]*边框与圆角[\s\S]*阴影与效果/u)
         assert.match(disclosure, /<details[\s\S]*<summary>[\s\S]*已设置 \{presentation\.authorValueCount\}/u)
         assert.match(codeEditor, /reconfigure\(EditorView\.editable\.of\(!readOnly\)\)/u)
         assert.match(codeEditor, /aria-readonly=\{readOnly\}/u)
@@ -286,6 +286,10 @@ describe('page document editor integration boundary', () => {
             join(repositoryRoot, 'src/features/document-editor/visual/HomeRibbonControls.tsx'),
             'utf8',
         )
+        const font = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/InlineRibbonStyleControls.tsx'),
+            'utf8',
+        )
 
         assert.doesNotMatch(assetPicker, /<small>\{asset\.id\}<\/small>/u)
         assert.doesNotMatch(structured, /asset\.id\.slice/u)
@@ -296,13 +300,17 @@ describe('page document editor integration boundary', () => {
         assert.match(ribbon, /<ArrowDownRight size=\{10\}/u)
         assert.match(ribbonCss, /\.document-ribbon-tabs\s*\{[^}]*overflow:\s*hidden/u)
         assert.match(ribbonCss, /\.document-ribbon-command\.is-icon-only > span/u)
-        assert.match(ribbonCss, /\.document-ribbon-group-content \.document-ribbon-node-color \.page-document-color-trigger\.fc-btn\s*\{[^}]*width:\s*var\(--document-ribbon-control-height\)[^}]*height:\s*var\(--document-ribbon-control-height\)/u)
+        assert.match(ribbonCss, /\.document-ribbon-group-content \.document-ribbon-color-command \.page-document-color-trigger\.fc-btn\s*\{[^}]*width:\s*var\(--document-ribbon-control-height\)[^}]*height:\s*var\(--document-ribbon-control-height\)/u)
         assert.doesNotMatch(ribbonCss, /\.document-ribbon-group-trigger|\.document-ribbon-group-menu/u)
         assert.doesNotMatch(home, /document-ribbon-control-status/u)
         assert.doesNotMatch(home, /label="样式"/u)
         assert.match(home, /label="块操作"[\s\S]*label="删除"/u)
-        assert.match(home, /ColorPropertyControl[\s\S]*节点文字[\s\S]*'color'[\s\S]*节点底色[\s\S]*'background-color'/u)
-        assert.match(home, /aria-label="节点行高"[\s\S]*next === 'custom'[\s\S]*onOpenDetails\?\.\(\)/u)
+        assert.match(font, /字体 · 选区[\s\S]*字体 · 后续输入[\s\S]*return '字体'/u)
+        assert.doesNotMatch(font, /createRibbonPropertyRequest/u)
+        assert.match(font, /文字颜色[\s\S]*'color'[\s\S]*文字底色[\s\S]*'background-color'/u)
+        assert.doesNotMatch(font, /label="所选文字"/u)
+        assert.match(home, /aria-label="文本块行高"[\s\S]*修改文本块行高/u)
+        assert.doesNotMatch(home, /label="查找"/u)
         assert.match(panel, /!fixedRoot && <NumericPropertyControl field=\{fieldFor\(fields, 'rotate'\)\}/u)
     })
 

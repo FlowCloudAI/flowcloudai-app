@@ -499,6 +499,23 @@
     opacity: var(--page-document-color-opacity);
 }
 
+.page-document-color-trigger.has-icon {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+.page-document-color-trigger.has-icon > span {
+    position: absolute;
+    right: var(--fc-space-xs);
+    bottom: calc(var(--fc-space-xs) / 2);
+    left: var(--fc-space-xs);
+    width: auto;
+    height: 3px;
+    border: 0;
+    border-radius: var(--fc-radius-full);
+}
+
 .page-document-color-floating-panel {
     --page-document-dock-control-height: var(--fc-control-height-sm);
     width: min(calc(var(--fc-control-height-sm) * 7), calc(100vw - var(--fc-space-lg)));

@@ -235,7 +235,7 @@ const TABS: readonly {key: VisualPropertyGroup; label: string}[] = [
     {key: 'appearance', label: '颜色与效果'},
 ]
 
-const TEXT_PRIMARY_PROPERTIES = ['font-size', 'font-weight', 'line-height'] as const
+const TEXT_PRIMARY_PROPERTIES = ['font-size', 'font-weight', 'font-style', 'line-height'] as const
 const TEXT_DETAIL_PROPERTIES = [
     'letter-spacing',
     'word-spacing',
@@ -290,7 +290,7 @@ const APPEARANCE_ROOT_EFFECT_PROPERTIES = ['box-shadow', 'opacity'] as const
 
 export const PAGE_DOCUMENT_NODE_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     container: '容器',
-    paragraph: '段落',
+    paragraph: '文本块',
     heading: '标题',
     image: '图片',
     asset: '图片',
@@ -507,9 +507,10 @@ export function PageDocumentPropertiesPanel({
                     </Button>
                     {tab === 'text' && (
                         <>
-                            <PropertyDisclosure key={`${node.id}:text-primary`} title="基础文字" fields={fields} properties={TEXT_PRIMARY_PROPERTIES}>
+                            <PropertyDisclosure key={`${node.id}:text-primary`} title="文本块基础格式" fields={fields} properties={TEXT_PRIMARY_PROPERTIES}>
                                 <NumericPropertyControl field={fieldFor(fields, 'font-size')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-size'), value, options)}/>
                                 <FontWeightControl field={fieldFor(fields, 'font-weight')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-weight'), value, options)}/>
+                                <KeywordPropertyControl field={fieldFor(fields, 'font-style')} onChange={(value, options) => applyOne(fieldFor(fields, 'font-style'), value, options)}/>
                                 <NumericPropertyControl field={fieldFor(fields, 'line-height')} onChange={(value, options) => applyOne(fieldFor(fields, 'line-height'), value, options)}/>
                             </PropertyDisclosure>
                             <PropertyDisclosure key={`${node.id}:text-detail`} title="字距与装饰" fields={fields} properties={TEXT_DETAIL_PROPERTIES}>

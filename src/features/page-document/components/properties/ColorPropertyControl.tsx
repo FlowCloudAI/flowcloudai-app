@@ -1,6 +1,7 @@
 // 本组件提供受控颜色入口；色板经 portal 浮于任务窗格之上，不调用平台取色器。
 
 import {useEffect, useRef, useState, type CSSProperties} from 'react'
+import type {LucideIcon} from 'lucide-react'
 import {Button, Input, Slider} from 'flowcloudai-ui'
 import {FloatingPanel} from '../../../../shared/ui/overlay'
 import type {
@@ -96,10 +97,12 @@ export function ColorPropertyControl({
     embedded = false,
     field,
     onChange,
+    triggerIcon: TriggerIcon,
 }: {
     embedded?: boolean
     field: VisualPropertyState
     onChange: (value: VisualPropertyEditValue, options?: PropertyChangeOptions) => Promise<boolean>
+    triggerIcon?: LucideIcon
 }) {
     const sourceColor = parseSerializedVisualColor(field.localValue ?? field.value)
     const initialColor = sourceColor ?? {kind: 'color' as const, value: '#000000', opacity: 100}
@@ -219,7 +222,7 @@ export function ColorPropertyControl({
                 <Button
                     aria-label={`设置${field.label}`}
                     aria-expanded={open}
-                    className="page-document-color-trigger"
+                    className={`page-document-color-trigger${TriggerIcon ? ' has-icon' : ''}`}
                     disabled={field.disabled}
                     iconOnly
                     size="sm"
@@ -233,6 +236,7 @@ export function ColorPropertyControl({
                         }
                     }}
                 >
+                    {TriggerIcon && <TriggerIcon aria-hidden="true" />}
                     <span
                         aria-hidden="true"
                         style={{

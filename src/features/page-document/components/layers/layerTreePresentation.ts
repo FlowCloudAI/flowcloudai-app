@@ -4,7 +4,7 @@ import type {LayerProjectionNode} from '../../domain/layerProjection.ts'
 
 const MANAGED_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
     container: '布局容器',
-    paragraph: '段落',
+    paragraph: '文本块',
     heading: '标题',
     asset: '图片',
     gallery: '图库',
@@ -22,7 +22,7 @@ function compactSummary(value: string): string {
 
 function sourceTypeLabel(tagName: string | null): string {
     if (tagName && /^h[1-6]$/u.test(tagName)) return '未纳入标题'
-    if (tagName === 'p') return '未纳入段落'
+    if (tagName === 'p') return '未纳入文本块'
     if (tagName === 'img' || tagName === 'picture' || tagName === 'figure') return '未纳入图片'
     if (tagName === 'section' || tagName === 'article' || tagName === 'main' || tagName === 'div') return '未纳入区域'
     return '未纳入 HTML'

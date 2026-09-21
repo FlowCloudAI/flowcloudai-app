@@ -53,6 +53,7 @@ export interface PageDocumentCanvasProps {
 
 export interface PageDocumentCanvasHandle {
     resolveLinkCandidate(intentId: string, resolution: CanvasInputResolution): void
+    focusEditor(): void
 }
 
 export function PageDocumentCanvas({
@@ -132,6 +133,9 @@ export function PageDocumentCanvas({
     }, [session])
 
     useImperativeHandle(ref, () => ({
+        focusEditor() {
+            frameRef.current?.contentWindow?.focus()
+        },
         resolveLinkCandidate(intentId, resolution) {
             if (!loadedRef.current) return
             send({type: 'resolve-input', intentId, accepted: resolution.accepted, selection: resolution.selection})

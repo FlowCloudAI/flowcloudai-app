@@ -1,6 +1,6 @@
 // 本组件把主仓已有的页面文档属性适配器接到 Office 功能区；不读取模型或直接改写源码。
 
-import {AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Eraser, IndentDecrease, IndentIncrease, Search, Trash2} from 'lucide-react'
+import {AlignCenter, AlignJustify, AlignLeft, AlignRight, IndentDecrease, IndentIncrease, Trash2} from 'lucide-react'
 import {Select} from 'flowcloudai-ui'
 import type {LayerProjectionNode} from '../../page-document/domain/layerProjection.ts'
 import type {
@@ -12,11 +12,11 @@ import type {
 } from '../../page-document/application/documentKernelDraftRuntime.ts'
 import {
     inspectVisualProperties,
-    type VisualPropertyEditValue,
     type VisualPropertyName,
     type VisualPropertyState,
 } from '../../page-document/application/visualPropertyEditing.ts'
 import type {LiveVisualScheduleOptions} from '../../page-document/application/liveVisualCommitScheduler.ts'
+import type {CanvasTypingStyleProperty} from '../../page-document/application/canvasInputOperation.ts'
 import {
     DOCUMENT_HOME_RIBBON_PRIORITIES,
     homeRibbonGroupAvailability,
@@ -33,7 +33,6 @@ import {
 } from './ribbonKernelBinding.ts'
 import type {RibbonTextRange} from './ribbonKernelBinding.ts'
 import {InlineRibbonStyleControls} from './InlineRibbonStyleControls.tsx'
-import {ColorPropertyControl} from '../../page-document/components/properties/ColorPropertyControl.tsx'
 
 export type RibbonApplyKernelEntry = (
     request: KernelDraftEditRequest,
@@ -55,13 +54,14 @@ export interface HomeRibbonControlsProps {
     inspectComponent: RibbonInspectComponent
     inspectTextRange: RibbonInspectTextRange
     activeTextRange: RibbonTextRange | null
+    typingStyles: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
     styleContext: 'mobile' | 'desktop'
-    onFind?: () => void
     onOpenDetails?: () => void
     onRemove?: () => void
+    onTypingStyleChange: (property: CanvasTypingStyleProperty, value: string) => void
+    onTypingStylesReset: (values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>) => void
 }
 
-const FONT_SIZE_OPTIONS = ['12px', '14px', '16px', '18px', '20px', '24px', '32px'] as const
 const LINE_HEIGHT_OPTIONS = Object.freeze([
     {value: '1.3', label: '紧凑'},
     {value: '1.6', label: '标准'},
@@ -94,141 +94,6 @@ function RibbonUnavailable({label, reason}: {label: string; reason: string}) {
     )
 }
 
-function FontControls({
-    node,
-    states,
-    applyKernelEntry,
-    styleContext,
-    onOpenDetails,
-}: {
-    node: LayerProjectionNode
-    states: readonly VisualPropertyState[]
-    applyKernelEntry: RibbonApplyKernelEntry
-    styleContext: 'mobile' | 'desktop'
-    onOpenDetails?: () => void
-}) {
-    const size = stateFor(states, 'font-size')
-    const weight = stateFor(states, 'font-weight')
-    const color = stateFor(states, 'color')
-    const backgroundColor = stateFor(states, 'background-color')
-    const lineHeight = stateFor(states, 'line-height')
-    const sizeValue = propertyValue(size)
-    const selectedSize = FONT_SIZE_OPTIONS.includes(sizeValue as (typeof FONT_SIZE_OPTIONS)[number])
-        ? sizeValue
-        : 'current'
-    const weightValue = propertyValue(weight)
-    const canWrite = Boolean(size && !size.disabled)
-    const canWeight = Boolean(weight && !weight.disabled)
-    const lineHeightValue = propertyValue(lineHeight)
-    const selectedLineHeight = LINE_HEIGHT_OPTIONS.some(option => option.value === lineHeightValue)
-        ? lineHeightValue
-        : 'custom'
-    const apply = (property: VisualPropertyName, value: VisualPropertyEditValue, label: string) => {
-        return applyKernelEntry(createRibbonPropertyRequest(node.id, property, value, styleContext), label, {immediate: true})
-    }
-    return (
-        <DocumentRibbonRows
-            first={
-                <>
-                    <Select
-                        aria-label="整段字号"
-                        disabled={!canWrite}
-                        onValueChange={value => {
-                            const next = String(value)
-                            if (next === 'current') return
-                            void apply(
-                                'font-size',
-                                next === 'unset'
-                                    ? {kind: 'clear-override'}
-                                    : {kind: 'numeric', value: Number(next.slice(0, -2)), unit: 'px', numberText: next.slice(0, -2)},
-                                '修改整段字号',
-                            )
-                        }}
-                        options={[
-                            {value: 'current', label: selectedSize === 'current' ? '当前字号' : sizeValue},
-                            ...FONT_SIZE_OPTIONS.map(value => ({value, label: value.slice(0, -2)})),
-                        ]}
-                        radius="sm"
-                        title={size?.reason ?? '整段字号'}
-                        value={selectedSize}
-                    />
-                    <div className="document-ribbon-font-weight" role="group" aria-label="整段字重">
-                        <button
-                            aria-label="加粗"
-                            aria-pressed={weightValue === '700'}
-                            disabled={!canWeight}
-                            onClick={() => void apply('font-weight', {kind: 'font-weight', value: weightValue === '700' ? '400' : '700'}, '切换整段加粗')}
-                            title={weight?.reason ?? '切换整段加粗'}
-                            type="button"
-                        >
-                            <Bold size={15} />
-                        </button>
-                    </div>
-                    <Select
-                        aria-label="节点行高"
-                        disabled={Boolean(lineHeight?.disabled)}
-                        onValueChange={value => {
-                            const next = String(value)
-                            if (next === 'custom') {
-                                onOpenDetails?.()
-                                return
-                            }
-                            void apply('line-height', {
-                                kind: 'numeric',
-                                value: Number(next),
-                                unit: '',
-                                numberText: next,
-                            }, '修改节点行高')
-                        }}
-                        options={[
-                            ...LINE_HEIGHT_OPTIONS,
-                            {value: 'custom', label: '自定义…', disabled: !onOpenDetails},
-                        ]}
-                        radius="sm"
-                        title={lineHeight?.reason ?? '节点行高'}
-                        value={selectedLineHeight}
-                    />
-                </>
-            }
-            second={<>
-                <button
-                    aria-label="清除节点字号"
-                    disabled={!canWrite || size?.localValue === null}
-                    onClick={() => void apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
-                    title={size?.clearTitle ?? '清除后恢复默认字号。'}
-                    type="button"
-                >
-                    <Eraser size={14} />
-                </button>
-                {color && <div className="document-ribbon-node-color">
-                    <span>节点文字</span>
-                    <ColorPropertyControl
-                        embedded
-                        field={color}
-                        onChange={(value, options) => applyKernelEntry(
-                            createRibbonPropertyRequest(node.id, 'color', value, styleContext),
-                            '修改节点文字颜色',
-                            options,
-                        )}
-                    />
-                </div>}
-                {backgroundColor && <div className="document-ribbon-node-color">
-                    <span>节点底色</span>
-                    <ColorPropertyControl
-                        embedded
-                        field={backgroundColor}
-                        onChange={(value, options) => applyKernelEntry(
-                            createRibbonPropertyRequest(node.id, 'background-color', value, styleContext),
-                            '修改节点背景颜色',
-                            options,
-                        )}
-                    />
-                </div>}
-            </>}
-        />
-    )
-}
-
 function ParagraphControls({
     node,
     states,
@@ -242,24 +107,29 @@ function ParagraphControls({
 }) {
     const alignment = stateFor(states, 'text-align')
     const indent = stateFor(states, 'margin-inline-start')
+    const lineHeight = stateFor(states, 'line-height')
     const current = propertyValue(alignment) || 'left'
     const canWrite = Boolean(alignment && !alignment.disabled)
     const indentValue = propertyValue(indent) || '0'
     const indentLevel = ribbonParagraphIndentLevel(indentValue)
     const indentReason = indent?.reason
         ?? (indentLevel === null ? '当前缩进是自定义值，请在详细设置中调整。' : null)
+    const lineHeightValue = propertyValue(lineHeight)
+    const selectedLineHeight = LINE_HEIGHT_OPTIONS.some(option => option.value === lineHeightValue)
+        ? lineHeightValue
+        : 'custom'
     const changeIndent = (direction: 'decrease' | 'increase') => {
         const next = ribbonParagraphIndentStep(indentValue, direction)
         if (!next) return
         void applyKernelEntry(
             createRibbonPropertyRequest(node.id, 'margin-inline-start', next, styleContext),
-            direction === 'increase' ? '增加段落缩进' : '减少段落缩进',
+            direction === 'increase' ? '增加文本块缩进' : '减少文本块缩进',
             {immediate: true},
         )
     }
     return (
         <DocumentRibbonRows
-            first={<div className="document-ribbon-alignment" role="group" aria-label="段落对齐">
+            first={<div className="document-ribbon-alignment" role="group" aria-label="文本块对齐">
                 {ALIGNMENT_OPTIONS.map(option => {
                     const Icon = option.icon
                     return (
@@ -282,6 +152,31 @@ function ParagraphControls({
                 })}
             </div>}
             second={<>
+                <Select
+                    aria-label="文本块行高"
+                    disabled={Boolean(lineHeight?.disabled)}
+                    onValueChange={value => {
+                        const next = String(value)
+                        if (next === 'custom') return
+                        void applyKernelEntry(
+                            createRibbonPropertyRequest(node.id, 'line-height', {
+                                kind: 'numeric',
+                                value: Number(next),
+                                unit: '',
+                                numberText: next,
+                            }, styleContext),
+                            '修改文本块行高',
+                            {immediate: true},
+                        )
+                    }}
+                    options={[
+                        ...LINE_HEIGHT_OPTIONS,
+                        {value: 'custom', label: lineHeightValue || '自定义'},
+                    ]}
+                    radius="sm"
+                    title={lineHeight?.reason ?? '文本块行高'}
+                    value={selectedLineHeight}
+                />
                 <DocumentRibbonCommand
                     ariaLabel={indentReason || indentLevel === 0 ? `减少缩进：${indentReason ?? '已到最小缩进'}` : '减少缩进'}
                     disabled={Boolean(indentReason) || indentLevel === 0}
@@ -309,42 +204,41 @@ export function HomeRibbonControls({
     inspectComponent,
     inspectTextRange,
     activeTextRange,
+    typingStyles,
     styleContext,
-    onFind,
     onOpenDetails,
     onRemove,
+    onTypingStyleChange,
+    onTypingStylesReset,
 }: HomeRibbonControlsProps) {
     const availability = homeRibbonGroupAvailability(selected)
     const states = selected?.managed
         ? inspectVisualProperties(selected, inspectComponent, '', styleContext)
         : []
     const editableText = Boolean(selected?.managed && ['paragraph', 'heading', 'list-item', 'table-cell'].includes(selected.kind))
-    const groupReason = availability.font ?? '先选择一个受管文字节点'
     return (
         <>
-            <DocumentRibbonGroup
-                disabledReason={availability.font}
-                label="字体"
+            {selected && editableText ? <InlineRibbonStyleControls
+                node={selected}
+                blockStates={states}
+                range={activeTextRange?.nodeId === selected.id ? activeTextRange : null}
+                typingStyles={typingStyles}
+                applyKernelEntry={applyKernelEntry}
+                inspectTextRange={inspectTextRange}
+                styleContext={styleContext}
                 onOpenDetails={onOpenDetails}
+                onTypingStyleChange={onTypingStyleChange}
+                onTypingStylesReset={onTypingStylesReset}
+            /> : <DocumentRibbonGroup
+                disabledReason={availability.font ?? '先选择一个受管文字节点'}
+                label="字体"
                 priority={DOCUMENT_HOME_RIBBON_PRIORITIES.font}
                 slot="font"
                 wide
-            >
-                {selected && editableText ? (
-                    <FontControls
-                        node={selected}
-                        states={states}
-                        applyKernelEntry={applyKernelEntry}
-                        styleContext={styleContext}
-                        onOpenDetails={onOpenDetails}
-                    />
-                ) : (
-                    <RibbonUnavailable label="整段文字" reason={groupReason} />
-                )}
-            </DocumentRibbonGroup>
+            ><RibbonUnavailable label="文字格式" reason={availability.font ?? '先选择一个受管文字节点'} /></DocumentRibbonGroup>}
             <DocumentRibbonGroup
                 disabledReason={availability.paragraph}
-                label="段落"
+                label="文本块"
                 onOpenDetails={onOpenDetails}
                 priority={DOCUMENT_HOME_RIBBON_PRIORITIES.paragraph}
                 slot="paragraph"
@@ -353,18 +247,8 @@ export function HomeRibbonControls({
                 {selected && editableText ? (
                     <ParagraphControls node={selected} states={states} applyKernelEntry={applyKernelEntry} styleContext={styleContext} />
                 ) : (
-                    <RibbonUnavailable label="段落对齐" reason={availability.paragraph ?? '当前节点不支持段落命令'} />
+                    <RibbonUnavailable label="文本块排版" reason={availability.paragraph ?? '当前节点不支持文本块命令'} />
                 )}
-            </DocumentRibbonGroup>
-            <DocumentRibbonGroup label="编辑" priority={DOCUMENT_HOME_RIBBON_PRIORITIES.edit} slot="edit">
-                <DocumentRibbonCommand
-                    disabled={!onFind}
-                    icon={Search}
-                    label="查找"
-                    onClick={onFind ?? (() => undefined)}
-                    size="large"
-                    title="查找功能将在后续工具栏批次接入"
-                />
             </DocumentRibbonGroup>
             {selected?.managed && selected.attributes['data-fc-editor-root'] === undefined && <DocumentRibbonGroup
                 label="块操作"
@@ -372,7 +256,6 @@ export function HomeRibbonControls({
                 slot="block"
             >
                 <DocumentRibbonCommand
-                    danger
                     disabled={!onRemove}
                     icon={Trash2}
                     label="删除"
@@ -380,12 +263,6 @@ export function HomeRibbonControls({
                     title={onRemove ? '删除选中的页面节点' : (availability.block ?? '当前节点不可删除')}
                 />
             </DocumentRibbonGroup>}
-            <InlineRibbonStyleControls
-                range={activeTextRange}
-                applyKernelEntry={applyKernelEntry}
-                inspectTextRange={inspectTextRange}
-                styleContext={styleContext}
-            />
         </>
     )
 }
