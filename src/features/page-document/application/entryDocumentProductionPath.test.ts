@@ -25,6 +25,7 @@ import {
 } from '../canvas/protocol/index.ts'
 import {createOpaqueElementAdoptionKernelRequest} from './opaqueElementAdoption.ts'
 import {createVisualPropertyEditRequest} from './visualPropertyEditing.ts'
+import {createRibbonTextRangePropertyRequest} from '../../document-editor/visual/ribbonKernelBinding.ts'
 
 const ENTRY_ID = '018f47a2-3b4c-7d5e-8f90-123456789abc'
 const PROJECT_ID = '11111111-1111-7111-8111-111111111111'
@@ -444,6 +445,50 @@ describe('页面编辑生产项目基线', () => {
         }
         assert.equal(state.model.entry.undo.length, 1)
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
+    })
+
+    it('CSS 变量颜色可经待输入格式与已有选区两条产品路径通过候选验收', () => {
+        const runtime = createDocumentKernelDraftRuntime()
+        const initial = createEntryDocumentSessionState(identity, document())
+        const message: CanvasInputIntentMessage = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent',
+            intentId: '87000000-0000-7000-8000-000000000000',
+            nodeId: PARAGRAPH_ID,
+            inputType: 'insertText',
+            from: 4,
+            to: 4,
+            expected: '',
+            text: '新',
+        }
+        const typing = createCanvasInputKernelOperation(
+            [message],
+            'canvas-input-history:typing-variable',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[message.intentId, {
+                nodeId: PARAGRAPH_ID,
+                styleContext: 'mobile',
+                values: {color: 'var(--fc-entry-text)'},
+            }]]),
+        )
+        const typingPrepared = runtime.prepare(initial.model, initial.snapshot, typing.request)
+        assert.equal(typingPrepared.status, 'ready', JSON.stringify(typingPrepared))
+
+        for (const [index, value] of ['var(--fc-entry-text)', '#000000'].entries()) {
+            const selection = createRibbonTextRangePropertyRequest(
+                {nodeId: PARAGRAPH_ID, from: 0, to: 2, expected: '受管'},
+                'color',
+                value,
+                'mobile',
+                () => `selection-color-${index}`,
+            )
+            const selectionPrepared = runtime.prepare(initial.model, initial.snapshot, selection)
+            assert.equal(selectionPrepared.status, 'ready', JSON.stringify(selectionPrepared))
+        }
     })
 
     it('真实会话连续输入多个字符时每个字符都保留待输入格式', () => {

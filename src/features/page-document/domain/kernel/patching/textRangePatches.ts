@@ -165,8 +165,24 @@ export function textRangeHasStyle(
         selected.every(
             unit =>
                 unit.kind === 'break' ||
-                normalizeValue(unit.propertyValue) === normalizeValue(value),
+                textUnitHasRequestedStyle(unit, property, value, resolveProperty),
         )
+    )
+}
+
+function textUnitHasRequestedStyle(
+    unit: TextRangeTextUnit,
+    property: string,
+    value: string,
+    resolveProperty: TextRangePropertyResolver,
+): boolean {
+    if (normalizeValue(unit.propertyValue) === normalizeValue(value)) return true
+    if (!value.includes('var(') || !unit.writeOwner?.hasDirectProperty) return false
+    const inspection = resolveProperty(unit.writeOwner.element, property)
+    return (
+        inspection.confidence.kind === 'proven' &&
+        normalizeValue(inspection.effectiveValue?.rawValue ?? null) === normalizeValue(value) &&
+        normalizeValue(inspection.effectiveValue?.resolvedValue ?? null) === normalizeValue(unit.propertyValue)
     )
 }
 

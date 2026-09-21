@@ -1048,6 +1048,41 @@ describe('DocumentKernel read facade', () => {
         assert.equal(repeated.status, 'unchanged')
     })
 
+    it('行内变量声明被更高优先级覆盖时仍拒绝格式候选', () => {
+        const snapshot = sourceSnapshot({
+            'project:style.css': `.article { --fc-entry-text: CanvasText; }
+.article [data-fc-inline-format] { color: #123456 !important; }`,
+            'entry:article.html': `<template data-fc-entry-patch data-fc-document-version="1" data-fc-entry-id="${ENTRY_ID}" data-fc-base-template-version="1"><template data-fc-fill="body"><p data-fc-node-id="${NODE_ID}" data-fc-node-kind="paragraph">正文</p></template></template>`,
+            'entry:style.css': '',
+        })
+        const {kernel, analysis} = analyze(snapshot)
+        const handle = kernel.queryComponents(analysis, {kinds: ['paragraph']})[0].handle
+        const result = kernel.prepareEdit(analysis, {
+            baseAnalysis: analysis.stamp.id,
+            idempotencyKey: idempotencyKey('edit:variable-overridden'),
+            interactionId: null,
+            authorizedScopes: ['entry'],
+            intents: [{
+                kind: 'edit-property',
+                target: {
+                    kind: 'text-range',
+                    component: handle,
+                    range: utf16Range(0, 2),
+                    expected: '正文',
+                },
+                property: 'color',
+                action: {kind: 'set-value', value: 'var(--fc-entry-text)'},
+                readContext: CONTEXT,
+                destination: {scope: 'entry', channel: {kind: 'inline'}},
+            }],
+        })
+
+        assert.equal(result.status, 'rejected')
+        if (result.status === 'rejected') {
+            assert.equal(result.diagnostics[0]?.code, 'text-format-postcondition-failed')
+        }
+    })
+
     it('文本格式通过实体源码映射且拒绝切开 emoji 代理对', () => {
         const snapshot = sourceSnapshot({
             'entry:article.html': `<template data-fc-entry-patch data-fc-document-version="1" data-fc-entry-id="${ENTRY_ID}" data-fc-base-template-version="1"><template data-fc-fill="body"><p data-fc-node-id="${NODE_ID}" data-fc-node-kind="paragraph">甲&amp;😀</p></template></template>`,
