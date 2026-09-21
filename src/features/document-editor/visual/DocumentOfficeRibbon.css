@@ -150,7 +150,6 @@
 
 .document-ribbon-group-footer button:hover:not(:disabled),
 .document-ribbon-group-footer button:focus-visible {
-    background: var(--fc-color-bg-secondary);
     color: var(--fc-color-primary);
 }
 

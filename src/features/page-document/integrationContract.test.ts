@@ -287,7 +287,7 @@ describe('page document editor integration boundary', () => {
         assert.match(layers, /'可视编辑'[\s\S]*'模板生成'[\s\S]*'仅代码编辑'/u)
         assert.match(ribbon, /iconOnly = size === 'small' && density !== 'full'/u)
         assert.doesNotMatch(ribbon, /document-ribbon-group-trigger|aria-haspopup="menu"/u)
-        assert.match(ribbon, /<ArrowUpRight size=\{10\}/u)
+        assert.match(ribbon, /<ArrowDownRight size=\{10\}/u)
         assert.match(ribbonCss, /\.document-ribbon-tabs\s*\{[^}]*overflow:\s*hidden/u)
         assert.match(ribbonCss, /\.document-ribbon-command\.is-icon-only > span/u)
         assert.doesNotMatch(ribbonCss, /\.document-ribbon-group-trigger|\.document-ribbon-group-menu/u)

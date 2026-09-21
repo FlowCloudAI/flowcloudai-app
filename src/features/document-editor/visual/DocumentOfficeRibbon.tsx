@@ -9,7 +9,7 @@ import {
     type KeyboardEvent,
     type ReactNode,
 } from 'react'
-import {ArrowUpRight, ChevronDown, ChevronUp, type LucideIcon} from 'lucide-react'
+import {ArrowDownRight, ChevronDown, ChevronUp, type LucideIcon} from 'lucide-react'
 import {
     documentRibbonDensity,
     type DocumentRibbonDensity,
@@ -190,7 +190,7 @@ export function DocumentRibbonGroup({
                         title={detailsTitle ?? `打开${label}详细设置`}
                         type="button"
                     >
-                        <ArrowUpRight size={10} />
+                        <ArrowDownRight size={10} />
                     </button>
                 )}
             </div>
