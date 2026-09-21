@@ -112,7 +112,7 @@ test('纯文本粘贴在未编辑或组合期拒绝提交，并规范换行与�
     }), {kind: 'block', reason: 'input-too-large'})
 })
 
-test('非折叠选区的单段粘贴只由 paste 提交一次替换且不分段', () => {
+test('非折叠选区粘贴含空行文本只提交一次替换且不分段', () => {
     const submittedBy: string[] = []
     if (canvasBeforeInputDecision({
         editingEnabled: true,
@@ -124,7 +124,7 @@ test('非折叠选区的单段粘贴只由 paste 提交一次替换且不分段'
         editableTarget: true,
         isComposing: false,
         selectionValid: true,
-        plainText: '替换文字',
+        plainText: '第一行\n\n第二行',
     }).kind === 'submit') submittedBy.push('paste')
 
     const messages = submittedBy.map((_, index): CanvasInputIntentMessage => ({
@@ -139,7 +139,7 @@ test('非折叠选区的单段粘贴只由 paste 提交一次替换且不分段'
         from: 1,
         to: 3,
         expected: '旧文',
-        text: '替换文字',
+        text: '第一行\n\n第二行',
     }))
     const handle = {nodeId: snapshot.nodeId} as ComponentHandle
     const intents = createCanvasInputKernelOperation(
@@ -151,6 +151,7 @@ test('非折叠选区的单段粘贴只由 paste 提交一次替换且不分段'
     assert.deepEqual(submittedBy, ['paste'])
     assert.equal(intents.filter(intent => intent.kind === 'replace-text').length, 1)
     assert.equal(intents.filter(intent => intent.kind === 'split-text-block').length, 0)
+    assert.equal(intents[0]?.kind === 'replace-text' ? intents[0].text : null, '第一行\n\n第二行')
 })
 
 test('分段只开放 paragraph、heading 与 list-item', () => {

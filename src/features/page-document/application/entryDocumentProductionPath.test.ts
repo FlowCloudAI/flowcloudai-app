@@ -329,13 +329,9 @@ describe('页面编辑生产项目基线', () => {
         if (save.status === 'ready') assert.equal(save.input.html, state.model.entry.sources['article.html'])
     })
 
-    it('真实会话多段纯文本粘贴生成多个块且一次撤销全部退回', () => {
+    it('真实会话粘贴的全部换行保留在当前块且一次撤销退回', () => {
         const initial = createEntryDocumentSessionState(identity, document())
         const runtime = createDocumentKernelDraftRuntime()
-        const createdIds = [
-            '84444444-4444-7444-8444-444444444444',
-            '85555555-5555-7555-8555-555555555555',
-        ]
         const message: CanvasInputIntentMessage = {
             channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
             version: PAGE_DOCUMENT_CANVAS_VERSION,
@@ -350,12 +346,10 @@ describe('页面编辑生产项目基线', () => {
             expected: '',
             text: '首行\n软换行\n\n第二段\n\n末段',
         }
-        let allocated = 0
         const operation = createCanvasInputKernelOperation(
             [message],
             'canvas-input-history:paste',
             'paragraph',
-            () => createdIds[allocated++],
         )
         const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
         assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
@@ -370,12 +364,10 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
         const state = acceptEntryDocumentVisualUpdate(initial, update)
         const html = state.model.entry.sources['article.html']
-        assert.match(html, /受管正文首行<br>软换行<\/p>/u)
-        assert.match(html, new RegExp(`${createdIds[0]}[^>]*>第二段<\\/p>`, 'u'))
-        assert.match(html, new RegExp(`${createdIds[1]}[^>]*>末段<\\/p>`, 'u'))
+        assert.match(html, /受管正文首行<br>软换行<br><br>第二段<br><br>末段<\/p>/u)
         assert.equal(
-            [PARAGRAPH_ID, ...createdIds].every(id => readCanvasInputTarget(html, id) !== null),
-            true,
+            readCanvasInputTarget(html, PARAGRAPH_ID)?.text,
+            '受管正文首行\n软换行\n\n第二段\n\n末段',
         )
         assert.equal(state.model.entry.undo.length, 1)
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])

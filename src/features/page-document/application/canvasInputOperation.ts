@@ -10,7 +10,6 @@ import {createLayerProjection} from '../domain/layerProjection.ts'
 import {
     idempotencyKey,
     interactionId,
-    mapPastedNodeIdentities,
     nodeId,
     utf16Range,
     type EditIntent,
@@ -83,48 +82,6 @@ export function applyCanvasInputToText(
 
 const splittableKinds = new Set(['paragraph', 'heading', 'list-item'])
 
-interface CanvasPastePlan {
-    readonly insertedText: string
-    readonly splitOffsets: readonly number[]
-    readonly finalOffset: number
-}
-
-export interface CanvasPasteIdentityOptions {
-    readonly sourceNodeIds: readonly string[]
-    readonly sameDocument: boolean
-    readonly operation: 'copy' | 'move'
-    readonly unavailable?: Iterable<string>
-}
-
-/** 文本粘贴产生的新块也必须经过同一身份映射器；调用方不能自行拼接或复用 UUID。 */
-export function mapCanvasPastedNodeIdentities(
-    options: CanvasPasteIdentityOptions,
-    allocate: () => string,
-): ReadonlyMap<ReturnType<typeof nodeId>, ReturnType<typeof nodeId>> {
-    return mapPastedNodeIdentities(options.sourceNodeIds, {
-        sameDocument: options.sameDocument,
-        operation: options.operation,
-        allocate,
-        unavailable: options.unavailable ?? [],
-    })
-}
-
-/** 空行是块边界，单个换行保留给 replace-text 编译为 br。 */
-export function planCanvasPlainTextPaste(text: string, from: number): CanvasPastePlan {
-    const paragraphs = text.replace(/\r\n?/gu, '\n').split(/\n(?:[\t ]*\n)+/gu)
-    const splitOffsets: number[] = []
-    let offset = from
-    for (const paragraph of paragraphs.slice(0, -1)) {
-        offset += paragraph.length
-        splitOffsets.push(offset)
-    }
-    return Object.freeze({
-        insertedText: paragraphs.join(''),
-        splitOffsets: Object.freeze(splitOffsets),
-        finalOffset: paragraphs.at(-1)?.length ?? 0,
-    })
-}
-
 function replacementIntent(
     message: CanvasInputIntentMessage,
     handle: ReturnType<typeof requireKernelComponentHandle>,
@@ -149,53 +106,24 @@ export function createCanvasInputKernelOperation(
     historyGroupId: string,
     targetKind: string,
     allocateNodeId: () => string = () => crypto.randomUUID(),
-    pasteIdentity?: CanvasPasteIdentityOptions,
 ): CanvasInputKernelOperation {
     const first = messages[0]
     if (!first || messages.some(message => message.nodeId.toLowerCase() !== first.nodeId.toLowerCase())) {
         throw new TypeError('同一画布输入批次必须包含同一受管节点的意图。')
     }
-    const structural = messages.filter(message => (
-        message.inputType === 'insertParagraph'
-        || (message.inputType === 'insertFromPaste' && planCanvasPlainTextPaste(message.text, message.from).splitOffsets.length > 0)
-    ))
+    const structural = messages.filter(message => message.inputType === 'insertParagraph')
     if (structural.length > 0 && messages.length !== 1) {
-        throw new TypeError('分段与多段粘贴必须作为独立的立即输入提交。')
+        throw new TypeError('分段必须作为独立的立即输入提交。')
     }
     if (structural.length > 0 && !splittableKinds.has(targetKind)) {
         throw new TypeError(`${targetKind} 不支持创建后续文本块。`)
     }
-    const structuralCount = structural.length === 0
-        ? 0
-        : structural[0].inputType === 'insertParagraph'
-          ? 1
-          : planCanvasPlainTextPaste(structural[0].text, structural[0].from).splitOffsets.length
-    const pasteSourceIds = pasteIdentity?.sourceNodeIds ?? Array.from(
-        {length: structuralCount},
-        () => crypto.randomUUID(),
-    )
-    const pastedMapping = structuralCount === 0
-        ? new Map<string, string>()
-        : mapCanvasPastedNodeIdentities(
-              pasteIdentity ?? {
-                  sourceNodeIds: pasteSourceIds,
-                  sameDocument: false,
-                  operation: 'copy',
-              },
-              allocateNodeId,
-          )
-    const allocatedNodeIds = structural.length === 0
-        ? []
-        : pasteSourceIds.map(sourceId =>
-              nodeId(pastedMapping.get(nodeId(sourceId)) ?? allocateNodeId()),
-          )
+    const allocatedNodeIds = structural.map(() => nodeId(allocateNodeId()))
     const selection = structural.length === 0
         ? null
         : Object.freeze({
               nodeId: allocatedNodeIds.at(-1) as string,
-              offset: structural[0].inputType === 'insertParagraph'
-                  ? 0
-                  : planCanvasPlainTextPaste(structural[0].text, structural[0].from).finalOffset,
+              offset: 0,
           })
     const request = Object.freeze({
         nodeIds: Object.freeze([first.nodeId.toLowerCase()]),
@@ -216,24 +144,6 @@ export function createCanvasInputKernelOperation(
                     coordinateSpace: 'current-candidate' as const,
                     newNodeId: allocatedNodeIds[0],
                 } satisfies EditIntent)])
-            }
-            if (first.inputType === 'insertFromPaste') {
-                const paste = planCanvasPlainTextPaste(first.text, first.from)
-                const intents: EditIntent[] = [replacementIntent(first, handle, paste.insertedText)]
-                for (let index = paste.splitOffsets.length - 1; index >= 0; index -= 1) {
-                    intents.push(Object.freeze({
-                        kind: 'split-text-block' as const,
-                        target: Object.freeze({
-                            kind: 'text-range' as const,
-                            component: handle,
-                            range: utf16Range(paste.splitOffsets[index], paste.splitOffsets[index]),
-                            expected: '',
-                        }),
-                        coordinateSpace: 'current-candidate' as const,
-                        newNodeId: allocatedNodeIds[index],
-                    }))
-                }
-                return Object.freeze(intents)
             }
             return Object.freeze(messages.map(message => replacementIntent(message, handle)))
         },

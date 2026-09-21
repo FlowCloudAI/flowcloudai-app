@@ -36,7 +36,6 @@ import {
     canvasInputBlockedFeedback,
     canvasInputHistoryLabel,
     createCanvasInputKernelOperation,
-    planCanvasPlainTextPaste,
     readCanvasInputTarget,
     readCanvasInputTargetText,
 } from '../application/canvasInputOperation.ts'
@@ -552,17 +551,15 @@ export function useEntryPageDocumentSession(input: UseEntryPageDocumentSessionIn
                 return reject('画布输入目标不属于当前可编辑的受管投影，已拒绝写入。')
             }
             const createsBlocks = message.inputType === 'insertParagraph'
-                || (message.inputType === 'insertFromPaste'
-                    && planCanvasPlainTextPaste(message.text, message.from).splitOffsets.length > 0)
             if (createsBlocks && !['paragraph', 'heading', 'list-item'].includes(target.kind)) {
                 return reject('表格单元格不支持分段。')
             }
             const scheduler = canvasInputSchedulerRef.current
             if (!scheduler) return reject('画布输入调度尚未就绪。')
-            const structural = message.inputType === 'insertParagraph' || message.inputType === 'insertFromPaste'
+            const separateInteraction = message.inputType === 'insertParagraph' || message.inputType === 'insertFromPaste'
             const accepted = await scheduler.schedule(message, {
-                immediate: message.inputType === 'insertCompositionText' || structural,
-                separate: structural,
+                immediate: message.inputType === 'insertCompositionText' || separateInteraction,
+                separate: separateInteraction,
             })
             if (!accepted && stateRef.current?.identity.entryId === current.identity.entryId) {
                 setVisualError('画布文本范围已经变化，本次输入未写入页面草稿。')
