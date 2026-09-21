@@ -150,7 +150,6 @@ function ListStructureControls({
                     void applyKernelEntry(
                         createRibbonPropertyRequest(node.id, 'list-style-type', {kind: 'keyword', value: String(value)}, context),
                         '修改列表标记',
-                        {immediate: true},
                     )
                 }}
                 options={[
@@ -261,7 +260,6 @@ export function ContextualRibbonControls({
         ) => applyKernelEntry(
             createRibbonPropertyRequest(selected.id, property, {kind: 'keyword', value}, context),
             label,
-            {immediate: true},
         )
         return <>
             <DocumentRibbonGroup label="图片" priority="essential" wide>
