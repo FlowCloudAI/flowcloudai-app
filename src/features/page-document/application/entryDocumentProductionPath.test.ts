@@ -421,6 +421,52 @@ describe('页面编辑生产项目基线', () => {
         assert.equal(undoEntryDocumentSession(state).model.entry.sources['article.html'], initial.model.entry.sources['article.html'])
     })
 
+    it('真实会话给中文组合提交的完整候选文字保留光标待输入颜色', () => {
+        const initial = createEntryDocumentSessionState(identity, document())
+        const runtime = createDocumentKernelDraftRuntime()
+        const message: CanvasInputIntentMessage = {
+            channel: PAGE_DOCUMENT_CANVAS_CHANNEL,
+            version: PAGE_DOCUMENT_CANVAS_VERSION,
+            sessionToken: 'a'.repeat(64),
+            sequence: 1,
+            type: 'input-intent',
+            intentId: '87999999-9999-7999-8999-999999999999',
+            nodeId: PARAGRAPH_ID,
+            inputType: 'insertCompositionText',
+            from: 4,
+            to: 4,
+            expected: '',
+            text: '中文',
+        }
+        const operation = createCanvasInputKernelOperation(
+            [message],
+            'canvas-input-history:composition-style',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[message.intentId, {
+                nodeId: PARAGRAPH_ID,
+                styleContext: 'mobile',
+                values: {color: '#c43c35'},
+            }]]),
+        )
+        const prepared = runtime.prepare(initial.model, initial.snapshot, operation.request)
+        assert.equal(prepared.status, 'ready', JSON.stringify(prepared))
+        if (prepared.status !== 'ready') return
+        const update = runtime.applyPrepared(
+            initial.model,
+            initial.snapshot,
+            prepared.edit,
+            '输入带格式中文',
+            {historyGroupId: 'canvas-input-history:composition-style'},
+        )
+        assert.equal(update.applied, true, JSON.stringify(update.diagnostics))
+        const state = acceptEntryDocumentVisualUpdate(initial, update)
+        const html = state.model.entry.sources['article.html']
+        assert.match(html, /color:\s*#c43c35/u)
+        assert.equal(readCanvasInputTarget(html, PARAGRAPH_ID)?.text, '受管正文中文')
+        assert.equal(state.model.entry.undo.length, 1)
+    })
+
     it('真实会话拒绝在 table-cell 进行 Shift+Enter 拆块且草稿保持不变', () => {
         const cellId = '87777777-7777-7777-8777-777777777777'
         const cellDocument = {

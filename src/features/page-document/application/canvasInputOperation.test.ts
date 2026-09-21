@@ -106,6 +106,44 @@ describe('canvas input operation', () => {
         )
     })
 
+    it('中文组合提交把完整候选文字与待输入格式放进同一内核批次', () => {
+        const message = intent('10222222-2222-7222-8222-222222222222', 'insertCompositionText', 2, 2, '', '中文')
+        const operation = createCanvasInputKernelOperation(
+            [message],
+            'canvas-input-history:composition-style',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[message.intentId, {
+                nodeId: NODE_ID,
+                styleContext: 'mobile',
+                values: {color: '#c43c35'},
+            }]]),
+        )
+        const handle = {nodeId: NODE_ID} as ComponentHandle
+        const intents = operation.request.createIntents(new Map([[NODE_ID, handle]]))
+
+        assert.equal(intents.length, 2)
+        assert.equal(intents[0]?.kind, 'replace-text')
+        assert.deepEqual(intents[1], {
+            kind: 'edit-property',
+            target: {
+                kind: 'text-range',
+                component: handle,
+                range: {unit: 'utf16-code-unit', from: 2, to: 4},
+                expected: '中文',
+            },
+            property: 'color',
+            action: {kind: 'set-value', value: '#c43c35'},
+            readContext: {
+                viewport: 'mobile',
+                interactions: {hover: false, focusWithin: false},
+                direction: 'ltr',
+                writingMode: 'horizontal-tb',
+            },
+            destination: {scope: 'entry', channel: {kind: 'inline'}},
+        })
+    })
+
     it('insertParagraph 映射为宿主分配身份的 split-text-block，insertLineBreak 映射为换行替换', () => {
         const createdId = '77777777-7777-7777-8777-777777777777'
         const split = intent('12111111-1111-7111-8111-111111111111', 'insertParagraph', 2, 2, '', '')

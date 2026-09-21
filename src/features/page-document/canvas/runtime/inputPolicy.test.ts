@@ -279,6 +279,21 @@ test('compositionstart 到多次中间态后 compositionend 只产出一次最�
     assert.equal(tracker.isComposing, false)
 })
 
+test('中文组合期间保留组合开始前的可信光标且不采集候选态选区', () => {
+    const source = readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
+    const compositionStart = source.slice(
+        source.indexOf("document.addEventListener('compositionstart'"),
+        source.indexOf("document.addEventListener('compositionend'"),
+    )
+    const selectionChange = source.slice(
+        source.indexOf("document.addEventListener('selectionchange'"),
+        source.indexOf('const reportSettledTextSelection'),
+    )
+
+    assert.doesNotMatch(compositionStart, /clearTextSelection\(\)/u)
+    assert.match(selectionChange, /!composition\.isComposing/u)
+})
+
 test('折叠删除不会把 UTF-16 代理对拆开', () => {
     const afterEmoji = {...snapshot, from: 3, to: 3}
     const backward = expandCollapsedCanvasDeletion('A😀B', afterEmoji, 'deleteContentBackward')

@@ -623,7 +623,8 @@ function installInputListeners(): void {
         if (candidateLeave) send(candidateLeave)
         const leave = linkHover.clear()
         if (leave) send(leave)
-        clearTextSelection()
+        // 输入法候选文字尚未进入作者源码，组合期间也不会上报其临时 DOM 选区。
+        // 保留组合开始前的可信光标，宿主才能把待输入格式应用到 compositionend 的最终文字。
         if (!editingEnabled || composition.isComposing) return
         const node = managedNode(event.target)
         const nodeId = managedNodeId(node)

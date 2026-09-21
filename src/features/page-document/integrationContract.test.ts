@@ -188,6 +188,7 @@ describe('page document editor integration boundary', () => {
         assert.match(color, /<FloatingPanel[\s\S]*passive[\s\S]*page-document-color-popover/u)
         assert.match(color, /<FloatingPanel[\s\S]*anchorRef=\{triggerAnchorRef\}/u)
         assert.match(color, /const customColorGuidance = `当前\$\{field\.label\}会保持不变；选择新颜色后才会替换。`/u)
+        assert.match(color, /!embedded && field\.reason/u)
         assert.match(color, /!embedded && hasCustomColor/u)
         assert.doesNotMatch(color, /复杂源码值会原样保留，请在代码模式调整/u)
         assert.match(overlay, /variant !== 'anchored'[\s\S]*resolveAnchoredOverlayPosition/u)

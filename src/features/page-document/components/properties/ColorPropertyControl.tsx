@@ -396,7 +396,7 @@ export function ColorPropertyControl({
                 disabled={field.disabled}
                 onClick={() => void onChange({kind: 'clear-override'}, {immediate: true})}
             >清除</Button>}
-            {field.reason && <p className="page-document-property__message">{field.reason}</p>}
+            {!embedded && field.reason && <p className="page-document-property__message">{field.reason}</p>}
         </section>
     )
 }
