@@ -1,4 +1,4 @@
-// 这些测试固定根内容测量边界，防止 100vh 与 iframe 自适应高度形成逐轮增长的反馈环。
+// 这些测试固定根内容测量与盒模型边界，防止外边距漏量或 iframe 高度形成逐轮增长的反馈环。
 
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
@@ -29,4 +29,20 @@ test('100vh 根节点带边框时连续回报只取内容高度并保持稳定',
     assert.match(runtime, /measureCanvasContentSize\(root\)/u)
     assert.match(runtime, /ResizeObserver\(reportSize\)\.observe\(root\)/u)
     assert.doesNotMatch(runtime, /document\.body\.(?:scroll|offset)(?:Width|Height)/u)
+})
+
+test('画布根建立独立格式化上下文并把子级首尾外边距纳入完整高度', () => {
+    const runtimeCss = readFileSync(new URL('./runtime.css', import.meta.url), 'utf8')
+    const rootRule = /#page-document-canvas-root\s*\{(?<body>[^}]*)\}/u.exec(runtimeCss)?.groups?.body ?? ''
+
+    assert.match(rootRule, /display:\s*flow-root/u)
+    assert.match(rootRule, /box-sizing:\s*border-box/u)
+    assert.match(rootRule, /margin:\s*0/u)
+    assert.match(rootRule, /border:\s*0/u)
+    assert.match(rootRule, /padding:\s*0/u)
+    assert.doesNotMatch(rootRule, /overflow:\s*hidden/u)
+
+    // WebKit 中未约束的根会漏掉首尾折叠外边距；flow-root 后根、body 与文档高度同为 404。
+    const measured = measureCanvasContentSize({scrollWidth: 640, scrollHeight: 404})
+    assert.deepEqual(measured, {width: 640, height: 404})
 })
