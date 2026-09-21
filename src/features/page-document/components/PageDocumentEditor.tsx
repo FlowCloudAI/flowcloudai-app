@@ -62,6 +62,7 @@ import {
 import {HomeRibbonControls} from '../../document-editor/visual/HomeRibbonControls.tsx'
 import {
     PageRibbonControls,
+    ResponsiveEditContextControl,
     ViewRibbonControls,
 } from '../../document-editor/visual/PageAndViewRibbonControls.tsx'
 import type {
@@ -1058,7 +1059,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             <footer className="page-document-editor__statusbar">
                 <span>{validationLabel(scope.validationPhase)} · {diagnosticCount} 条诊断</span>
                 <span>{dirty ? '草稿未保存' : state.persistedRevision ? '草稿已同步' : '新页面尚未保存'}</span>
-                <span>修改生效范围：{editContext === 'desktop' ? '桌面覆盖' : '移动基础'}</span>
+                <ResponsiveEditContextControl compact onChange={setEditContext} value={editContext} />
                 <span>选中：{selectedNode ? pageDocumentLayerLabel(selectedNode) : '—'}</span>
                 <span>revision · {state.persistedRevision ? `r${state.persistedRevision}` : '—'}</span>
             </footer>

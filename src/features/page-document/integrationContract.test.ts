@@ -344,4 +344,25 @@ describe('page document editor integration boundary', () => {
         assert.match(panel, /node\?\.managed && !fixedRoot[\s\S]*删除选中节点/u)
         assert.match(editor, /createPageNodeRemoval\(layerProjection\.nodes, node\.id\)[\s\S]*setSelectedNodeId\(removal\.selectionAfterRemoval\)/u)
     })
+
+    it('状态栏与视图页签共用断点档位且不联动画布宽度', () => {
+        const editor = readFileSync(
+            join(currentDirectory, 'components/PageDocumentEditor.tsx'),
+            'utf8',
+        )
+        const viewControls = readFileSync(
+            join(repositoryRoot, 'src/features/document-editor/visual/PageAndViewRibbonControls.tsx'),
+            'utf8',
+        )
+        const sharedControl = viewControls.slice(
+            viewControls.indexOf('export function ResponsiveEditContextControl'),
+            viewControls.indexOf('export function ViewRibbonControls'),
+        )
+
+        assert.match(editor, /<ViewRibbonControls[\s\S]*editContext=\{editContext\}[\s\S]*onEditContextChange=\{setEditContext\}/u)
+        assert.match(editor, /<ResponsiveEditContextControl compact onChange=\{setEditContext\} value=\{editContext\} \/>/u)
+        assert.match(viewControls, /<ResponsiveEditContextControl onChange=\{onEditContextChange\} value=\{editContext\} \/>/u)
+        assert.match(sharedControl, /onClick=\{\(\) => onChange\(context\)\}/u)
+        assert.doesNotMatch(sharedControl, /preview|Preview/u)
+    })
 })

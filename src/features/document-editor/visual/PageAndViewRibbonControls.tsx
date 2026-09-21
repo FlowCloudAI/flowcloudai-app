@@ -203,6 +203,32 @@ export function PageRibbonControls({scope, editContext, onScopeChange, onOpenThe
     </>
 }
 
+export function ResponsiveEditContextControl({
+    value,
+    onChange,
+    compact = false,
+}: {
+    value: ResponsiveViewportContext
+    onChange: (context: ResponsiveViewportContext) => void
+    compact?: boolean
+}) {
+    return <div
+        className={`document-ribbon-choice-row document-responsive-edit-context${compact ? ' is-compact' : ''}`}
+        role="group"
+        aria-label="修改生效范围"
+    >
+        {(Object.keys(RESPONSIVE_EDIT_SCOPE_LABELS) as ResponsiveViewportContext[]).map(context => <button
+            aria-pressed={value === context}
+            key={context}
+            onClick={() => onChange(context)}
+            title={RESPONSIVE_EDIT_SCOPE_NOTES[context]}
+            type="button"
+        >
+            {RESPONSIVE_EDIT_SCOPE_LABELS[context]}
+        </button>)}
+    </div>
+}
+
 export function ViewRibbonControls({previewMode, editContext, outlineVisible, layoutGuidesVisible, onPreviewModeChange, onEditContextChange, onOutlineVisibleChange, onLayoutGuidesVisibleChange, onOpenDisplay, onOpenDeveloperInfo}: {
     previewMode: LayoutPreviewViewportMode
     editContext: ResponsiveViewportContext
@@ -222,9 +248,7 @@ export function ViewRibbonControls({previewMode, editContext, outlineVisible, la
             </div>
         </DocumentRibbonGroup>
         <DocumentRibbonGroup label="修改生效范围" priority="high" wide>
-            <div className="document-ribbon-choice-row" role="group" aria-label="修改生效范围">
-                {(Object.keys(RESPONSIVE_EDIT_SCOPE_LABELS) as ResponsiveViewportContext[]).map(context => <button aria-pressed={editContext === context} key={context} onClick={() => onEditContextChange(context)} title={RESPONSIVE_EDIT_SCOPE_NOTES[context]} type="button">{RESPONSIVE_EDIT_SCOPE_LABELS[context]}</button>)}
-            </div>
+            <ResponsiveEditContextControl onChange={onEditContextChange} value={editContext} />
             <small>这里只切换属性读写档位；画布宽度由左侧“预览画布宽度”单独控制。</small>
         </DocumentRibbonGroup>
         <DocumentRibbonGroup label="显示" priority="normal">

@@ -334,6 +334,19 @@
     margin-left: auto;
 }
 
+.page-document-editor__statusbar .document-responsive-edit-context {
+    flex: 0 0 auto;
+    padding: 0;
+    border-color: var(--fc-color-border-light);
+    background: transparent;
+}
+
+.page-document-editor__statusbar .document-responsive-edit-context > button {
+    height: var(--fc-control-height-xs);
+    padding-inline: var(--fc-space-sm);
+    font-size: var(--fc-font-size-caption);
+}
+
 .page-document-editor-state {
     min-height: 20rem;
     padding: var(--fc-space-xl);
