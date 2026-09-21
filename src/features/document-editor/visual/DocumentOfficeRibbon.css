@@ -101,6 +101,7 @@
 }
 
 .document-ribbon-group {
+    position: relative;
     display: grid;
     grid-template-rows: var(--document-ribbon-group-body-height) 1rem;
     min-width: max-content;
@@ -119,11 +120,12 @@
 }
 
 .document-ribbon-group-footer {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--fc-space-xs);
     min-height: 0;
+    padding-inline: 1rem;
     color: var(--fc-color-text-tertiary);
     font-size: var(--fc-font-size-2xs);
     line-height: 1;
@@ -131,13 +133,30 @@
 }
 
 .document-ribbon-group-footer button {
+    position: absolute;
+    right: 0;
+    bottom: 0;
     display: grid;
     place-items: center;
+    width: 1rem;
+    height: 1rem;
     padding: 0;
     border: 0;
+    border-radius: var(--fc-radius-xs);
     background: transparent;
     color: inherit;
     cursor: pointer;
+}
+
+.document-ribbon-group-footer button:hover:not(:disabled),
+.document-ribbon-group-footer button:focus-visible {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-primary);
+}
+
+.document-ribbon-group-footer button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .document-ribbon-command {
@@ -173,19 +192,6 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-}
-
-.document-ribbon-group-menu .document-ribbon-command.is-icon-only {
-    width: auto;
-    padding: 0 var(--fc-space-sm);
-}
-
-.document-ribbon-group-menu .document-ribbon-command.is-icon-only > span {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
 }
 
 .document-ribbon-command:hover:not(:disabled),
@@ -308,60 +314,6 @@
 
 .document-ribbon-group.is-disabled {
     opacity: 0.58;
-}
-
-.document-ribbon-group.is-group-collapsed .document-ribbon-group-content {
-    display: none;
-}
-
-.document-ribbon-group-trigger {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fc-space-xs);
-    min-height: var(--document-ribbon-group-body-height);
-    padding: 0 var(--fc-space-sm);
-    border: 1px solid var(--fc-color-border-light);
-    border-radius: var(--fc-radius-sm);
-    background: var(--fc-color-bg-secondary);
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    font: inherit;
-}
-
-.document-ribbon-group-menu {
-    --document-ribbon-control-height: var(--fc-control-height-xs);
-    position: fixed;
-    z-index: 20;
-    display: grid;
-    gap: var(--fc-space-sm);
-    min-width: 14rem;
-    max-width: min(24rem, calc(100vw - 2 * var(--fc-space-sm)));
-    padding: var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-md);
-    font-size: var(--fc-font-size-xs);
-}
-
-.document-ribbon-group-menu .document-ribbon-group-content {
-    display: flex;
-    flex-wrap: wrap;
-}
-
-.document-ribbon-group-menu-details {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fc-space-xs);
-    min-height: 2rem;
-    border: 1px solid var(--fc-color-border-light);
-    border-radius: var(--fc-radius-sm);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    font: inherit;
 }
 
 .document-ribbon-layout-choice {

@@ -10,7 +10,6 @@ import {
     DOCUMENT_HOME_RIBBON_PRIORITIES,
     homeRibbonGroupAvailability,
     resolveRibbonTab,
-    ribbonGroupIsCollapsed,
     ribbonTabsForNode,
 } from '../../document-editor/visual/documentRibbonModel.ts'
 
@@ -52,16 +51,14 @@ test('固定根容器按页面处理且失效上下文稳定回到开始', () =>
     assert.equal(resolveRibbonTab('view', root), 'view')
 })
 
-test('开始页签组顺序固定，节点能力只改变禁用原因', () => {
-    assert.deepEqual(DOCUMENT_HOME_RIBBON_GROUPS, ['font', 'paragraph', 'style', 'edit', 'block'])
+test('开始页签只登记有真实命令的操作组，节点能力只改变禁用原因', () => {
+    assert.deepEqual(DOCUMENT_HOME_RIBBON_GROUPS, ['font', 'paragraph', 'edit', 'block'])
     assert.deepEqual(homeRibbonGroupAvailability(node('paragraph')), {
         font: null,
         paragraph: null,
-        style: '当前节点不支持此组命令',
         edit: null,
         block: null,
     })
-    assert.equal(homeRibbonGroupAvailability(node('heading')).style, null)
     assert.equal(homeRibbonGroupAvailability(node('asset')).paragraph, '当前节点不支持此组命令')
     assert.equal(
         homeRibbonGroupAvailability(node('container', {'data-fc-editor-root': ''})).block,
@@ -71,20 +68,14 @@ test('开始页签组顺序固定，节点能力只改变禁用原因', () => {
     assert.equal(homeRibbonGroupAvailability(null).font, '先选择一个文档节点')
 })
 
-test('功能区按自身宽度收缩，并按组优先级决定折叠', () => {
+test('功能区宽度只改变命令密度，不再把低优先级操作组替换成大下拉框', () => {
     assert.equal(documentRibbonDensity(1600), 'full')
     assert.equal(documentRibbonDensity(1280), 'icons')
     assert.equal(documentRibbonDensity(1100), 'compact')
     assert.equal(documentRibbonDensity(860), 'minimal')
-    assert.equal(ribbonGroupIsCollapsed('icons', 'low'), false)
-    assert.equal(ribbonGroupIsCollapsed('compact', 'low'), true)
-    assert.equal(ribbonGroupIsCollapsed('compact', 'normal'), false)
-    assert.equal(ribbonGroupIsCollapsed('minimal', 'normal'), true)
-    assert.equal(ribbonGroupIsCollapsed('minimal', 'essential'), false)
     assert.deepEqual(DOCUMENT_HOME_RIBBON_PRIORITIES, {
         font: 'essential',
         paragraph: 'high',
-        style: 'low',
         edit: 'normal',
         block: 'low',
     })

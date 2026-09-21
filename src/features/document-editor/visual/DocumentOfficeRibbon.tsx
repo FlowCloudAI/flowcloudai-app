@@ -1,20 +1,17 @@
-// 本组件提供 Office 式顶部功能区外壳；两行布局、宽度收缩和浮动组菜单都不接触文档源码。
+// 本组件提供 Office 式顶部功能区外壳；常用命令与组级详细设置入口都不接触文档源码。
 import {
+    Children,
     createContext,
     useContext,
-    useEffect,
     useLayoutEffect,
     useRef,
     useState,
-    type CSSProperties,
     type KeyboardEvent,
     type ReactNode,
 } from 'react'
-import {createPortal} from 'react-dom'
-import {ChevronDown, ChevronRight, ChevronUp, type LucideIcon} from 'lucide-react'
+import {ArrowUpRight, ChevronDown, ChevronUp, type LucideIcon} from 'lucide-react'
 import {
     documentRibbonDensity,
-    ribbonGroupIsCollapsed,
     type DocumentRibbonDensity,
     type DocumentRibbonGroupPriority,
     type DocumentRibbonTab,
@@ -169,79 +166,20 @@ export function DocumentRibbonGroup({
     onOpenDetails?: () => void
     detailsTitle?: string
     priority?: DocumentRibbonGroupPriority
-    slot?: 'font' | 'paragraph' | 'style' | 'edit' | 'block'
+    slot?: 'font' | 'paragraph' | 'edit' | 'block'
     wide?: boolean
 }) {
-    const density = useContext(DocumentRibbonDensityContext)
-    const collapsed = ribbonGroupIsCollapsed(density, priority)
-    const [menuOpen, setMenuOpen] = useState(false)
-    const triggerRef = useRef<HTMLButtonElement | null>(null)
-    const menuRef = useRef<HTMLDivElement | null>(null)
-    const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
-
-    useLayoutEffect(() => {
-        if (!menuOpen) return
-        const trigger = triggerRef.current
-        const menu = menuRef.current
-        if (!trigger || !menu) return
-        const anchor = trigger.getBoundingClientRect()
-        const bounds = menu.getBoundingClientRect()
-        const gap = 4
-        const left = Math.max(gap, Math.min(anchor.left, window.innerWidth - bounds.width - gap))
-        const below = anchor.bottom + gap
-        const top =
-            below + bounds.height <= window.innerHeight - gap
-                ? below
-                : Math.max(gap, anchor.top - bounds.height - gap)
-        setMenuStyle({left, top})
-    }, [menuOpen])
-
-    useEffect(() => {
-        if (!menuOpen) return
-        const closeOnPointer = (event: PointerEvent) => {
-            const target = event.target
-            if (!(target instanceof Node)) return
-            if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return
-            setMenuOpen(false)
-        }
-        const closeOnKey = (event: globalThis.KeyboardEvent) => {
-            if (event.key !== 'Escape') return
-            setMenuOpen(false)
-            triggerRef.current?.focus()
-        }
-        document.addEventListener('pointerdown', closeOnPointer)
-        document.addEventListener('keydown', closeOnKey)
-        return () => {
-            document.removeEventListener('pointerdown', closeOnPointer)
-            document.removeEventListener('keydown', closeOnKey)
-        }
-    }, [menuOpen])
-
-    const content = <div className="document-ribbon-group-content">{children}</div>
+    // 功能区只承载常用动作；详细设置由统一的组启动器交给属性任务窗格，避免整组退化成大下拉框。
+    if (Children.toArray(children).length === 0) return null
     return (
         <div
             aria-disabled={disabledReason ? true : undefined}
-            className={`document-ribbon-group${wide ? ' is-wide' : ''}${disabledReason ? ' is-disabled' : ''}${collapsed ? ' is-group-collapsed' : ''}`}
+            className={`document-ribbon-group${wide ? ' is-wide' : ''}${disabledReason ? ' is-disabled' : ''}`}
             data-ribbon-priority={priority}
             data-ribbon-group={slot}
             title={disabledReason ?? undefined}
         >
-            {collapsed ? (
-                <button
-                    aria-expanded={menuOpen}
-                    aria-haspopup="menu"
-                    className="document-ribbon-group-trigger"
-                    onClick={() => setMenuOpen(open => !open)}
-                    ref={triggerRef}
-                    title={`展开${label}组`}
-                    type="button"
-                >
-                    <span>{label}</span>
-                    <ChevronDown size={13} />
-                </button>
-            ) : (
-                content
-            )}
+            <div className="document-ribbon-group-content">{children}</div>
             <div className="document-ribbon-group-footer">
                 <span title={label}>{label}</span>
                 {onOpenDetails && (
@@ -252,39 +190,10 @@ export function DocumentRibbonGroup({
                         title={detailsTitle ?? `打开${label}详细设置`}
                         type="button"
                     >
-                        <ChevronRight size={11} />
+                        <ArrowUpRight size={10} />
                     </button>
                 )}
             </div>
-            {collapsed &&
-                menuOpen &&
-                createPortal(
-                    <div
-                        aria-label={`${label}组命令`}
-                        className="document-ribbon-group-menu"
-                        ref={menuRef}
-                        role="menu"
-                        style={menuStyle}
-                    >
-                        <strong>{label}</strong>
-                        {content}
-                        {onOpenDetails && (
-                            <button
-                                className="document-ribbon-group-menu-details"
-                                disabled={Boolean(disabledReason)}
-                                onClick={() => {
-                                    setMenuOpen(false)
-                                    onOpenDetails()
-                                }}
-                                type="button"
-                            >
-                                详细设置
-                                <ChevronRight size={12} />
-                            </button>
-                        )}
-                    </div>,
-                    document.body,
-                )}
         </div>
     )
 }

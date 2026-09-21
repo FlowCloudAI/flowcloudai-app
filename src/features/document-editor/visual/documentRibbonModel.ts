@@ -12,12 +12,11 @@ export type DocumentRibbonGroupPriority = 'essential' | 'high' | 'normal' | 'low
 
 export const DOCUMENT_BASE_RIBBON_TABS = ['home', 'insert', 'page', 'view'] as const
 
-export type DocumentHomeRibbonGroup = 'font' | 'paragraph' | 'style' | 'edit' | 'block'
+export type DocumentHomeRibbonGroup = 'font' | 'paragraph' | 'edit' | 'block'
 
 export const DOCUMENT_HOME_RIBBON_GROUPS = [
     'font',
     'paragraph',
-    'style',
     'edit',
     'block',
 ] as const satisfies readonly DocumentHomeRibbonGroup[]
@@ -25,7 +24,6 @@ export const DOCUMENT_HOME_RIBBON_GROUPS = [
 export const DOCUMENT_HOME_RIBBON_PRIORITIES = Object.freeze({
     font: 'essential',
     paragraph: 'high',
-    style: 'low',
     edit: 'normal',
     block: 'low',
 } as const satisfies Readonly<Record<DocumentHomeRibbonGroup, DocumentRibbonGroupPriority>>)
@@ -37,19 +35,9 @@ export function documentRibbonDensity(width: number): DocumentRibbonDensity {
     return 'full'
 }
 
-export function ribbonGroupIsCollapsed(
-    density: DocumentRibbonDensity,
-    priority: DocumentRibbonGroupPriority,
-): boolean {
-    if (density === 'minimal') return priority === 'normal' || priority === 'low'
-    if (density === 'compact') return priority === 'low'
-    return false
-}
-
 export interface DocumentHomeRibbonAvailability {
     readonly font: string | null
     readonly paragraph: string | null
-    readonly style: string | null
     readonly edit: null
     readonly block: string | null
 }
@@ -60,15 +48,11 @@ export function homeRibbonGroupAvailability(
     const isManaged = Boolean(node?.managed)
     const isRoot = node?.attributes['data-fc-editor-root'] !== undefined
     const supportsText = Boolean(node?.managed && isInlineFormatNodeKind(node.kind))
-    const supportsSemanticStyle = Boolean(
-        node?.managed && !isRoot && ['heading', 'list', 'list-item'].includes(node.kind),
-    )
     const selectionReason = node ? '当前节点不支持此组命令' : '先选择一个文档节点'
 
     return {
         font: supportsText ? null : selectionReason,
         paragraph: supportsText ? null : selectionReason,
-        style: supportsSemanticStyle ? null : selectionReason,
         edit: null,
         block: isManaged && !isRoot ? null : isRoot ? '固定页面根不能移动或删除' : selectionReason,
     }

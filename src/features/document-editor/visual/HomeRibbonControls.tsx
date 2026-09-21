@@ -247,14 +247,6 @@ export function HomeRibbonControls({
                     <RibbonUnavailable label="段落对齐" reason={availability.paragraph ?? '当前节点不支持段落命令'} />
                 )}
             </DocumentRibbonGroup>
-            <DocumentRibbonGroup
-                disabledReason={availability.style}
-                label="样式"
-                priority={DOCUMENT_HOME_RIBBON_PRIORITIES.style}
-                slot="style"
-            >
-                <RibbonUnavailable label="语义样式" reason={availability.style ?? '当前样式页签尚未接入'} />
-            </DocumentRibbonGroup>
             <DocumentRibbonGroup label="编辑" priority={DOCUMENT_HOME_RIBBON_PRIORITIES.edit} slot="edit">
                 <DocumentRibbonCommand
                     disabled={!onFind}
