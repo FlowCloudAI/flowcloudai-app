@@ -1,12 +1,13 @@
 // 本组件把画布的可信文字选区绑定到现有 text-range 检查与属性意图；不接触草稿或源码。
 
-import {Bold, Eraser, Italic, Underline} from 'lucide-react'
+import {Bold, Eraser, Italic, Strikethrough, Underline} from 'lucide-react'
 import {Select} from 'flowcloudai-ui'
 import type {KernelTextRangeInspectionRequest} from '../../page-document/application/documentKernelDraftRuntime.ts'
 import type {RibbonApplyKernelEntry, RibbonInspectTextRange} from './HomeRibbonControls.tsx'
 import {DocumentRibbonCommand, DocumentRibbonGroup, DocumentRibbonRows} from './DocumentOfficeRibbon.tsx'
 import {
     createRibbonTextRangePropertyRequest,
+    toggleRibbonTextDecoration,
     type RibbonInlineProperty,
     type RibbonTextRange,
 } from './ribbonKernelBinding.ts'
@@ -78,13 +79,6 @@ function isMixedValue(
     return inspection.inspection.properties[property]?.valueState.kind === 'mixed'
 }
 
-function toggledDecoration(value: string | null): string {
-    const tokens = new Set((value ?? '').split(/\s+/u).filter(token => token && token !== 'none'))
-    if (tokens.has('underline')) tokens.delete('underline')
-    else tokens.add('underline')
-    return ['underline', 'line-through'].filter(token => tokens.has(token)).join(' ') || 'none'
-}
-
 export function InlineRibbonStyleControls({
     range,
     applyKernelEntry,
@@ -132,7 +126,8 @@ export function InlineRibbonStyleControls({
                     <DocumentRibbonCommand active={style === 'italic'} disabled={!enabled} icon={Italic} label="斜体" onClick={() => apply('font-style', style === 'italic' ? 'normal' : 'italic', '切换选区斜体')} title={reason ?? '切换选区斜体'} />
                 </>}
                 second={<>
-                    <DocumentRibbonCommand active={(decoration ?? '').split(/\s+/u).includes('underline')} disabled={!enabled} icon={Underline} label="下划线" onClick={() => apply('text-decoration-line', toggledDecoration(decoration), '切换选区下划线')} title={reason ?? '切换选区下划线'} />
+                    <DocumentRibbonCommand active={(decoration ?? '').split(/\s+/u).includes('underline')} disabled={!enabled} icon={Underline} label="下划线" onClick={() => apply('text-decoration-line', toggleRibbonTextDecoration(decoration, 'underline'), '切换选区下划线')} title={reason ?? '切换选区下划线'} />
+                    <DocumentRibbonCommand active={(decoration ?? '').split(/\s+/u).includes('line-through')} disabled={!enabled} icon={Strikethrough} label="删除线" onClick={() => apply('text-decoration-line', toggleRibbonTextDecoration(decoration, 'line-through'), '切换选区删除线')} title={reason ?? '切换选区删除线'} />
                     <Select
                         aria-label="选区文字颜色"
                         disabled={!enabled}

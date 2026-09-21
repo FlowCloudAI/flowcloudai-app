@@ -6,6 +6,7 @@ import {utf16Range, type ComponentHandle} from '../domain/kernel/index.ts'
 import {
     createRibbonPropertyRequest,
     createRibbonTextRangePropertyRequest,
+    toggleRibbonTextDecoration,
 } from '../../document-editor/visual/ribbonKernelBinding.ts'
 import {refreshCanvasTextSelection} from '../canvas/runtime/inputPolicy.ts'
 
@@ -132,6 +133,26 @@ test('行内样式功能区按当前档位读取且始终写入 inline 通道', 
         assert.equal(intent.readContext.viewport, styleContext)
         assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
     }
+})
+
+test('所选文字删除线与下划线独立切换并写入同一 inline 装饰声明', () => {
+    const range = {nodeId: NODE_ID, from: 0, to: 2, expected: '文字'} as const
+    const withBoth = toggleRibbonTextDecoration('underline', 'line-through')
+    assert.equal(withBoth, 'underline line-through')
+    assert.equal(toggleRibbonTextDecoration(withBoth, 'underline'), 'line-through')
+    assert.equal(toggleRibbonTextDecoration(withBoth, 'line-through'), 'underline')
+
+    const intent = createRibbonTextRangePropertyRequest(
+        range,
+        'text-decoration-line',
+        withBoth,
+        'mobile',
+        () => 'inline-decoration-request',
+    ).createIntents(new Map([[NODE_ID, handle()]]))[0]
+    assert.equal(intent?.kind, 'edit-property')
+    if (intent?.kind !== 'edit-property') return
+    assert.deepEqual(intent.action, {kind: 'set-value', value: 'underline line-through'})
+    assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'inline'}})
 })
 
 test('写回重采集后同一文字选区可连续发出两次行内样式请求', () => {

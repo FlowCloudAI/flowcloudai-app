@@ -32,6 +32,18 @@ export type RibbonInlineProperty =
     | 'text-decoration-line'
     | 'color'
 
+export type RibbonTextDecoration = 'underline' | 'line-through'
+
+export function toggleRibbonTextDecoration(
+    value: string | null,
+    decoration: RibbonTextDecoration,
+): string {
+    const tokens = new Set((value ?? '').split(/\s+/u).filter(token => token && token !== 'none'))
+    if (tokens.has(decoration)) tokens.delete(decoration)
+    else tokens.add(decoration)
+    return ['underline', 'line-through'].filter(token => tokens.has(token)).join(' ') || 'none'
+}
+
 function inlineReadContext(styleContext: 'mobile' | 'desktop'): ReadContext {
     // 行内目的地不分档；viewport 只描述作者当前所见区间，供回读和影响分析使用。
     return Object.freeze({
