@@ -1,4 +1,4 @@
-import {type ReactNode, useId} from 'react'
+import {type ReactNode, type RefObject, useId} from 'react'
 import {Button} from 'flowcloudai-ui'
 import Overlay from './Overlay'
 
@@ -8,6 +8,8 @@ export interface FloatingPanelProps {
     dismissible?: boolean
     /** 输入建议等浮层不夺取编辑焦点，也不锁定页面滚动。 */
     passive?: boolean
+    /** 提供触发器后改为贴靠式浮层；省略时维持原有居中面板。 */
+    anchorRef?: RefObject<HTMLElement | null>
     /** 浮层背板附加类名，用于全屏等页面级布局。 */
     layerClassName?: string
     className?: string
@@ -21,7 +23,7 @@ export interface FloatingPanelProps {
 }
 
 /**
- * 浮动面板：四边不挨屏、居中、点背板可关闭。基于 Overlay。
+ * 浮动面板：默认居中；提供 anchorRef 时贴近触发器并自动避让视口边缘。基于 Overlay。
  */
 export default function FloatingPanel({
     title,
@@ -31,6 +33,7 @@ export default function FloatingPanel({
     labelledBy,
     closeLabel = '关闭',
     showCloseButton,
+    anchorRef,
     children,
     ...props
 }: FloatingPanelProps) {
@@ -41,7 +44,8 @@ export default function FloatingPanel({
 
     return (
         <Overlay
-            variant="floating"
+            variant={anchorRef ? 'anchored' : 'floating'}
+            anchorRef={anchorRef}
             onClose={onClose}
             dismissible={dismissible}
             ariaLabel={titleId ? undefined : ariaLabel}

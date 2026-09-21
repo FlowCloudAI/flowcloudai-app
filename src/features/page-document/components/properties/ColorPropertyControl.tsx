@@ -112,6 +112,7 @@ export function ColorPropertyControl({
     const [brightness, setBrightness] = useState(initialHsv.value)
     const [hexDraft, setHexDraft] = useState(pickerHex(initialColor.value))
     const [error, setError] = useState<string | null>(null)
+    const triggerAnchorRef = useRef<HTMLSpanElement>(null)
     const interactionRef = useRef<string | null>(null)
     const colorRef = useRef(color)
     const pendingFlushRef = useRef(false)
@@ -212,32 +213,35 @@ export function ColorPropertyControl({
             {!sourceColor && (field.localValue ?? field.value) && (
                 <p className="page-document-property__message">复杂源码值会原样保留，请在代码模式调整。</p>
             )}
-            <Button
-                aria-label={`设置${field.label}`}
-                aria-expanded={open}
-                className="page-document-color-trigger"
-                disabled={field.disabled}
-                iconOnly
-                size="sm"
-                title={`设置${field.label}`}
-                variant="outline"
-                onClick={() => {
-                    if (open) close()
-                    else {
-                        interactionRef.current = `page-color-${crypto.randomUUID()}`
-                        setOpen(true)
-                    }
-                }}
-            >
-                <span
-                    aria-hidden="true"
-                    style={{
-                        '--page-document-color-preview': previewColor(sourceColor?.value ?? 'transparent'),
-                        '--page-document-color-opacity': (sourceColor?.opacity ?? 100) / 100,
-                    } as CSSProperties}
-                />
-            </Button>
+            <span className="page-document-color-trigger-anchor" ref={triggerAnchorRef}>
+                <Button
+                    aria-label={`设置${field.label}`}
+                    aria-expanded={open}
+                    className="page-document-color-trigger"
+                    disabled={field.disabled}
+                    iconOnly
+                    size="sm"
+                    title={`设置${field.label}`}
+                    variant="outline"
+                    onClick={() => {
+                        if (open) close()
+                        else {
+                            interactionRef.current = `page-color-${crypto.randomUUID()}`
+                            setOpen(true)
+                        }
+                    }}
+                >
+                    <span
+                        aria-hidden="true"
+                        style={{
+                            '--page-document-color-preview': previewColor(sourceColor?.value ?? 'transparent'),
+                            '--page-document-color-opacity': (sourceColor?.opacity ?? 100) / 100,
+                        } as CSSProperties}
+                    />
+                </Button>
+            </span>
             <FloatingPanel
+                anchorRef={triggerAnchorRef}
                 ariaLabel={`${field.label}色板`}
                 className="page-document-color-floating-panel"
                 open={open}

@@ -186,6 +186,8 @@ describe('page document editor integration boundary', () => {
         )
 
         assert.match(color, /<FloatingPanel[\s\S]*passive[\s\S]*page-document-color-popover/u)
+        assert.match(color, /<FloatingPanel[\s\S]*anchorRef=\{triggerAnchorRef\}/u)
+        assert.match(overlay, /variant !== 'anchored'[\s\S]*resolveAnchoredOverlayPosition/u)
         assert.match(overlay, /createPortal\([\s\S]*document\.body/u)
         assert.doesNotMatch(color, /type="color"/u)
         assert.match(color, /\{fallbackLabel\}<\/Button>[\s\S]*<strong>主题色<\/strong>/u)
@@ -290,6 +292,7 @@ describe('page document editor integration boundary', () => {
         assert.match(ribbon, /<ArrowDownRight size=\{10\}/u)
         assert.match(ribbonCss, /\.document-ribbon-tabs\s*\{[^}]*overflow:\s*hidden/u)
         assert.match(ribbonCss, /\.document-ribbon-command\.is-icon-only > span/u)
+        assert.match(ribbonCss, /\.document-ribbon-group-content \.document-ribbon-node-color \.page-document-color-trigger\.fc-btn\s*\{[^}]*width:\s*var\(--document-ribbon-control-height\)[^}]*height:\s*var\(--document-ribbon-control-height\)/u)
         assert.doesNotMatch(ribbonCss, /\.document-ribbon-group-trigger|\.document-ribbon-group-menu/u)
         assert.doesNotMatch(home, /document-ribbon-control-status/u)
         assert.doesNotMatch(home, /label="样式"/u)

@@ -38,6 +38,15 @@
         max(var(--fc-space-lg), env(safe-area-inset-left, 0px));
 }
 
+/* 锚定：portal 仍覆盖完整视口，但面板贴近触发器，定位数值由 Overlay 统一计算。 */
+.fc-overlay--anchored {
+    --fc-overlay-anchor-gap: var(--fc-space-xs);
+    --fc-overlay-anchor-edge: var(--fc-space-sm);
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 0;
+}
+
 /* 上滑：贴底铺满，底部留安全区。变体组件后续接入。 */
 .fc-overlay--sheet {
     /*
@@ -95,7 +104,8 @@
     overflow: hidden;
 }
 
-.fc-overlay__panel--floating {
+.fc-overlay__panel--floating,
+.fc-overlay__panel--anchored {
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -103,6 +113,24 @@
     box-shadow: var(--fc-shadow-lg);
     backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+}
+
+.fc-overlay__panel--anchored {
+    position: fixed;
+    top: var(--fc-overlay-anchor-top);
+    left: var(--fc-overlay-anchor-left);
+    max-width: var(--fc-overlay-anchor-max-width);
+    max-height: var(--fc-overlay-anchor-max-height);
+    visibility: hidden;
+    transform-origin: top left;
+}
+
+.fc-overlay__panel--anchored[data-anchor-side='top'] {
+    transform-origin: bottom left;
+}
+
+.fc-overlay__panel--anchored[data-positioned='true'] {
+    visibility: visible;
 }
 
 .fc-floating-panel__header {
@@ -133,7 +161,8 @@
 }
 
 /* 进场：浮动轻微放大淡入；上滑从底部滑入。 */
-.fc-overlay--floating .fc-overlay__panel {
+.fc-overlay--floating .fc-overlay__panel,
+.fc-overlay--anchored .fc-overlay__panel {
     transform: scale(0.96);
     opacity: 0.4;
 }

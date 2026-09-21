@@ -2,9 +2,19 @@
  * 通用浮层外壳：统一 portal、动效、焦点恢复、滚动锁与关闭入口。
  * Alert 模态拥有更高关闭优先级，具体判定由同目录纯逻辑模块提供。
  */
-import {type CSSProperties, type ReactNode, useEffect, useRef, useState} from 'react'
+import {
+    type CSSProperties,
+    type ReactNode,
+    type RefObject,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from 'react'
 import {createPortal} from 'react-dom'
 import {useAlertModalState} from 'flowcloudai-ui'
+import {resolveAnchoredOverlayPosition, type AnchoredOverlayPosition} from './anchoredOverlayPosition'
 import {shouldDismissOverlay} from './overlayDismissalModel'
 import {pushOverlay, removeOverlay} from './overlayStack'
 import './Overlay.css'
@@ -13,9 +23,15 @@ import './Overlay.css'
 const FLOATING_TRANSITION_MS = 100
 const SHEET_TRANSITION_MS = 250
 
-type OverlayStyle = CSSProperties & {'--fc-overlay-transition-duration': string}
+type OverlayStyle = CSSProperties & {
+    '--fc-overlay-transition-duration': string
+    '--fc-overlay-anchor-top'?: string
+    '--fc-overlay-anchor-left'?: string
+    '--fc-overlay-anchor-max-width'?: string
+    '--fc-overlay-anchor-max-height'?: string
+}
 
-type OverlayVariant = 'floating' | 'sheet' | 'fullscreen'
+type OverlayVariant = 'floating' | 'anchored' | 'sheet' | 'fullscreen'
 
 interface OverlayProps {
     open: boolean
@@ -25,6 +41,8 @@ interface OverlayProps {
     /** 非模态建议浮层保留原输入焦点，不遮挡背景交互。 */
     passive?: boolean
     variant?: OverlayVariant
+    /** anchored 变体的触发器；面板会跟随它定位并在视口边缘自动翻转。 */
+    anchorRef?: RefObject<HTMLElement | null>
     /** 浮层外壳附加类名，用于变体组件调整背板或安全区。 */
     layerClassName?: string
     /** 浮层面板附加类名，用于承载自定义卡片样式。 */
@@ -45,6 +63,7 @@ export default function Overlay({
     dismissible = true,
     passive = false,
     variant = 'floating',
+    anchorRef,
     layerClassName,
     className,
     ariaLabel,
@@ -57,6 +76,7 @@ export default function Overlay({
     const [mounted, setMounted] = useState(open)
     const [active, setActive] = useState(false)
     const [overlayTop, setOverlayTop] = useState(0)
+    const [anchorPosition, setAnchorPosition] = useState<AnchoredOverlayPosition | null>(null)
     const panelRef = useRef<HTMLDivElement>(null)
     // 用 ref 持有最新回调与可关闭标志，使下方副作用只依赖 open，避免 dismissible 抖动重跑。
     // 在 effect 中同步（不在渲染期写 ref，遵循 react-hooks/refs）。
@@ -133,6 +153,50 @@ export default function Overlay({
         }
     }, [open, variant])
 
+    const updateAnchorPosition = useCallback(() => {
+        if (variant !== 'anchored' || !open || !anchorRef?.current || !panelRef.current) return
+        const anchorRect = anchorRef.current.getBoundingClientRect()
+        const panelRect = panelRef.current.getBoundingClientRect()
+        const panelStyle = getComputedStyle(panelRef.current)
+        const next = resolveAnchoredOverlayPosition({
+            anchor: anchorRect,
+            panelWidth: panelRect.width,
+            panelHeight: panelRect.height,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            gap: readCssPixel(panelStyle, '--fc-overlay-anchor-gap', 4),
+            edge: readCssPixel(panelStyle, '--fc-overlay-anchor-edge', 8),
+        })
+        setAnchorPosition(current => positionsEqual(current, next) ? current : next)
+    }, [anchorRef, open, variant])
+
+    // 每次内容重绘后先在布局阶段校正，避免面板扩展“更多颜色”时闪到旧位置。
+    useLayoutEffect(() => {
+        if (mounted) updateAnchorPosition()
+    }, [mounted, updateAnchorPosition])
+
+    useEffect(() => {
+        if (variant !== 'anchored' || !open || !anchorRef?.current || !panelRef.current) return
+        const anchor = anchorRef.current
+        const panel = panelRef.current
+        let frame = requestAnimationFrame(updateAnchorPosition)
+        const scheduleUpdate = () => {
+            cancelAnimationFrame(frame)
+            frame = requestAnimationFrame(updateAnchorPosition)
+        }
+        const observer = new ResizeObserver(scheduleUpdate)
+        observer.observe(anchor)
+        observer.observe(panel)
+        window.addEventListener('resize', scheduleUpdate)
+        window.addEventListener('scroll', scheduleUpdate, true)
+        return () => {
+            cancelAnimationFrame(frame)
+            observer.disconnect()
+            window.removeEventListener('resize', scheduleUpdate)
+            window.removeEventListener('scroll', scheduleUpdate, true)
+        }
+    }, [anchorRef, open, updateAnchorPosition, variant])
+
     // 开启期间：注册返回栈、捕获阶段 Esc（优先于页面返回）、锁定滚动、聚焦面板。
     useEffect(() => {
         if (!open) return
@@ -183,6 +247,12 @@ export default function Overlay({
     const overlayStyle: OverlayStyle = {
         '--fc-overlay-transition-duration': `${transitionDurationMs}ms`,
         ...(variant === 'floating' ? {top: overlayTop} : {}),
+        ...(variant === 'anchored' && anchorPosition ? {
+            '--fc-overlay-anchor-top': `${anchorPosition.top}px`,
+            '--fc-overlay-anchor-left': `${anchorPosition.left}px`,
+            '--fc-overlay-anchor-max-width': `${anchorPosition.maxWidth}px`,
+            '--fc-overlay-anchor-max-height': `${anchorPosition.maxHeight}px`,
+        } : {}),
     }
 
     return createPortal(
@@ -206,6 +276,8 @@ export default function Overlay({
                 aria-label={ariaLabel}
                 aria-labelledby={labelledBy}
                 data-tour-id={dataTourId}
+                data-anchor-side={anchorPosition?.side}
+                data-positioned={variant !== 'anchored' || anchorPosition ? 'true' : 'false'}
                 tabIndex={-1}
                 onMouseDown={(e) => e.stopPropagation()}
             >
@@ -214,6 +286,23 @@ export default function Overlay({
         </div>,
         document.body,
     )
+}
+
+function readCssPixel(style: CSSStyleDeclaration, property: string, fallback: number): number {
+    const value = Number.parseFloat(style.getPropertyValue(property))
+    return Number.isFinite(value) ? value : fallback
+}
+
+function positionsEqual(
+    current: AnchoredOverlayPosition | null,
+    next: AnchoredOverlayPosition,
+): boolean {
+    return current !== null &&
+        current.top === next.top &&
+        current.left === next.left &&
+        current.maxWidth === next.maxWidth &&
+        current.maxHeight === next.maxHeight &&
+        current.side === next.side
 }
 
 function getOverlayTop(): number {

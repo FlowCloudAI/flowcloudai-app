@@ -484,6 +484,11 @@
     justify-self: start;
 }
 
+.page-document-color-trigger-anchor {
+    display: inline-flex;
+    justify-self: start;
+}
+
 .page-document-color-trigger > span {
     display: block;
     width: 100%;
@@ -496,13 +501,13 @@
 
 .page-document-color-floating-panel {
     --page-document-dock-control-height: var(--fc-control-height-sm);
-    width: min(calc(var(--fc-control-height-sm) * 10), 100%);
-    padding: var(--fc-space-md);
+    width: min(calc(var(--fc-control-height-sm) * 7), calc(100vw - var(--fc-space-lg)));
+    padding: var(--fc-space-sm);
 }
 
 .page-document-color-popover {
     display: grid;
-    gap: var(--fc-space-sm);
+    gap: var(--fc-space-xs);
 }
 
 .page-document-color-popover > strong {
@@ -517,6 +522,8 @@
 }
 
 .page-document-color-cell.fc-btn {
+    width: 100%;
+    min-height: var(--fc-control-height-sm);
     min-width: 0;
     padding: var(--fc-space-xs);
 }
@@ -549,6 +556,7 @@
 
 .page-document-color-clear.fc-btn {
     width: 100%;
+    min-height: var(--fc-control-height-sm);
     justify-content: flex-start;
 }
 

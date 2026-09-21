@@ -285,6 +285,22 @@
     margin: 0;
 }
 
+/* 属性 Dock 的色块尺寸依赖 Dock 局部变量；嵌入功能区时必须按功能区行高重新定成正方形。 */
+.document-ribbon-group-content .document-ribbon-node-color .page-document-color-trigger.fc-btn {
+    width: var(--document-ribbon-control-height);
+    min-width: var(--document-ribbon-control-height);
+    height: var(--document-ribbon-control-height);
+    min-height: var(--document-ribbon-control-height);
+    padding: var(--fc-space-xs);
+    aspect-ratio: 1;
+}
+
+.document-ribbon-node-color .page-document-color-trigger > span {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1;
+}
+
 .document-ribbon-alignment button,
 .document-ribbon-font-weight button {
     display: grid;
