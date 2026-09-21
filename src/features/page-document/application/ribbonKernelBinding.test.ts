@@ -115,6 +115,20 @@ test('段落缩进只沿固定档位增减并写入当前断点', () => {
     })
 })
 
+test('字体组行高档位写入当前节点受管规则', () => {
+    const intent = createRibbonPropertyRequest(
+        NODE_ID,
+        'line-height',
+        {kind: 'numeric', value: 1.8, unit: '', numberText: '1.8'},
+        'mobile',
+    ).createIntents(new Map([[NODE_ID, handle()]]))[0]
+    assert.equal(intent?.kind, 'edit-property')
+    if (intent?.kind !== 'edit-property') return
+    assert.equal(intent.property, 'line-height')
+    assert.deepEqual(intent.action, {kind: 'set-value', value: '1.8'})
+    assert.deepEqual(intent.destination, {scope: 'entry', channel: {kind: 'base-rule'}})
+})
+
 test('断点切换经功能区绑定写入移动基础与桌面条件通道', () => {
     const bindings = new Map([[NODE_ID, handle()]])
     const mobile = createRibbonPropertyRequest(

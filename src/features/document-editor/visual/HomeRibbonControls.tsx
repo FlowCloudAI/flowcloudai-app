@@ -62,6 +62,12 @@ export interface HomeRibbonControlsProps {
 }
 
 const FONT_SIZE_OPTIONS = ['12px', '14px', '16px', '18px', '20px', '24px', '32px'] as const
+const LINE_HEIGHT_OPTIONS = Object.freeze([
+    {value: '1.3', label: '紧凑'},
+    {value: '1.6', label: '标准'},
+    {value: '1.8', label: '宽松'},
+    {value: '2', label: '舒展'},
+])
 const ALIGNMENT_OPTIONS = [
     {value: 'left', label: '左对齐', icon: AlignLeft},
     {value: 'center', label: '居中', icon: AlignCenter},
@@ -93,16 +99,19 @@ function FontControls({
     states,
     applyKernelEntry,
     styleContext,
+    onOpenDetails,
 }: {
     node: LayerProjectionNode
     states: readonly VisualPropertyState[]
     applyKernelEntry: RibbonApplyKernelEntry
     styleContext: 'mobile' | 'desktop'
+    onOpenDetails?: () => void
 }) {
     const size = stateFor(states, 'font-size')
     const weight = stateFor(states, 'font-weight')
     const color = stateFor(states, 'color')
     const backgroundColor = stateFor(states, 'background-color')
+    const lineHeight = stateFor(states, 'line-height')
     const sizeValue = propertyValue(size)
     const selectedSize = FONT_SIZE_OPTIONS.includes(sizeValue as (typeof FONT_SIZE_OPTIONS)[number])
         ? sizeValue
@@ -110,6 +119,10 @@ function FontControls({
     const weightValue = propertyValue(weight)
     const canWrite = Boolean(size && !size.disabled)
     const canWeight = Boolean(weight && !weight.disabled)
+    const lineHeightValue = propertyValue(lineHeight)
+    const selectedLineHeight = LINE_HEIGHT_OPTIONS.some(option => option.value === lineHeightValue)
+        ? lineHeightValue
+        : 'custom'
     const apply = (property: VisualPropertyName, value: VisualPropertyEditValue, label: string) => {
         return applyKernelEntry(createRibbonPropertyRequest(node.id, property, value, styleContext), label, {immediate: true})
     }
@@ -151,18 +164,42 @@ function FontControls({
                             <Bold size={15} />
                         </button>
                     </div>
-                    <button
-                        aria-label="清除"
-                        disabled={!canWrite || size?.localValue === null}
-                        onClick={() => void apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
-                        title={size?.clearTitle ?? '清除后恢复默认字号。'}
-                        type="button"
-                    >
-                        <Eraser size={14} />
-                    </button>
+                    <Select
+                        aria-label="节点行高"
+                        disabled={Boolean(lineHeight?.disabled)}
+                        onValueChange={value => {
+                            const next = String(value)
+                            if (next === 'custom') {
+                                onOpenDetails?.()
+                                return
+                            }
+                            void apply('line-height', {
+                                kind: 'numeric',
+                                value: Number(next),
+                                unit: '',
+                                numberText: next,
+                            }, '修改节点行高')
+                        }}
+                        options={[
+                            ...LINE_HEIGHT_OPTIONS,
+                            {value: 'custom', label: '自定义…', disabled: !onOpenDetails},
+                        ]}
+                        radius="sm"
+                        title={lineHeight?.reason ?? '节点行高'}
+                        value={selectedLineHeight}
+                    />
                 </>
             }
             second={<>
+                <button
+                    aria-label="清除节点字号"
+                    disabled={!canWrite || size?.localValue === null}
+                    onClick={() => void apply('font-size', {kind: 'clear-override'}, '清除整段字号')}
+                    title={size?.clearTitle ?? '清除后恢复默认字号。'}
+                    type="button"
+                >
+                    <Eraser size={14} />
+                </button>
                 {color && <div className="document-ribbon-node-color">
                     <span>节点文字</span>
                     <ColorPropertyControl
@@ -294,7 +331,13 @@ export function HomeRibbonControls({
                 wide
             >
                 {selected && editableText ? (
-                    <FontControls node={selected} states={states} applyKernelEntry={applyKernelEntry} styleContext={styleContext} />
+                    <FontControls
+                        node={selected}
+                        states={states}
+                        applyKernelEntry={applyKernelEntry}
+                        styleContext={styleContext}
+                        onOpenDetails={onOpenDetails}
+                    />
                 ) : (
                     <RibbonUnavailable label="整段文字" reason={groupReason} />
                 )}
