@@ -5,7 +5,6 @@ import {Select} from 'flowcloudai-ui'
 import type {KernelTextRangeInspectionRequest} from '../../page-document/application/documentKernelDraftRuntime.ts'
 import {
     serializeVisualPropertyValue,
-    type VisualPropertyName,
     type VisualPropertyState,
 } from '../../page-document/application/visualPropertyEditing.ts'
 import type {CanvasTypingStyleProperty} from '../../page-document/application/canvasInputOperation.ts'
@@ -17,6 +16,8 @@ import {
     createRibbonTextRangePropertyRequest,
     resolveRibbonFontScope,
     ribbonCaretInspectionRange,
+    ribbonFontControlsAvailable,
+    ribbonInlineDisplayValue,
     toggleRibbonTextDecoration,
     type RibbonFontScope,
     type RibbonInlineProperty,
@@ -25,15 +26,14 @@ import {
 
 export interface InlineRibbonStyleControlsProps {
     readonly node: LayerProjectionNode
-    readonly blockStates: readonly VisualPropertyState[]
     readonly range: RibbonTextRange | null
     readonly typingStyles: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>
     readonly applyKernelEntry: RibbonApplyKernelEntry
     readonly inspectTextRange: RibbonInspectTextRange
     readonly styleContext: 'mobile' | 'desktop'
     readonly onOpenDetails?: () => void
-    readonly onTypingStyleChange: (property: CanvasTypingStyleProperty, value: string) => void
-    readonly onTypingStylesReset: (values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>) => void
+    readonly onTypingStyleChange: (property: CanvasTypingStyleProperty, value: string | null) => void
+    readonly onTypingStylesReset: () => void
 }
 
 const PROPERTIES = Object.freeze([
@@ -55,18 +55,6 @@ const FONT_SIZE_OPTIONS = Object.freeze([
     {value: '32px', label: '32'},
 ])
 
-function stateFor(
-    states: readonly VisualPropertyState[],
-    property: VisualPropertyName,
-): VisualPropertyState | null {
-    return states.find(item => item.property === property) ?? null
-}
-
-function blockValue(states: readonly VisualPropertyState[], property: VisualPropertyName): string {
-    const state = stateFor(states, property)
-    return (state?.localValue ?? state?.value ?? '').trim()
-}
-
 function inspect(
     range: RibbonTextRange,
     inspectTextRange: RibbonInspectTextRange,
@@ -85,65 +73,57 @@ function inspect(
     return inspectTextRange(request)
 }
 
-function uniformValue(
+interface InlineComputedSnapshot {
+    readonly values: Readonly<Partial<Record<RibbonInlineProperty, string | null>>>
+    readonly mixed: ReadonlySet<RibbonInlineProperty>
+    readonly managedOverrides: ReadonlySet<RibbonInlineProperty>
+}
+
+function computedSnapshot(
     inspection: ReturnType<RibbonInspectTextRange> | null,
-    property: RibbonInlineProperty,
-): string | null {
+): InlineComputedSnapshot | null {
     if (inspection?.status !== 'ready') return null
-    const state = inspection.inspection.properties[property]?.valueState
-    return state?.kind === 'uniform' ? state.value : null
-}
-
-function isMixedValue(
-    inspection: ReturnType<RibbonInspectTextRange> | null,
-    property: RibbonInlineProperty,
-): boolean {
-    if (inspection?.status !== 'ready') return false
-    return inspection.inspection.properties[property]?.valueState.kind === 'mixed'
-}
-
-function hasManagedOverride(
-    inspection: ReturnType<RibbonInspectTextRange> | null,
-    property: RibbonInlineProperty,
-): boolean {
-    if (inspection?.status !== 'ready') return false
-    const segments = inspection.inspection.properties[property]?.segments ?? []
-    return segments.length > 0 && segments.every(segment => segment.managedOverride)
+    const values: Partial<Record<RibbonInlineProperty, string | null>> = {}
+    const mixed = new Set<RibbonInlineProperty>()
+    const managedOverrides = new Set<RibbonInlineProperty>()
+    for (const property of PROPERTIES) {
+        const inspected = inspection.inspection.properties[property]
+        if (inspected?.valueState.kind === 'uniform') values[property] = inspected.valueState.value
+        else if (inspected?.valueState.kind === 'mixed') mixed.add(property)
+        const segments = inspected?.segments ?? []
+        if (segments.length > 0 && segments.every(segment => segment.managedOverride)) {
+            managedOverrides.add(property)
+        }
+    }
+    return Object.freeze({
+        values: Object.freeze(values),
+        mixed,
+        managedOverrides,
+    })
 }
 
 function colorField(
-    states: readonly VisualPropertyState[],
-    inspection: ReturnType<RibbonInspectTextRange> | null,
-    typingStyles: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>,
+    value: string | null,
+    mixed: boolean,
+    managedOverride: boolean,
+    storedMark: boolean,
     property: 'color' | 'background-color',
     scope: RibbonFontScope,
+    enabled: boolean,
 ): VisualPropertyState {
-    const block = stateFor(states, property)
-    if (scope === 'inactive' && block) {
-        return Object.freeze({
-            ...block,
-            disabled: true,
-            reason: '在画布中放置光标或选择文字后可用。',
-        })
-    }
-    const pending = scope === 'typing' ? typingStyles[property] : undefined
-    const inspected = uniformValue(inspection, property)
-    const value = pending ?? inspected ?? block?.value ?? (property === 'color' ? 'currentcolor' : 'transparent')
-    const mixed = isMixedValue(inspection, property)
-    const localValue = scope === 'typing'
-        ? pending ?? inspected
-        : hasManagedOverride(inspection, property) ? inspected : null
+    const resolved = value ?? (property === 'color' ? 'currentcolor' : 'transparent')
+    const localValue = scope === 'typing' ? storedMark ? resolved : null : managedOverride ? resolved : null
     return Object.freeze({
         property,
         label: property === 'color' ? '文字颜色' : '文字底色',
         group: 'appearance',
-        value,
+        value: resolved,
         localValue,
-        sourceState: mixed ? 'mixed' : pending ? 'local' : 'inherited',
+        sourceState: mixed ? 'mixed' : storedMark ? 'local' : 'inherited',
         statusText: mixed ? '多种值' : scope === 'typing' ? '后续输入' : '选区',
-        clearTitle: scope === 'typing' ? '恢复文本块基础颜色' : '清除局部颜色',
-        disabled: false,
-        reason: null,
+        clearTitle: scope === 'typing' ? '清除待输入颜色并继承光标处样式' : '清除局部颜色',
+        disabled: !enabled,
+        reason: enabled ? null : '在画布中放置光标或选择文字后可用。',
     })
 }
 
@@ -155,7 +135,6 @@ function scopeLabel(scope: RibbonFontScope): string {
 
 export function InlineRibbonStyleControls({
     node,
-    blockStates,
     range,
     typingStyles,
     applyKernelEntry,
@@ -170,21 +149,19 @@ export function InlineRibbonStyleControls({
         ? range.to > range.from ? range : ribbonCaretInspectionRange(range, node.textContent)
         : null
     const inspection = inspectionRange ? inspect(inspectionRange, inspectTextRange, styleContext) : null
-    const rangeReady = scope === 'typing' && node.textContent.length === 0
-        ? range?.from === 0 && range.to === 0
-        : scope !== 'inactive' && inspection?.status === 'ready'
-    const inlineValue = (property: RibbonInlineProperty): string | null => {
-        const pending = scope === 'typing' ? typingStyles[property] : undefined
-        return pending ?? uniformValue(inspection, property)
-    }
-    const effectiveValue = (property: RibbonInlineProperty): string => {
-        return inlineValue(property) ?? blockValue(blockStates, property as VisualPropertyName)
-    }
+    const computed = computedSnapshot(inspection)
+    const controlsEnabled = ribbonFontControlsAvailable(node.managed, range)
+    const effectiveValue = (property: RibbonInlineProperty): string =>
+        ribbonInlineDisplayValue(
+            scope,
+            computed?.values[property] ?? null,
+            typingStyles[property],
+        ) ?? ''
     const mixed = (property: RibbonInlineProperty): boolean =>
-        scope === 'selection' && isMixedValue(inspection, property)
+        scope === 'selection' && Boolean(computed?.mixed.has(property))
 
     const applyInline = (property: RibbonInlineProperty, value: string | null, label: string) => {
-        if (!range || scope !== 'selection' || !rangeReady) return Promise.resolve(false)
+        if (!range || scope !== 'selection' || !controlsEnabled) return Promise.resolve(false)
         return applyKernelEntry(
             createRibbonTextRangePropertyRequest(range, property, value, styleContext),
             label,
@@ -212,29 +189,38 @@ export function InlineRibbonStyleControls({
     const weight = effectiveValue('font-weight')
     const style = effectiveValue('font-style')
     const decoration = effectiveValue('text-decoration-line')
-    const textColor = colorField(blockStates, inspection, typingStyles, 'color', scope)
-    const backgroundColor = colorField(blockStates, inspection, typingStyles, 'background-color', scope)
+    const textColor = colorField(
+        effectiveValue('color'),
+        mixed('color'),
+        Boolean(computed?.managedOverrides.has('color')),
+        typingStyles.color !== undefined,
+        'color',
+        scope,
+        controlsEnabled,
+    )
+    const backgroundColor = colorField(
+        effectiveValue('background-color'),
+        mixed('background-color'),
+        Boolean(computed?.managedOverrides.has('background-color')),
+        typingStyles['background-color'] !== undefined,
+        'background-color',
+        scope,
+        controlsEnabled,
+    )
     const clear = () => {
         if (scope === 'selection') {
             for (const property of PROPERTIES) void applyInline(property, null, `清除选区${property}`)
             return
         }
         if (scope === 'typing') {
-            onTypingStylesReset({
-                'background-color': blockValue(blockStates, 'background-color') || 'transparent',
-                color: blockValue(blockStates, 'color') || 'currentcolor',
-                'font-size': blockValue(blockStates, 'font-size') || '16px',
-                'font-style': blockValue(blockStates, 'font-style') || 'normal',
-                'font-weight': blockValue(blockStates, 'font-weight') || '400',
-                'text-decoration-line': blockValue(blockStates, 'text-decoration-line') || 'none',
-            })
+            onTypingStylesReset()
             return
         }
     }
 
     return (
         <DocumentRibbonGroup
-            disabledReason={scope === 'selection' && !rangeReady ? '选区已经变化，请重新选择文字。' : null}
+            disabledReason={!controlsEnabled ? '在画布中放置光标或选择文字后可用。' : null}
             label={scopeLabel(scope)}
             onOpenDetails={onOpenDetails}
             priority="essential"
@@ -245,7 +231,7 @@ export function InlineRibbonStyleControls({
                 first={<>
                     <Select
                         aria-label={scope === 'typing' ? '后续输入字号' : scope === 'selection' ? '选区字号' : '文字字号'}
-                        disabled={!rangeReady}
+                        disabled={!controlsEnabled}
                         onValueChange={value => {
                             const next = String(value)
                             if (next === 'current' || next === 'mixed') return
@@ -266,21 +252,21 @@ export function InlineRibbonStyleControls({
                     />
                     <DocumentRibbonCommand
                         active={weight === '700'}
-                        disabled={!rangeReady}
+                        disabled={!controlsEnabled}
                         icon={Bold}
                         label="加粗"
                         onClick={() => void applyValue('font-weight', weight === '700' ? '400' : '700', '切换加粗')}
                     />
                     <DocumentRibbonCommand
                         active={style === 'italic'}
-                        disabled={!rangeReady}
+                        disabled={!controlsEnabled}
                         icon={Italic}
                         label="斜体"
                         onClick={() => void applyValue('font-style', style === 'italic' ? 'normal' : 'italic', '切换斜体')}
                     />
                     <DocumentRibbonCommand
                         active={(decoration || '').split(/\s+/u).includes('underline')}
-                        disabled={!rangeReady}
+                        disabled={!controlsEnabled}
                         icon={Underline}
                         label="下划线"
                         onClick={() => {
@@ -290,7 +276,7 @@ export function InlineRibbonStyleControls({
                     />
                     <DocumentRibbonCommand
                         active={(decoration || '').split(/\s+/u).includes('line-through')}
-                        disabled={!rangeReady}
+                        disabled={!controlsEnabled}
                         icon={Strikethrough}
                         label="删除线"
                         onClick={() => {
@@ -310,7 +296,7 @@ export function InlineRibbonStyleControls({
                                 const serialized = serializeVisualPropertyValue('color', value)
                                 if (scope === 'selection') return applyInline('color', serialized, '修改文字颜色')
                                 if (scope === 'typing') {
-                                    onTypingStyleChange('color', serialized ?? (blockValue(blockStates, 'color') || 'currentcolor'))
+                                    onTypingStyleChange('color', serialized)
                                     return Promise.resolve(true)
                                 }
                                 return Promise.resolve(false)
@@ -327,14 +313,14 @@ export function InlineRibbonStyleControls({
                                 const serialized = serializeVisualPropertyValue('background-color', value)
                                 if (scope === 'selection') return applyInline('background-color', serialized, '修改文字底色')
                                 if (scope === 'typing') {
-                                    onTypingStyleChange('background-color', serialized ?? (blockValue(blockStates, 'background-color') || 'transparent'))
+                                    onTypingStyleChange('background-color', serialized)
                                     return Promise.resolve(true)
                                 }
                                 return Promise.resolve(false)
                             }}
                         />
                     </span>
-                    <DocumentRibbonCommand disabled={!rangeReady} icon={Eraser} label="清除格式" onClick={clear} />
+                    <DocumentRibbonCommand disabled={!controlsEnabled} icon={Eraser} label="清除格式" onClick={clear} />
                 </>}
             />
         </DocumentRibbonGroup>

@@ -35,6 +35,7 @@ test('宿主只展示并转发画布标记集，不再按偏移猜测存活状�
     assert.doesNotMatch(source, /expectedTypingCaretRef|typingStyleRef|current\.caret === message\.from/u)
     assert.match(source, /updateStoredMarks\('merge',/u)
     assert.match(source, /updateStoredMarks\('replace',/u)
+    assert.match(source, /const resetTypingStyles = \(\) =>[\s\S]*?updateStoredMarks\('replace', null\)/u)
     assert.match(undoHandler, /clearTypingContext\(\)[\s\S]*?session\.undo\(\)/u)
     assert.match(redoHandler, /clearTypingContext\(\)[\s\S]*?session\.redo\(\)/u)
     assert.match(contextHandler, /nextContext === editContext[\s\S]*?clearTypingContext\(\)[\s\S]*?setEditContext\(nextContext\)/u)

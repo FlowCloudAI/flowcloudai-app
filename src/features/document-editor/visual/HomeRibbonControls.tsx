@@ -58,8 +58,8 @@ export interface HomeRibbonControlsProps {
     styleContext: 'mobile' | 'desktop'
     onOpenDetails?: () => void
     onRemove?: () => void
-    onTypingStyleChange: (property: CanvasTypingStyleProperty, value: string) => void
-    onTypingStylesReset: (values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>) => void
+    onTypingStyleChange: (property: CanvasTypingStyleProperty, value: string | null) => void
+    onTypingStylesReset: () => void
 }
 
 const LINE_HEIGHT_OPTIONS = Object.freeze([
@@ -220,7 +220,6 @@ export function HomeRibbonControls({
         <>
             {selected && editableText ? <InlineRibbonStyleControls
                 node={selected}
-                blockStates={states}
                 range={activeTextRange?.nodeId === selected.id ? activeTextRange : null}
                 typingStyles={typingStyles}
                 applyKernelEntry={applyKernelEntry}

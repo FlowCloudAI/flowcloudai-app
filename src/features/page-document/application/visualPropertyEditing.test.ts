@@ -223,7 +223,7 @@ describe('visual property editing', () => {
         assert.equal(states.some(item => /本(?:级|档|状态)未设置/u.test(item.statusText)), false)
     })
 
-    it('桌面覆盖清除后经真实内核回落到移动基础值', () => {
+    it('属性任务窗格仍能分档写入节点字号，桌面覆盖清除后回落移动基础', () => {
         const source = snapshot()
         const runtime = createDocumentKernelDraftRuntime()
         let model = createDocumentDraft(source)
@@ -260,6 +260,34 @@ describe('visual property editing', () => {
         assert.equal(desktop?.sourceState, 'other-viewport')
         assert.match(desktop?.statusText ?? '', /继承/u)
         assert.equal(desktop?.clearTitle, '清除后继承移动基础设置。')
+    })
+
+    it('旧词条的节点级字体规则保留在源码中并继续按断点读数', () => {
+        const style = baseStyle().replace(
+            'color: #334455; padding-block-start: 2px;',
+            'color: #334455; font-size: 17px; font-weight: 600; padding-block-start: 2px;',
+        ) + `
+@layer fc-node {
+  @media (min-width: 48rem) {
+    [data-fc-node-id="${PARAGRAPH_ID}"][data-fc-node-kind="paragraph"] { font-size: 23px; }
+  }
+}`
+        const source = snapshot(style)
+        const model = createDocumentDraft(source)
+        const runtime = createDocumentKernelDraftRuntime()
+        const read = (context: 'mobile' | 'desktop') => inspectVisualProperties(
+            paragraph(model),
+            request => runtime.inspectComponent(model, source, request),
+            model.entry.sources['style.css'],
+            context,
+        )
+        const mobile = read('mobile')
+        const desktop = read('desktop')
+
+        assert.equal(mobile.find(item => item.property === 'font-size')?.value, '17px')
+        assert.equal(mobile.find(item => item.property === 'font-weight')?.value, '600')
+        assert.equal(desktop.find(item => item.property === 'font-size')?.value, '23px')
+        assert.equal(model.entry.sources['style.css'], style)
     })
 
     it('属性状态区分默认、继承、多值与复杂源码，清除说明给出真实回退结果', () => {

@@ -137,7 +137,7 @@ describe('page document editor integration boundary', () => {
             'utf8',
         )
         assert.match(inlineRibbon, /sizeMixed[\s\S]*label: '混合'/u)
-        assert.match(inlineRibbon, /isMixedValue\(inspection, property\)/u)
+        assert.match(inlineRibbon, /computed\?\.mixed\.has\(property\)/u)
     })
 
     it('连续属性交互经会话调度且结束与切换节点都会冲刷尾帧', () => {
@@ -308,6 +308,9 @@ describe('page document editor integration boundary', () => {
         assert.match(home, /label="块操作"[\s\S]*label="删除"/u)
         assert.match(font, /字体 · 选区[\s\S]*字体 · 后续输入[\s\S]*return '字体'/u)
         assert.doesNotMatch(font, /createRibbonPropertyRequest/u)
+        assert.doesNotMatch(font, /blockStates|blockValue|pending \?\? inspected/u)
+        assert.match(font, /ribbonInlineDisplayValue/u)
+        assert.match(font, /onTypingStylesReset\(\)/u)
         assert.match(font, /文字颜色[\s\S]*'color'[\s\S]*文字底色[\s\S]*'background-color'/u)
         assert.doesNotMatch(font, /label="所选文字"/u)
         assert.match(home, /aria-label="文本块行高"[\s\S]*修改文本块行高/u)

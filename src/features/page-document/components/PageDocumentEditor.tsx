@@ -400,23 +400,28 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             : null)
     }
 
-    const setTypingStyleProperty = (property: CanvasTypingStyleProperty, value: string) => {
+    const setTypingStyleProperty = (property: CanvasTypingStyleProperty, value: string | null) => {
         if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
-        canvasRef.current?.updateStoredMarks('merge', {
-            styleContext: editContext,
-            values: {[property]: value},
-        })
+        if (value === null) {
+            const values = {...(typingStyle?.nodeId === activeTextRange.nodeId
+                ? typingStyle.storedMarks.values
+                : {})}
+            delete values[property]
+            canvasRef.current?.updateStoredMarks('replace', Object.keys(values).length > 0
+                ? {styleContext: editContext, values}
+                : null)
+        } else {
+            canvasRef.current?.updateStoredMarks('merge', {
+                styleContext: editContext,
+                values: {[property]: value},
+            })
+        }
         requestAnimationFrame(() => canvasRef.current?.focusEditor())
     }
 
-    const resetTypingStyles = (
-        values: Readonly<Partial<Record<CanvasTypingStyleProperty, string>>>,
-    ) => {
+    const resetTypingStyles = () => {
         if (!activeTextRange || activeTextRange.from !== activeTextRange.to) return
-        canvasRef.current?.updateStoredMarks('replace', {
-            styleContext: editContext,
-            values: Object.freeze({...values}),
-        })
+        canvasRef.current?.updateStoredMarks('replace', null)
         requestAnimationFrame(() => canvasRef.current?.focusEditor())
     }
 

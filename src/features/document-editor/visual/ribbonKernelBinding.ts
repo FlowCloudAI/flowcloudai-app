@@ -32,6 +32,23 @@ export function resolveRibbonFontScope(range: RibbonTextRange | null): RibbonFon
     return range.to > range.from ? 'selection' : 'typing'
 }
 
+/** 字体控件的可用性只取决于真实受管文字目标与画布落点，不能由可能滞后的草稿探查代替。 */
+export function ribbonFontControlsAvailable(
+    targetAvailable: boolean,
+    range: RibbonTextRange | null,
+): boolean {
+    return targetAvailable && resolveRibbonFontScope(range) !== 'inactive'
+}
+
+/** 待输入标记是光标计算样式的尚未落盘覆盖；除此之外只显示内核返回的计算值。 */
+export function ribbonInlineDisplayValue(
+    scope: RibbonFontScope,
+    computedValue: string | null,
+    storedMark: string | undefined,
+): string | null {
+    return scope === 'typing' && storedMark !== undefined ? storedMark : computedValue
+}
+
 export type RibbonInlineProperty =
     | 'background-color'
     | 'font-size'
