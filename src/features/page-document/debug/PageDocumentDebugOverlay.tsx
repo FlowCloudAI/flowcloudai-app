@@ -19,11 +19,20 @@ import './PageDocumentDebugOverlay.css'
 
 const VISIBLE_LINES = 400
 
+/** 草稿 article.html 是嵌套 <template> 的补丁格式；querySelector 不进入 template.content，必须逐层查找。 */
 function nodeSource(html: string, nodeId: string): string {
     try {
         const parsed = new DOMParser().parseFromString(html, 'text/html')
         const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(nodeId) : nodeId
-        return parsed.querySelector(`[data-fc-node-id="${escaped}"]`)?.outerHTML ?? '(草稿中找不到该节点)'
+        const selector = `[data-fc-node-id="${escaped}"]`
+        const pending: ParentNode[] = [parsed]
+        while (pending.length > 0) {
+            const scope = pending.shift() as ParentNode
+            const found = scope.querySelector(selector)
+            if (found) return found.outerHTML
+            for (const template of Array.from(scope.querySelectorAll('template'))) pending.push(template.content)
+        }
+        return '(草稿中找不到该节点)'
     } catch (error) {
         return `(解析草稿失败：${String(error)})`
     }
