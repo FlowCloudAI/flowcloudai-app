@@ -12,6 +12,7 @@ import type {ComponentHandle} from '../domain/kernel/index.ts'
 import {createCanvasInputCommitScheduler} from './canvasInputCommitScheduler.ts'
 import {
     applyCanvasInputToText,
+    type CanvasTypingStyleSnapshot,
     canvasInputHistoryLabel,
     createCanvasInputKernelOperation,
     createCanvasInputKernelRequest,
@@ -105,6 +106,10 @@ describe('canvas input operation', () => {
                 ['color', {kind: 'set-value', value: '#334455'}],
             ],
         )
+        assert.deepEqual(operation.resolution, {
+            accepted: true,
+            selection: {nodeId: NODE_ID, offset: 3},
+        })
     })
 
     it('中文组合提交把完整候选文字与待输入格式放进同一内核批次', () => {
@@ -144,6 +149,38 @@ describe('canvas input operation', () => {
             },
             destination: {scope: 'entry', channel: {kind: 'inline'}},
         })
+        assert.deepEqual(operation.resolution, {
+            accepted: true,
+            selection: {nodeId: NODE_ID, offset: 4},
+        })
+    })
+
+    it('连续输入批次按最后一条 current-candidate 消息返回格式重挂落点，无格式批次不返回', () => {
+        const first = intent('10555555-5555-7555-8555-555555555555', 'insertText', 2, 2, '', '甲')
+        const last = intent('10666666-6666-7666-8666-666666666666', 'insertText', 3, 3, '', '乙')
+        const style: CanvasTypingStyleSnapshot = {
+            nodeId: NODE_ID,
+            styleContext: 'mobile',
+            values: {color: '#334455'},
+        }
+        const styled = createCanvasInputKernelOperation(
+            [first, last],
+            'canvas-input-history:styled-caret',
+            'paragraph',
+            () => crypto.randomUUID(),
+            new Map([[first.intentId, style], [last.intentId, style]]),
+        )
+        const plain = createCanvasInputKernelOperation(
+            [first, last],
+            'canvas-input-history:plain-caret',
+            'paragraph',
+        )
+
+        assert.deepEqual(styled.resolution, {
+            accepted: true,
+            selection: {nodeId: NODE_ID, offset: 4},
+        })
+        assert.deepEqual(plain.resolution, {accepted: true, selection: null})
     })
 
     it('画布输入模块生成的所有顺序文本意图都显式使用当前候选坐标', () => {

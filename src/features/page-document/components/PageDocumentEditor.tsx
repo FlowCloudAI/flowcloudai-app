@@ -94,9 +94,10 @@ import {
     resolveStructuredSelectionContext,
 } from '../application/structuredContentEditing.ts'
 import type {RibbonTextRange} from '../../document-editor/visual/ribbonKernelBinding.ts'
-import type {
-    CanvasTypingStyleProperty,
-    CanvasTypingStyleSnapshot,
+import {
+    canvasInputCaretSelection,
+    type CanvasTypingStyleProperty,
+    type CanvasTypingStyleSnapshot,
 } from '../application/canvasInputOperation.ts'
 import {
     resolveRibbonTab,
@@ -461,10 +462,7 @@ export function PageDocumentEditor(props: PageDocumentEditorEntryProps) {
             })
             : null
         if (typingSnapshot && message.inputType !== 'insertParagraph') {
-            expectedTypingCaretRef.current = {
-                nodeId: message.nodeId,
-                offset: message.from + message.text.length,
-            }
+            expectedTypingCaretRef.current = canvasInputCaretSelection(message)
         }
         const result = await session.applyCanvasInputIntent(message, typingSnapshot)
         if (!result.accepted) expectedTypingCaretRef.current = null

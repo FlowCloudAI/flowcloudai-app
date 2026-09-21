@@ -39,7 +39,11 @@ import {createCanvasLinkCandidateTracker} from './linkCandidate.ts'
 import {createCanvasLinkHoverTracker} from './linkHover.ts'
 import {requireCanvasStartupContext, startCanvasRuntimeWhenReady} from './startup.ts'
 import {mountCanvasStyles} from './styleMount.ts'
-import {restoreCanvasResolvedSelection, type CanvasResolvedSelection} from './resolvedSelection.ts'
+import {
+    applyPendingCanvasInputRender,
+    restoreCanvasResolvedSelection,
+    type CanvasResolvedSelection,
+} from './resolvedSelection.ts'
 import runtimeCss from './runtime.css?inline'
 
 let token: string
@@ -540,10 +544,13 @@ function resolveInput(
     if (pendingInputIds.size > 0 || composition.isComposing) return
     const next = pendingRender
     pendingRender = null
-    if (next && (rejectedInputPending || pendingResolvedSelection)) {
-        const resolvedSelection = rejectedInputPending ? null : pendingResolvedSelection
+    if (applyPendingCanvasInputRender(
+        next,
+        rejectedInputPending,
+        pendingResolvedSelection,
+        applyRender,
+    )) {
         pendingResolvedSelection = null
-        applyRender(next, resolvedSelection)
     }
     rejectedInputPending = false
 }

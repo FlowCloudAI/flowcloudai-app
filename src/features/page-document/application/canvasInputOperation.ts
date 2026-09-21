@@ -38,6 +38,15 @@ export interface CanvasInputKernelOperation {
     readonly resolution: CanvasInputResolution
 }
 
+export function canvasInputCaretSelection(
+    message: CanvasInputIntentMessage,
+): NonNullable<CanvasInputResolution['selection']> {
+    return Object.freeze({
+        nodeId: message.nodeId,
+        offset: message.from + message.text.length,
+    })
+}
+
 export type CanvasTypingStyleProperty =
     | 'background-color'
     | 'color'
@@ -170,12 +179,16 @@ export function createCanvasInputKernelOperation(
         throw new TypeError(`${targetKind} 不支持创建后续文本块。`)
     }
     const allocatedNodeIds = structural.map(() => nodeId(allocateNodeId()))
-    const selection = structural.length === 0
-        ? null
-        : Object.freeze({
+    const last = messages.at(-1)
+    const hasTypingStyle = messages.some(message => typingStyles.get(message.intentId) != null)
+    const selection = structural.length > 0
+        ? Object.freeze({
               nodeId: allocatedNodeIds.at(-1) as string,
               offset: 0,
           })
+        : hasTypingStyle && last
+          ? canvasInputCaretSelection(last)
+          : null
     const request = Object.freeze({
         nodeIds: Object.freeze([first.nodeId.toLowerCase()]),
         idempotencyKey: idempotencyKey(`canvas-input:${first.intentId.toLowerCase()}`),

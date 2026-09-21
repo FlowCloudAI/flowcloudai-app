@@ -1,6 +1,7 @@
 // 本模块在安全重挂 DOM 后恢复宿主确认的光标；目标尚未出现时保留回执给下一帧。
 
 import type {CanvasTextSelectionSnapshot} from './inputPolicy.ts'
+import type {CanvasRenderCommand} from '../protocol/index.ts'
 
 export interface CanvasResolvedSelection {
     readonly nodeId: string
@@ -10,6 +11,17 @@ export interface CanvasResolvedSelection {
 export interface CanvasResolvedSelectionResult {
     readonly restoredSelection: CanvasTextSelectionSnapshot | null
     readonly pendingSelection: CanvasResolvedSelection | null
+}
+
+export function applyPendingCanvasInputRender(
+    render: CanvasRenderCommand | null,
+    rejected: boolean,
+    selection: CanvasResolvedSelection | null,
+    applyRender: (render: CanvasRenderCommand, selection: CanvasResolvedSelection | null) => void,
+): boolean {
+    if (!render || (!rejected && !selection)) return false
+    applyRender(render, rejected ? null : selection)
+    return true
 }
 
 export function restoreCanvasResolvedSelection(
