@@ -48,6 +48,7 @@ import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosi
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
 import {createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
 import {syncTextBlockPlaceholder, syncTextBlockPlaceholders} from './textBlockPlaceholder.ts'
+import {createStructuralInputFence, type FencedCanvasInput} from './structuralInputFence.ts'
 import {createCanvasDebugTrace, describeDomPosition} from './debugTrace.ts'
 import {
     absorbableEchoElement,
@@ -82,6 +83,12 @@ let rollbackSelection: CanvasResolvedSelection | null = null
  */
 let pointerPressActive = false
 let pointerPressNodeId: string | null = null
+/** 拆块围栏；拆块被拒、宿主不给落点或迟迟不到时，超时后仍在当时的光标处重放。 */
+const splitFence = createStructuralInputFence()
+const SPLIT_FENCE_TIMEOUT_MS = 2_000
+let splitFenceTimer: ReturnType<typeof setTimeout> | null = null
+let splitFenceLanding: CanvasResolvedSelection | null = null
+let splitFenceReleasePending = false
 const caretState = createCanvasCaretStoredMarksState()
 const composition = createCanvasCompositionTracker()
 const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
@@ -291,6 +298,10 @@ function applyRender(
         } else if (textSelection && restoreTextSelection(textSelection)) {
             restoredSelection = textSelection
         }
+        const splitLanded = splitFence.intentId !== null && restoredSelection !== null
+            && resolvedSelection !== null && splitFenceLanding !== null
+            && resolvedSelection.nodeId === splitFenceLanding.nodeId
+            && resolvedSelection.offset === splitFenceLanding.offset
         const shouldReportSelection = pendingResolvedSelection === null
         debugTrace.trace('applyRender:done', {requestId: command.requestId, restoredSelection, pendingResolvedSelection, selection: debugSelectionSummary()})
         selectionReportGate.finishRender(() => {
@@ -303,6 +314,7 @@ function applyRender(
             missingAssetIds,
         })
         reportSize()
+        if (splitLanded) releaseSplitFence('landed')
     } catch (error) {
         clearRenderedDocument()
         send({
@@ -564,11 +576,49 @@ function reportBlockedInput(inputType: string, reason: 'invalid-selection' | 'un
     })
 }
 
+function replayFencedInput(input: FencedCanvasInput): void {
+    const caret = captureSelection() ?? caretState.selection
+    const node = caret ? findManagedNode(caret.nodeId) : null
+    if (!caret || !isCanvasEditableElement(node)) {
+        debugTrace.trace('split-fence:dropped', {input})
+        return
+    }
+    const snapshot = input.inputType.startsWith('delete')
+        ? expandCollapsedCanvasDeletion(semanticText(node), caret, input.inputType)
+        : caret
+    if (
+        input.inputType === 'insertParagraph'
+        && (!snapshot.collapsed || !isCanvasSplittableKind(node.getAttribute('data-fc-node-kind')))
+    ) {
+        reportBlockedInput(input.inputType, snapshot.collapsed ? 'unsupported-input-type' : 'invalid-selection', caret.nodeId)
+        return
+    }
+    // 重放中再次拆块会重新开启围栏，其后的缓冲输入由 submitInputIntent 继续按序排队。
+    submitInputIntent(snapshot, input.inputType, input.text)
+}
+
+function releaseSplitFence(reason: string): void {
+    if (splitFence.intentId === null) return
+    if (splitFenceTimer !== null) clearTimeout(splitFenceTimer)
+    splitFenceTimer = null
+    splitFenceLanding = null
+    splitFenceReleasePending = false
+    const queued = splitFence.release()
+    debugTrace.trace('split-fence:release', {reason, queued: queued.length})
+    for (const input of queued) replayFencedInput(input)
+}
+
 function submitInputIntent(
     snapshot: CanvasTextSelectionSnapshot,
     inputType: CanvasInputType,
     text: string,
 ): boolean {
+    if (splitFence.intentId !== null) {
+        // 快照指向旧块的拆分点，不能沿用；重放时按新块里的光标重新取。
+        splitFence.enqueue({inputType, text})
+        debugTrace.trace('split-fence:queued', {inputType, text})
+        return false
+    }
     if (snapshot.expected.length > 65_536 || text.length > 65_536) {
         reportBlockedInput(inputType, 'input-too-large', snapshot.nodeId)
         return false
@@ -581,6 +631,13 @@ function submitInputIntent(
     const intentId = crypto.randomUUID()
     pendingInputIds.set(intentId, {nodeId: snapshot.nodeId, offset: snapshot.from})
     debugTrace.trace('send:input-intent', {intentId, inputType, snapshot, text, storedMarks: caretState.storedMarks})
+    if (inputType === 'insertParagraph') {
+        splitFence.begin(intentId)
+        splitFenceLanding = null
+        splitFenceReleasePending = false
+        if (splitFenceTimer !== null) clearTimeout(splitFenceTimer)
+        splitFenceTimer = setTimeout(() => releaseSplitFence('timeout'), SPLIT_FENCE_TIMEOUT_MS)
+    }
     send({
         type: 'input-intent',
         intentId,
@@ -613,7 +670,10 @@ function releasePendingRenderAfterComposition(submitted: boolean): void {
     if (submitted || pendingInputIds.size > 0 || !pendingRender) return
     const next = pendingRender
     pendingRender = null
-    applyRender(next)
+    // 组合期间暂存的可能正是拆块后的新块预览，落点必须随之交给它。
+    const resolvedSelection = pendingResolvedSelection
+    pendingResolvedSelection = null
+    applyRender(next, resolvedSelection)
 }
 
 function setEditing(enabled: boolean): void {
@@ -630,7 +690,12 @@ function setEditing(enabled: boolean): void {
         restoreCompositionStart()
         releasePendingRenderAfterComposition(false)
     }
-    if (!enabled) pendingResolvedSelection = null
+    if (!enabled) {
+        pendingResolvedSelection = null
+        if (splitFence.intentId !== null) debugTrace.trace('split-fence:discarded', {queued: splitFence.release().length})
+        if (splitFenceTimer !== null) clearTimeout(splitFenceTimer)
+        splitFenceTimer = null
+    }
     applyCanvasEditingState(root, editingEnabled)
 }
 
@@ -659,6 +724,11 @@ function resolveInput(
         if (origin && (!rollbackSelection || origin.offset < rollbackSelection.offset)) rollbackSelection = origin
     }
     if (accepted && selection) pendingResolvedSelection = selection
+    if (intentId.toLowerCase() === splitFence.intentId) {
+        // 成功且有落点时等新块挂载；被拒或没有落点时，结算完毕后在当时的光标处重放。
+        if (accepted && selection) splitFenceLanding = selection
+        else splitFenceReleasePending = true
+    }
     debugTrace.trace('resolve-input', {intentId, accepted, selection, ...debugState(), rejectedInputPending, rollbackSelection})
     if (pendingInputIds.size > 0 || composition.isComposing) return
     const next = pendingRender
@@ -672,6 +742,7 @@ function resolveInput(
     if (settled === 'discarded') debugTrace.trace('render:discard-stale', {requestId: next?.requestId ?? null, pendingResolvedSelection})
     rejectedInputPending = false
     rollbackSelection = null
+    if (splitFenceReleasePending) releaseSplitFence('settled-without-landing')
 }
 
 /** 仅供调试浮层的原生事件记录；捕获阶段注册，先于业务处理器看到事件原貌。 */
