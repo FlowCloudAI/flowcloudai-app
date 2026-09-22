@@ -38,7 +38,7 @@
 | [adr/0004-unified-object-layer-and-asset-scope.md](adr/0004-unified-object-layer-and-asset-scope.md) | 现行 | 2026-09-18 | 统一对象层、项目资产范围、段落索引、节点规则与桌面快照/世界包后端迁移已实施；组件链授权及跨平台验收仍待完成 |
 | [adr/0005-page-document-node-identity-and-component-contract.md](adr/0005-page-document-node-identity-and-component-contract.md) | 现行 | 2026-09-18 | 页面文档 v1 的九类节点身份保持/重映射规则与引用式公共组件序列化格式；组件存储、展开与编辑流程留到阶段 D |
 | [adr/0006-page-document-caret-and-inline-format.md](adr/0006-page-document-caret-and-inline-format.md) | 接受；待实现 | 2026-09-21 | ADR：编辑光标与待输入标记集由画布持有、语义偏移映射互逆、字体功能区读计算值写行内标记、文本块不持有独立默认字体；含空 span 方案与内核位置映射方案的不采用理由 |
-| [adr/0007-page-document-canvas-input-session.md](adr/0007-page-document-canvas-input-session.md) | 待评审 | 2026-09-22 | ADR：画布输入会话采用权威快照加本地重放；规定纪元与修订号、输入记录与依赖规则、快照接纳、可恢复内容、宿主管理的保留 ID 乐观拆块、宿主变更屏障与选区恢复；第一阶段只交付契约与事件序列测试 |
+| [adr/0007-page-document-canvas-input-session.md](adr/0007-page-document-canvas-input-session.md) | 待评审 | 2026-09-22 | ADR：画布输入会话采用权威快照加本地重放；规定桥会话与运行时实例、纪元与内容版本、编辑动作记录与依赖规则、带消费确认的终态交付、屏障约束下的重放、恢复记录、宿主管理保留 ID 的乐观拆块、撤销等待与选区次序；第一阶段只交付契约与事件序列测试 |
 | [验收清单.md](验收清单.md) | 现行 | 2026-09-18 | 尚未由用户在原生产物确认的 WebP 图片与画布层叠层检查项；通过一项删一项 |
 | [契约缺口.md](契约缺口.md) | 现行 | 2026-09-19 | 阶段 C Office 功能区移植后仅剩图库专用模块缺口；其余主仓契约已接入 |
 | [页面编辑器实现差距.md](页面编辑器实现差距.md) | 现行 | 2026-09-20 | 相对 `app_entry_page_editor` 的作者可见能力差距与用户实测问题，按待修／待补／待移植／待定分类，通过一条删一条 |
