@@ -163,3 +163,14 @@ test('画布只接受 URL fragment 中的 32 字节十六进制 token', () => {
     assert.equal(readCanvasSessionToken(`?token=${token}`), null)
     assert.equal(readCanvasSessionToken('#token=short'), null)
 })
+
+test('作者源码中的画布自有属性一律剥离，不能伪造锚点、占位或编辑权限', () => {
+    const result = isolatePageDocument(
+        '<p data-fc-node-id="33333333-3333-7333-8333-333333333333" data-fc-node-kind="paragraph" data-fc-canvas-editable="">'
+        + '<span data-fc-canvas-caret-anchor="">藏</span><br data-fc-canvas-placeholder=""><span data-fc-canvas-echo="x">字</span></p>',
+        '',
+    )
+    assert.ok(result.artifact)
+    assert.doesNotMatch(result.artifact.html, /data-fc-canvas-/u)
+    assert.match(result.artifact.html, /藏<\/span><br><span>字/u)
+})

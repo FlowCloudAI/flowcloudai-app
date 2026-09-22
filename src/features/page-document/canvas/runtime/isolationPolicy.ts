@@ -162,7 +162,9 @@ function sanitizeHtmlElement(element: HtmlElement, errors: string[], assetIds: S
     let displayAssetId: string | null = null
     for (const attribute of element.attrs) {
         const name = qualifiedName(attribute)
-        if (name === 'data-fc-asset-placeholder' || name === 'data-fc-canvas-asset-id') continue
+        // data-fc-canvas-* 是画布自有命名空间（锚点、占位、回显、编辑权限等）；作者源码里的同名属性
+        // 会让画布把作者文字当成零长度节点，与内核算出不同偏移，因此一律剥离。
+        if (name === 'data-fc-asset-placeholder' || name.startsWith('data-fc-canvas-')) continue
         if ([...FORBIDDEN_HTML_ATTRIBUTE_PREFIXES].some(prefix => name.startsWith(prefix))) {
             errors.push(`画布隔离层拒绝事件属性 ${name}。`)
             continue
