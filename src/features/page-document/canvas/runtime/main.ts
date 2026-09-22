@@ -75,6 +75,12 @@ let lastTextSelectionKey: string | null = null
 /** 待决输入及其起点；拒绝回滚后光标回到最早被拒输入的起点。 */
 const pendingInputIds = new Map<string, CanvasResolvedSelection>()
 let rollbackSelection: CanvasResolvedSelection | null = null
+/**
+ * 指针按下期间不改动锚点：块末锚点撑着一行，按下即移除会让块收缩，抬起时指针已落在别处，
+ * 浏览器把 click 派发给共同祖先（页面根），画布因此选中根节点并丢掉光标。
+ */
+let pointerPressActive = false
+let pointerPressNodeId: string | null = null
 const caretState = createCanvasCaretStoredMarksState()
 const composition = createCanvasCompositionTracker()
 const selectionReportGate = createCanvasSelectionReportGate(callback => requestAnimationFrame(callback))
@@ -470,7 +476,7 @@ function placeCaretInAnchor(anchor: Element): boolean {
  * 已经一致时不改动 DOM，selectionchange 因此不会反复触发。组合期间锚点由输入法占用，不动它。
  */
 function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState.selection): void {
-    if (composition.isComposing) return
+    if (composition.isComposing || pointerPressActive) return
     const node = editingEnabled && target?.collapsed ? findManagedNode(target.nodeId) : null
     const editable = isCanvasEditableElement(node) ? node : null
     const marksStyle = editable ? storedMarkStyle(caretState.storedMarks) : null
@@ -667,6 +673,19 @@ function resolveInput(
 }
 
 /** 仅供调试浮层的原生事件记录；捕获阶段注册，先于业务处理器看到事件原貌。 */
+function installPointerPressTracking(): void {
+    document.addEventListener('pointerdown', event => {
+        pointerPressActive = true
+        pointerPressNodeId = managedNodeId(managedNode(event.target))
+    }, true)
+    // 抬起落在 iframe 外时可能收不到 pointerup；失焦或键盘输入都表示按压已经结束。
+    const release = () => {
+        pointerPressActive = false
+    }
+    window.addEventListener('blur', release)
+    document.addEventListener('keydown', release, true)
+}
+
 function installDebugListeners(): void {
     const keyDetail = (event: KeyboardEvent) => ({
         key: event.key,
@@ -819,8 +838,11 @@ function installInputListeners(): void {
     })
 
     const reportSettledTextSelection = () => {
+        pointerPressActive = false
         const fallback = caretState.selection
         requestAnimationFrame(() => {
+            // click 在 pointerup 之后同步派发，这里已经用完按下节点；避免拖选等无 click 的按压残留。
+            pointerPressNodeId = null
             if (!selectionReportGate.suppressed) reportTextSelection(fallback, true)
         })
     }
@@ -831,7 +853,6 @@ function installInputListeners(): void {
             if (caretState.storedMarks) debugTrace.trace('marks-cleared', {by: '指针'})
             caretState.authorPointer()
             pendingResolvedSelection = null
-            syncCaretAnchor(null)
         }
     })
 
@@ -990,7 +1011,10 @@ function start(): void {
             const nodeId = managedNodeId(anchor.closest('[data-fc-node-id]'))
             if (href) send({type: 'navigation-intent', href, nodeId})
         }
-        const nodeId = managedNodeId(target.closest('[data-fc-node-id]'))
+        // 按下与抬起落在不同元素时 click 派发给共同祖先；作者点的是按下处的节点。
+        const pressedNodeId = pointerPressNodeId
+        pointerPressNodeId = null
+        const nodeId = pressedNodeId ?? managedNodeId(target.closest('[data-fc-node-id]'))
         if (!nodeId) return
         setSelection(nodeId)
         send({type: 'selection', nodeId})
@@ -1025,6 +1049,7 @@ function start(): void {
         if (leave) send(leave)
     })
 
+    installPointerPressTracking()
     installDebugListeners()
     installInputListeners()
     // 宿主工具栏把焦点还给 iframe 时只聚焦了窗口；可编辑节点未聚焦时输入法会绕过画布的组合跟踪。
