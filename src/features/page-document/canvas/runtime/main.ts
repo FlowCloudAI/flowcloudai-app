@@ -46,7 +46,8 @@ import {
 } from './resolvedSelection.ts'
 import {locateTextOffset, semanticOffset, semanticText} from './semanticTextPosition.ts'
 import {createCanvasCaretStoredMarksState} from './caretStoredMarks.ts'
-import {caretAfterTrailingBreak, createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
+import {createCaretAnchor, findCaretAnchors, removeCaretAnchor} from './caretAnchor.ts'
+import {syncTextBlockPlaceholder, syncTextBlockPlaceholders} from './textBlockPlaceholder.ts'
 import {createCanvasDebugTrace, describeDomPosition} from './debugTrace.ts'
 import {
     absorbableEchoElement,
@@ -274,6 +275,8 @@ function applyRender(
         const missingAssetIds = missingCanvasAssetIds(assetDisplays, assetCache)
         if (missingAssetIds.length > CANVAS_ASSET_REQUEST_MAX_COUNT) throw new Error('画布图片引用超过上限。')
         applyCanvasEditingState(root, editingEnabled)
+        // 阅读与编辑共用这里：空块与块末换行后的最后一行都要可见，光标恢复前先补齐占位。
+        syncTextBlockPlaceholders(root)
         setSelection(resolvedSelection?.nodeId ?? selectedNodeId, resolvedSelection !== null)
         let restoredSelection: CanvasTextSelectionSnapshot | null = null
         if (resolvedSelection) {
@@ -479,10 +482,8 @@ function syncCaretAnchor(target: CanvasTextSelectionSnapshot | null = caretState
     if (composition.isComposing || pointerPressActive) return
     const node = editingEnabled && target?.collapsed ? findManagedNode(target.nodeId) : null
     const editable = isCanvasEditableElement(node) ? node : null
-    const marksStyle = editable ? storedMarkStyle(caretState.storedMarks) : null
-    // 没有待输入标记时，块末换行之后仍需要一个无样式锚点撑出真实的一行。
-    const style = marksStyle
-        ?? (editable && target && caretAfterTrailingBreak(semanticText(editable), target.from) ? '' : null)
+    // 块末换行之后的空行由文本块占位撑出，锚点只服务于待输入标记。
+    const style = editable ? storedMarkStyle(caretState.storedMarks) : null
     const anchors = findCaretAnchors(root)
     const current = anchors.length === 1 ? anchors[0] : null
     if (
@@ -537,6 +538,7 @@ function applyOptimisticTextEdit(snapshot: CanvasTextSelectionSnapshot, text: st
         }
     }
     node.normalize()
+    syncTextBlockPlaceholder(node)
     const caret = snapshot.from + text.length
     const restoredCaret = {
         nodeId: snapshot.nodeId,

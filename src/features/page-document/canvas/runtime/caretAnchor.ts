@@ -10,23 +10,12 @@
  * 空行内元素无法稳定容纳光标，因此内含一个零宽填充字符。
  */
 
-export const CARET_ANCHOR_ATTRIBUTE = 'data-fc-canvas-caret-anchor'
+import {CARET_ANCHOR_ATTRIBUTE, isCaretAnchor} from './canvasOnlyNodes.ts'
+
+export {CARET_ANCHOR_ATTRIBUTE, isCaretAnchor}
 export const CARET_ANCHOR_FILLER = '\u200B'
 
-const ELEMENT_NODE = 1
 const TEXT_NODE = 3
-
-/**
- * 块末尾的换行之后没有可渲染的行：WebKit 会把「末尾 <br> 之后」规范化到 <br> 之前，
- * 光标与输入法候选文字都会落回上一行。这个位置同样需要锚点撑出真实的一行。
- */
-export function caretAfterTrailingBreak(text: string, offset: number): boolean {
-    return offset === text.length && text.endsWith('\n')
-}
-
-export function isCaretAnchor(value: Node): boolean {
-    return value.nodeType === ELEMENT_NODE && (value as Element).hasAttribute(CARET_ANCHOR_ATTRIBUTE)
-}
 
 export function createCaretAnchor(
     documentNode: Document,

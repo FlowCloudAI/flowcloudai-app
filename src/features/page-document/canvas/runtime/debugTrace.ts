@@ -11,7 +11,8 @@ import {
     CANVAS_DEBUG_KIND_MAX_CODE_UNITS,
     type CanvasDebugLogEntry,
 } from '../protocol/index.ts'
-import {CARET_ANCHOR_ATTRIBUTE, CARET_ANCHOR_FILLER} from './caretAnchor.ts'
+import {CARET_ANCHOR_FILLER} from './caretAnchor.ts'
+import {CARET_ANCHOR_ATTRIBUTE, TEXT_BLOCK_PLACEHOLDER_ATTRIBUTE} from './canvasOnlyNodes.ts'
 
 const ELEMENT_NODE = 1
 const TEXT_NODE = 3
@@ -45,6 +46,7 @@ function nodeLabel(value: Node): string {
     const element = value as Element
     const name = element.tagName.toLowerCase()
     if (element.hasAttribute(CARET_ANCHOR_ATTRIBUTE)) return `${name}(锚点)`
+    if (element.hasAttribute(TEXT_BLOCK_PLACEHOLDER_ATTRIBUTE)) return `${name}(占位)`
     if (element.hasAttribute('data-fc-canvas-echo')) return `${name}(回显)`
     const nodeId = element.getAttribute('data-fc-node-id')
     return nodeId ? `${name}#${nodeId.slice(0, 8)}` : name
