@@ -289,9 +289,8 @@ export function PageDocumentCanvas({
                     const selection = resolution.accepted ? resolution.selection : null
                     // 拒绝时先把当前草稿排进画布的 pendingRender，再解除意图以原子回滚临时 DOM。
                     if (!resolution.accepted) sendLatestRender()
-                    if (selection) {
-                        latest.current.onSelectionChange?.(selection.nodeId)
-                    }
+                    // 落点只交给画布：它在新预览挂载后自行聚焦并回报选区。宿主若在此按「作者换块」处理，
+                    // 会清掉待输入格式、让画布回报旧光标，随后旧块的 set-selection 把刚落进新块的光标打掉。
                     send({
                         type: 'resolve-input',
                         intentId: intent.intentId,
