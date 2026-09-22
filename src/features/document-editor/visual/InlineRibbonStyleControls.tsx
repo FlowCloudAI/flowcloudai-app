@@ -1,7 +1,9 @@
 // 本组件让可信文字选区与光标待输入格式共用一套字体控件；文本块基础格式只由组启动器进入属性 Dock。
 
 import {Baseline, Bold, Eraser, Highlighter, Italic, Strikethrough, Underline} from 'lucide-react'
+import {useEffect} from 'react'
 import {Select} from 'flowcloudai-ui'
+import {debugLog} from '../../page-document/debug/pageDocumentDebugLog.ts'
 import type {KernelTextRangeInspectionRequest} from '../../page-document/application/documentKernelDraftRuntime.ts'
 import {
     serializeVisualPropertyValue,
@@ -207,6 +209,11 @@ export function InlineRibbonStyleControls({
         scope,
         controlsEnabled,
     )
+    const debugDisplay = `${scope}|${textColor.value}|${size}|${weight}|${controlsEnabled}`
+    useEffect(() => {
+        const [displayScope, color, fontSize, fontWeight, enabled] = debugDisplay.split('|')
+        debugLog('ribbon:font', {scope: displayScope, color, fontSize, fontWeight, enabled: enabled === 'true'})
+    }, [debugDisplay])
     const clear = () => {
         if (scope === 'selection') {
             for (const property of PROPERTIES) void applyInline(property, null, `清除选区${property}`)

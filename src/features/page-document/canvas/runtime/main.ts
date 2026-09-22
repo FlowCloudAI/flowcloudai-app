@@ -98,6 +98,8 @@ const debugTrace = createCanvasDebugTrace(entries => send({type: 'debug-log', en
 let debugFocusNodeId: string | null = null
 let debugLastNodeHtml = ''
 let debugObserver: MutationObserver | null = null
+let debugPaintHandle: number | null = null
+let debugLastPaint = ''
 
 type RuntimePayload = CanvasRuntimeMessage extends infer Message
     ? Message extends CanvasRuntimeMessage
@@ -215,7 +217,61 @@ function debugFocus(value: EventTarget | Node | null): void {
     debugSnapshotFocusedNode('开始监听')
 }
 
+/**
+ * 逐帧采样：rAF 回调在每次绘制前执行，此刻的计算样式就是即将画出的样子。MutationObserver
+ * 只在任务之间取快照，看不到一帧之内的闪变；这里记录光标附近文字片段的计算颜色、字号与字重，
+ * 变化时才写日志。
+ */
+function debugPaintProbe(): void {
+    debugPaintHandle = null
+    if (!debugTrace.enabled) return
+    debugPaintHandle = requestAnimationFrame(debugPaintProbe)
+    const node = debugFocusNodeId ? findManagedNode(debugFocusNodeId) : null
+    if (!node) return
+    const texts: Text[] = []
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+    for (let current = walker.nextNode(); current; current = walker.nextNode()) {
+        if ((current.nodeValue ?? '').length > 0) texts.push(current as Text)
+    }
+    const selection = getSelection()
+    const anchorNode = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).startContainer : null
+    let caretIndex = texts.length - 1
+    if (anchorNode) {
+        const exact = texts.findIndex(text => text === anchorNode || anchorNode.contains(text))
+        if (exact >= 0) caretIndex = exact
+        else {
+            let before = -1
+            texts.forEach((text, index) => {
+                if ((anchorNode.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_PRECEDING) !== 0) before = index
+            })
+            if (before >= 0) caretIndex = before
+        }
+    }
+    const runs = texts.slice(Math.max(0, caretIndex - 5), caretIndex + 3).map(text => {
+        const style = text.parentElement ? getComputedStyle(text.parentElement) : null
+        return {
+            text: (text.nodeValue ?? '').slice(-16),
+            color: style?.color ?? null,
+            size: style?.fontSize ?? null,
+            weight: style?.fontWeight ?? null,
+            at: text === anchorNode ? '光标' : undefined,
+        }
+    })
+    const summary = JSON.stringify(runs)
+    if (summary === debugLastPaint) return
+    debugLastPaint = summary
+    debugTrace.trace('paint', {
+        runs,
+        focused: document.activeElement === node,
+        composing: composition.isComposing,
+        storedMarks: caretState.storedMarks,
+    })
+}
+
 function setDebug(enabled: boolean): void {
+    if (debugPaintHandle !== null) cancelAnimationFrame(debugPaintHandle)
+    debugPaintHandle = null
+    debugLastPaint = ''
     debugObserver?.disconnect()
     debugObserver = null
     debugFocusNodeId = null
@@ -247,6 +303,7 @@ function setDebug(enabled: boolean): void {
         attributeOldValue: true,
     })
     debugFocus(getSelection()?.anchorNode ?? document.activeElement)
+    debugPaintHandle = requestAnimationFrame(debugPaintProbe)
 }
 
 function applyRender(
